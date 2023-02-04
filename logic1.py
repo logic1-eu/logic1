@@ -16,7 +16,7 @@ class Formula:
         >>> Ne(1, 0) & Ne(1 + 1, 0)
         And(Ne(1, 0), Ne(2, 0))
         """
-        return And(*args)
+        return AND(*args)
 
     def __invert__(a):
         """Hijack the bitwise invert operator ``~`` for our logical Not.
@@ -222,6 +222,39 @@ class Ex(QuantifiedFormula):
         self.args = (variable, matrix)
 
 
+def EX(variable, matrix):
+    """A convenience wrapper for the Ex Formula constructor, which does type
+    checking.
+
+    This is intended for inteactive use.
+
+    >>> from sympy.abc import x
+    >>> EX(x, Eq(x, x))
+    Ex(x, Eq(x, x))
+
+    For efficiency reasons, the constructors of subclasses of Formula do not
+    check argument types. Trouble following later on can be hard to diagnose:
+    >>> f = Ex("x", Eq(x, x))
+    >>> f
+    Ex('x', Eq(x, x))
+    >>> Not(f).simplify()
+    Traceback (most recent call last):
+    ...
+    AttributeError: 'NoneType' object has no attribute 'func'
+
+    EX checks and raises an exception immediately:
+    >>> EX("x", Eq(x, x))
+    Traceback (most recent call last):
+    ...
+    TypeError: x is not a sympy.Symbol
+    """
+    if not isinstance(variable, sympy.Symbol):
+        raise TypeError(f"{variable} is not a sympy.Symbol")
+    if not isinstance(matrix, Formula):
+        raise TypeError(f"{matrix} is not a Formula")
+    return Ex(variable, matrix)
+
+
 class All(QuantifiedFormula):
     """
     >>> from sympy.abc import x, y
@@ -233,6 +266,39 @@ class All(QuantifiedFormula):
     def __init__(self, variable, matrix):
         self.func = All
         self.args = (variable, matrix)
+
+
+def ALL(variable, matrix):
+    """A convenience wrapper for the All Formula constructor, which does type
+    checking.
+
+    This is intended for inteactive use.
+
+    >>> from sympy.abc import x
+    >>> ALL(x, Eq(x, x))
+    All(x, Eq(x, x))
+
+    For efficiency reasons, the constructors of subclasses of Formula do not
+    check argument types. Trouble following later on can be hard to diagnose:
+    >>> f = All("x", Eq(x, x))
+    >>> f
+    All('x', Eq(x, x))
+    >>> Not(f).simplify()
+    Traceback (most recent call last):
+    ...
+    AttributeError: 'NoneType' object has no attribute 'func'
+
+    ALL checks and raises an exception immediately:
+    >>> ALL("x", Eq(x, x))
+    Traceback (most recent call last):
+    ...
+    TypeError: x is not a sympy.Symbol
+    """
+    if not isinstance(variable, sympy.Symbol):
+        raise TypeError(f"{variable} is not a sympy.Symbol")
+    if not isinstance(matrix, Formula):
+        raise TypeError(f"{matrix} is not a Formula")
+    return All(variable, matrix)
 
 
 class BooleanFormula(Formula):
@@ -315,6 +381,14 @@ class Equivalent(BooleanFormula):
         return Equivalent(lhs, rhs)
 
 
+def EQUIV(lhs, rhs):
+    if not isinstance(lhs, Formula):
+        raise TypeError(f"{lhs} is not a Formula")
+    if not isinstance(rhs, Formula):
+        raise TypeError(f"{rhs} is not a Formula")
+    return Equivalent(lhs, rhs)
+
+
 class Implies(BooleanFormula):
 
     _latex_style = "infix"
@@ -355,6 +429,14 @@ class Implies(BooleanFormula):
         if lhs_simplify == rhs_simplify:
             return T
         return Implies(lhs_simplify, rhs_simplify)
+
+
+def IMPL(lhs, rhs):
+    if not isinstance(lhs, Formula):
+        raise TypeError(f"{lhs} is not a Formula")
+    if not isinstance(rhs, Formula):
+        raise TypeError(f"{rhs} is not a Formula")
+    return Implies(lhs, rhs)
 
 
 class AndOr(BooleanFormula):
@@ -426,6 +508,13 @@ class And(AndOr):
         self.args = args
 
 
+def AND(*args):
+    for arg in args:
+        if not isinstance(arg, Formula):
+            raise TypeError(f"{arg} is not a Formula")
+    return And(*args)
+
+
 class Or(AndOr):
     """Constructor for disjunctions of Formulas.
 
@@ -449,6 +538,13 @@ class Or(AndOr):
     def __init__(self, *args):
         self.func = Or
         self.args = args
+
+
+def OR(*args):
+    for arg in args:
+        if not isinstance(arg, Formula):
+            raise TypeError(f"{arg} is not a Formula")
+    return Or(*args)
 
 
 class Not(BooleanFormula):
@@ -475,6 +571,12 @@ class Not(BooleanFormula):
         if arg_simplify is F:
             return T
         return involutive_not(arg_simplify)
+
+
+def NOT(arg):
+    if not isinstance(arg, Formula):
+        raise TypeError(f"{arg} is not a Formula")
+    return Not(arg)
 
 
 def involutive_not(arg: Formula):
