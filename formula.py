@@ -1,3 +1,22 @@
+"""Module for first-order formulas with equality Eq -> BinaryAtomicFormula ->
+AtomicFormula. There is no language L in the sense of model theory specified.
+Applications would implement their particular languages as follows:
+
+* Relations of L are provided by subclassing AtomicFormula. More generally,
+  BinaryAtomicFormula can be subclassed. More specifically, the module atomic
+  provides some classes for inequalities and other relations that can be
+  subclassed.
+
+* Technically, the atomic formula classes provided here and an the module
+  atomic admit *all* sympy expressions as terms. Consequently, the
+  implementation of the functions of L must not provide but limit the set of
+  admissible functions (which includes constants). Within the application code,
+  this is a matter of self-discipline using only L-terms as arguments for the
+  constructors of the relations. Explicit tests beyond assertions would take
+  place only in convenience wrappers around constructors for the user
+  interface; compare EX, ALL, AND, OR, EQUIV, IMPL below.
+"""
+
 import sympy
 
 
@@ -11,55 +30,69 @@ class Formula:
     """
 
     def __and__(*args):
-        """Hijack the bitwise and operator ``&`` for our logical And.
+        """Override the bitwise and operator ``&`` for logical AND.
 
-        >>> Ne(1, 0) & Ne(1 + 1, 0)
-        And(Ne(1, 0), Ne(2, 0))
+        Note that ``&`` delegates to the convenience wrapper AND in contrast to
+        the constructor And.
+
+        >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
+        And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
         return AND(*args)
 
     def __invert__(a):
-        """Hijack the bitwise invert operator ``~`` for our logical Not.
+        """Override the bitwise invert operator ``~`` for logical NOT.
+
+        Note that ``~`` delegates to the convenience wrapper NOT in contrast to
+        the constructor Not.
 
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
-        return Not(a)
+        return NOT(a)
 
     def __lshift__(a1, a2):
-        """Hijack the bitwise left shift operator ``>>`` for our logical
-        Implies.
+        """Override the bitwise left shift operator ``>>`` for logical IMPL.
 
-        >>> from sympy.abc import x, y
-        >>> Gt(x + 1, y) << Ge(x, y)
-        Implies(Ge(x, y), Gt(x + 1, y))
+        Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
+        to the constructor Implies.
+
+        >>> from sympy.abc import x, y, z
+        >>> Eq(x + z, y + z) << Eq(x, y)
+        Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies(a2, a1)
+        return IMPL(a2, a1)
 
     def __or__(*args):
-        """Hijack the bitwise or operator ``|`` for our logical And.
+        """Override the bitwise or operator ``|`` for logical OR.
 
-        >>> from sympy.abc import x, y
-        >>> Eq(x, y) | Lt(x, y) | Gt(x, y)
-        Or(Or(Eq(x, y), Lt(x, y)), Gt(x, y))
+        Note that ``|`` delegates to the convenience wrapper OR in contrast to
+        the constructor Or.
+
+        >>> from sympy.abc import x, y, z
+        >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
+        Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
-        return Or(*args)
+        return OR(*args)
 
     def __rshift__(a1, a2):
-        """Hijack the bitwise right shift operator ``<<`` for our logical
-        Implies with reversed sides.
+        """Override the bitwise right shift operator ``<<`` for logical IMPL
+        with reversed sides.
 
-        >>> from sympy.abc import x, y
-        >>> Ge(x, y) >> Gt(x + 1, y)
-        Implies(Ge(x, y), Gt(x + 1, y))
+        Note that ``<<`` uses the convenience wrapper IMPL in contrast to the
+        constructor implies.
+
+        >>> from sympy.abc import x, y, z
+        >>> Eq(x, y) >> Eq(x + z, y + z)
+        Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies(a1, a2)
+        return IMPL(a1, a2)
 
     def __eq__(self, other):
         """Recursive equality of the formulas self and other.
 
-        >>> e1 = Gt(1, 0)
-        >>> e2 = Gt(1, 0)
+        >>> e1 = Eq(1, 0)
+        >>> e2 = Eq(1, 0)
         >>> e1 == e2
         True
         >>> e1 is e2
@@ -70,7 +103,7 @@ class Formula:
     def __init__(self, *args):
         """An initializer that always raises an exception.
 
-        >>> Formula(">", 1, 0)
+        >>> Formula(Eq, 1, 0)
         Traceback (most recent call last):
         ...
         NotImplementedError
@@ -97,10 +130,10 @@ class Formula:
         return repr
 
     def _repr_latex_(self):
-        """A LaTeX representation of the formula as it is used within jupyter
+        r"""A LaTeX representation of the formula as it is used within jupyter
         notebooks
 
-        >> Eq(1, 0)._repr_latex()_
+        >>> Eq(1, 0)._repr_latex_()
         '$\\displaystyle 1 = 0$'
 
         Subclasses have latex() methods yielding plain LaTeX without the
@@ -126,7 +159,7 @@ class Formula:
         >>> e1
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1)
-        <class 'logic1.Equivalent'>
+        <class 'formula.Equivalent'>
         >>> e1.sympy()
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1.sympy())
@@ -188,8 +221,8 @@ class QuantifiedFormula(Formula):
         r"""A LaTeX representation of the QuantifiedFormula.
 
         >>> from sympy.abc import x, y
-        >>> All(x, Ex(y, Or(Eq(y, x), Lt(x, y)))).latex()
-        '\\forall x \\,\\exists y \\, (y = x \\, \\vee \\, x < y)'
+        >>> All(x, Ex(y, Implies(Not(Eq(x, 0)), Eq(x * y, 1)))).latex()
+        '\\forall x \\,\\exists y \\, (\\neg \\, (x = 0) \\, \\longrightarrow \\, x y = 1)'
         """
         self_latex = self._latex_symbol
         self_latex += " " + str(self.args[0])
@@ -318,11 +351,13 @@ class BooleanFormula(Formula):
 
         if self._latex_style == "constant":
             return self._latex_symbol
-        if self._latex_style == "prefix":
+        if self._latex_style == "not":
             self_latex = self._latex_symbol
             self_latex += " " + self._latex_symbol_spacing
-            self_latex += " " + latex_in_parens(self, self.args[0])
-            return self_latex
+            inner_latex = self.args[0].latex()
+            if self.func is self.args[0].func:
+                return self_latex + inner_latex
+            return self_latex + " " + "(" + inner_latex + ")"
         if self._latex_style == "infix":
             self_latex = latex_in_parens(self, self.args[0])
             for a in self.args[1:]:
@@ -331,6 +366,7 @@ class BooleanFormula(Formula):
                 self_latex += " " + self._latex_symbol_spacing
                 self_latex += " " + latex_in_parens(self, a)
             return self_latex
+        assert False
 
 
 class Equivalent(BooleanFormula):
@@ -450,11 +486,11 @@ class AndOr(BooleanFormula):
 def _simplify_gAnd(f):
     """Simplify a ``generic And,`` which can be one of And, Or.
 
-    >>> from sympy.abc import x
-    >>> _simplify_gAnd(And(Ne(x, 0), T, Ne(x, 0), And(Ne(x, 1), Ne(x, 2))))
-    And(Ne(x, 0), Ne(x, 1), Ne(x, 2))
-    >>> _simplify_gAnd(Or(Ge(x, 0), Or(Ge(x, 1), Ge(x, 2)), And(Ge(x, 1), Ge(x, 2))))
-    Or(Ge(x, 0), Ge(x, 1), Ge(x, 2), And(Ge(x, 1), Ge(x, 2)))
+    >>> from sympy.abc import x, y, z
+    >>> _simplify_gAnd(And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))))
+    And(Eq(x, y), Eq(x, z), Eq(x, x + z))
+    >>> _simplify_gAnd(Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z))))
+    Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
     """
     if f.func is And:
         gAnd = And
@@ -486,12 +522,13 @@ def _simplify_gAnd(f):
 class And(AndOr):
     """Constructor for conjunctions of Formulas.
 
+    >>> from sympy.abc import x, y, z
     >>> And()
     T
-    >>> And(Ne(1, 0))
-    Ne(1, 0)
-    >>> And(Ne(1, 0), Ne(2, 0), Ne(3, 0))
-    And(Ne(1, 0), Ne(2, 0), Ne(3, 0))
+    >>> And(Eq(0, 0))
+    Eq(0, 0)
+    >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
+    And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
     _latex_symbol = "\\wedge"
     _sympy_func = sympy.And
@@ -512,7 +549,13 @@ def AND(*args):
     for arg in args:
         if not isinstance(arg, Formula):
             raise TypeError(f"{arg} is not a Formula")
-    return And(*args)
+    args_flat = []
+    for arg in args:
+        if arg.func is And:
+            args_flat.extend(list(arg.args))
+        else:
+            args_flat.append(arg)
+    return And(*args_flat)
 
 
 class Or(AndOr):
@@ -544,14 +587,20 @@ def OR(*args):
     for arg in args:
         if not isinstance(arg, Formula):
             raise TypeError(f"{arg} is not a Formula")
-    return Or(*args)
+    args_flat = []
+    for arg in args:
+        if arg.func is Or:
+            args_flat.extend(list(arg.args))
+        else:
+            args_flat.append(arg)
+    return Or(*args_flat)
 
 
 class Not(BooleanFormula):
 
-    _latex_style = "prefix"
+    _latex_style = "not"
     _latex_symbol = "\\neg"
-    _latex_precedence = 90
+    _latex_precedence = 99
 
     _sympy_func = sympy.Not
 
@@ -583,8 +632,8 @@ def involutive_not(arg: Formula):
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> involutive_not(Ne(1, 0))
-    Not(Ne(1, 0))
+    >>> involutive_not(Eq(0, 0))
+    Not(Eq(0, 0))
     >>> involutive_not(Not(Eq(1, 0)))
     Eq(1, 0)
     >>> involutive_not(T)
@@ -705,57 +754,4 @@ class Eq(BinaryAtomicFormula):
 
     def __init__(self, lhs, rhs):
         self.func = Eq
-        self.args = (lhs, rhs)
-
-
-class Ne(BinaryAtomicFormula):
-    """
-    >>> Ne(1, 0)
-    Ne(1, 0)
-    """
-    _latex_symbol = "\\neq"
-    _sympy_func = sympy.Ne
-
-    def __init__(self, lhs, rhs):
-        self.func = Ne
-        self.args = (lhs, rhs)
-
-
-class Ge(BinaryAtomicFormula):
-
-    _latex_symbol = "\\geq"
-    _sympy_func = sympy.Ge
-
-    def __init__(self, lhs, rhs):
-        self.func = Ge
-        self.args = (lhs, rhs)
-
-
-class Le(BinaryAtomicFormula):
-
-    _latex_symbol = "\\leq"
-    _sympy_func = sympy.Le
-
-    def __init__(self, lhs, rhs):
-        self.func = Le
-        self.args = (lhs, rhs)
-
-
-class Gt(BinaryAtomicFormula):
-
-    _latex_symbol = ">"
-    _sympy_func = sympy.Gt
-
-    def __init__(self, lhs, rhs):
-        self.func = Gt
-        self.args = (lhs, rhs)
-
-
-class Lt(BinaryAtomicFormula):
-
-    _latex_symbol = "<"
-    _sympy_func = sympy.Lt
-
-    def __init__(self, lhs, rhs):
-        self.func = Lt
         self.args = (lhs, rhs)
