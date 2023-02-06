@@ -18,6 +18,10 @@ Applications would implement their particular languages as follows:
 """
 
 import sympy
+# from .tracing import trace
+
+
+Variable = sympy.Symbol
 
 
 class Formula:
@@ -106,13 +110,13 @@ class Formula:
         >>> Formula(Eq, 1, 0)
         Traceback (most recent call last):
         ...
-        NotImplementedError
+        NotImplementedError: Formula is an abstract class
 
         This provides a hands-on implementation of an abstract class. It is
         inherited down the hierarchy. Only the the leaf classes, which
         correspond to logic operators should be instantiated.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Formula is an abstract class")
 
     def __repr__(self):
         """Representation of the Formula suitable for use as an input.
@@ -140,6 +144,18 @@ class Formula:
         surrounding $\\displaystyle ... $.
         """
         return "$\\displaystyle " + self.latex() + "$"
+
+    def nnf(self, implicitNot=False):
+        """A negation normal form that always raises an exception.
+
+        This provides a hands-on implementation of an abstract class. It is
+        inherited down the hierarchy. Only the the leaf classes, which
+        correspond to logic operators should be instantiated.
+
+        This method would get called if any leaf class missed to implement an
+        nnf() method.
+        """
+        raise NotImplementedError(f"nnf() method missing on {self.func}")
 
     def simplify(self, Theta=None):
         """Identity as a default implemenation of a simplifier for formulas.
@@ -175,7 +191,7 @@ class Formula:
         >>> e3.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError
+        NotImplementedError: no sympy representation of <class 'formula._T'> available
 
         >>> e4 = All(x, Ex(y, Eq(x, y)))
         >>> e4.sympy()
@@ -191,7 +207,7 @@ class QuantifiedFormula(Formula):
     _latex_precedence = 99
     _latex_symbol_spacing = "\\,"
 
-    is_atom = False
+    is_atomic = False
     is_boolean = False
     is_quantified = True
 
@@ -222,20 +238,33 @@ class QuantifiedFormula(Formula):
 
         >>> from sympy.abc import x, y
         >>> All(x, Ex(y, Implies(Not(Eq(x, 0)), Eq(x * y, 1)))).latex()
-        '\\forall x \\,\\exists y \\, (\\neg \\, (x = 0) \\, \\longrightarrow \\, x y = 1)'
+        '\\forall x \\, \\exists y \\, (\\neg \\, (x = 0) \\, \\longrightarrow \\, x y = 1)'
         """
+        def latex_in_parens(inner):
+            inner_Latex = inner.latex()
+            if not inner.is_quantified and inner.func is not Not:
+                inner_Latex = "(" + inner_Latex + ")"
+            return inner_Latex
+
         self_latex = self._latex_symbol
         self_latex += " " + str(self.args[0])
         self_latex += " " + self._latex_symbol_spacing
-        if not self.args[1].is_quantified:
-            self_latex += " ("
-        self_latex += self.args[1].latex()
-        if not self.args[1].is_quantified:
-            self_latex += ")"
+        self_latex += " " + latex_in_parens(self.args[1])
         return self_latex
 
+    def nnf(self, implicitNot: bool = False):
+        func_nnf = self.func.dualize(conditional=implicitNot)
+        matrix_nnf = self.matrix.nnf(implicitNot=implicitNot)
+        return func_nnf(self.variable, matrix_nnf)
+
     def simplify(self, Theta=None):
-        self.func(self.variable, self.matrix.simplify)
+        """Simplification.
+
+        >>> from sympy.abc import x, y
+        >>> All(x, Ex(y, Eq(x, y))).simplify()
+        All(x, Ex(y, Eq(x, y)))
+        """
+        return self.func(self.variable, self.matrix.simplify())
 
     def sympy(self, *args, **kwargs):
         print(f"sympy representation of {type(self)} is not available.")
@@ -249,6 +278,12 @@ class Ex(QuantifiedFormula):
     Ex(x, Eq(x, 1))
     """
     _latex_symbol = "\\exists"
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return All
+        return Ex
 
     def __init__(self, variable, matrix):
         self.func = Ex
@@ -267,22 +302,22 @@ def EX(variable, matrix):
 
     For efficiency reasons, the constructors of subclasses of Formula do not
     check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = Ex("x", Eq(x, x))
+    >>> f = Ex("x", "y")
     >>> f
-    Ex('x', Eq(x, x))
-    >>> Not(f).simplify()
+    Ex('x', 'y')
+    >>> f.simplify()
     Traceback (most recent call last):
     ...
-    AttributeError: 'NoneType' object has no attribute 'func'
+    AttributeError: 'str' object has no attribute 'simplify'
 
     EX checks and raises an exception immediately:
     >>> EX("x", Eq(x, x))
     Traceback (most recent call last):
     ...
-    TypeError: x is not a sympy.Symbol
+    TypeError: x is not a Variable
     """
-    if not isinstance(variable, sympy.Symbol):
-        raise TypeError(f"{variable} is not a sympy.Symbol")
+    if not isinstance(variable, Variable):
+        raise TypeError(f"{variable} is not a Variable")
     if not isinstance(matrix, Formula):
         raise TypeError(f"{matrix} is not a Formula")
     return Ex(variable, matrix)
@@ -295,6 +330,12 @@ class All(QuantifiedFormula):
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
     _latex_symbol = "\\forall"
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return Ex
+        return All
 
     def __init__(self, variable, matrix):
         self.func = All
@@ -313,58 +354,68 @@ def ALL(variable, matrix):
 
     For efficiency reasons, the constructors of subclasses of Formula do not
     check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = All("x", Eq(x, x))
+    >>> f = All("x", "y")
     >>> f
-    All('x', Eq(x, x))
-    >>> Not(f).simplify()
+    All('x', 'y')
+    >>> f.simplify()
     Traceback (most recent call last):
     ...
-    AttributeError: 'NoneType' object has no attribute 'func'
+    AttributeError: 'str' object has no attribute 'simplify'
 
     ALL checks and raises an exception immediately:
     >>> ALL("x", Eq(x, x))
     Traceback (most recent call last):
     ...
-    TypeError: x is not a sympy.Symbol
+    TypeError: x is not a Variable
     """
-    if not isinstance(variable, sympy.Symbol):
-        raise TypeError(f"{variable} is not a sympy.Symbol")
+    if not isinstance(variable, Variable):
+        raise TypeError(f"{variable} is not a Variable")
     if not isinstance(matrix, Formula):
         raise TypeError(f"{matrix} is not a Formula")
     return All(variable, matrix)
 
 
 class BooleanFormula(Formula):
+    """Boolean Formulas have a Boolean operator at the top level.
+
+    An operator of a Formula is either a quantifier Ex, All or a Boolean
+    operator And, Or, Not, Implies, Equivaelent, T, F. Note that members of
+    BooleanFormula start, in the sense of prefix notation, with a Boolean
+    operator but may have quantified subformulas deeper in the expression tree.
+    """
 
     _latex_symbol_spacing = "\\,"
 
-    is_atom = False
+    is_atomic = False
     is_boolean = True
     is_quantified = False
 
     def latex(self):
-        def latex_in_parens(outer, inner):
-            inner_Latex = inner.latex()
+        def not_latex_in_parens(outer, inner):
+            inner_latex = inner.latex()
+            if inner.func is not outer.func and not inner.is_quantified:
+                inner_latex = "(" + inner_latex + ")"
+            return inner_latex
+
+        def infix_latex_in_parens(outer, inner):
+            inner_latex = inner.latex()
             if outer._latex_precedence >= inner._latex_precedence:
-                inner_Latex = "(" + inner_Latex + ")"
-            return inner_Latex
+                inner_latex = "(" + inner_latex + ")"
+            return inner_latex
 
         if self._latex_style == "constant":
             return self._latex_symbol
         if self._latex_style == "not":
             self_latex = self._latex_symbol
             self_latex += " " + self._latex_symbol_spacing
-            inner_latex = self.args[0].latex()
-            if self.func is self.args[0].func:
-                return self_latex + inner_latex
-            return self_latex + " " + "(" + inner_latex + ")"
+            return self_latex + " " + not_latex_in_parens(self, self.arg)
         if self._latex_style == "infix":
-            self_latex = latex_in_parens(self, self.args[0])
+            self_latex = infix_latex_in_parens(self, self.args[0])
             for a in self.args[1:]:
                 self_latex += " " + self._latex_symbol_spacing
                 self_latex += " " + self._latex_symbol
                 self_latex += " " + self._latex_symbol_spacing
-                self_latex += " " + latex_in_parens(self, a)
+                self_latex += " " + infix_latex_in_parens(self, a)
             return self_latex
         assert False
 
@@ -389,6 +440,10 @@ class Equivalent(BooleanFormula):
     def __init__(self, lhs, rhs):
         self.func = Equivalent
         self.args = (lhs, rhs)
+
+    def nnf(self, implicitNot=False):
+        tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
+        return tmp.nnf(implicitNot=implicitNot)
 
     def simplify(self, Theta=None):
         """Recursively simplify the Equivalence.
@@ -447,6 +502,9 @@ class Implies(BooleanFormula):
         self.func = Implies
         self.args = (lhs, rhs)
 
+    def nnf(self, implicitNot=False):
+        return Or(Not(self.lhs), self.rhs).nnf(implicitNot=implicitNot)
+
     def simplify(self, Theta=None):
         if self.rhs is T:
             return self.lhs
@@ -479,44 +537,42 @@ class AndOr(BooleanFormula):
     _latex_style = "infix"
     _latex_precedence = 50
 
+    def nnf(self, implicitNot=False):
+        """Negation normal form.
+        """
+        func_nnf = self.func.dualize(conditional=implicitNot)
+        args_nnf = (arg.nnf(implicitNot=implicitNot) for arg in self.args)
+        return func_nnf(*args_nnf)
+
     def simplify(self, Theta=None):
-        return _simplify_gAnd(self)
+        """Simplification.
 
-
-def _simplify_gAnd(f):
-    """Simplify a ``generic And,`` which can be one of And, Or.
-
-    >>> from sympy.abc import x, y, z
-    >>> _simplify_gAnd(And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))))
-    And(Eq(x, y), Eq(x, z), Eq(x, x + z))
-    >>> _simplify_gAnd(Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z))))
-    Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
-    """
-    if f.func is And:
-        gAnd = And
-        gT = T
-        gF = F
-    else:
-        assert f.func is Or
-        gAnd = Or
-        gT = F
-        gF = T
-    simplified_args = []
-    for arg in f.args:
-        arg_simplify = arg.simplify()
-        if arg_simplify is gF:
-            return gF
-        if arg_simplify is gT:
-            continue
-        if arg_simplify in simplified_args:
-            continue
-        if arg_simplify.func is gAnd:
-            simplified_args.extend(arg_simplify.args)
-        else:
-            simplified_args.append(arg_simplify)
-    if not simplified_args:
-        return gT
-    return gAnd(*simplified_args)
+        >>> from sympy.abc import x, y, z
+        >>> And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))).simplify()
+        And(Eq(x, y), Eq(x, z), Eq(x, x + z))
+        >>> Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z))).simplify()
+        Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
+        """
+        gAnd = And.dualize(conditional=self.func is Or)
+        gT = _T.dualize(conditional=self.func is Or)()
+        gF = _F.dualize(conditional=self.func is Or)()
+        # gAnd is an AndOr func, gT and gF are complete TruthValue singletons
+        simplified_args = []
+        for arg in self.args:
+            arg_simplify = arg.simplify()
+            if arg_simplify is gF:
+                return gF
+            if arg_simplify is gT:
+                continue
+            if arg_simplify in simplified_args:
+                continue
+            if arg_simplify.func is gAnd:
+                simplified_args.extend(arg_simplify.args)
+            else:
+                simplified_args.append(arg_simplify)
+        if not simplified_args:
+            return gT
+        return gAnd(*simplified_args)
 
 
 class And(AndOr):
@@ -532,6 +588,12 @@ class And(AndOr):
     """
     _latex_symbol = "\\wedge"
     _sympy_func = sympy.And
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return Or
+        return And
 
     def __new__(cls, *args):
         if not args:
@@ -570,6 +632,12 @@ class Or(AndOr):
     """
     _latex_symbol = "\\vee"
     _sympy_func = sympy.Or
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return And
+        return Or
 
     def __new__(cls, *args):
         if not args:
@@ -613,7 +681,24 @@ class Not(BooleanFormula):
         self.func = Not
         self.args = (arg, )
 
+    def nnf(self, implicitNot=False):
+        """Negation normal form.
+
+        >>> from sympy.abc import x, y, z
+        >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
+        >>> Not(f).nnf()
+        Ex(x, All(y, Or(Not(Eq(x, y)), F, Not(Eq(x, y)), Or(Not(Eq(x, z)), Not(Eq(y, x))))))
+        """
+        return self.arg.nnf(implicitNot=not implicitNot)
+
     def simplify(self, Theta=None):
+        """Simplification.
+
+        >>> from sympy.abc import x, y, z
+        >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
+        >>> Not(f).simplify()
+        Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
+        """
         arg_simplify = self.arg.simplify(Theta=Theta)
         if arg_simplify is T:
             return F
@@ -649,8 +734,11 @@ class TruthValue(BooleanFormula):
     _latex_style = "constant"
     _latex_precedence = 99
 
+    def nnf(self, implicitNot=False):
+        return self.func.dualize(conditional=implicitNot)()
+
     def sympy(self):
-        raise NotImplementedError
+        raise NotImplementedError(f"no sympy representation of {self.func} available")
 
 
 class _T(TruthValue):
@@ -668,6 +756,12 @@ class _T(TruthValue):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return _F
+        return _T
 
     def __init__(self):
         self.func = _T
@@ -696,6 +790,12 @@ class _F(TruthValue):
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return _T
+        return _F
+
     def __init__(self):
         self.func = _F
         self.args = ()
@@ -712,9 +812,14 @@ class AtomicFormula(BooleanFormula):
     _latex_symbol_spacing = ""
     _latex_precedence = 99
 
-    is_atom = True
+    is_atomic = True
     is_boolean = False
     is_quantified = False
+
+    def nnf(self, implicitNot=False):
+        if implicitNot:
+            return Not(self)
+        return self
 
     # Override Formula.sympy() to prevent recursion into terms
     def sympy(self, **kwargs):
