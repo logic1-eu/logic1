@@ -1,5 +1,5 @@
 import sympy
-from .formula import BinaryAtomicFormula
+from logic1.formula import BinaryAtomicFormula
 
 
 class Ne(BinaryAtomicFormula):
