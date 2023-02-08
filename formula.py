@@ -17,24 +17,39 @@ Applications would implement their particular languages as follows:
   interface; compare EX, ALL, AND, OR, EQUIV, IMPL below.
 """
 
+from abc import ABC, abstractclassmethod
+
 import sympy
+
+from logic1.containers import Variables
+
 # from .tracing import trace
 
 
 Variable = sympy.Symbol
 
 
-class Formula:
-    """A class for representing first-order formulas.
+def is_constant(term) -> bool:
+    return not isinstance(term, sympy.Basic)
+
+
+def is_variable(term) -> bool:
+    return not isinstance(term, Variable)
+
+
+class Formula(ABC):
+    """An abstract base class for first-order formulas.
 
     Attributes:
     -----------
-    func: a logic1 class
+    func: a subclass of ``Formula`` for formulas starting with the logical
+          operator func
+
     args: a tuple of ``Formula``
     """
 
-    def __and__(*args):
-        """Override the bitwise and operator ``&`` for logical AND.
+    def __and__(self, other):
+        """Override the ``&`` operator to apply logical AND.
 
         Note that ``&`` delegates to the convenience wrapper AND in contrast to
         the constructor And.
@@ -42,10 +57,10 @@ class Formula:
         >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
-        return AND(*args)
+        return AND(self, other)
 
-    def __invert__(a):
-        """Override the bitwise invert operator ``~`` for logical NOT.
+    def __invert__(self):
+        """Override the ``~`` operator to apply logical NOT.
 
         Note that ``~`` delegates to the convenience wrapper NOT in contrast to
         the constructor Not.
@@ -53,10 +68,10 @@ class Formula:
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
-        return NOT(a)
+        return NOT(self)
 
-    def __lshift__(a1, a2):
-        """Override the bitwise left shift operator ``>>`` for logical IMPL.
+    def __lshift__(self, other):
+        """Override ``>>`` operator to apply logical IMPL.
 
         Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
         to the constructor Implies.
@@ -65,10 +80,10 @@ class Formula:
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return IMPL(a2, a1)
+        return IMPL(other, self)
 
-    def __or__(*args):
-        """Override the bitwise or operator ``|`` for logical OR.
+    def __or__(self, other):
+        """Override the ``|`` operator to apply logical OR.
 
         Note that ``|`` delegates to the convenience wrapper OR in contrast to
         the constructor Or.
@@ -77,11 +92,11 @@ class Formula:
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
-        return OR(*args)
+        return OR(self, other)
 
-    def __rshift__(a1, a2):
-        """Override the bitwise right shift operator ``<<`` for logical IMPL
-        with reversed sides.
+    def __rshift__(self, other):
+        """Override the ``<<`` operator to apply logical IMPL with reversed
+        sides.
 
         Note that ``<<`` uses the convenience wrapper IMPL in contrast to the
         constructor implies.
@@ -90,7 +105,7 @@ class Formula:
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return IMPL(a1, a2)
+        return IMPL(self, other)
 
     def __eq__(self, other):
         """Recursive equality of the formulas self and other.
@@ -104,19 +119,9 @@ class Formula:
         """
         return self.func == other.func and self.args == other.args
 
+    @abstractclassmethod
     def __init__(self, *args):
-        """An initializer that always raises an exception.
-
-        >>> Formula(Eq, 1, 0)
-        Traceback (most recent call last):
         ...
-        NotImplementedError: Formula is an abstract class
-
-        This provides a hands-on implementation of an abstract class. It is
-        inherited down the hierarchy. Only the the leaf classes, which
-        correspond to logic operators should be instantiated.
-        """
-        raise NotImplementedError("Formula is an abstract class")
 
     def __repr__(self):
         """Representation of the Formula suitable for use as an input.
@@ -145,17 +150,38 @@ class Formula:
         """
         return "$\\displaystyle " + self.latex() + "$"
 
-    def nnf(self, implicitNot=False):
-        """A negation normal form that always raises an exception.
+    @abstractclassmethod
+    def nnf(self, implicit_not=False):
+        """Negation normal form.
 
-        This provides a hands-on implementation of an abstract class. It is
-        inherited down the hierarchy. Only the the leaf classes, which
-        correspond to logic operators should be instantiated.
+        An NNF is a formula where logical Not is only applied to atomic
+        formulas and thruth values. The only other allowed Boolean operators
+        are And and Or. Besides those Boolean operators, we also admit
+        quantifiers Ex and All. If the input is quanitfier-free, nnf will not
+        introduce any quanitfiers.
 
-        This method would get called if any leaf class missed to implement an
-        nnf() method.
+        >>> from sympy.abc import a, y
+        >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
+        >>> f.nnf()
+        ... # doctest: +NORMALIZE_WHITESPACE
+        And(Or(Or(Not(Eq(a, 0)), F), Ex(y, Not(Eq(y, a)))), \
+            Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
         """
-        raise NotImplementedError(f"nnf() method missing on {self.func}")
+        ...
+
+    def pnf(self, is_nnf: bool = False):
+        """Prenex normal form.
+
+        A PNF is an NNF where all quantifiers Ex and All stand at the beginning
+        of the formula. The argument is_nnf can be used as a hint that self is
+        already in NNF.
+        """
+        # All logical operators admissible in NNF are supposed to have
+        # overriden the pnf() method here. Therefore, we get here if and only
+        # if pnf() is called with a toplevel operator that is not admissible in
+        # NNF. It follows that self is not in NNF. We ignore the keyword
+        # argument, transform into NNF, and recurse.
+        return self.nnf().pnf(is_nnf=True)
 
     def simplify(self, Theta=None):
         """Identity as a default implemenation of a simplifier for formulas.
@@ -191,15 +217,30 @@ class Formula:
         >>> e3.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError: no sympy representation of <class 'formula._T'> available
+        NotImplementedError: sympy does not know <class 'formula._T'>
 
         >>> e4 = All(x, Ex(y, Eq(x, y)))
         >>> e4.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError
+        NotImplementedError: sympy does not know <class 'formula.All'>
         """
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
+
+    @abstractclassmethod
+    def vars(self, assume_quantified: set = set()) -> Variables:
+        """
+        >>> from sympy.abc import x, y, z
+        >>> f = Eq(3 * x, 0) \
+                >> ALL(z, ALL(x, (~ Eq(x, 0) >> EX(y, Eq(x * y, 1)))))
+        >>> f.vars().free == {x}
+        True
+        >>> f.vars().bound == {x, y}
+        True
+        >>> z not in f.vars().all
+        True
+        """
+        ...
 
 
 class QuantifiedFormula(Formula):
@@ -252,9 +293,9 @@ class QuantifiedFormula(Formula):
         self_latex += " " + latex_in_parens(self.args[1])
         return self_latex
 
-    def nnf(self, implicitNot: bool = False):
-        func_nnf = self.func.dualize(conditional=implicitNot)
-        matrix_nnf = self.matrix.nnf(implicitNot=implicitNot)
+    def nnf(self, implicit_not: bool = False):
+        func_nnf = self.func.dualize(conditional=implicit_not)
+        matrix_nnf = self.matrix.nnf(implicit_not=implicit_not)
         return func_nnf(self.variable, matrix_nnf)
 
     def simplify(self, Theta=None):
@@ -267,8 +308,11 @@ class QuantifiedFormula(Formula):
         return self.func(self.variable, self.matrix.simplify())
 
     def sympy(self, *args, **kwargs):
-        print(f"sympy representation of {type(self)} is not available.")
-        raise NotImplementedError
+        raise NotImplementedError(f"sympy does not know {type(self)}")
+
+    def vars(self, assume_quantified: set = set()) -> Variables:
+        quantified = assume_quantified | {self.variable}
+        return self.matrix.vars(assume_quantified=quantified)
 
 
 class Ex(QuantifiedFormula):
@@ -390,14 +434,14 @@ class BooleanFormula(Formula):
     is_boolean = True
     is_quantified = False
 
-    def latex(self):
-        def not_latex_in_parens(outer, inner):
+    def latex(self) -> str:
+        def not_latex_in_parens(outer, inner) -> str:
             inner_latex = inner.latex()
             if inner.func is not outer.func and not inner.is_quantified:
                 inner_latex = "(" + inner_latex + ")"
             return inner_latex
 
-        def infix_latex_in_parens(outer, inner):
+        def infix_latex_in_parens(outer, inner) -> str:
             inner_latex = inner.latex()
             if outer._latex_precedence >= inner._latex_precedence:
                 inner_latex = "(" + inner_latex + ")"
@@ -418,6 +462,12 @@ class BooleanFormula(Formula):
                 self_latex += " " + infix_latex_in_parens(self, a)
             return self_latex
         assert False
+
+    def vars(self, assume_quantified: set = set()) -> Variables:
+        variables = Variables()
+        for arg in self.args:
+            variables |= arg.vars(assume_quantified=assume_quantified)
+        return variables
 
 
 class Equivalent(BooleanFormula):
@@ -441,9 +491,9 @@ class Equivalent(BooleanFormula):
         self.func = Equivalent
         self.args = (lhs, rhs)
 
-    def nnf(self, implicitNot=False):
+    def nnf(self, implicit_not=False):
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
-        return tmp.nnf(implicitNot=implicitNot)
+        return tmp.nnf(implicit_not=implicit_not)
 
     def simplify(self, Theta=None):
         """Recursively simplify the Equivalence.
@@ -502,8 +552,8 @@ class Implies(BooleanFormula):
         self.func = Implies
         self.args = (lhs, rhs)
 
-    def nnf(self, implicitNot=False):
-        return Or(Not(self.lhs), self.rhs).nnf(implicitNot=implicitNot)
+    def nnf(self, implicit_not=False):
+        return Or(Not(self.lhs), self.rhs).nnf(implicit_not=implicit_not)
 
     def simplify(self, Theta=None):
         if self.rhs is T:
@@ -537,11 +587,11 @@ class AndOr(BooleanFormula):
     _latex_style = "infix"
     _latex_precedence = 50
 
-    def nnf(self, implicitNot=False):
+    def nnf(self, implicit_not=False):
         """Negation normal form.
         """
-        func_nnf = self.func.dualize(conditional=implicitNot)
-        args_nnf = (arg.nnf(implicitNot=implicitNot) for arg in self.args)
+        func_nnf = self.func.dualize(conditional=implicit_not)
+        args_nnf = (arg.nnf(implicit_not=implicit_not) for arg in self.args)
         return func_nnf(*args_nnf)
 
     def simplify(self, Theta=None):
@@ -681,7 +731,7 @@ class Not(BooleanFormula):
         self.func = Not
         self.args = (arg, )
 
-    def nnf(self, implicitNot=False):
+    def nnf(self, implicit_not=False):
         """Negation normal form.
 
         >>> from sympy.abc import x, y, z
@@ -689,7 +739,7 @@ class Not(BooleanFormula):
         >>> Not(f).nnf()
         Ex(x, All(y, Or(Not(Eq(x, y)), F, Not(Eq(x, y)), Or(Not(Eq(x, z)), Not(Eq(y, x))))))
         """
-        return self.arg.nnf(implicitNot=not implicitNot)
+        return self.arg.nnf(implicit_not=not implicit_not)
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -734,11 +784,14 @@ class TruthValue(BooleanFormula):
     _latex_style = "constant"
     _latex_precedence = 99
 
-    def nnf(self, implicitNot=False):
-        return self.func.dualize(conditional=implicitNot)()
+    def nnf(self, implicit_not=False):
+        return self.func.dualize(conditional=implicit_not)()
 
     def sympy(self):
-        raise NotImplementedError(f"no sympy representation of {self.func} available")
+        raise NotImplementedError(f"sympy does not know {self.func}")
+
+    def vars(self, assume_quantified: set = set()):
+        return Variables()
 
 
 class _T(TruthValue):
@@ -816,14 +869,23 @@ class AtomicFormula(BooleanFormula):
     is_boolean = False
     is_quantified = False
 
-    def nnf(self, implicitNot=False):
-        if implicitNot:
+    def nnf(self, implicit_not=False):
+        if implicit_not:
             return Not(self)
         return self
 
     # Override Formula.sympy() to prevent recursion into terms
     def sympy(self, **kwargs):
         return self._sympy_func(*self.args, **kwargs)
+
+    def vars(self, assume_quantified: set = set()) -> Variables:
+        all_vars = set()
+        for term in self.args:
+            if is_constant(term):
+                continue
+            all_vars |= term.atoms(sympy.Symbol)
+        return Variables(free=all_vars - assume_quantified,
+                         bound=all_vars & assume_quantified)
 
 
 class BinaryAtomicFormula(AtomicFormula):
