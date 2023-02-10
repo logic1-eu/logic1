@@ -134,18 +134,20 @@ class Formula(ABC):
 
     def __repr__(self):
         """Representation of the Formula suitable for use as an input.
-
-        __str__() falls back to this unless explicitly implemented in a
-        subclass.
         """
-        repr = self.func.__name__
-        repr += "("
+        r = self.func.__name__
+        r += "("
         if self.args:
-            repr += self.args[0].__repr__()
+            r += self.args[0].__repr__()
             for a in self.args[1:]:
-                repr += ", " + a.__repr__()
-        repr += ")"
-        return repr
+                r += ", " + a.__repr__()
+        r += ")"
+        return r
+
+    def __str__(self):
+        """Representation of the Formula used in printing.
+        """
+        return self._sprint(mode="text")
 
     def _repr_latex_(self):
         r"""A LaTeX representation of the formula as it is used within jupyter
@@ -159,6 +161,9 @@ class Formula(ABC):
         """
         return "$\\displaystyle " + self.latex() + "$"
 
+    def latex(self: Self) -> str:
+        return self._sprint(mode="latex")
+
     @abstractclassmethod
     def qvars(self: Self) -> set:
         """The set of all variables that are quantified in self.
@@ -170,6 +175,10 @@ class Formula(ABC):
         >>> ALL(y, EX(x, Eq(a, y)) & EX(z, Eq(a, y))).qvars() == {x, y, z}
         True
         """
+        ...
+
+    @abstractclassmethod
+    def _sprint(self, mode: str) -> str:
         ...
 
     def simplify(self: Self, Theta=None):
@@ -314,10 +323,14 @@ class Formula(ABC):
         ...
 
 
+latex = Formula.latex
+
+
 class QuantifiedFormula(Formula):
 
-    _latex_precedence = 99
-    _latex_symbol_spacing = "\\,"
+    _print_precedence = 99
+    _text_symbol_spacing = " "
+    _latex_symbol_spacing = " \\, "
 
     is_atomic = False
     is_boolean = False
@@ -349,25 +362,6 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
-    def latex(self):
-        r"""A LaTeX representation of the QuantifiedFormula.
-
-        >>> from sympy.abc import x, y
-        >>> All(x, Ex(y, Implies(Not(Eq(x, 0)), Eq(x * y, 1)))).latex()
-        '\\forall x \\, \\exists y \\, (\\neg \\, (x = 0) \\, \\longrightarrow \\, x y = 1)'
-        """
-        def latex_in_parens(inner):
-            inner_Latex = inner.latex()
-            if not inner.is_quantified and inner.func is not Not:
-                inner_Latex = "(" + inner_Latex + ")"
-            return inner_Latex
-
-        self_latex = self._latex_symbol
-        self_latex += " " + sympy.latex(self.args[0])
-        self_latex += " " + self._latex_symbol_spacing
-        self_latex += " " + latex_in_parens(self.args[1])
-        return self_latex
-
     def qvars(self: Self) -> set:
         return self.arg.qvars() | {self.var}
 
@@ -379,6 +373,24 @@ class QuantifiedFormula(Formula):
         All(x, Ex(y, Eq(x, y)))
         """
         return self.func(self.var, self.arg.simplify())
+
+    def _sprint(self: Self, mode: str) -> str:
+        def arg_in_parens(inner):
+            inner_sprint = inner._sprint(mode)
+            if not inner.is_quantified and inner.func is not Not:
+                inner_sprint = "(" + inner_sprint + ")"
+            return inner_sprint
+
+        if mode == "latex":
+            symbol = self._latex_symbol
+            var = sympy.latex(self.args[0])
+            spacing = self._latex_symbol_spacing
+        else:
+            assert mode == "text"
+            symbol = self._text_symbol
+            var = self.args[0].__str__()
+            spacing = self._text_symbol_spacing
+        return f"{symbol} {var}{spacing}{arg_in_parens(self.args[1])}"
 
     def sympy(self, *args, **kwargs):
         raise NotImplementedError(f"sympy does not know {type(self)}")
@@ -443,6 +455,7 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, Eq(x, 1))
     Ex(x, Eq(x, 1))
     """
+    _text_symbol = "Ex"
     _latex_symbol = "\\exists"
 
     @staticmethod
@@ -495,6 +508,7 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
+    _text_symbol = "All"
     _latex_symbol = "\\forall"
 
     @staticmethod
@@ -549,47 +563,49 @@ class BooleanFormula(Formula):
     BooleanFormula start, in the sense of prefix notation, with a Boolean
     operator but may have quantified subformulas deeper in the expression tree.
     """
-
-    _latex_symbol_spacing = "\\,"
+    _text_symbol_spacing = " "
+    _latex_symbol_spacing = " \\, "
 
     is_atomic = False
     is_boolean = True
     is_quantified = False
-
-    def latex(self) -> str:
-        def not_latex_in_parens(outer, inner) -> str:
-            inner_latex = inner.latex()
-            if inner.func is not outer.func and not inner.is_quantified:
-                inner_latex = "(" + inner_latex + ")"
-            return inner_latex
-
-        def infix_latex_in_parens(outer, inner) -> str:
-            inner_latex = inner.latex()
-            if outer._latex_precedence >= inner._latex_precedence:
-                inner_latex = "(" + inner_latex + ")"
-            return inner_latex
-
-        if self._latex_style == "constant":
-            return self._latex_symbol
-        if self._latex_style == "not":
-            self_latex = self._latex_symbol
-            self_latex += " " + self._latex_symbol_spacing
-            return self_latex + " " + not_latex_in_parens(self, self.arg)
-        if self._latex_style == "infix":
-            self_latex = infix_latex_in_parens(self, self.args[0])
-            for a in self.args[1:]:
-                self_latex += " " + self._latex_symbol_spacing
-                self_latex += " " + self._latex_symbol
-                self_latex += " " + self._latex_symbol_spacing
-                self_latex += " " + infix_latex_in_parens(self, a)
-            return self_latex
-        assert False
 
     def qvars(self: Self) -> set:
         qvars = set()
         for arg in self.args:
             qvars |= arg.qvars()
         return qvars
+
+    def _sprint(self, mode: str) -> str:
+        def not_arg(outer, inner) -> str:
+            inner_sprint = inner._sprint(mode)
+            if inner.func is not outer.func and not inner.is_quantified:
+                inner_sprint = "(" + inner_sprint + ")"
+            return inner_sprint
+
+        def infix_arg(outer, inner) -> str:
+            inner_sprint = inner._sprint(mode)
+            if outer._print_precedence >= inner._print_precedence:
+                inner_sprint = "(" + inner_sprint + ")"
+            return inner_sprint
+
+        if mode == "latex":
+            symbol = self._latex_symbol
+            spacing = self._latex_symbol_spacing
+        else:
+            assert mode == "text"
+            symbol = self._text_symbol
+            spacing = self._text_symbol_spacing
+        if self._print_style == "constant":
+            return symbol
+        if self._print_style == "not":
+            return f"{symbol}{spacing}{not_arg(self, self.arg)}"
+        if self._print_style == "infix":
+            s = infix_arg(self, self.args[0])
+            for a in self.args[1:]:
+                s = f"{s}{spacing}{symbol}{spacing}{infix_arg(self, a)}"
+            return s
+        assert False
 
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
@@ -613,9 +629,11 @@ class BooleanFormula(Formula):
 
 class Equivalent(BooleanFormula):
 
-    _latex_style = "infix"
+    _print_style = "infix"
+    _print_precedence = 10
+    _text_symbol = "<-->"
     _latex_symbol = "\\longleftrightarrow"
-    _latex_precedence = 10
+
     _sympy_func = sympy.Equivalent
 
     @property
@@ -673,9 +691,10 @@ def EQUIV(lhs, rhs):
 
 class Implies(BooleanFormula):
 
-    _latex_style = "infix"
+    _print_style = "infix"
+    _print_precedence = 10
+    _text_symbol = "-->"
     _latex_symbol = "\\longrightarrow"
-    _latex_precedence = 10
 
     _sympy_func = sympy.Implies
 
@@ -692,9 +711,6 @@ class Implies(BooleanFormula):
     def __init__(self, lhs, rhs):
         self.func = Implies
         self.args = (lhs, rhs)
-
-    def to_nnf(self, implicit_not=False):
-        return Or(Not(self.lhs), self.rhs).to_nnf(implicit_not=implicit_not)
 
     def simplify(self, Theta=None):
         if self.rhs is T:
@@ -715,6 +731,9 @@ class Implies(BooleanFormula):
             return T
         return Implies(lhs_simplify, rhs_simplify)
 
+    def to_nnf(self, implicit_not=False):
+        return Or(Not(self.lhs), self.rhs).to_nnf(implicit_not=implicit_not)
+
 
 def IMPL(lhs, rhs):
     if not isinstance(lhs, Formula):
@@ -725,15 +744,9 @@ def IMPL(lhs, rhs):
 
 
 class AndOr(BooleanFormula):
-    _latex_style = "infix"
-    _latex_precedence = 50
 
-    def to_nnf(self, implicit_not=False):
-        """Negation normal form.
-        """
-        func_nnf = self.func.dualize(conditional=implicit_not)
-        args_nnf = (arg.to_nnf(implicit_not=implicit_not) for arg in self.args)
-        return func_nnf(*args_nnf)
+    _print_style = "infix"
+    _print_precedence = 50
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -765,6 +778,13 @@ class AndOr(BooleanFormula):
             return gT
         return gAnd(*simplified_args)
 
+    def to_nnf(self, implicit_not=False):
+        """Negation normal form.
+        """
+        func_nnf = self.func.dualize(conditional=implicit_not)
+        args_nnf = (arg.to_nnf(implicit_not=implicit_not) for arg in self.args)
+        return func_nnf(*args_nnf)
+
 
 class And(AndOr):
     """Constructor for conjunctions of Formulas.
@@ -777,7 +797,9 @@ class And(AndOr):
     >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
+    _text_symbol = "&"
     _latex_symbol = "\\wedge"
+
     _sympy_func = sympy.And
 
     @staticmethod
@@ -821,7 +843,9 @@ class Or(AndOr):
     >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
+    _text_symbol = "|"
     _latex_symbol = "\\vee"
+
     _sympy_func = sympy.Or
 
     @staticmethod
@@ -857,9 +881,10 @@ def OR(*args):
 
 class Not(BooleanFormula):
 
-    _latex_style = "not"
+    _print_precedence = 99
+    _print_style = "not"
+    _text_symbol = "~"
     _latex_symbol = "\\neg"
-    _latex_precedence = 99
 
     _sympy_func = sympy.Not
 
@@ -871,16 +896,6 @@ class Not(BooleanFormula):
     def __init__(self, arg):
         self.func = Not
         self.args = (arg, )
-
-    def to_nnf(self, implicit_not=False):
-        """Negation normal form.
-
-        >>> from sympy.abc import x, y, z
-        >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
-        >>> Not(f).to_nnf()
-        Ex(x, All(y, Or(Not(Eq(x, y)), F, Not(Eq(x, y)), Or(Not(Eq(x, z)), Not(Eq(y, x))))))
-        """
-        return self.arg.to_nnf(implicit_not=not implicit_not)
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -896,6 +911,16 @@ class Not(BooleanFormula):
         if arg_simplify is F:
             return T
         return involutive_not(arg_simplify)
+
+    def to_nnf(self, implicit_not=False):
+        """Negation normal form.
+
+        >>> from sympy.abc import x, y, z
+        >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
+        >>> Not(f).to_nnf()
+        Ex(x, All(y, Or(Not(Eq(x, y)), F, Not(Eq(x, y)), Or(Not(Eq(x, z)), Not(Eq(y, x))))))
+        """
+        return self.arg.to_nnf(implicit_not=not implicit_not)
 
 
 def NOT(arg):
@@ -922,17 +947,17 @@ def involutive_not(arg: Formula):
 
 class TruthValue(BooleanFormula):
 
-    _latex_style = "constant"
-    _latex_precedence = 99
+    _print_style = "constant"
+    _print_precedence = 99
 
     def qvars(self: Self) -> set:
         return set()
 
-    def to_nnf(self, implicit_not=False):
-        return self.func.dualize(conditional=implicit_not)()
-
     def sympy(self):
         raise NotImplementedError(f"sympy does not know {self.func}")
+
+    def to_nnf(self, implicit_not=False):
+        return self.func.dualize(conditional=implicit_not)()
 
     def vars(self, assume_quantified: set = set()):
         return Variables()
@@ -945,6 +970,7 @@ class _T(TruthValue):
     support subclassing. We do not use a module because we need _T to be a
     subclass itself.
     """
+    _text_symbol = "T"
     _latex_symbol = "\\top"
 
     _instance = None
@@ -978,6 +1004,7 @@ class _F(TruthValue):
     support subclassing. We do not use a module because we need _F to be a
     subclass itself.
     """
+    _text_symbol = "F"
     _latex_symbol = "\\bot"
 
     _instance = None
@@ -1006,8 +1033,9 @@ F = _F()
 
 class AtomicFormula(BooleanFormula):
 
-    _latex_symbol_spacing = ""
-    _latex_precedence = 99
+    _print_precedence = 99
+    _text_symbol_spacing = " "
+    _latex_symbol_spacing = " "
 
     is_atomic = True
     is_boolean = False
@@ -1015,11 +1043,6 @@ class AtomicFormula(BooleanFormula):
 
     def qvars(self: Self) -> set:
         return set()
-
-    def to_nnf(self, implicit_not=False):
-        if implicit_not:
-            return Not(self)
-        return self
 
     def subs(self: Self, substitution: dict) -> Self:
         # The recursion into args here applies sympy.subs().
@@ -1036,6 +1059,11 @@ class AtomicFormula(BooleanFormula):
         return self._sympy_func(*self.args, **kwargs)
 
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
+        return self
+
+    def to_nnf(self, implicit_not=False):
+        if implicit_not:
+            return Not(self)
         return self
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
@@ -1063,14 +1091,20 @@ class BinaryAtomicFormula(AtomicFormula):
         """The right-hand side of the BinaryAtomicFormula."""
         return self.args[1]
 
-    # Override BooleanFormula.latex() to prevent recursion into terms
-    def latex(self):
-        self_latex = sympy.latex(self.lhs)
-        self_latex += " " + self._latex_symbol_spacing
-        self_latex += self._latex_symbol
-        self_latex += " " + self._latex_symbol_spacing
-        self_latex += sympy.latex(self.rhs)
-        return self_latex
+    # Override BooleanFormula._sprint() to prevent recursion into terms
+    def _sprint(self, mode: str) -> str:
+        if mode == "latex":
+            symbol = self._latex_symbol
+            lhs = sympy.latex(self.lhs)
+            rhs = sympy.latex(self.rhs)
+            spacing = self._latex_symbol_spacing
+        else:
+            assert mode == "text"
+            symbol = self._text_symbol
+            lhs = self.lhs.__str__()
+            rhs = self.rhs.__str__()
+            spacing = self._text_symbol_spacing
+        return f"{lhs}{spacing}{symbol}{spacing}{rhs}"
 
 
 class Eq(BinaryAtomicFormula):
@@ -1079,7 +1113,9 @@ class Eq(BinaryAtomicFormula):
     >>> Eq(x, x)
     Eq(x, x)
     """
+    _text_symbol = "="
     _latex_symbol = "="
+
     _sympy_func = sympy.Eq
 
     def __init__(self, lhs, rhs):
