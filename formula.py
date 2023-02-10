@@ -18,12 +18,20 @@ Applications would implement their particular languages as follows:
 """
 
 from abc import ABC, abstractclassmethod
+from typing import Any, Callable
 
 import sympy
 
 from logic1.containers import Variables
 
 # from .tracing import trace
+
+Self = Any
+
+
+# So far, we use Sympy expressions as Terms and Sympy Symbols as variables
+# without consistently using corresponding subclasses. We collect a few
+# helpers here.
 
 
 Variable = sympy.Symbol
@@ -35,6 +43,40 @@ def is_constant(term) -> bool:
 
 def is_variable(term) -> bool:
     return not isinstance(term, Variable)
+
+
+class _Rename():
+    """
+    >>> from sympy.abc import x, y
+    >>> rename(x)
+    x_R3
+    >>> rename(_)
+    x_R4
+    >>> rename(y)
+    y_R5
+    >>> rename(x)
+    x_R6
+    """
+
+    _index = 0
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __call__(self, var: sympy.Symbol):
+        key = "R"
+        _Rename._index += 1
+        var_str = var.__str__()
+        L = var_str.split("_" + key)
+        if len(L) == 2:
+            var_str = L[0]
+        return Variable(f"{var_str}_{key}{_Rename._index}")
+
+
+rename = _Rename()
 
 
 class Formula(ABC):
@@ -59,7 +101,7 @@ class Formula(ABC):
         """
         return AND(self, other)
 
-    def __invert__(self):
+    def __invert__(self: Self) -> Self:
         """Override the ``~`` operator to apply logical NOT.
 
         Note that ``~`` delegates to the convenience wrapper NOT in contrast to
@@ -151,39 +193,19 @@ class Formula(ABC):
         return "$\\displaystyle " + self.latex() + "$"
 
     @abstractclassmethod
-    def nnf(self, implicit_not=False):
-        """Negation normal form.
+    def qvars(self: Self) -> set:
+        """The set of all variables that are quantified in self.
 
-        An NNF is a formula where logical Not is only applied to atomic
-        formulas and thruth values. The only other allowed Boolean operators
-        are And and Or. Besides those Boolean operators, we also admit
-        quantifiers Ex and All. If the input is quanitfier-free, nnf will not
-        introduce any quanitfiers.
+        This should not be confused with bound ocurrences of variables. Compare
+        the Formula.vars() method.
 
-        >>> from sympy.abc import a, y
-        >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
-        >>> f.nnf()
-        ... # doctest: +NORMALIZE_WHITESPACE
-        And(Or(Or(Not(Eq(a, 0)), F), Ex(y, Not(Eq(y, a)))), \
-            Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
+        >>> from sympy.abc import a, b, c, x, y, z
+        >>> ALL(y, EX(x, Eq(a, y)) & EX(z, Eq(a, y))).qvars() == {x, y, z}
+        True
         """
         ...
 
-    def pnf(self, is_nnf: bool = False):
-        """Prenex normal form.
-
-        A PNF is an NNF where all quantifiers Ex and All stand at the beginning
-        of the formula. The argument is_nnf can be used as a hint that self is
-        already in NNF.
-        """
-        # All logical operators admissible in NNF are supposed to have
-        # overriden the pnf() method here. Therefore, we get here if and only
-        # if pnf() is called with a toplevel operator that is not admissible in
-        # NNF. It follows that self is not in NNF. We ignore the keyword
-        # argument, transform into NNF, and recurse.
-        return self.nnf().pnf(is_nnf=True)
-
-    def simplify(self, Theta=None):
+    def simplify(self: Self, Theta=None):
         """Identity as a default implemenation of a simplifier for formulas.
 
         This should be overridden in the majority of the classes that
@@ -191,7 +213,23 @@ class Formula(ABC):
         """
         return self
 
-    def sympy(self, **kwargs):
+    @abstractclassmethod
+    def subs(self: Self, substitution: dict) -> Self:
+        """Substitution.
+
+        >>> from sympy.abc import a, b, c, x, y, z
+        >>> EX(x, Eq(x, a)).subs({x: a})
+        Ex(x, Eq(x, a))
+        >>> f = EX(x, Eq(x, a)).subs({a: x})
+        >>> g = Ex(x, f & Eq(b, 0))
+        >>> g
+        Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
+        >>> g.subs({b: x})
+        Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
+        """
+        ...
+
+    def sympy(self: Self, **kwargs) -> sympy.Basic:
         """Provide a sympy representation of the Formula if possible.
 
         Subclasses that have no match in sympy can raise NotImplementedError.
@@ -227,8 +265,59 @@ class Formula(ABC):
         """
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
+    def to_distinct_vars(self: Self) -> Self:
+        # Recursion starts with a badlist (technically a set) of all free
+        # variables.
+        return self._to_distinct_vars(self.vars().free)
+
     @abstractclassmethod
-    def vars(self, assume_quantified: set = set()) -> Variables:
+    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+        # Traverses self. If a badlisted variable is encountered as a
+        # quantified variable, it will be replaced with a fresh name in the
+        # respective QuantifiedFormula, and the fresh name will be badlisted
+        # for the future. Note that this can includes variables that do not
+        # *occur* in a mathematical sense.
+        ...
+
+    @abstractclassmethod
+    def to_nnf(self: Self, implicit_not=False) -> Self:
+        """Negation normal form.
+
+        An NNF is a formula where logical Not is only applied to atomic
+        formulas and thruth values. The only other allowed Boolean operators
+        are And and Or. Besides those Boolean operators, we also admit
+        quantifiers Ex and All. If the input is quanitfier-free, to_nnf will not
+        introduce any quanitfiers.
+
+        >>> from sympy.abc import a, y
+        >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
+        >>> f.to_nnf()
+        ... # doctest: +NORMALIZE_WHITESPACE
+        And(Or(Or(Not(Eq(a, 0)), F), Ex(y, Not(Eq(y, a)))), \
+            Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
+        """
+        ...
+
+    def to_pnf(self: Self, is_nnf: bool = False) -> Self:
+        """Prenex normal form.
+
+        A PNF is an NNF where all quantifiers Ex and All stand at the beginning
+        of the formula. The argument is_nnf can be used as a hint that self is
+        already in NNF.
+        """
+        # All logical operators admissible in NNF are supposed to have
+        # overriden the pnf() method here. Therefore, we get here if and only
+        # if pnf() is called with a toplevel operator that is not admissible in
+        # NNF. It follows that self is not in NNF. We ignore the keyword
+        # argument, transform into NNF, and recurse.
+        return self.to_nnf().to_pnf(is_nnf=True)
+
+    @abstractclassmethod
+    def transform_atoms(self: Self, transformation: Callable) -> Self:
+        ...
+
+    @abstractclassmethod
+    def vars(self: Self, assume_quantified: set = set()) -> Variables:
         """
         >>> from sympy.abc import x, y, z
         >>> f = Eq(3 * x, 0) \
@@ -253,23 +342,27 @@ class QuantifiedFormula(Formula):
     is_quantified = True
 
     @property
-    def variable(self):
+    def var(self):
         """The variable of the quantifier.
 
         >>> from sympy.abc import x, y
         >>> e1 = All(x, Ex(y, Eq(x, y)))
-        >>> e1.variable
+        >>> e1.var
         x
         """
         return self.args[0]
 
+    @var.setter
+    def var(self, value: Variable):
+        self.args = (value, *self.args[1:])
+
     @property
-    def matrix(self):
+    def arg(self):
         """The subformula in the scope of the QuantifiedFormula.
 
         >>> from sympy.abc import x, y
         >>> e1 = All(x, Ex(y, Eq(x, y)))
-        >>> e1.matrix
+        >>> e1.arg
         Ex(y, Eq(x, y))
         """
         return self.args[1]
@@ -288,15 +381,13 @@ class QuantifiedFormula(Formula):
             return inner_Latex
 
         self_latex = self._latex_symbol
-        self_latex += " " + str(self.args[0])
+        self_latex += " " + sympy.latex(self.args[0])
         self_latex += " " + self._latex_symbol_spacing
         self_latex += " " + latex_in_parens(self.args[1])
         return self_latex
 
-    def nnf(self, implicit_not: bool = False):
-        func_nnf = self.func.dualize(conditional=implicit_not)
-        matrix_nnf = self.matrix.nnf(implicit_not=implicit_not)
-        return func_nnf(self.variable, matrix_nnf)
+    def qvars(self: Self) -> set:
+        return self.arg.qvars() | {self.var}
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -305,14 +396,73 @@ class QuantifiedFormula(Formula):
         >>> All(x, Ex(y, Eq(x, y))).simplify()
         All(x, Ex(y, Eq(x, y)))
         """
-        return self.func(self.variable, self.matrix.simplify())
+        return self.func(self.var, self.arg.simplify())
 
     def sympy(self, *args, **kwargs):
         raise NotImplementedError(f"sympy does not know {type(self)}")
 
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        quantified = assume_quantified | {self.variable}
-        return self.matrix.vars(assume_quantified=quantified)
+    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+
+        a = self.arg._to_distinct_vars(badlist)
+        if self.var not in badlist:
+            badlist |= {self.var}  # mutable
+            return self.func(self.var, a)
+        v = rename(self.var)
+        while v in badlist:
+            v = rename(v)
+        badlist |= {v}  # mutable
+        return self.func(v, a.transform_atoms())
+
+    def to_nnf(self, implicit_not: bool = False):
+        func_nnf = self.func.dualize(conditional=implicit_not)
+        arg_nnf = self.arg.to_nnf(implicit_not=implicit_not)
+        return func_nnf(self.var, arg_nnf)
+
+    def subs(self: Self, substitution: dict) -> Self:
+        """Substitution.
+        """
+        # A copy of the mutual could be avoided by keeping track of the changes
+        # and undoing them at the end.
+        substitution = substitution.copy()
+        # (1) Remove substitution for the quantified variable. In principle,
+        # this is covered by (2) below, but doing it here has a chance to avoid
+        # renaming the quantified variable:
+        if self.var in substitution:
+            del substitution[self.var]
+        # Collect all variables on the right hand sides of substitutions:
+        substituted_vars = set()
+        for term in substitution.values():
+            if is_constant(term):
+                continue
+            substituted_vars |= term.atoms(sympy.Symbol)
+        # (2) Rename the quantified variable so that it is not a key and does
+        # not occur in a value of substitution. Notice that resolving clashes
+        # with values can cause new clashes with keys, and vice versa.
+        # Therefore, we check keys in spite of (1). Termination is not an
+        # issue, because there are only finitely many variables in
+        # substitution and substitution is not modified:
+        self_var = self.var
+        while self.var in substituted_vars or self.var in substitution:
+            self.var = rename(self.var)
+        # We have renamed the variable in self.var. Its renaming in self.arg
+        # will take place during the recursion that is necessary anyway. We
+        # know the following: (i) self.var is not a key, (ii) self.var does not
+        # occur in the values, (iii) self_var is not a key, (iv) it is possible
+        # that self_var occur in values:
+        substitution[self_var] = self.var
+        # All free occurrences of self_var in self.arg will be renamed to
+        # self.var. In case of (iv) above, substitution will introduce new free
+        # occurrences of self_var, which do not clash with the new quantified
+        # variable self.var:
+        return self.func(self.var, self.arg.subs(substitution))
+
+    def transform_atoms(self: Self, transformation: Callable) -> Self:
+        return self.func(self.var,
+                         self.arg.transform_atoms(transformation))
+
+    def vars(self: Self, assume_quantified: set = set()) -> Variables:
+        quantified = assume_quantified | {self.var}
+        return self.arg.vars(assume_quantified=quantified)
 
 
 class Ex(QuantifiedFormula):
@@ -329,12 +479,12 @@ class Ex(QuantifiedFormula):
             return All
         return Ex
 
-    def __init__(self, variable, matrix):
+    def __init__(self, variable, arg):
         self.func = Ex
-        self.args = (variable, matrix)
+        self.args = (variable, arg)
 
 
-def EX(variable, matrix):
+def EX(variable, arg):
     """A convenience wrapper for the Ex Formula constructor, which does type
     checking.
 
@@ -362,9 +512,9 @@ def EX(variable, matrix):
     """
     if not isinstance(variable, Variable):
         raise TypeError(f"{variable} is not a Variable")
-    if not isinstance(matrix, Formula):
-        raise TypeError(f"{matrix} is not a Formula")
-    return Ex(variable, matrix)
+    if not isinstance(arg, Formula):
+        raise TypeError(f"{arg} is not a Formula")
+    return Ex(variable, arg)
 
 
 class All(QuantifiedFormula):
@@ -381,12 +531,12 @@ class All(QuantifiedFormula):
             return Ex
         return All
 
-    def __init__(self, variable, matrix):
+    def __init__(self, variable, arg):
         self.func = All
-        self.args = (variable, matrix)
+        self.args = (variable, arg)
 
 
-def ALL(variable, matrix):
+def ALL(variable, arg):
     """A convenience wrapper for the All Formula constructor, which does type
     checking.
 
@@ -414,9 +564,9 @@ def ALL(variable, matrix):
     """
     if not isinstance(variable, Variable):
         raise TypeError(f"{variable} is not a Variable")
-    if not isinstance(matrix, Formula):
-        raise TypeError(f"{matrix} is not a Formula")
-    return All(variable, matrix)
+    if not isinstance(arg, Formula):
+        raise TypeError(f"{arg} is not a Formula")
+    return All(variable, arg)
 
 
 class BooleanFormula(Formula):
@@ -463,11 +613,29 @@ class BooleanFormula(Formula):
             return self_latex
         assert False
 
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        variables = Variables()
+    def qvars(self: Self) -> set:
+        qvars = set()
         for arg in self.args:
-            variables |= arg.vars(assume_quantified=assume_quantified)
-        return variables
+            qvars |= arg.qvars()
+        return qvars
+
+    def subs(self: Self, substitution: dict) -> Self:
+        """Substitution.
+        """
+        return self.func(*(arg.subs(substitution) for arg in self.args))
+
+    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+        self.func(*(arg._to_distinct_vars(badlist) for arg in self.args))
+
+    def transform_atoms(self: Self, transformation: Callable) -> Self:
+        return self.func(*(arg.transform_atoms(transformation)
+                           for arg in self.args))
+
+    def vars(self, assume_quantified: set = set()) -> Variables:
+        vars = Variables()
+        for arg in self.args:
+            vars |= arg.vars(assume_quantified=assume_quantified)
+        return vars
 
 
 class Equivalent(BooleanFormula):
@@ -491,9 +659,9 @@ class Equivalent(BooleanFormula):
         self.func = Equivalent
         self.args = (lhs, rhs)
 
-    def nnf(self, implicit_not=False):
+    def to_nnf(self, implicit_not=False):
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
-        return tmp.nnf(implicit_not=implicit_not)
+        return tmp.to_nnf(implicit_not=implicit_not)
 
     def simplify(self, Theta=None):
         """Recursively simplify the Equivalence.
@@ -552,8 +720,8 @@ class Implies(BooleanFormula):
         self.func = Implies
         self.args = (lhs, rhs)
 
-    def nnf(self, implicit_not=False):
-        return Or(Not(self.lhs), self.rhs).nnf(implicit_not=implicit_not)
+    def to_nnf(self, implicit_not=False):
+        return Or(Not(self.lhs), self.rhs).to_nnf(implicit_not=implicit_not)
 
     def simplify(self, Theta=None):
         if self.rhs is T:
@@ -587,11 +755,11 @@ class AndOr(BooleanFormula):
     _latex_style = "infix"
     _latex_precedence = 50
 
-    def nnf(self, implicit_not=False):
+    def to_nnf(self, implicit_not=False):
         """Negation normal form.
         """
         func_nnf = self.func.dualize(conditional=implicit_not)
-        args_nnf = (arg.nnf(implicit_not=implicit_not) for arg in self.args)
+        args_nnf = (arg.to_nnf(implicit_not=implicit_not) for arg in self.args)
         return func_nnf(*args_nnf)
 
     def simplify(self, Theta=None):
@@ -731,15 +899,15 @@ class Not(BooleanFormula):
         self.func = Not
         self.args = (arg, )
 
-    def nnf(self, implicit_not=False):
+    def to_nnf(self, implicit_not=False):
         """Negation normal form.
 
         >>> from sympy.abc import x, y, z
         >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
-        >>> Not(f).nnf()
+        >>> Not(f).to_nnf()
         Ex(x, All(y, Or(Not(Eq(x, y)), F, Not(Eq(x, y)), Or(Not(Eq(x, z)), Not(Eq(y, x))))))
         """
-        return self.arg.nnf(implicit_not=not implicit_not)
+        return self.arg.to_nnf(implicit_not=not implicit_not)
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -784,7 +952,10 @@ class TruthValue(BooleanFormula):
     _latex_style = "constant"
     _latex_precedence = 99
 
-    def nnf(self, implicit_not=False):
+    def qvars(self: Self) -> set:
+        return set()
+
+    def to_nnf(self, implicit_not=False):
         return self.func.dualize(conditional=implicit_not)()
 
     def sympy(self):
@@ -869,16 +1040,32 @@ class AtomicFormula(BooleanFormula):
     is_boolean = False
     is_quantified = False
 
-    def nnf(self, implicit_not=False):
+    def qvars(self: Self) -> set:
+        return set()
+
+    def to_nnf(self, implicit_not=False):
         if implicit_not:
             return Not(self)
         return self
+
+    def subs(self: Self, substitution: dict) -> Self:
+        # The recursion into args here applies sympy.subs().
+        args_subs = []
+        for term in self.args:
+            if is_constant(term):
+                args_subs.append(term)
+            else:
+                args_subs.append(term.subs(substitution, simultaneous=True))
+        return self.func(*(args_subs))
 
     # Override Formula.sympy() to prevent recursion into terms
     def sympy(self, **kwargs):
         return self._sympy_func(*self.args, **kwargs)
 
-    def vars(self, assume_quantified: set = set()) -> Variables:
+    def transform_atoms(self: Self, transformation: Callable) -> Self:
+        return transformation(self)
+
+    def vars(self: Self, assume_quantified: set = set()) -> Variables:
         all_vars = set()
         for term in self.args:
             if is_constant(term):
