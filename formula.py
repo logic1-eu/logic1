@@ -23,6 +23,7 @@ from typing import Any, Callable
 import sympy
 
 from logic1.containers import Variables
+from logic1.renaming import rename
 
 # from .tracing import trace
 
@@ -43,40 +44,6 @@ def is_constant(term) -> bool:
 
 def is_variable(term) -> bool:
     return not isinstance(term, Variable)
-
-
-class _Rename():
-    """
-    >>> from sympy.abc import x, y
-    >>> rename(x)
-    x_R3
-    >>> rename(_)
-    x_R4
-    >>> rename(y)
-    y_R5
-    >>> rename(x)
-    x_R6
-    """
-
-    _index = 0
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __call__(self, var: sympy.Symbol):
-        key = "R"
-        _Rename._index += 1
-        var_str = var.__str__()
-        L = var_str.split("_" + key)
-        if len(L) == 2:
-            var_str = L[0]
-        return Variable(f"{var_str}_{key}{_Rename._index}")
-
-
-rename = _Rename()
 
 
 class Formula(ABC):
@@ -217,7 +184,9 @@ class Formula(ABC):
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
 
+        >>> from logic1.renaming import push, pop
         >>> from sympy.abc import a, b, c, x, y, z
+        >>> push()
         >>> EX(x, Eq(x, a)).subs({x: a})
         Ex(x, Eq(x, a))
         >>> f = EX(x, Eq(x, a)).subs({a: x})
@@ -226,6 +195,7 @@ class Formula(ABC):
         Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
         >>> g.subs({b: x})
         Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
+        >>> pop()
         """
         ...
 
@@ -266,6 +236,18 @@ class Formula(ABC):
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
     def to_distinct_vars(self: Self) -> Self:
+        """
+        >>> from logic1.renaming import push, pop
+        >>> from sympy.abc import x, y, z
+        >>> push()
+        >>> f0 = ALL(z, EX(y, Eq(x, y) & Eq(y, z) & EX(x, T)))
+        >>> f = Eq(x, y) & EX(x, Eq(x, y) & f0)
+        >>> f.to_distinct_vars()
+        ... # doctest: +NORMALIZE_WHITESPACE
+        And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
+            All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
+        >>> pop()
+        """
         # Recursion starts with a badlist (technically a set) of all free
         # variables.
         return self._to_distinct_vars(self.vars().free)
@@ -402,16 +384,13 @@ class QuantifiedFormula(Formula):
         raise NotImplementedError(f"sympy does not know {type(self)}")
 
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
-
-        a = self.arg._to_distinct_vars(badlist)
-        if self.var not in badlist:
-            badlist |= {self.var}  # mutable
-            return self.func(self.var, a)
-        v = rename(self.var)
-        while v in badlist:
-            v = rename(v)
-        badlist |= {v}  # mutable
-        return self.func(v, a.transform_atoms())
+        arg = self.arg._to_distinct_vars(badlist)
+        if self.var in badlist:
+            var = rename(self.var)
+            badlist |= {var}  # mutable
+            arg = arg.subs({self.var: var})
+            return self.func(var, arg)
+        return self.func(self.var, arg)
 
     def to_nnf(self, implicit_not: bool = False):
         func_nnf = self.func.dualize(conditional=implicit_not)
@@ -425,35 +404,28 @@ class QuantifiedFormula(Formula):
         # and undoing them at the end.
         substitution = substitution.copy()
         # (1) Remove substitution for the quantified variable. In principle,
-        # this is covered by (2) below, but doing it here has a chance to avoid
-        # renaming the quantified variable:
+        # this is covered by (2) below, but deleting here preserves the name.
         if self.var in substitution:
             del substitution[self.var]
         # Collect all variables on the right hand sides of substitutions:
         substituted_vars = set()
         for term in substitution.values():
-            if is_constant(term):
-                continue
-            substituted_vars |= term.atoms(sympy.Symbol)
-        # (2) Rename the quantified variable so that it is not a key and does
-        # not occur in a value of substitution. Notice that resolving clashes
-        # with values can cause new clashes with keys, and vice versa.
-        # Therefore, we check keys in spite of (1). Termination is not an
-        # issue, because there are only finitely many variables in
-        # substitution and substitution is not modified:
-        self_var = self.var
-        while self.var in substituted_vars or self.var in substitution:
-            self.var = rename(self.var)
-        # We have renamed the variable in self.var. Its renaming in self.arg
-        # will take place during the recursion that is necessary anyway. We
-        # know the following: (i) self.var is not a key, (ii) self.var does not
-        # occur in the values, (iii) self_var is not a key, (iv) it is possible
-        # that self_var occur in values:
-        substitution[self_var] = self.var
-        # All free occurrences of self_var in self.arg will be renamed to
-        # self.var. In case of (iv) above, substitution will introduce new free
-        # occurrences of self_var, which do not clash with the new quantified
-        # variable self.var:
+            substituted_vars |= sympy.S(term).atoms(sympy.Symbol)
+        # (2) Make sure the quantified variable is not a key and does not occur
+        # in a value of substitution:
+        if self.var in substituted_vars or self.var in substitution:
+            var = rename(self.var)
+            # We now know the following:
+            #   (i) var is not a key,
+            #  (ii) var does not occur in the values,
+            # (iii) self.var is not a key.
+            # We do *not* know whether self.var occurs in the values.
+            substitution[self.var] = var
+            # All free occurrences of self.var in self.arg will be renamed to
+            # var. In case of (iv) above, substitution will introduce new free
+            # occurrences of self.var, which do not clash with the new
+            # quantified variable var:
+            return self.func(var, self.arg.subs(substitution))
         return self.func(self.var, self.arg.subs(substitution))
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
@@ -625,7 +597,8 @@ class BooleanFormula(Formula):
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
-        self.func(*(arg._to_distinct_vars(badlist) for arg in self.args))
+        return self.func(*(arg._to_distinct_vars(badlist)
+                           for arg in self.args))
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         return self.func(*(arg.transform_atoms(transformation)
@@ -1061,6 +1034,9 @@ class AtomicFormula(BooleanFormula):
     # Override Formula.sympy() to prevent recursion into terms
     def sympy(self, **kwargs):
         return self._sympy_func(*self.args, **kwargs)
+
+    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+        return self
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         return transformation(self)
