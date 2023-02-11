@@ -18,7 +18,7 @@ Applications would implement their particular languages as follows:
 """
 
 from abc import ABC, abstractclassmethod
-from typing import Any, Callable
+from typing import Any, Callable, final
 
 import sympy
 
@@ -57,6 +57,7 @@ class Formula(ABC):
     args: a tuple of ``Formula``
     """
 
+    @final
     def __and__(self, other):
         """Override the ``&`` operator to apply logical AND.
 
@@ -68,6 +69,7 @@ class Formula(ABC):
         """
         return AND(self, other)
 
+    @final
     def __invert__(self: Self) -> Self:
         """Override the ``~`` operator to apply logical NOT.
 
@@ -79,6 +81,7 @@ class Formula(ABC):
         """
         return NOT(self)
 
+    @final
     def __lshift__(self, other):
         """Override ``>>`` operator to apply logical IMPL.
 
@@ -91,6 +94,7 @@ class Formula(ABC):
         """
         return IMPL(other, self)
 
+    @final
     def __or__(self, other):
         """Override the ``|`` operator to apply logical OR.
 
@@ -103,6 +107,7 @@ class Formula(ABC):
         """
         return OR(self, other)
 
+    @final
     def __rshift__(self, other):
         """Override the ``<<`` operator to apply logical IMPL with reversed
         sides.
@@ -119,6 +124,8 @@ class Formula(ABC):
     def __eq__(self, other):
         """Recursive equality of the formulas self and other.
 
+        This is *not* logical ``equal.``
+
         >>> e1 = Eq(1, 0)
         >>> e2 = Eq(1, 0)
         >>> e1 == e2
@@ -132,6 +139,7 @@ class Formula(ABC):
     def __init__(self, *args):
         ...
 
+    @final
     def __repr__(self):
         """Representation of the Formula suitable for use as an input.
         """
@@ -144,11 +152,13 @@ class Formula(ABC):
         r += ")"
         return r
 
+    @final
     def __str__(self):
         """Representation of the Formula used in printing.
         """
         return self._sprint(mode="text")
 
+    @final
     def _repr_latex_(self):
         r"""A LaTeX representation of the formula as it is used within jupyter
         notebooks
@@ -161,6 +171,7 @@ class Formula(ABC):
         """
         return "$\\displaystyle " + self.latex() + "$"
 
+    @final
     def latex(self: Self) -> str:
         return self._sprint(mode="latex")
 
@@ -177,17 +188,17 @@ class Formula(ABC):
         """
         ...
 
-    @abstractclassmethod
-    def _sprint(self, mode: str) -> str:
-        ...
-
-    def simplify(self: Self, Theta=None):
+    def simplify(self: Self, Theta=None) -> Self:
         """Identity as a default implemenation of a simplifier for formulas.
 
         This should be overridden in the majority of the classes that
         are finally instantiated.
         """
         return self
+
+    @abstractclassmethod
+    def _sprint(self: Self, mode: str) -> str:
+        ...
 
     @abstractclassmethod
     def subs(self: Self, substitution: dict) -> Self:
@@ -244,6 +255,7 @@ class Formula(ABC):
         """
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
+    @final
     def to_distinct_vars(self: Self) -> Self:
         """
         >>> from logic1.renaming import push, pop
@@ -277,8 +289,8 @@ class Formula(ABC):
         An NNF is a formula where logical Not is only applied to atomic
         formulas and thruth values. The only other allowed Boolean operators
         are And and Or. Besides those Boolean operators, we also admit
-        quantifiers Ex and All. If the input is quanitfier-free, to_nnf will not
-        introduce any quanitfiers.
+        quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
+        not introduce any quanitfiers.
 
         >>> from sympy.abc import a, y
         >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
@@ -289,6 +301,7 @@ class Formula(ABC):
         """
         ...
 
+    @final
     def to_pnf(self: Self, is_nnf: bool = False) -> Self:
         """Prenex normal form.
 
@@ -296,12 +309,15 @@ class Formula(ABC):
         of the formula. The argument is_nnf can be used as a hint that self is
         already in NNF.
         """
-        # All logical operators admissible in NNF are supposed to have
-        # overriden the pnf() method here. Therefore, we get here if and only
-        # if pnf() is called with a toplevel operator that is not admissible in
-        # NNF. It follows that self is not in NNF. We ignore the keyword
-        # argument, transform into NNF, and recurse.
-        return self.to_nnf().to_pnf(is_nnf=True)
+        if is_nnf:
+            return self._to_pnf()
+        return self.to_nnf()._to_pnf()
+
+    # All derived NNF operators must override
+    def _to_pnf(self: Self) -> None:
+        """Prenex normal form. self must be in negation normal form.
+        """
+        raise NotImplementedError(f"{self.func} is not an NNF operator")
 
     @abstractclassmethod
     def transform_atoms(self: Self, transformation: Callable) -> Self:
@@ -408,6 +424,11 @@ class QuantifiedFormula(Formula):
         func_nnf = self.func.dualize(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not)
         return func_nnf(self.var, arg_nnf)
+
+    def _to_pnf(self: Self) -> Formula:
+        """Prenex normal form. self must be in negation normal form.
+        """
+        return self
 
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
@@ -785,6 +806,11 @@ class AndOr(BooleanFormula):
         args_nnf = (arg.to_nnf(implicit_not=implicit_not) for arg in self.args)
         return func_nnf(*args_nnf)
 
+    def _to_pnf(self: Self) -> Formula:
+        """Prenex normal form. self must be in negation normal form.
+        """
+        return self
+
 
 class And(AndOr):
     """Constructor for conjunctions of Formulas.
@@ -922,6 +948,11 @@ class Not(BooleanFormula):
         """
         return self.arg.to_nnf(implicit_not=not implicit_not)
 
+    def _to_pnf(self: Self) -> Formula:
+        """Prenex normal form. self must be in negation normal form.
+        """
+        return self
+
 
 def NOT(arg):
     if not isinstance(arg, Formula):
@@ -958,6 +989,11 @@ class TruthValue(BooleanFormula):
 
     def to_nnf(self, implicit_not=False):
         return self.func.dualize(conditional=implicit_not)()
+
+    def _to_pnf(self: Self) -> Formula:
+        """Prenex normal form. self must be in negation normal form.
+        """
+        return self
 
     def vars(self, assume_quantified: set = set()):
         return Variables()
@@ -1064,6 +1100,11 @@ class AtomicFormula(BooleanFormula):
     def to_nnf(self, implicit_not=False):
         if implicit_not:
             return Not(self)
+        return self
+
+    def _to_pnf(self: Self) -> Formula:
+        """Prenex normal form. self must be in negation normal form.
+        """
         return self
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
