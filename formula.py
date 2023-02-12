@@ -18,14 +18,13 @@ Applications would implement their particular languages as follows:
 """
 
 from abc import ABC, abstractclassmethod
-from typing import Any, Callable, final
+from typing import Any, Callable, final, Union
 
 import sympy
 
 from logic1.containers import Variables
 from logic1.renaming import rename
-
-# from .tracing import trace
+from logic1.tracing import trace
 
 Self = Any
 
@@ -172,6 +171,23 @@ class Formula(ABC):
         return "$\\displaystyle " + self.latex() + "$"
 
     @final
+    def count_alternations(self: Self) -> int:
+        """Count number of quantifier alternations.
+
+        Returns the maximal number of quantifier alternations along a path in
+        the expression tree. Occurrence of quantified variables is not checked.
+
+        >>> from sympy.abc import x, y, z
+        >>> EX(x, Eq(x, y) & ALL(x, EX(y, EX(z, T)))).count_alternations()
+        2
+        """
+        return self._count_alternations()[0]
+
+    @abstractclassmethod
+    def _count_alternations(self: Self) -> tuple:
+        ...
+
+    @final
     def latex(self: Self) -> str:
         return self._sprint(mode="latex")
 
@@ -302,20 +318,71 @@ class Formula(ABC):
         ...
 
     @final
-    def to_pnf(self: Self, is_nnf: bool = False) -> Self:
-        """Prenex normal form.
+    def to_pnf(self: Self, prefer_universal: bool = False,
+               is_admissible: bool = False) -> Self:
+        """Convert to Prenex Normal Form.
 
-        A PNF is an NNF where all quantifiers Ex and All stand at the beginning
-        of the formula. The argument is_nnf can be used as a hint that self is
-        already in NNF.
+        A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) where all
+        quantifiers Ex and All stand at the beginning of the formula. The
+        method minimizes the number of quantifier alternations in the prenex
+        block. Results starting with an existential quantifier are prefered.
+        This can be changed by passing prefer_universal=True. The argument
+        is_nnf can be used as a hint that self is already in NNF.
+
+        Burhenne p.88:
+        >>> from logic1.renaming import push, pop
+        >>> push()
+        >>> x = sympy.symbols('x:8')
+        >>> f1 = EX(x[1], ALL(x[2], ALL(x[3], T)))
+        >>> f2 = ALL(x[4], EX(x[5], ALL(x[6], F)))
+        >>> f3 = EX(x[7], Eq(x[0], 0))
+        >>> (f1 & f2 & f3).to_pnf()
+        ... # doctest: +NORMALIZE_WHITESPACE
+        All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
+            And(T, F, Eq(x0, 0)))))))))
+        >>> pop()
+
+        Derived from redlog.tst:
+        >>> push()
+        >>> from sympy.abc import a, b, y
+        >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
+        >>> f2 = EX(y, Eq(y, a) | Eq(a, 0))
+        >>> EQUIV(f1, f2).to_pnf()
+        ... # doctest: +NORMALIZE_WHITESPACE
+        Ex(y_R1, All(y_R2,
+           And(Or(Or(Not(Eq(a, 0)), Not(Eq(b, 0)), Not(Eq(y, 0))),
+                  Or(Eq(y_R1, a), Eq(a, 0))),
+               Or(And(Not(Eq(y_R2, a)), Not(Eq(a, 0))),
+                  And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
+        >>> pop()
+
+        >>> push()
+        >>> EQUIV(f1, f2).to_pnf(prefer_universal=True)
+        ... # doctest: +NORMALIZE_WHITESPACE
+        All(y_R2, Ex(y_R1,
+           And(Or(Or(Not(Eq(a, 0)), Not(Eq(b, 0)), Not(Eq(y, 0))),
+                  Or(Eq(y_R1, a), Eq(a, 0))),
+               Or(And(Not(Eq(y_R2, a)), Not(Eq(a, 0))),
+                  And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
+        >>> pop()
         """
-        if is_nnf:
-            return self._to_pnf()
-        return self.to_nnf()._to_pnf()
+        if is_admissible:
+            phi = self
+        else:
+            phi = self.to_nnf().to_distinct_vars()
+        return phi._to_pnf()[All if prefer_universal else Ex]
 
-    # All derived NNF operators must override
-    def _to_pnf(self: Self) -> None:
-        """Prenex normal form. self must be in negation normal form.
+    # abstract - see docstring
+    def _to_pnf(self: Self) -> dict:
+        """Private convert to Prenex Normal Form.
+
+        self must be in NNF. All NNF operators (QuantifiedFormula, AndOr,
+        TruthValue, AtomicFormula) must override this method. The result is a
+        dict d with len(d) == 2. The keys are Ex and All, the values are both
+        prenex equivalents of self with the same minimized number of quantifier
+        alternations. Either d[Ex] starts with an existential quantifier and
+        d[All] starts with a universal quantifier, or d[Ex] is d[All], i.e.,
+        identity is guaranteed.
         """
         raise NotImplementedError(f"{self.func} is not an NNF operator")
 
@@ -378,6 +445,12 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
+    def _count_alternations(self: Self) -> tuple:
+        count, quantifiers = self.arg._count_alternations()
+        if self.func.dualize() in quantifiers:
+            return (count + 1, {self.func})
+        return (count, quantifiers)
+
     def qvars(self: Self) -> set:
         return self.arg.qvars() | {self.var}
 
@@ -420,15 +493,16 @@ class QuantifiedFormula(Formula):
             return self.func(var, arg)
         return self.func(self.var, arg)
 
-    def to_nnf(self, implicit_not: bool = False):
+    def to_nnf(self: Self, implicit_not: bool = False) -> Formula:
         func_nnf = self.func.dualize(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not)
         return func_nnf(self.var, arg_nnf)
 
-    def _to_pnf(self: Self) -> Formula:
+    def _to_pnf(self: Self) -> dict:
         """Prenex normal form. self must be in negation normal form.
         """
-        return self
+        pnf = self.func(self.var, self.arg._to_pnf()[self.func])
+        return {Ex: pnf, All: pnf}
 
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
@@ -590,6 +664,18 @@ class BooleanFormula(Formula):
     is_atomic = False
     is_boolean = True
     is_quantified = False
+
+    def _count_alternations(self: Self) -> tuple:
+        best_count = -1
+        best_quantifiers = {Ex, All}
+        for arg in self.args:
+            count, quantifiers = arg._count_alternations()
+            if count > best_count:
+                best_count = count
+                best_quantifiers = quantifiers
+            elif count == best_count:
+                best_quantifiers |= quantifiers
+        return (best_count, best_quantifiers)
 
     def qvars(self: Self) -> set:
         qvars = set()
@@ -799,17 +885,60 @@ class AndOr(BooleanFormula):
             return gT
         return gAnd(*simplified_args)
 
-    def to_nnf(self, implicit_not=False):
-        """Negation normal form.
+    def to_nnf(self: Self, implicit_not: bool = False) -> Self:
+        """Convert to Negation normal form.
         """
         func_nnf = self.func.dualize(conditional=implicit_not)
         args_nnf = (arg.to_nnf(implicit_not=implicit_not) for arg in self.args)
         return func_nnf(*args_nnf)
 
-    def _to_pnf(self: Self) -> Formula:
-        """Prenex normal form. self must be in negation normal form.
+    def _to_pnf(self: Self) -> dict:
+        """Convert to Prenex Normal Form. self must be in NNF.
         """
-        return self
+
+        def interchange(self: AndOr, q: Union[type[Ex], type[Or]]) -> Formula:
+            quantifiers = []
+            args = list(self.args)
+
+            while True:
+                found_quantifier = False
+                for i, arg_i in enumerate(args):
+                    while arg_i.func is q:
+                        quantifiers.append((q, arg_i.var))
+                        arg_i = arg_i.arg
+                        found_quantifier = True
+                    args[i] = arg_i
+                if not found_quantifier:
+                    break
+                q = q.dualize()
+            pnf = self.func(*args)
+            for q, v in reversed(quantifiers):
+                pnf = q(v, pnf)
+            return pnf
+
+        L1 = []
+        L2 = []
+        for arg in self.args:
+            d = arg._to_pnf()
+            L1.append(d[Ex])
+            L2.append(d[All])
+        phi1 = interchange(self.func(*L1), Ex)
+        phi2 = interchange(self.func(*L2), All)
+        if phi1.func is not Ex and phi2.func is not All:
+            # self is quantifier-free
+            return {Ex: self, All: self}
+        phi1_alternations = phi1.count_alternations()
+        phi2_alternations = phi2.count_alternations()
+        d = {}
+        if phi1_alternations == phi2_alternations:
+            d[Ex] = phi1 if phi1.func is Ex else phi2
+            d[All] = phi2 if phi2.func is All else phi1
+            return d
+        if phi1_alternations < phi2_alternations:
+            d[Ex] = d[All] = phi1
+            return d
+        d[Ex] = d[All] = phi2
+        return d
 
 
 class And(AndOr):
@@ -949,9 +1078,9 @@ class Not(BooleanFormula):
         return self.arg.to_nnf(implicit_not=not implicit_not)
 
     def _to_pnf(self: Self) -> Formula:
-        """Prenex normal form. self must be in negation normal form.
+        """Convert to Prenex Normal Form. self must be in NNF.
         """
-        return self
+        return {Ex: self, All: self}
 
 
 def NOT(arg):
@@ -981,6 +1110,9 @@ class TruthValue(BooleanFormula):
     _print_style = "constant"
     _print_precedence = 99
 
+    def _count_alternations(self: Self) -> tuple:
+        return (-1, {Ex, All})
+
     def qvars(self: Self) -> set:
         return set()
 
@@ -993,7 +1125,7 @@ class TruthValue(BooleanFormula):
     def _to_pnf(self: Self) -> Formula:
         """Prenex normal form. self must be in negation normal form.
         """
-        return self
+        return {Ex: self, All: self}
 
     def vars(self, assume_quantified: set = set()):
         return Variables()
@@ -1077,6 +1209,9 @@ class AtomicFormula(BooleanFormula):
     is_boolean = False
     is_quantified = False
 
+    def _count_alternations(self: Self) -> tuple:
+        return (-1, {Ex, All})
+
     def qvars(self: Self) -> set:
         return set()
 
@@ -1105,7 +1240,7 @@ class AtomicFormula(BooleanFormula):
     def _to_pnf(self: Self) -> Formula:
         """Prenex normal form. self must be in negation normal form.
         """
-        return self
+        return {Ex: self, All: self}
 
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         return transformation(self)
