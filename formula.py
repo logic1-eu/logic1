@@ -24,7 +24,7 @@ import sympy
 
 from logic1.containers import Variables
 from logic1.renaming import rename
-from logic1.tracing import trace
+# from logic1.tracing import trace
 
 Self = Any
 
@@ -143,19 +143,19 @@ class Formula(ABC):
         """Representation of the Formula suitable for use as an input.
         """
         r = self.func.__name__
-        r += "("
+        r += '('
         if self.args:
             r += self.args[0].__repr__()
             for a in self.args[1:]:
-                r += ", " + a.__repr__()
-        r += ")"
+                r += ', ' + a.__repr__()
+        r += ')'
         return r
 
     @final
     def __str__(self):
         """Representation of the Formula used in printing.
         """
-        return self._sprint(mode="text")
+        return self._sprint(mode='text')
 
     @final
     def _repr_latex_(self):
@@ -168,7 +168,7 @@ class Formula(ABC):
         Subclasses have latex() methods yielding plain LaTeX without the
         surrounding $\\displaystyle ... $.
         """
-        return "$\\displaystyle " + self.latex() + "$"
+        return '$\\displaystyle ' + self.latex() + '$'
 
     @final
     def count_alternations(self: Self) -> int:
@@ -189,7 +189,7 @@ class Formula(ABC):
 
     @final
     def latex(self: Self) -> str:
-        return self._sprint(mode="latex")
+        return self._sprint(mode='latex')
 
     @abstractclassmethod
     def qvars(self: Self) -> set:
@@ -384,7 +384,7 @@ class Formula(ABC):
         d[All] starts with a universal quantifier, or d[Ex] is d[All], i.e.,
         identity is guaranteed.
         """
-        raise NotImplementedError(f"{self.func} is not an NNF operator")
+        raise NotImplementedError(f'{self.func} is not an NNF operator')
 
     @abstractclassmethod
     def transform_atoms(self: Self, transformation: Callable) -> Self:
@@ -412,8 +412,8 @@ latex = Formula.latex
 class QuantifiedFormula(Formula):
 
     _print_precedence = 99
-    _text_symbol_spacing = " "
-    _latex_symbol_spacing = " \\, "
+    _text_symbol_spacing = ' '
+    _latex_symbol_spacing = ' \\, '
 
     is_atomic = False
     is_boolean = False
@@ -467,22 +467,22 @@ class QuantifiedFormula(Formula):
         def arg_in_parens(inner):
             inner_sprint = inner._sprint(mode)
             if not inner.is_quantified and inner.func is not Not:
-                inner_sprint = "(" + inner_sprint + ")"
+                inner_sprint = '(' + inner_sprint + ')'
             return inner_sprint
 
-        if mode == "latex":
+        if mode == 'latex':
             symbol = self._latex_symbol
             var = sympy.latex(self.args[0])
             spacing = self._latex_symbol_spacing
         else:
-            assert mode == "text"
+            assert mode == 'text'
             symbol = self._text_symbol
             var = self.args[0].__str__()
             spacing = self._text_symbol_spacing
-        return f"{symbol} {var}{spacing}{arg_in_parens(self.args[1])}"
+        return f'{symbol} {var}{spacing}{arg_in_parens(self.args[1])}'
 
     def sympy(self, *args, **kwargs):
-        raise NotImplementedError(f"sympy does not know {type(self)}")
+        raise NotImplementedError(f'sympy does not know {type(self)}')
 
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
         arg = self.arg._to_distinct_vars(badlist)
@@ -550,8 +550,8 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, Eq(x, 1))
     Ex(x, Eq(x, 1))
     """
-    _text_symbol = "Ex"
-    _latex_symbol = "\\exists"
+    _text_symbol = 'Ex'
+    _latex_symbol = '\\exists'
 
     @staticmethod
     def dualize(conditional: bool = True):
@@ -576,7 +576,7 @@ def EX(variable, arg):
 
     For efficiency reasons, the constructors of subclasses of Formula do not
     check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = Ex("x", "y")
+    >>> f = Ex('x', 'y')
     >>> f
     Ex('x', 'y')
     >>> f.simplify()
@@ -585,15 +585,15 @@ def EX(variable, arg):
     AttributeError: 'str' object has no attribute 'simplify'
 
     EX checks and raises an exception immediately:
-    >>> EX("x", Eq(x, x))
+    >>> EX('x', Eq(x, x))
     Traceback (most recent call last):
     ...
     TypeError: x is not a Variable
     """
     if not isinstance(variable, Variable):
-        raise TypeError(f"{variable} is not a Variable")
+        raise TypeError(f'{variable} is not a Variable')
     if not isinstance(arg, Formula):
-        raise TypeError(f"{arg} is not a Formula")
+        raise TypeError(f'{arg} is not a Formula')
     return Ex(variable, arg)
 
 
@@ -603,8 +603,8 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
-    _text_symbol = "All"
-    _latex_symbol = "\\forall"
+    _text_symbol = 'All'
+    _latex_symbol = '\\forall'
 
     @staticmethod
     def dualize(conditional: bool = True):
@@ -629,7 +629,7 @@ def ALL(variable, arg):
 
     For efficiency reasons, the constructors of subclasses of Formula do not
     check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = All("x", "y")
+    >>> f = All('x', 'y')
     >>> f
     All('x', 'y')
     >>> f.simplify()
@@ -638,15 +638,15 @@ def ALL(variable, arg):
     AttributeError: 'str' object has no attribute 'simplify'
 
     ALL checks and raises an exception immediately:
-    >>> ALL("x", Eq(x, x))
+    >>> ALL('x', Eq(x, x))
     Traceback (most recent call last):
     ...
     TypeError: x is not a Variable
     """
     if not isinstance(variable, Variable):
-        raise TypeError(f"{variable} is not a Variable")
+        raise TypeError(f'{variable} is not a Variable')
     if not isinstance(arg, Formula):
-        raise TypeError(f"{arg} is not a Formula")
+        raise TypeError(f'{arg} is not a Formula')
     return All(variable, arg)
 
 
@@ -658,8 +658,8 @@ class BooleanFormula(Formula):
     BooleanFormula start, in the sense of prefix notation, with a Boolean
     operator but may have quantified subformulas deeper in the expression tree.
     """
-    _text_symbol_spacing = " "
-    _latex_symbol_spacing = " \\, "
+    _text_symbol_spacing = ' '
+    _latex_symbol_spacing = ' \\, '
 
     is_atomic = False
     is_boolean = True
@@ -687,30 +687,30 @@ class BooleanFormula(Formula):
         def not_arg(outer, inner) -> str:
             inner_sprint = inner._sprint(mode)
             if inner.func is not outer.func and not inner.is_quantified:
-                inner_sprint = "(" + inner_sprint + ")"
+                inner_sprint = '(' + inner_sprint + ')'
             return inner_sprint
 
         def infix_arg(outer, inner) -> str:
             inner_sprint = inner._sprint(mode)
             if outer._print_precedence >= inner._print_precedence:
-                inner_sprint = "(" + inner_sprint + ")"
+                inner_sprint = '(' + inner_sprint + ')'
             return inner_sprint
 
-        if mode == "latex":
+        if mode == 'latex':
             symbol = self._latex_symbol
             spacing = self._latex_symbol_spacing
         else:
-            assert mode == "text"
+            assert mode == 'text'
             symbol = self._text_symbol
             spacing = self._text_symbol_spacing
-        if self._print_style == "constant":
+        if self._print_style == 'constant':
             return symbol
-        if self._print_style == "not":
-            return f"{symbol}{spacing}{not_arg(self, self.arg)}"
-        if self._print_style == "infix":
+        if self._print_style == 'not':
+            return f'{symbol}{spacing}{not_arg(self, self.arg)}'
+        if self._print_style == 'infix':
             s = infix_arg(self, self.args[0])
             for a in self.args[1:]:
-                s = f"{s}{spacing}{symbol}{spacing}{infix_arg(self, a)}"
+                s = f'{s}{spacing}{symbol}{spacing}{infix_arg(self, a)}'
             return s
         assert False
 
@@ -736,10 +736,10 @@ class BooleanFormula(Formula):
 
 class Equivalent(BooleanFormula):
 
-    _print_style = "infix"
+    _print_style = 'infix'
     _print_precedence = 10
-    _text_symbol = "<-->"
-    _latex_symbol = "\\longleftrightarrow"
+    _text_symbol = '<-->'
+    _latex_symbol = '\\longleftrightarrow'
 
     _sympy_func = sympy.Equivalent
 
@@ -790,18 +790,18 @@ class Equivalent(BooleanFormula):
 
 def EQUIV(lhs, rhs):
     if not isinstance(lhs, Formula):
-        raise TypeError(f"{lhs} is not a Formula")
+        raise TypeError(f'{lhs} is not a Formula')
     if not isinstance(rhs, Formula):
-        raise TypeError(f"{rhs} is not a Formula")
+        raise TypeError(f'{rhs} is not a Formula')
     return Equivalent(lhs, rhs)
 
 
 class Implies(BooleanFormula):
 
-    _print_style = "infix"
+    _print_style = 'infix'
     _print_precedence = 10
-    _text_symbol = "-->"
-    _latex_symbol = "\\longrightarrow"
+    _text_symbol = '-->'
+    _latex_symbol = '\\longrightarrow'
 
     _sympy_func = sympy.Implies
 
@@ -844,15 +844,15 @@ class Implies(BooleanFormula):
 
 def IMPL(lhs, rhs):
     if not isinstance(lhs, Formula):
-        raise TypeError(f"{lhs} is not a Formula")
+        raise TypeError(f'{lhs} is not a Formula')
     if not isinstance(rhs, Formula):
-        raise TypeError(f"{rhs} is not a Formula")
+        raise TypeError(f'{rhs} is not a Formula')
     return Implies(lhs, rhs)
 
 
 class AndOr(BooleanFormula):
 
-    _print_style = "infix"
+    _print_style = 'infix'
     _print_precedence = 50
 
     def simplify(self, Theta=None):
@@ -952,8 +952,8 @@ class And(AndOr):
     >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
-    _text_symbol = "&"
-    _latex_symbol = "\\wedge"
+    _text_symbol = '&'
+    _latex_symbol = '\\wedge'
 
     _sympy_func = sympy.And
 
@@ -978,7 +978,7 @@ class And(AndOr):
 def AND(*args):
     for arg in args:
         if not isinstance(arg, Formula):
-            raise TypeError(f"{arg} is not a Formula")
+            raise TypeError(f'{arg} is not a Formula')
     args_flat = []
     for arg in args:
         if arg.func is And:
@@ -998,8 +998,8 @@ class Or(AndOr):
     >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
-    _text_symbol = "|"
-    _latex_symbol = "\\vee"
+    _text_symbol = '|'
+    _latex_symbol = '\\vee'
 
     _sympy_func = sympy.Or
 
@@ -1024,7 +1024,7 @@ class Or(AndOr):
 def OR(*args):
     for arg in args:
         if not isinstance(arg, Formula):
-            raise TypeError(f"{arg} is not a Formula")
+            raise TypeError(f'{arg} is not a Formula')
     args_flat = []
     for arg in args:
         if arg.func is Or:
@@ -1037,9 +1037,9 @@ def OR(*args):
 class Not(BooleanFormula):
 
     _print_precedence = 99
-    _print_style = "not"
-    _text_symbol = "~"
-    _latex_symbol = "\\neg"
+    _print_style = 'not'
+    _text_symbol = '~'
+    _latex_symbol = '\\neg'
 
     _sympy_func = sympy.Not
 
@@ -1085,7 +1085,7 @@ class Not(BooleanFormula):
 
 def NOT(arg):
     if not isinstance(arg, Formula):
-        raise TypeError(f"{arg} is not a Formula")
+        raise TypeError(f'{arg} is not a Formula')
     return Not(arg)
 
 
@@ -1107,7 +1107,7 @@ def involutive_not(arg: Formula):
 
 class TruthValue(BooleanFormula):
 
-    _print_style = "constant"
+    _print_style = 'constant'
     _print_precedence = 99
 
     def _count_alternations(self: Self) -> tuple:
@@ -1117,7 +1117,7 @@ class TruthValue(BooleanFormula):
         return set()
 
     def sympy(self):
-        raise NotImplementedError(f"sympy does not know {self.func}")
+        raise NotImplementedError(f'sympy does not know {self.func}')
 
     def to_nnf(self, implicit_not=False):
         return self.func.dualize(conditional=implicit_not)()
@@ -1138,8 +1138,8 @@ class _T(TruthValue):
     support subclassing. We do not use a module because we need _T to be a
     subclass itself.
     """
-    _text_symbol = "T"
-    _latex_symbol = "\\top"
+    _text_symbol = 'T'
+    _latex_symbol = '\\top'
 
     _instance = None
 
@@ -1159,7 +1159,7 @@ class _T(TruthValue):
         self.args = ()
 
     def __repr__(self):
-        return "T"
+        return 'T'
 
 
 T = _T()
@@ -1172,8 +1172,8 @@ class _F(TruthValue):
     support subclassing. We do not use a module because we need _F to be a
     subclass itself.
     """
-    _text_symbol = "F"
-    _latex_symbol = "\\bot"
+    _text_symbol = 'F'
+    _latex_symbol = '\\bot'
 
     _instance = None
 
@@ -1193,7 +1193,7 @@ class _F(TruthValue):
         self.args = ()
 
     def __repr__(self):
-        return "F"
+        return 'F'
 
 
 F = _F()
@@ -1202,8 +1202,8 @@ F = _F()
 class AtomicFormula(BooleanFormula):
 
     _print_precedence = 99
-    _text_symbol_spacing = " "
-    _latex_symbol_spacing = " "
+    _text_symbol_spacing = ' '
+    _latex_symbol_spacing = ' '
 
     is_atomic = True
     is_boolean = False
@@ -1269,18 +1269,18 @@ class BinaryAtomicFormula(AtomicFormula):
 
     # Override BooleanFormula._sprint() to prevent recursion into terms
     def _sprint(self, mode: str) -> str:
-        if mode == "latex":
+        if mode == 'latex':
             symbol = self._latex_symbol
             lhs = sympy.latex(self.lhs)
             rhs = sympy.latex(self.rhs)
             spacing = self._latex_symbol_spacing
         else:
-            assert mode == "text"
+            assert mode == 'text'
             symbol = self._text_symbol
             lhs = self.lhs.__str__()
             rhs = self.rhs.__str__()
             spacing = self._text_symbol_spacing
-        return f"{lhs}{spacing}{symbol}{spacing}{rhs}"
+        return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
 
 
 class Eq(BinaryAtomicFormula):
@@ -1289,8 +1289,8 @@ class Eq(BinaryAtomicFormula):
     >>> Eq(x, x)
     Eq(x, x)
     """
-    _text_symbol = "="
-    _latex_symbol = "="
+    _text_symbol = '='
+    _latex_symbol = '='
 
     _sympy_func = sympy.Eq
 

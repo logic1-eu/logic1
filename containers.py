@@ -39,7 +39,7 @@ class Variables():
         return self.union(other)
 
     def __repr__(self):
-        return f"Variables(free={self.free}, bound={self.bound})"
+        return f'Variables(free={self.free}, bound={self.bound})'
 
     def union(self, other):
         """

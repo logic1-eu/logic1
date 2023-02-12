@@ -7,8 +7,8 @@ class Ne(BinaryAtomicFormula):
     >>> Ne(1, 0)
     Ne(1, 0)
     """
-    _text_symbol = "!="
-    _latex_symbol = "\\neq"
+    _text_symbol = '!='
+    _latex_symbol = '\\neq'
 
     _sympy_func = sympy.Ne
 
@@ -19,8 +19,8 @@ class Ne(BinaryAtomicFormula):
 
 class Ge(BinaryAtomicFormula):
 
-    _text_symbol = ">="
-    _latex_symbol = "\\geq"
+    _text_symbol = '>='
+    _latex_symbol = '\\geq'
 
     _sympy_func = sympy.Ge
 
@@ -31,8 +31,8 @@ class Ge(BinaryAtomicFormula):
 
 class Le(BinaryAtomicFormula):
 
-    _text_symbol = "<="
-    _latex_symbol = "\\leq"
+    _text_symbol = '<='
+    _latex_symbol = '\\leq'
 
     _sympy_func = sympy.Le
 
@@ -43,8 +43,8 @@ class Le(BinaryAtomicFormula):
 
 class Gt(BinaryAtomicFormula):
 
-    _text_symbol = ">"
-    _latex_symbol = ">"
+    _text_symbol = '>'
+    _latex_symbol = '>'
 
     _sympy_func = sympy.Gt
 
@@ -55,8 +55,8 @@ class Gt(BinaryAtomicFormula):
 
 class Lt(BinaryAtomicFormula):
 
-    _text_symbol = "<"
-    _latex_symbol = "<"
+    _text_symbol = '<'
+    _latex_symbol = '<'
 
     _sympy_func = sympy.Lt
 

@@ -1,6 +1,6 @@
 from sympy import Symbol
 
-_key = "R"
+_key = 'R'
 _index = 0
 _stack = []
 
@@ -37,7 +37,7 @@ def rename(var: Symbol) -> Symbol:
     global _index, _key
     _index += 1
     var_str = var.__str__()
-    L = var_str.split("_" + _key)
+    L = var_str.split('_' + _key)
     if len(L) == 2:
         var_str = L[0]
-    return Symbol(f"{var_str}_{_key}{_index}")
+    return Symbol(f'{var_str}_{_key}{_index}')
