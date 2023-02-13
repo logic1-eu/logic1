@@ -2,6 +2,28 @@ import sympy
 from logic1.formula import BinaryAtomicFormula
 
 
+class Eq(BinaryAtomicFormula):
+    """
+    >>> from sympy.abc import x
+    >>> Eq(x, x)
+    Eq(x, x)
+    """
+    _text_symbol = '='
+    _latex_symbol = '='
+
+    _sympy_func = sympy.Eq
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return Ne
+        return Eq
+
+    def __init__(self, lhs, rhs):
+        self.func = Eq
+        self.args = (lhs, rhs)
+
+
 class Ne(BinaryAtomicFormula):
     """
     >>> Ne(1, 0)
@@ -11,6 +33,12 @@ class Ne(BinaryAtomicFormula):
     _latex_symbol = '\\neq'
 
     _sympy_func = sympy.Ne
+
+    @staticmethod
+    def dualize(conditional: bool = True):
+        if conditional:
+            return Eq
+        return Ne
 
     def __init__(self, lhs, rhs):
         self.func = Ne
