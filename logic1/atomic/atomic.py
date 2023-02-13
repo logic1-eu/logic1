@@ -1,5 +1,5 @@
 import sympy
-from logic1.formula import BinaryAtomicFormula
+from ..formulas import BinaryAtomicFormula
 
 
 class Eq(BinaryAtomicFormula):

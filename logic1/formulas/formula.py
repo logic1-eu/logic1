@@ -22,8 +22,8 @@ from typing import Any, Callable, final, Union
 
 import sympy
 
-from logic1.containers import Variables
-from logic1.renaming import rename
+from .containers import Variables
+from .renaming import rename
 # from logic1.tracing import trace
 
 Self = Any
@@ -175,7 +175,7 @@ class Formula(ABC):
 
         Returns the maximal number of quantifier alternations along a path in
         the expression tree. Occurrence of quantified variables is not checked.
-        >>> from logic1.formula import EX, ALL, T
+        >>> from logic1 import EX, ALL, T
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import x, y, z
         >>> EX(x, Eq(x, y) & ALL(x, EX(y, EX(z, T)))).count_alternations()
@@ -200,7 +200,7 @@ class Formula(ABC):
         This should not be confused with bound ocurrences of variables. Compare
         the Formula.vars() method.
 
-        >>> from logic1.formula import EX, ALL
+        >>> from logic1 import EX, ALL
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import a, b, c, x, y, z
         >>> ALL(y, EX(x, Eq(a, y)) & EX(z, Eq(a, y))).qvars() == {x, y, z}
@@ -224,8 +224,7 @@ class Formula(ABC):
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
 
-        >>> from logic1.renaming import push, pop
-        >>> from logic1.formula import EX
+        >>> from logic1 import push, pop, EX
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import a, b, c, x, y, z
         >>> push()
@@ -252,7 +251,7 @@ class Formula(ABC):
         >>> e1
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1)
-        <class 'formula.Equivalent'>
+        <class 'logic1.formulas.formula.Equivalent'>
         >>> e1.sympy()
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1.sympy())
@@ -268,13 +267,13 @@ class Formula(ABC):
         >>> e3.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError: sympy does not know <class 'formula._T'>
+        NotImplementedError: sympy does not know <class 'logic1.formulas.formula._T'>
 
         >>> e4 = All(x, Ex(y, Eq(x, y)))
         >>> e4.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError: sympy does not know <class 'formula.All'>
+        NotImplementedError: sympy does not know <class 'logic1.formulas.formula.All'>
         """
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
@@ -287,8 +286,7 @@ class Formula(ABC):
         Furthermore, each bound variables occurs with one and only one
         quantifier.
 
-        >>> from logic1.renaming import push, pop
-        >>> from logic1.formula import EX, ALL, T
+        >>> from logic1 import push, pop, EX, ALL, T
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import x, y, z
         >>> push()
@@ -324,7 +322,7 @@ class Formula(ABC):
         quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
         not introduce any quanitfiers.
 
-        >>> from logic1.formula import EX, EQUIV, NOT, T
+        >>> from logic1 import EX, EQUIV, NOT, T
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import a, y
         >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
@@ -349,8 +347,7 @@ class Formula(ABC):
 
         Burhenne p.88:
 
-        >>> from logic1.renaming import push, pop
-        >>> from logic1.formula import EX, ALL, T, F
+        >>> from logic1 import push, pop, EX, ALL, T, F
         >>> from logic1.atomic import Eq
         >>> push()
         >>> x = sympy.symbols('x:8')
@@ -366,7 +363,7 @@ class Formula(ABC):
         Derived from redlog.tst:
 
         >>> push()
-        >>> from logic1.formula import EQUIV, AND, OR
+        >>> from logic1 import EQUIV, AND, OR
         >>> from sympy.abc import a, b, y
         >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
         >>> f2 = EX(y, Eq(y, a) | Eq(a, 0))
@@ -415,7 +412,7 @@ class Formula(ABC):
     def vars(self: Self, assume_quantified: set = set()) -> Variables:
         """Get variables.
 
-        >>> from logic1.formula import EX, ALL
+        >>> from logic1 import EX, ALL
         >>> from logic1.atomic import Eq
         >>> from sympy.abc import x, y, z
         >>> f = Eq(3 * x, 0) \
@@ -600,7 +597,7 @@ def EX(variable, arg):
 
     This is intended for inteactive use.
 
-    >>> from logic1.formula import EX
+    >>> from logic1 import EX
     >>> from logic1.atomic import Eq
     >>> from sympy.abc import x
     >>> EX(x, Eq(x, x))
@@ -656,7 +653,7 @@ def ALL(variable, arg):
 
     This is intended for inteactive use.
 
-    >>> from logic1.formula import ALL
+    >>> from logic1 import ALL
     >>> from logic1.atomic import Eq
     >>> from sympy.abc import x
     >>> ALL(x, Eq(x, x))
