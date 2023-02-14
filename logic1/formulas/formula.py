@@ -24,25 +24,10 @@ import sympy
 
 from .containers import Variables
 from .renaming import rename
+from .term import Variable, is_constant
 # from logic1.tracing import trace
 
 Self = Any
-
-
-# So far, we use Sympy expressions as Terms and Sympy Symbols as variables
-# without consistently using corresponding subclasses. We collect a few
-# helpers here.
-
-
-Variable = sympy.Symbol
-
-
-def is_constant(term) -> bool:
-    return not isinstance(term, sympy.Basic)
-
-
-def is_variable(term) -> bool:
-    return not isinstance(term, Variable)
 
 
 class Formula(ABC):
@@ -60,7 +45,7 @@ class Formula(ABC):
         >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
-        return And.AND(self, other)
+        return And.interactive_new(self, other)
 
     @final
     def __invert__(self: Self) -> Self:
@@ -73,7 +58,7 @@ class Formula(ABC):
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
-        return Not.NOT(self)
+        return Not.interactive_new(self)
 
     @final
     def __lshift__(self, other):
@@ -87,7 +72,7 @@ class Formula(ABC):
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies.IMPL(other, self)
+        return Implies.interactive_new(other, self)
 
     @final
     def __or__(self, other):
@@ -101,7 +86,7 @@ class Formula(ABC):
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
-        return Or.OR(self, other)
+        return Or.interactive_new(self, other)
 
     @final
     def __rshift__(self, other):
@@ -116,7 +101,7 @@ class Formula(ABC):
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies.IMPL(self, other)
+        return Implies.interactive_new(self, other)
 
     def __eq__(self, other):
         """Recursive equality of the formulas self and other.
@@ -468,6 +453,43 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
+    @classmethod
+    def interactive_new(cls, variable, arg):
+        """A type-checking convenience wrapper for the constructor.
+
+        This is intended for inteactive use.
+
+        >>> from logic1 import EX
+        >>> from logic1.atomic import Eq
+        >>> from sympy.abc import x
+        >>> EX(x, Eq(x, x))
+        Ex(x, Eq(x, x))
+
+        For efficiency reasons, the constructors of subclasses of Formula do
+        not check argument types. Trouble following later on can be hard to
+        diagnose:
+
+        >>> f = Ex('x', 'y')
+        >>> f
+        Ex('x', 'y')
+        >>> f.simplify()
+        Traceback (most recent call last):
+        ...
+        AttributeError: 'str' object has no attribute 'simplify'
+
+        EX checks and raises an exception immediately:
+
+        >>> EX('x', Eq(x, x))
+        Traceback (most recent call last):
+        ...
+        TypeError: 'x' is not a Variable
+        """
+        if not isinstance(variable, Variable):
+            raise TypeError(f'{repr(variable)} is not a Variable')
+        if not isinstance(arg, Formula):
+            raise TypeError(f'{repr(arg)} is not a Formula')
+        return cls(variable, arg)
+
     def _count_alternations(self: Self) -> tuple:
         count, quantifiers = self.arg._count_alternations()
         if self.func.dualize() in quantifiers:
@@ -586,50 +608,12 @@ class Ex(QuantifiedFormula):
             return All
         return Ex
 
-    @classmethod
-    def EX(cls, variable, arg):
-        """A convenience wrapper for the Ex Formula constructor, which does
-        type checking.
-
-        This is intended for inteactive use.
-
-        >>> from logic1 import EX
-        >>> from logic1.atomic import Eq
-        >>> from sympy.abc import x
-        >>> EX(x, Eq(x, x))
-        Ex(x, Eq(x, x))
-
-        For efficiency reasons, the constructors of subclasses of Formula do
-        not check argument types. Trouble following later on can be hard to
-        diagnose:
-
-        >>> f = Ex('x', 'y')
-        >>> f
-        Ex('x', 'y')
-        >>> f.simplify()
-        Traceback (most recent call last):
-        ...
-        AttributeError: 'str' object has no attribute 'simplify'
-
-        EX checks and raises an exception immediately:
-
-        >>> EX('x', Eq(x, x))
-        Traceback (most recent call last):
-        ...
-        TypeError: x is not a Variable
-        """
-        if not isinstance(variable, Variable):
-            raise TypeError(f'{variable} is not a Variable')
-        if not isinstance(arg, Formula):
-            raise TypeError(f'{arg} is not a Formula')
-        return cls(variable, arg)
-
     def __init__(self, variable, arg):
         self.func = Ex
         self.args = (variable, arg)
 
 
-EX = Ex.EX
+EX = Ex.interactive_new
 
 
 class All(QuantifiedFormula):
@@ -648,50 +632,12 @@ class All(QuantifiedFormula):
             return Ex
         return All
 
-    @classmethod
-    def ALL(cls, variable, arg):
-        """A convenience wrapper for the All Formula constructor, which does
-        type checking.
-
-        This is intended for inteactive use.
-
-        >>> from logic1 import ALL
-        >>> from logic1.atomic import Eq
-        >>> from sympy.abc import x
-        >>> ALL(x, Eq(x, x))
-        All(x, Eq(x, x))
-
-        For efficiency reasons, the constructors of subclasses of Formula do
-        not check argument types. Trouble following later on can be hard to
-        diagnose:
-
-        >>> f = All('x', 'y')
-        >>> f
-        All('x', 'y')
-        >>> f.simplify()
-        Traceback (most recent call last):
-        ...
-        AttributeError: 'str' object has no attribute 'simplify'
-
-        ALL checks and raises an exception immediately:
-
-        >>> ALL('x', Eq(x, x))
-        Traceback (most recent call last):
-        ...
-        TypeError: x is not a Variable
-        """
-        if not isinstance(variable, Variable):
-            raise TypeError(f'{variable} is not a Variable')
-        if not isinstance(arg, Formula):
-            raise TypeError(f'{arg} is not a Formula')
-        return cls(variable, arg)
-
     def __init__(self, variable, arg):
         self.func = All
         self.args = (variable, arg)
 
 
-ALL = All.ALL
+ALL = All.interactive_new
 
 
 class BooleanFormula(Formula):
@@ -798,7 +744,7 @@ class Equivalent(BooleanFormula):
         return self.args[1]
 
     @classmethod
-    def EQUIV(cls, lhs, rhs):
+    def interactive_new(cls, lhs, rhs):
         if not isinstance(lhs, Formula):
             raise TypeError(f'{lhs} is not a Formula')
         if not isinstance(rhs, Formula):
@@ -842,7 +788,7 @@ class Equivalent(BooleanFormula):
         return Equivalent(lhs, rhs)
 
 
-EQUIV = Equivalent.EQUIV
+EQUIV = Equivalent.interactive_new
 
 
 class Implies(BooleanFormula):
@@ -865,7 +811,7 @@ class Implies(BooleanFormula):
         return self.args[1]
 
     @classmethod
-    def IMPL(cls, lhs, rhs):
+    def interactive_new(cls, lhs, rhs):
         if not isinstance(lhs, Formula):
             raise TypeError(f'{lhs} is not a Formula')
         if not isinstance(rhs, Formula):
@@ -904,13 +850,26 @@ class Implies(BooleanFormula):
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
 
 
-IMPL = Implies.IMPL
+IMPL = Implies.interactive_new
 
 
 class AndOr(BooleanFormula):
 
     _print_style = 'infix'
     _print_precedence = 50
+
+    @classmethod
+    def interactive_new(cls, *args):
+        for arg in args:
+            if not isinstance(arg, Formula):
+                raise TypeError(f'{arg} is not a Formula')
+        args_flat = []
+        for arg in args:
+            if arg.func is cls:
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        return cls(*args_flat)
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -1040,19 +999,6 @@ class And(AndOr):
             return Or
         return And
 
-    @classmethod
-    def AND(cls, *args):
-        for arg in args:
-            if not isinstance(arg, Formula):
-                raise TypeError(f'{arg} is not a Formula')
-        args_flat = []
-        for arg in args:
-            if arg.func is And:
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        return cls(*args_flat)
-
     def __new__(cls, *args):
         if not args:
             return T
@@ -1065,7 +1011,7 @@ class And(AndOr):
         self.args = args
 
 
-AND = And.AND
+AND = And.interactive_new
 
 
 class Or(AndOr):
@@ -1090,19 +1036,6 @@ class Or(AndOr):
             return And
         return Or
 
-    @classmethod
-    def OR(cls, *args):
-        for arg in args:
-            if not isinstance(arg, Formula):
-                raise TypeError(f'{arg} is not a Formula')
-        args_flat = []
-        for arg in args:
-            if arg.func is Or:
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        return cls(*args_flat)
-
     def __new__(cls, *args):
         if not args:
             return F
@@ -1115,7 +1048,7 @@ class Or(AndOr):
         self.args = args
 
 
-OR = Or.OR
+OR = Or.interactive_new
 
 
 class Not(BooleanFormula):
@@ -1133,9 +1066,9 @@ class Not(BooleanFormula):
         return self.args[0]
 
     @classmethod
-    def NOT(cls, arg):
+    def interactive_new(cls, arg):
         if not isinstance(arg, Formula):
-            raise TypeError(f'{arg} is not a Formula')
+            raise TypeError(f'{repr(arg)} is not a Formula')
         return cls(arg)
 
     def __init__(self, arg):
@@ -1178,7 +1111,7 @@ class Not(BooleanFormula):
         return {Ex: self, All: self}
 
 
-NOT = Not.NOT
+NOT = Not.interactive_new
 
 
 def involutive_not(arg: Formula):
@@ -1306,6 +1239,13 @@ class AtomicFormula(BooleanFormula):
     is_atomic = True
     is_boolean = False
     is_quantified = False
+
+    @classmethod
+    def interactive_new(cls, *args):
+        args_ = []
+        for arg in args:
+            args_.append(sympy.Integer(arg) if isinstance(arg, int) else arg)
+        return cls(*args_)
 
     def _count_alternations(self: Self) -> tuple:
         return (-1, {Ex, All})

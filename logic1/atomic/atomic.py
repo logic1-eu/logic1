@@ -24,6 +24,9 @@ class Eq(BinaryAtomicFormula):
         self.args = (lhs, rhs)
 
 
+EQ = Eq.interactive_new
+
+
 class Ne(BinaryAtomicFormula):
     """
     >>> Ne(1, 0)
@@ -45,6 +48,9 @@ class Ne(BinaryAtomicFormula):
         self.args = (lhs, rhs)
 
 
+NE = Ne.interactive_new
+
+
 class Ge(BinaryAtomicFormula):
 
     _text_symbol = '>='
@@ -55,6 +61,9 @@ class Ge(BinaryAtomicFormula):
     def __init__(self, lhs, rhs):
         self.func = Ge
         self.args = (lhs, rhs)
+
+
+GE = Ge.interactive_new
 
 
 class Le(BinaryAtomicFormula):
@@ -69,6 +78,9 @@ class Le(BinaryAtomicFormula):
         self.args = (lhs, rhs)
 
 
+LE = Le.interactive_new
+
+
 class Gt(BinaryAtomicFormula):
 
     _text_symbol = '>'
@@ -81,6 +93,9 @@ class Gt(BinaryAtomicFormula):
         self.args = (lhs, rhs)
 
 
+GT = Gt.interactive_new
+
+
 class Lt(BinaryAtomicFormula):
 
     _text_symbol = '<'
@@ -91,3 +106,6 @@ class Lt(BinaryAtomicFormula):
     def __init__(self, lhs, rhs):
         self.func = Lt
         self.args = (lhs, rhs)
+
+
+LT = Lt.interactive_new
