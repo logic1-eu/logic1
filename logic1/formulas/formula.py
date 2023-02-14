@@ -60,7 +60,7 @@ class Formula(ABC):
         >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
-        return AND(self, other)
+        return And.AND(self, other)
 
     @final
     def __invert__(self: Self) -> Self:
@@ -73,7 +73,7 @@ class Formula(ABC):
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
-        return NOT(self)
+        return Not.NOT(self)
 
     @final
     def __lshift__(self, other):
@@ -87,7 +87,7 @@ class Formula(ABC):
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return IMPL(other, self)
+        return Implies.IMPL(other, self)
 
     @final
     def __or__(self, other):
@@ -101,7 +101,7 @@ class Formula(ABC):
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
-        return OR(self, other)
+        return Or.OR(self, other)
 
     @final
     def __rshift__(self, other):
@@ -116,7 +116,7 @@ class Formula(ABC):
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return IMPL(self, other)
+        return Implies.IMPL(self, other)
 
     def __eq__(self, other):
         """Recursive equality of the formulas self and other.
@@ -586,44 +586,50 @@ class Ex(QuantifiedFormula):
             return All
         return Ex
 
+    @classmethod
+    def EX(cls, variable, arg):
+        """A convenience wrapper for the Ex Formula constructor, which does
+        type checking.
+
+        This is intended for inteactive use.
+
+        >>> from logic1 import EX
+        >>> from logic1.atomic import Eq
+        >>> from sympy.abc import x
+        >>> EX(x, Eq(x, x))
+        Ex(x, Eq(x, x))
+
+        For efficiency reasons, the constructors of subclasses of Formula do
+        not check argument types. Trouble following later on can be hard to
+        diagnose:
+
+        >>> f = Ex('x', 'y')
+        >>> f
+        Ex('x', 'y')
+        >>> f.simplify()
+        Traceback (most recent call last):
+        ...
+        AttributeError: 'str' object has no attribute 'simplify'
+
+        EX checks and raises an exception immediately:
+
+        >>> EX('x', Eq(x, x))
+        Traceback (most recent call last):
+        ...
+        TypeError: x is not a Variable
+        """
+        if not isinstance(variable, Variable):
+            raise TypeError(f'{variable} is not a Variable')
+        if not isinstance(arg, Formula):
+            raise TypeError(f'{arg} is not a Formula')
+        return cls(variable, arg)
+
     def __init__(self, variable, arg):
         self.func = Ex
         self.args = (variable, arg)
 
 
-def EX(variable, arg):
-    """A convenience wrapper for the Ex Formula constructor, which does type
-    checking.
-
-    This is intended for inteactive use.
-
-    >>> from logic1 import EX
-    >>> from logic1.atomic import Eq
-    >>> from sympy.abc import x
-    >>> EX(x, Eq(x, x))
-    Ex(x, Eq(x, x))
-
-    For efficiency reasons, the constructors of subclasses of Formula do not
-    check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = Ex('x', 'y')
-    >>> f
-    Ex('x', 'y')
-    >>> f.simplify()
-    Traceback (most recent call last):
-    ...
-    AttributeError: 'str' object has no attribute 'simplify'
-
-    EX checks and raises an exception immediately:
-    >>> EX('x', Eq(x, x))
-    Traceback (most recent call last):
-    ...
-    TypeError: x is not a Variable
-    """
-    if not isinstance(variable, Variable):
-        raise TypeError(f'{variable} is not a Variable')
-    if not isinstance(arg, Formula):
-        raise TypeError(f'{arg} is not a Formula')
-    return Ex(variable, arg)
+EX = Ex.EX
 
 
 class All(QuantifiedFormula):
@@ -642,44 +648,50 @@ class All(QuantifiedFormula):
             return Ex
         return All
 
+    @classmethod
+    def ALL(cls, variable, arg):
+        """A convenience wrapper for the All Formula constructor, which does
+        type checking.
+
+        This is intended for inteactive use.
+
+        >>> from logic1 import ALL
+        >>> from logic1.atomic import Eq
+        >>> from sympy.abc import x
+        >>> ALL(x, Eq(x, x))
+        All(x, Eq(x, x))
+
+        For efficiency reasons, the constructors of subclasses of Formula do
+        not check argument types. Trouble following later on can be hard to
+        diagnose:
+
+        >>> f = All('x', 'y')
+        >>> f
+        All('x', 'y')
+        >>> f.simplify()
+        Traceback (most recent call last):
+        ...
+        AttributeError: 'str' object has no attribute 'simplify'
+
+        ALL checks and raises an exception immediately:
+
+        >>> ALL('x', Eq(x, x))
+        Traceback (most recent call last):
+        ...
+        TypeError: x is not a Variable
+        """
+        if not isinstance(variable, Variable):
+            raise TypeError(f'{variable} is not a Variable')
+        if not isinstance(arg, Formula):
+            raise TypeError(f'{arg} is not a Formula')
+        return cls(variable, arg)
+
     def __init__(self, variable, arg):
         self.func = All
         self.args = (variable, arg)
 
 
-def ALL(variable, arg):
-    """A convenience wrapper for the All Formula constructor, which does type
-    checking.
-
-    This is intended for inteactive use.
-
-    >>> from logic1 import ALL
-    >>> from logic1.atomic import Eq
-    >>> from sympy.abc import x
-    >>> ALL(x, Eq(x, x))
-    All(x, Eq(x, x))
-
-    For efficiency reasons, the constructors of subclasses of Formula do not
-    check argument types. Trouble following later on can be hard to diagnose:
-    >>> f = All('x', 'y')
-    >>> f
-    All('x', 'y')
-    >>> f.simplify()
-    Traceback (most recent call last):
-    ...
-    AttributeError: 'str' object has no attribute 'simplify'
-
-    ALL checks and raises an exception immediately:
-    >>> ALL('x', Eq(x, x))
-    Traceback (most recent call last):
-    ...
-    TypeError: x is not a Variable
-    """
-    if not isinstance(variable, Variable):
-        raise TypeError(f'{variable} is not a Variable')
-    if not isinstance(arg, Formula):
-        raise TypeError(f'{arg} is not a Formula')
-    return All(variable, arg)
+ALL = All.ALL
 
 
 class BooleanFormula(Formula):
@@ -785,6 +797,14 @@ class Equivalent(BooleanFormula):
         """The right-hand side of the Equivalence."""
         return self.args[1]
 
+    @classmethod
+    def EQUIV(cls, lhs, rhs):
+        if not isinstance(lhs, Formula):
+            raise TypeError(f'{lhs} is not a Formula')
+        if not isinstance(rhs, Formula):
+            raise TypeError(f'{rhs} is not a Formula')
+        return cls(lhs, rhs)
+
     def __init__(self, lhs, rhs):
         self.func = Equivalent
         self.args = (lhs, rhs)
@@ -822,12 +842,7 @@ class Equivalent(BooleanFormula):
         return Equivalent(lhs, rhs)
 
 
-def EQUIV(lhs, rhs):
-    if not isinstance(lhs, Formula):
-        raise TypeError(f'{lhs} is not a Formula')
-    if not isinstance(rhs, Formula):
-        raise TypeError(f'{rhs} is not a Formula')
-    return Equivalent(lhs, rhs)
+EQUIV = Equivalent.EQUIV
 
 
 class Implies(BooleanFormula):
@@ -848,6 +863,14 @@ class Implies(BooleanFormula):
     def rhs(self):
         """The right-hand side of the Implies."""
         return self.args[1]
+
+    @classmethod
+    def IMPL(cls, lhs, rhs):
+        if not isinstance(lhs, Formula):
+            raise TypeError(f'{lhs} is not a Formula')
+        if not isinstance(rhs, Formula):
+            raise TypeError(f'{rhs} is not a Formula')
+        return cls(lhs, rhs)
 
     def __init__(self, lhs, rhs):
         self.func = Implies
@@ -881,12 +904,7 @@ class Implies(BooleanFormula):
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
 
 
-def IMPL(lhs, rhs):
-    if not isinstance(lhs, Formula):
-        raise TypeError(f'{lhs} is not a Formula')
-    if not isinstance(rhs, Formula):
-        raise TypeError(f'{rhs} is not a Formula')
-    return Implies(lhs, rhs)
+IMPL = Implies.IMPL
 
 
 class AndOr(BooleanFormula):
@@ -1022,6 +1040,19 @@ class And(AndOr):
             return Or
         return And
 
+    @classmethod
+    def AND(cls, *args):
+        for arg in args:
+            if not isinstance(arg, Formula):
+                raise TypeError(f'{arg} is not a Formula')
+        args_flat = []
+        for arg in args:
+            if arg.func is And:
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        return cls(*args_flat)
+
     def __new__(cls, *args):
         if not args:
             return T
@@ -1034,17 +1065,7 @@ class And(AndOr):
         self.args = args
 
 
-def AND(*args):
-    for arg in args:
-        if not isinstance(arg, Formula):
-            raise TypeError(f'{arg} is not a Formula')
-    args_flat = []
-    for arg in args:
-        if arg.func is And:
-            args_flat.extend(list(arg.args))
-        else:
-            args_flat.append(arg)
-    return And(*args_flat)
+AND = And.AND
 
 
 class Or(AndOr):
@@ -1069,6 +1090,19 @@ class Or(AndOr):
             return And
         return Or
 
+    @classmethod
+    def OR(cls, *args):
+        for arg in args:
+            if not isinstance(arg, Formula):
+                raise TypeError(f'{arg} is not a Formula')
+        args_flat = []
+        for arg in args:
+            if arg.func is Or:
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        return cls(*args_flat)
+
     def __new__(cls, *args):
         if not args:
             return F
@@ -1081,17 +1115,7 @@ class Or(AndOr):
         self.args = args
 
 
-def OR(*args):
-    for arg in args:
-        if not isinstance(arg, Formula):
-            raise TypeError(f'{arg} is not a Formula')
-    args_flat = []
-    for arg in args:
-        if arg.func is Or:
-            args_flat.extend(list(arg.args))
-        else:
-            args_flat.append(arg)
-    return Or(*args_flat)
+OR = Or.OR
 
 
 class Not(BooleanFormula):
@@ -1107,6 +1131,12 @@ class Not(BooleanFormula):
     def arg(self):
         """The one argument of the Not."""
         return self.args[0]
+
+    @classmethod
+    def NOT(cls, arg):
+        if not isinstance(arg, Formula):
+            raise TypeError(f'{arg} is not a Formula')
+        return cls(arg)
 
     def __init__(self, arg):
         self.func = Not
@@ -1148,10 +1178,7 @@ class Not(BooleanFormula):
         return {Ex: self, All: self}
 
 
-def NOT(arg):
-    if not isinstance(arg, Formula):
-        raise TypeError(f'{arg} is not a Formula')
-    return Not(arg)
+NOT = Not.NOT
 
 
 def involutive_not(arg: Formula):
