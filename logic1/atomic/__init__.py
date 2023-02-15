@@ -1,1 +1,1 @@
-from .atomic import (Eq, Ne, Gt, Lt, Ge, Le)
+from .atomic import (Eq, EQ, Ne, NE, Gt, GT, Lt, LT, Ge, GE, Le, LE)

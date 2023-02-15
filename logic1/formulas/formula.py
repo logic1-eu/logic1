@@ -17,17 +17,23 @@ Applications would implement their particular languages as follows:
   interface; compare EX, ALL, AND, OR, EQUIV, IMPL below.
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractclassmethod
-from typing import Any, Callable, final, Union
+from typing import Callable, final, Union
 
 import sympy
 
 from .containers import Variables
 from .renaming import rename
-from .term import Variable, is_constant
 # from logic1.tracing import trace
 
-Self = Any
+
+"""A Variable is a sympy.Symbol. This definition is made here and it is
+considered final. Variables appear as arguments of quantifiers, where
+there is possibly no atomic formula nearby.
+"""
+Variable = sympy.Symbol
 
 
 class Formula(ABC):
@@ -41,8 +47,8 @@ class Formula(ABC):
         Note that ``&`` delegates to the convenience wrapper AND in contrast to
         the constructor And.
 
-        >>> from logic1.atomic import Eq
-        >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
+        >>> from logic1.atomic import EQ
+        >>> EQ(0, 0) & EQ(1 + 1, 2) & EQ(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
         return And.interactive_new(self, other)
@@ -54,8 +60,8 @@ class Formula(ABC):
         Note that ``~`` delegates to the convenience wrapper NOT in contrast to
         the constructor Not.
 
-        >>> from logic1.atomic import Eq
-        >>> ~ Eq(1,0)
+        >>> from logic1.atomic import EQ
+        >>> ~ EQ(1,0)
         Not(Eq(1, 0))
         """
         return Not.interactive_new(self)
@@ -67,9 +73,9 @@ class Formula(ABC):
         Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
         to the constructor Implies.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> Eq(x + z, y + z) << Eq(x, y)
+        >>> EQ(x + z, y + z) << EQ(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
         return Implies.interactive_new(other, self)
@@ -81,9 +87,9 @@ class Formula(ABC):
         Note that ``|`` delegates to the convenience wrapper OR in contrast to
         the constructor Or.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
+        >>> EQ(x, 0) | EQ(x, y) | EQ(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
         return Or.interactive_new(self, other)
@@ -96,9 +102,9 @@ class Formula(ABC):
         Note that ``<<`` uses the convenience wrapper IMPL in contrast to the
         constructor implies.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> Eq(x, y) >> Eq(x + z, y + z)
+        >>> EQ(x, y) >> EQ(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
         return Implies.interactive_new(self, other)
@@ -161,9 +167,9 @@ class Formula(ABC):
         Returns the maximal number of quantifier alternations along a path in
         the expression tree. Occurrence of quantified variables is not checked.
         >>> from logic1 import EX, ALL, T
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> EX(x, Eq(x, y) & ALL(x, EX(y, EX(z, T)))).count_alternations()
+        >>> EX(x, EQ(x, y) & ALL(x, EX(y, EX(z, T)))).count_alternations()
         2
         """
         return self._count_alternations()[0]
@@ -186,9 +192,9 @@ class Formula(ABC):
         the Formula.vars() method.
 
         >>> from logic1 import EX, ALL
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import a, b, c, x, y, z
-        >>> ALL(y, EX(x, Eq(a, y)) & EX(z, Eq(a, y))).qvars() == {x, y, z}
+        >>> ALL(y, EX(x, EQ(a, y)) & EX(z, EQ(a, y))).qvars() == {x, y, z}
         True
         """
         ...
@@ -210,13 +216,13 @@ class Formula(ABC):
         """Substitution.
 
         >>> from logic1 import push, pop, EX
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import a, b, c, x, y, z
         >>> push()
-        >>> EX(x, Eq(x, a)).subs({x: a})
+        >>> EX(x, EQ(x, a)).subs({x: a})
         Ex(x, Eq(x, a))
-        >>> f = EX(x, Eq(x, a)).subs({a: x})
-        >>> g = Ex(x, f & Eq(b, 0))
+        >>> f = EX(x, EQ(x, a)).subs({a: x})
+        >>> g = Ex(x, f & EQ(b, 0))
         >>> g
         Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
         >>> g.subs({b: x})
@@ -230,9 +236,9 @@ class Formula(ABC):
 
         Subclasses that have no match in sympy can raise NotImplementedError.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(Eq(x, y), Eq(x + 1, y + 1))
+        >>> e1 = Equivalent(EQ(x, y), EQ(x + 1, y + 1))
         >>> e1
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1)
@@ -242,7 +248,7 @@ class Formula(ABC):
         >>> type(e1.sympy())
         Equivalent
 
-        >>> e2 = Equivalent(Eq(x, y), Eq(y, x))
+        >>> e2 = Equivalent(EQ(x, y), EQ(y, x))
         >>> e2
         Equivalent(Eq(x, y), Eq(y, x))
         >>> e2.sympy()
@@ -254,7 +260,7 @@ class Formula(ABC):
         ...
         NotImplementedError: sympy does not know <class 'logic1.formulas.formula._T'>
 
-        >>> e4 = All(x, Ex(y, Eq(x, y)))
+        >>> e4 = All(x, Ex(y, EQ(x, y)))
         >>> e4.sympy()
         Traceback (most recent call last):
         ...
@@ -272,11 +278,11 @@ class Formula(ABC):
         quantifier.
 
         >>> from logic1 import push, pop, EX, ALL, T
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
         >>> push()
-        >>> f0 = ALL(z, EX(y, Eq(x, y) & Eq(y, z) & EX(x, T)))
-        >>> f = Eq(x, y) & EX(x, Eq(x, y) & f0)
+        >>> f0 = ALL(z, EX(y, EQ(x, y) & EQ(y, z) & EX(x, T)))
+        >>> f = EQ(x, y) & EX(x, EQ(x, y) & f0)
         >>> f.to_distinct_vars()
         ... # doctest: +NORMALIZE_WHITESPACE
         And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
@@ -308,9 +314,9 @@ class Formula(ABC):
         not introduce any quanitfiers.
 
         >>> from logic1 import EX, EQUIV, NOT, T
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import a, y
-        >>> f = EQUIV(Eq(a, 0) & T, EX(y, ~ Eq(y, a)))
+        >>> f = EQUIV(EQ(a, 0) & T, EX(y, ~ EQ(y, a)))
         >>> f.to_nnf()
         ... # doctest: +NORMALIZE_WHITESPACE
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
@@ -333,12 +339,12 @@ class Formula(ABC):
         Burhenne p.88:
 
         >>> from logic1 import push, pop, EX, ALL, T, F
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> push()
         >>> x = sympy.symbols('x:8')
         >>> f1 = EX(x[1], ALL(x[2], ALL(x[3], T)))
         >>> f2 = ALL(x[4], EX(x[5], ALL(x[6], F)))
-        >>> f3 = EX(x[7], Eq(x[0], 0))
+        >>> f3 = EX(x[7], EQ(x[0], 0))
         >>> (f1 & f2 & f3).to_pnf()
         ... # doctest: +NORMALIZE_WHITESPACE
         All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
@@ -350,8 +356,8 @@ class Formula(ABC):
         >>> push()
         >>> from logic1 import EQUIV, AND, OR
         >>> from sympy.abc import a, b, y
-        >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
-        >>> f2 = EX(y, Eq(y, a) | Eq(a, 0))
+        >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
+        >>> f2 = EX(y, EQ(y, a) | EQ(a, 0))
         >>> EQUIV(f1, f2).to_pnf()
         ... # doctest: +NORMALIZE_WHITESPACE
         Ex(y_R1, All(y_R2,
@@ -398,10 +404,10 @@ class Formula(ABC):
         """Get variables.
 
         >>> from logic1 import EX, ALL
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = Eq(3 * x, 0) \
-                >> ALL(z, ALL(x, (~ Eq(x, 0) >> EX(y, Eq(x * y, 1)))))
+        >>> f = EQ(3 * x, 0) \
+                >> ALL(z, ALL(x, (~ EQ(x, 0) >> EX(y, EQ(x * y, 1)))))
         >>> f.vars().free == {x}
         True
         >>> f.vars().bound == {x, y}
@@ -429,9 +435,9 @@ class QuantifiedFormula(Formula):
     def var(self):
         """The variable of the quantifier.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = All(x, Ex(y, Eq(x, y)))
+        >>> e1 = All(x, Ex(y, EQ(x, y)))
         >>> e1.var
         x
         """
@@ -445,9 +451,9 @@ class QuantifiedFormula(Formula):
     def arg(self):
         """The subformula in the scope of the QuantifiedFormula.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = All(x, Ex(y, Eq(x, y)))
+        >>> e1 = All(x, Ex(y, EQ(x, y)))
         >>> e1.arg
         Ex(y, Eq(x, y))
         """
@@ -460,9 +466,9 @@ class QuantifiedFormula(Formula):
         This is intended for inteactive use.
 
         >>> from logic1 import EX
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x
-        >>> EX(x, Eq(x, x))
+        >>> EX(x, EQ(x, x))
         Ex(x, Eq(x, x))
 
         For efficiency reasons, the constructors of subclasses of Formula do
@@ -479,7 +485,7 @@ class QuantifiedFormula(Formula):
 
         EX checks and raises an exception immediately:
 
-        >>> EX('x', Eq(x, x))
+        >>> EX('x', EQ(x, x))
         Traceback (most recent call last):
         ...
         TypeError: 'x' is not a Variable
@@ -502,9 +508,9 @@ class QuantifiedFormula(Formula):
     def simplify(self, Theta=None):
         """Simplification.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> All(x, Ex(y, Eq(x, y))).simplify()
+        >>> All(x, Ex(y, EQ(x, y))).simplify()
         All(x, Ex(y, Eq(x, y)))
         """
         return self.func(self.var, self.arg.simplify())
@@ -594,9 +600,9 @@ class QuantifiedFormula(Formula):
 
 class Ex(QuantifiedFormula):
     """
-    >>> from logic1.atomic import Eq
+    >>> from logic1.atomic import EQ
     >>> from sympy.abc import x
-    >>> Ex(x, Eq(x, 1))
+    >>> Ex(x, EQ(x, 1))
     Ex(x, Eq(x, 1))
     """
     _text_symbol = 'Ex'
@@ -618,9 +624,9 @@ EX = Ex.interactive_new
 
 class All(QuantifiedFormula):
     """
-    >>> from logic1.atomic import Eq
+    >>> from logic1.atomic import EQ
     >>> from sympy.abc import x, y
-    >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
+    >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
     _text_symbol = 'All'
@@ -763,9 +769,9 @@ class Equivalent(BooleanFormula):
     def simplify(self, Theta=None):
         """Recursively simplify the Equivalence.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(Not(Eq(x, y)), F)
+        >>> e1 = Equivalent(Not(EQ(x, y)), F)
         >>> e1.simplify()
         Eq(x, y)
         """
@@ -874,11 +880,11 @@ class AndOr(BooleanFormula):
     def simplify(self, Theta=None):
         """Simplification.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))).simplify()
+        >>> And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(x, x + z))).simplify()
         And(Eq(x, y), Eq(x, z), Eq(x, x + z))
-        >>> Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z))).simplify()
+        >>> Or(EQ(x, 0), Or(EQ(x, 1), EQ(x, 2)), And(EQ(x, y), EQ(x, z))).simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
         gAnd = And.dualize(conditional=self.func is Or)
@@ -979,13 +985,13 @@ class AndOr(BooleanFormula):
 class And(AndOr):
     """Constructor for conjunctions of Formulas.
 
-    >>> from logic1.atomic import Eq
+    >>> from logic1.atomic import EQ
     >>> from sympy.abc import x, y, z
     >>> And()
     T
-    >>> And(Eq(0, 0))
+    >>> And(EQ(0, 0))
     Eq(0, 0)
-    >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
+    >>> And(EQ(x, 0), EQ(x, y), EQ(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
     _text_symbol = '&'
@@ -1017,12 +1023,12 @@ AND = And.interactive_new
 class Or(AndOr):
     """Constructor for disjunctions of Formulas.
 
-    >>> from logic1.atomic import Eq
+    >>> from logic1.atomic import EQ
     >>> Or()
     F
-    >>> Or(Eq(1, 0))
+    >>> Or(EQ(1, 0))
     Eq(1, 0)
-    >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
+    >>> Or(EQ(1, 0), EQ(2, 0), EQ(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
     _text_symbol = '|'
@@ -1078,9 +1084,9 @@ class Not(BooleanFormula):
     def simplify(self, Theta=None):
         """Simplification.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = All(x, EX(y, And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
+        >>> f = All(x, EX(y, And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))))
         >>> Not(f).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
         """
@@ -1095,10 +1101,10 @@ class Not(BooleanFormula):
                to_positive: bool = True) -> Self:
         """Negation normal form.
 
-        >>> from logic1.atomic import Eq
+        >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
         >>> f = All(x, EX(y, \
-                    And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))))
+                    And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))))
         >>> Not(f).to_nnf()
         Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
         """
@@ -1118,10 +1124,10 @@ def involutive_not(arg: Formula):
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.atomic import Eq
-    >>> involutive_not(Eq(0, 0))
+    >>> from logic1.atomic import EQ
+    >>> involutive_not(EQ(0, 0))
     Not(Eq(0, 0))
-    >>> involutive_not(Not(Eq(1, 0)))
+    >>> involutive_not(Not(EQ(1, 0)))
     Eq(1, 0)
     >>> involutive_not(T)
     Not(T)
@@ -1240,28 +1246,11 @@ class AtomicFormula(BooleanFormula):
     is_boolean = False
     is_quantified = False
 
-    @classmethod
-    def interactive_new(cls, *args):
-        args_ = []
-        for arg in args:
-            args_.append(sympy.Integer(arg) if isinstance(arg, int) else arg)
-        return cls(*args_)
-
     def _count_alternations(self: Self) -> tuple:
         return (-1, {Ex, All})
 
     def qvars(self: Self) -> set:
         return set()
-
-    def subs(self: Self, substitution: dict) -> Self:
-        # The recursion into args here applies sympy.subs().
-        args_subs = []
-        for term in self.args:
-            if is_constant(term):
-                args_subs.append(term)
-            else:
-                args_subs.append(term.subs(substitution, simultaneous=True))
-        return self.func(*(args_subs))
 
     # Override Formula.sympy() to prevent recursion into terms
     def sympy(self, **kwargs):
@@ -1288,42 +1277,17 @@ class AtomicFormula(BooleanFormula):
         """
         return {Ex: self, All: self}
 
+    @abstractclassmethod
+    def _sprint(self: Self, mode: str) -> str:
+        ...
+
+    @abstractclassmethod
+    def subs(self: Self, substitution: dict) -> Self:
+        ...
+
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         return transformation(self)
 
+    @abstractclassmethod
     def vars(self: Self, assume_quantified: set = set()) -> Variables:
-        all_vars = set()
-        for term in self.args:
-            if is_constant(term):
-                continue
-            all_vars |= term.atoms(sympy.Symbol)
-        return Variables(free=all_vars - assume_quantified,
-                         bound=all_vars & assume_quantified)
-
-
-class BinaryAtomicFormula(AtomicFormula):
-
-    @property
-    def lhs(self):
-        """The left-hand side of the BinaryAtomicFormula."""
-        return self.args[0]
-
-    @property
-    def rhs(self):
-        """The right-hand side of the BinaryAtomicFormula."""
-        return self.args[1]
-
-    # Override BooleanFormula._sprint() to prevent recursion into terms
-    def _sprint(self, mode: str) -> str:
-        if mode == 'latex':
-            symbol = self._latex_symbol
-            lhs = sympy.latex(self.lhs)
-            rhs = sympy.latex(self.rhs)
-            spacing = self._latex_symbol_spacing
-        else:
-            assert mode == 'text'
-            symbol = self._text_symbol
-            lhs = self.lhs.__str__()
-            rhs = self.rhs.__str__()
-            spacing = self._text_symbol_spacing
-        return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
+        ...
