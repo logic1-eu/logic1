@@ -114,9 +114,9 @@ class Formula(ABC):
 
         This is *not* logical ``equal.``
 
-        >>> from logic1.atomic import Ne
-        >>> e1 = Ne(1, 0)
-        >>> e2 = Ne(1, 0)
+        >>> from logic1.atomic import NE
+        >>> e1 = NE(1, 0)
+        >>> e2 = NE(1, 0)
         >>> e1 == e2
         True
         >>> e1 is e2
@@ -258,13 +258,15 @@ class Formula(ABC):
         >>> e3.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError: sympy does not know <class 'logic1.formulas.formula._T'>
+        NotImplementedError:
+            sympy does not know <class 'logic1.formulas.formula._T'>
 
         >>> e4 = All(x, Ex(y, EQ(x, y)))
         >>> e4.sympy()
         Traceback (most recent call last):
         ...
-        NotImplementedError: sympy does not know <class 'logic1.formulas.formula.All'>
+        NotImplementedError:
+            sympy does not know <class 'logic1.formulas.formula.All'>
         """
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
@@ -284,7 +286,6 @@ class Formula(ABC):
         >>> f0 = ALL(z, EX(y, EQ(x, y) & EQ(y, z) & EX(x, T)))
         >>> f = EQ(x, y) & EX(x, EQ(x, y) & f0)
         >>> f.to_distinct_vars()
-        ... # doctest: +NORMALIZE_WHITESPACE
         And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
             All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
         >>> pop()
@@ -318,7 +319,6 @@ class Formula(ABC):
         >>> from sympy.abc import a, y
         >>> f = EQUIV(EQ(a, 0) & T, EX(y, ~ EQ(y, a)))
         >>> f.to_nnf()
-        ... # doctest: +NORMALIZE_WHITESPACE
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
         """
@@ -346,7 +346,6 @@ class Formula(ABC):
         >>> f2 = ALL(x[4], EX(x[5], ALL(x[6], F)))
         >>> f3 = EX(x[7], EQ(x[0], 0))
         >>> (f1 & f2 & f3).to_pnf()
-        ... # doctest: +NORMALIZE_WHITESPACE
         All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
             And(T, F, Eq(x0, 0)))))))))
         >>> pop()
@@ -359,7 +358,6 @@ class Formula(ABC):
         >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
         >>> f2 = EX(y, EQ(y, a) | EQ(a, 0))
         >>> EQUIV(f1, f2).to_pnf()
-        ... # doctest: +NORMALIZE_WHITESPACE
         Ex(y_R1, All(y_R2,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
@@ -368,7 +366,6 @@ class Formula(ABC):
 
         >>> push()
         >>> EQUIV(f1, f2).to_pnf(prefer_universal=True)
-        ... # doctest: +NORMALIZE_WHITESPACE
         All(y_R2, Ex(y_R1,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
@@ -510,7 +507,7 @@ class QuantifiedFormula(Formula):
 
         >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> All(x, Ex(y, EQ(x, y))).simplify()
+        >>> ALL(x, EX(y, EQ(x, y))).simplify()
         All(x, Ex(y, Eq(x, y)))
         """
         return self.func(self.var, self.arg.simplify())
@@ -771,7 +768,7 @@ class Equivalent(BooleanFormula):
 
         >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(Not(EQ(x, y)), F)
+        >>> e1 = EQUIV(~ EQ(x, y), F)
         >>> e1.simplify()
         Eq(x, y)
         """
@@ -884,7 +881,8 @@ class AndOr(BooleanFormula):
         >>> from sympy.abc import x, y, z
         >>> And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(x, x + z))).simplify()
         And(Eq(x, y), Eq(x, z), Eq(x, x + z))
-        >>> Or(EQ(x, 0), Or(EQ(x, 1), EQ(x, 2)), And(EQ(x, y), EQ(x, z))).simplify()
+        >>> f = Or(EQ(x, 0), Or(EQ(x, 1), EQ(x, 2)), And(EQ(x, y), EQ(x, z)))
+        >>> f.simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
         gAnd = And.dualize(conditional=self.func is Or)
@@ -1086,8 +1084,8 @@ class Not(BooleanFormula):
 
         >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = All(x, EX(y, And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))))
-        >>> Not(f).simplify()
+        >>> f = And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))
+        >>> ~ All(x, EX(y, f)).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
         """
         arg_simplify = self.arg.simplify(Theta=Theta)
@@ -1103,9 +1101,8 @@ class Not(BooleanFormula):
 
         >>> from logic1.atomic import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = All(x, EX(y, \
-                    And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))))
-        >>> Not(f).to_nnf()
+        >>> f = ALL(x, EX(y, And(EQ(x, y), T, EQ(x, y), EQ(x, z) & EQ(y, x))))
+        >>> (~f).to_nnf()
         Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
         """
         return self.arg.to_nnf(implicit_not=not implicit_not,
@@ -1127,7 +1124,7 @@ def involutive_not(arg: Formula):
     >>> from logic1.atomic import EQ
     >>> involutive_not(EQ(0, 0))
     Not(Eq(0, 0))
-    >>> involutive_not(Not(EQ(1, 0)))
+    >>> involutive_not(~EQ(1, 0))
     Eq(1, 0)
     >>> involutive_not(T)
     Not(T)
