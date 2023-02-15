@@ -6,4 +6,5 @@ ___copyright__ = 'Copyright 2023, Thomas Sturm, Germany'
 ___license__ = 'BSD 2-Clause (aka Simplified BSD, FreeBSD)'
 ___status__ = 'Prototype'
 
-from .formulas import *
+from .firstorder import *
+from .support.renaming import *

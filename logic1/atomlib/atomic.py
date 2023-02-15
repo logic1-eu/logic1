@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import sympy
 
-from ..formulas import formula
-from ..formulas.containers import Variables
+from ..firstorder import formula
+from ..support.containers import Variables
 
 Term = sympy.Expr
 
