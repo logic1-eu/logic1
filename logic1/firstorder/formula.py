@@ -58,7 +58,7 @@ class Formula(ABC):
         return And.interactive_new(self, other)
 
     @final
-    def __invert__(self: Self) -> Self:
+    def __invert__(self) -> Self:
         """Override the ``~`` operator to apply logical NOT.
 
         Note that ``~`` delegates to the convenience wrapper NOT in contrast to
@@ -165,7 +165,7 @@ class Formula(ABC):
         return '$\\displaystyle ' + self.latex() + '$'
 
     @abstractmethod
-    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
         """Return any atomic formula contained in self, None if there is none.
 
         A typical use cass is getting access to methods of classes derived from
@@ -174,7 +174,7 @@ class Formula(ABC):
         ...
 
     @final
-    def count_alternations(self: Self) -> int:
+    def count_alternations(self) -> int:
         """Count number of quantifier alternations.
 
         Returns the maximal number of quantifier alternations along a path in
@@ -188,17 +188,17 @@ class Formula(ABC):
         return self._count_alternations()[0]
 
     @abstractmethod
-    def _count_alternations(self: Self) -> tuple:
+    def _count_alternations(self) -> tuple:
         ...
 
     @final
-    def latex(self: Self) -> str:
+    def latex(self) -> str:
         """Convert to LaTeX representation.
         """
         return self._sprint(mode='latex')
 
     @abstractmethod
-    def qvars(self: Self) -> set:
+    def qvars(self) -> set:
         """The set of all variables that are quantified in self.
 
         This should not be confused with bound ocurrences of variables. Compare
@@ -212,7 +212,7 @@ class Formula(ABC):
         """
         ...
 
-    def simplify(self: Self, Theta=None) -> Self:
+    def simplify(self, Theta=None) -> Self:
         """Identity as a default implemenation of a simplifier for formulas.
 
         This should be overridden in the majority of the classes that
@@ -221,11 +221,11 @@ class Formula(ABC):
         return self
 
     @abstractmethod
-    def _sprint(self: Self, mode: str) -> str:
+    def _sprint(self, mode: str) -> str:
         ...
 
     @abstractmethod
-    def subs(self: Self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> Self:
         """Substitution.
 
         >>> from logic1 import push, pop, EX
@@ -248,7 +248,7 @@ class Formula(ABC):
         """
         ...
 
-    def sympy(self: Self, **kwargs) -> sympy.Basic:
+    def sympy(self, **kwargs) -> sympy.Basic:
         """Provide a sympy representation of the Formula if possible.
 
         Subclasses that have no match in sympy can raise NotImplementedError.
@@ -288,7 +288,7 @@ class Formula(ABC):
         return self._sympy_func(*(a.sympy(**kwargs) for a in self.args))
 
     @final
-    def to_distinct_vars(self: Self) -> Self:
+    def to_distinct_vars(self) -> Self:
         """Convert to equivalent formulas with distinct variables.
 
         Bound variables are renamed such that that set of all bound
@@ -312,7 +312,7 @@ class Formula(ABC):
         return self._to_distinct_vars(self.vars().free)
 
     @abstractmethod
-    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> Self:
         # Traverses self. If a badlisted variable is encountered as a
         # quantified variable, it will be replaced with a fresh name in the
         # respective QuantifiedFormula, and the fresh name will be badlisted
@@ -321,7 +321,7 @@ class Formula(ABC):
         ...
 
     @abstractmethod
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Self:
         """Convert to Negation Normal Form.
 
@@ -342,7 +342,7 @@ class Formula(ABC):
         ...
 
     @final
-    def to_pnf(self: Self, prefer_universal: bool = False,
+    def to_pnf(self, prefer_universal: bool = False,
                is_admissible: bool = False) -> Self:
         """Convert to Prenex Normal Form.
 
@@ -396,7 +396,7 @@ class Formula(ABC):
         return phi._to_pnf()[All if prefer_universal else Ex]
 
     # abstract - see docstring
-    def _to_pnf(self: Self) -> dict:
+    def _to_pnf(self) -> dict:
         """Private convert to Prenex Normal Form.
 
         self must be in NNF. All NNF operators (QuantifiedFormula, AndOr,
@@ -410,11 +410,11 @@ class Formula(ABC):
         raise NotImplementedError(f'{self.func} is not an NNF operator')
 
     @abstractmethod
-    def transform_atoms(self: Self, transformation: Callable) -> Self:
+    def transform_atoms(self, transformation: Callable) -> Self:
         ...
 
     @abstractmethod
-    def vars(self: Self, assume_quantified: set = set()) -> Variables:
+    def vars(self, assume_quantified: set = set()) -> Variables:
         """Get variables.
 
         >>> from logic1 import EX, ALL
@@ -516,16 +516,16 @@ class QuantifiedFormula(Formula):
             raise TypeError(f'{repr(variable)} is not a Variable')
         return cls(variable, arg)
 
-    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
         return self.arg.get_any_atomic_formula()
 
-    def _count_alternations(self: Self) -> tuple:
+    def _count_alternations(self) -> tuple:
         count, quantifiers = self.arg._count_alternations()
         if self.func.dualize() in quantifiers:
             return (count + 1, {self.func})
         return (count, quantifiers)
 
-    def qvars(self: Self) -> set:
+    def qvars(self) -> set:
         return self.arg.qvars() | {self.var}
 
     def simplify(self, Theta=None):
@@ -538,7 +538,7 @@ class QuantifiedFormula(Formula):
         """
         return self.func(self.var, self.arg.simplify())
 
-    def _sprint(self: Self, mode: str) -> str:
+    def _sprint(self, mode: str) -> str:
         def arg_in_parens(inner):
             inner_sprint = inner._sprint(mode)
             if not inner.is_quantified and inner.func is not Not:
@@ -560,7 +560,7 @@ class QuantifiedFormula(Formula):
     def sympy(self, *args, **kwargs):
         raise NotImplementedError(f'sympy does not know {type(self)}')
 
-    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> Self:
         arg = self.arg._to_distinct_vars(badlist)
         if self.var in badlist:
             var = rename(self.var)
@@ -569,20 +569,20 @@ class QuantifiedFormula(Formula):
             return self.func(var, arg)
         return self.func(self.var, arg)
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         func_nnf = self.func.dualize(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not,
                                   to_positive=to_positive)
         return func_nnf(self.var, arg_nnf)
 
-    def _to_pnf(self: Self) -> dict:
+    def _to_pnf(self) -> dict:
         """Prenex normal form. self must be in negation normal form.
         """
         pnf = self.func(self.var, self.arg._to_pnf()[self.func])
         return {Ex: pnf, All: pnf}
 
-    def subs(self: Self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> Self:
         """Substitution.
         """
         atom = self.get_any_atomic_formula()
@@ -616,11 +616,11 @@ class QuantifiedFormula(Formula):
             return self.func(var, self.arg.subs(substitution))
         return self.func(self.var, self.arg.subs(substitution))
 
-    def transform_atoms(self: Self, transformation: Callable) -> Self:
+    def transform_atoms(self, transformation: Callable) -> Self:
         return self.func(self.var,
                          self.arg.transform_atoms(transformation))
 
-    def vars(self: Self, assume_quantified: set = set()) -> Variables:
+    def vars(self, assume_quantified: set = set()) -> Variables:
         quantified = assume_quantified | {self.var}
         return self.arg.vars(assume_quantified=quantified)
 
@@ -688,14 +688,14 @@ class BooleanFormula(Formula):
     is_boolean = True
     is_quantified = False
 
-    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
         for arg in self.args:
             atom = arg.get_any_atomic_formula()
             if atom:
                 return atom
         return None
 
-    def _count_alternations(self: Self) -> tuple:
+    def _count_alternations(self) -> tuple:
         best_count = -1
         best_quantifiers = {Ex, All}
         for arg in self.args:
@@ -707,7 +707,7 @@ class BooleanFormula(Formula):
                 best_quantifiers |= quantifiers
         return (best_count, best_quantifiers)
 
-    def qvars(self: Self) -> set:
+    def qvars(self) -> set:
         qvars = set()
         for arg in self.args:
             qvars |= arg.qvars()
@@ -744,16 +744,16 @@ class BooleanFormula(Formula):
             return s
         assert False
 
-    def subs(self: Self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> Self:
         """Substitution.
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> Self:
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
 
-    def transform_atoms(self: Self, transformation: Callable) -> Self:
+    def transform_atoms(self, transformation: Callable) -> Self:
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
 
@@ -795,7 +795,7 @@ class Equivalent(BooleanFormula):
         self.func = Equivalent
         self.args = (lhs, rhs)
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
@@ -881,7 +881,7 @@ class Implies(BooleanFormula):
             return T
         return Implies(lhs_simplify, rhs_simplify)
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         if self.rhs.func is Or:
             tmp = Or(Not(self.lhs), *self.rhs.args)
@@ -943,7 +943,7 @@ class AndOr(BooleanFormula):
             return gT
         return gAnd(*simplified_args)
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Self:
         """Convert to Negation Normal Form.
         """
@@ -958,7 +958,7 @@ class AndOr(BooleanFormula):
                 args_nnf += [arg_nnf]
         return func_nnf(*args_nnf)
 
-    def _to_pnf(self: Self) -> dict:
+    def _to_pnf(self) -> dict:
         """Convert to Prenex Normal Form. self must be in NNF.
         """
 
@@ -1132,7 +1132,7 @@ class Not(BooleanFormula):
             return T
         return involutive_not(arg_simplify)
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Self:
         """Negation normal form.
 
@@ -1145,7 +1145,7 @@ class Not(BooleanFormula):
         return self.arg.to_nnf(implicit_not=not implicit_not,
                                to_positive=to_positive)
 
-    def _to_pnf(self: Self) -> Formula:
+    def _to_pnf(self) -> Formula:
         """Convert to Prenex Normal Form. self must be in NNF.
         """
         return {Ex: self, All: self}
@@ -1176,16 +1176,16 @@ class TruthValue(BooleanFormula):
     _print_style = 'constant'
     _print_precedence = 99
 
-    def _count_alternations(self: Self) -> tuple:
+    def _count_alternations(self) -> tuple:
         return (-1, {Ex, All})
 
-    def qvars(self: Self) -> set:
+    def qvars(self) -> set:
         return set()
 
     def sympy(self):
         raise NotImplementedError(f'sympy does not know {self.func}')
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         if to_positive:
             return self.func.dualize(conditional=implicit_not)()
@@ -1193,7 +1193,7 @@ class TruthValue(BooleanFormula):
             return Not(self)
         return self
 
-    def _to_pnf(self: Self) -> Formula:
+    def _to_pnf(self) -> Formula:
         """Prenex normal form. self must be in negation normal form.
         """
         return {Ex: self, All: self}
@@ -1308,15 +1308,15 @@ class AtomicFormula(BooleanFormula):
         ...
 
     @final
-    def _count_alternations(self: Self) -> tuple:
+    def _count_alternations(self) -> tuple:
         return (-1, {Ex, All})
 
     @final
-    def get_any_atomic_formula(self: Self) -> AtomicFormula:
+    def get_any_atomic_formula(self) -> AtomicFormula:
         return self
 
     @final
-    def qvars(self: Self) -> set:
+    def qvars(self) -> set:
         return set()
 
     @final
@@ -1326,10 +1326,10 @@ class AtomicFormula(BooleanFormula):
         return self._sympy_func(*self.args, **kwargs)
 
     @final
-    def _to_distinct_vars(self: Self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> Self:
         return self
 
-    def to_nnf(self: Self, implicit_not: bool = False,
+    def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         if implicit_not:
             if to_positive:
@@ -1343,23 +1343,23 @@ class AtomicFormula(BooleanFormula):
         return self
 
     @final
-    def _to_pnf(self: Self) -> Formula:
+    def _to_pnf(self) -> Formula:
         """Prenex normal form. self must be in negation normal form.
         """
         return {Ex: self, All: self}
 
     @abstractmethod
-    def _sprint(self: Self, mode: str) -> str:
+    def _sprint(self, mode: str) -> str:
         ...
 
     @abstractmethod
-    def subs(self: Self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> Self:
         ...
 
     @final
-    def transform_atoms(self: Self, transformation: Callable) -> Self:
+    def transform_atoms(self, transformation: Callable) -> Self:
         return transformation(self)
 
     @abstractmethod
-    def vars(self: Self, assume_quantified: set = set()) -> Variables:
+    def vars(self, assume_quantified: set = set()) -> Variables:
         ...
