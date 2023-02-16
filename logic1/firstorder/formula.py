@@ -1,39 +1,43 @@
-"""Module for first-order formulas with equality Eq -> BinaryAtomicFormula ->
-AtomicFormula. There is no language L in the sense of model theory specified.
-Applications would implement their particular languages as follows:
+"""Module for first-order formulas.
 
-* Relations of L are provided by subclassing AtomicFormula. More generally,
-  BinaryAtomicFormula can be subclassed. More specifically, the module atomic
-  provides some classes for inequalities and other relations that can be
-  subclassed.
+There are classes Ex, All, Equivaelent, Implies, And, Or, Not, _T, _F which
+provide constructors for corresponding (sub)formulas. Furthermore, there are
+interactive constructors EX, ALL, EQUIV, IMPL (>>), AND (&), OR (|), NOT (~),
+T, F, which do some error checking.
 
-* Technically, the atomic formula classes provided here and an the module
-  atomic admit *all* sympy expressions as terms. Consequently, the
-  implementation of the functions of L must not provide but limit the set of
-  admissible functions (which includes constants). Within the application code,
-  this is a matter of self-discipline using only L-terms as arguments for the
-  constructors of the relations. Explicit tests beyond assertions would take
-  place only in convenience wrappers around constructors for the user
-  interface; compare EX, ALL, AND, OR, EQUIV, IMPL below.
+There is no language L in the sense of model theory specified. Application
+modules implement L as follows:
+
+1. Choose sets R of admissible relation symbols and F of admissible function
+   symbols, which includes constants.
+
+2. For each relation in R derive a class Rel from the Abstract Base Class
+   firstorder.AtomicFormula and implement at least the abstract methods
+   specified by firstorder.AtomicFormula.
+
+3. In combination with the first-order constructors above, the constructors Rel
+   allow the construction of first-order L-formulas. Similarly to EX, ALL etc.
+   above, respective interactive constructors REL can provide error checking.
+
+The firstorder module imposes no restrictions on the representation of atomic
+formulas and terms. It is quite natural to represent relations similarly to the
+firstorder.BooleanFormula and its subclasses.
+
+For the argument terms, sympy.Expr are certainly an option. This will support a
+super set of the function symbols F in L, in general. The interacitve
+constructors REL can check that only valid L-terms are used.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractclassmethod
-from typing import Callable, final, Union
+from abc import ABC, abstractmethod
+from typing import Any, Callable, final, Union
 
 import sympy
 
 from ..support.containers import Variables
 from ..support.renaming import rename
-# from logic1.tracing import trace
-
-
-"""A Variable is a sympy.Symbol. This definition is made here and it is
-considered final. Variables appear as arguments of quantifiers, where
-there is possibly no atomic formula nearby.
-"""
-Variable = sympy.Symbol
+# from ..support.tracing import trace
 
 
 class Formula(ABC):
@@ -124,7 +128,7 @@ class Formula(ABC):
         """
         return self.func == other.func and self.args == other.args
 
-    @abstractclassmethod
+    @abstractmethod
     def __init__(self, *args):
         ...
 
@@ -160,6 +164,15 @@ class Formula(ABC):
         """
         return '$\\displaystyle ' + self.latex() + '$'
 
+    @abstractmethod
+    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+        """Return any atomic formula contained in self, None if there is none.
+
+        A typical use cass is getting access to methods of classes derived from
+        AtomicFormula elsewhere.
+        """
+        ...
+
     @final
     def count_alternations(self: Self) -> int:
         """Count number of quantifier alternations.
@@ -174,7 +187,7 @@ class Formula(ABC):
         """
         return self._count_alternations()[0]
 
-    @abstractclassmethod
+    @abstractmethod
     def _count_alternations(self: Self) -> tuple:
         ...
 
@@ -184,7 +197,7 @@ class Formula(ABC):
         """
         return self._sprint(mode='latex')
 
-    @abstractclassmethod
+    @abstractmethod
     def qvars(self: Self) -> set:
         """The set of all variables that are quantified in self.
 
@@ -207,11 +220,11 @@ class Formula(ABC):
         """
         return self
 
-    @abstractclassmethod
+    @abstractmethod
     def _sprint(self: Self, mode: str) -> str:
         ...
 
-    @abstractclassmethod
+    @abstractmethod
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
 
@@ -219,14 +232,18 @@ class Formula(ABC):
         >>> from logic1.atomlib.atomic import EQ
         >>> from sympy.abc import a, b, c, x, y, z
         >>> push()
+
         >>> EX(x, EQ(x, a)).subs({x: a})
         Ex(x, Eq(x, a))
+
         >>> f = EX(x, EQ(x, a)).subs({a: x})
         >>> g = Ex(x, f & EQ(b, 0))
         >>> g
         Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
+
         >>> g.subs({b: x})
         Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
+
         >>> pop()
         """
         ...
@@ -294,7 +311,7 @@ class Formula(ABC):
         # variables.
         return self._to_distinct_vars(self.vars().free)
 
-    @abstractclassmethod
+    @abstractmethod
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
         # Traverses self. If a badlisted variable is encountered as a
         # quantified variable, it will be replaced with a fresh name in the
@@ -303,7 +320,7 @@ class Formula(ABC):
         # *occur* in a mathematical sense.
         ...
 
-    @abstractclassmethod
+    @abstractmethod
     def to_nnf(self: Self, implicit_not: bool = False,
                to_positive: bool = True) -> Self:
         """Convert to Negation Normal Form.
@@ -392,11 +409,11 @@ class Formula(ABC):
         """
         raise NotImplementedError(f'{self.func} is not an NNF operator')
 
-    @abstractclassmethod
+    @abstractmethod
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         ...
 
-    @abstractclassmethod
+    @abstractmethod
     def vars(self: Self, assume_quantified: set = set()) -> Variables:
         """Get variables.
 
@@ -441,7 +458,7 @@ class QuantifiedFormula(Formula):
         return self.args[0]
 
     @var.setter
-    def var(self, value: Variable):
+    def var(self, value: Any):
         self.args = (value, *self.args[1:])
 
     @property
@@ -487,11 +504,20 @@ class QuantifiedFormula(Formula):
         ...
         TypeError: 'x' is not a Variable
         """
-        if not isinstance(variable, Variable):
-            raise TypeError(f'{repr(variable)} is not a Variable')
         if not isinstance(arg, Formula):
             raise TypeError(f'{repr(arg)} is not a Formula')
+        atom = arg.get_any_atomic_formula()
+        # If atom is None, then arg does not contain any atomic formula.
+        # Therefore we cannot know what are valid variables, and we will accept
+        # anything. Otherwise atom has a static method providing the type of
+        # variables. This assumes that there is only one class of atomic
+        # formulas used within a formula.
+        if atom and not isinstance(variable, atom.variable_type()):
+            raise TypeError(f'{repr(variable)} is not a Variable')
         return cls(variable, arg)
+
+    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+        return self.arg.get_any_atomic_formula()
 
     def _count_alternations(self: Self) -> tuple:
         count, quantifiers = self.arg._count_alternations()
@@ -520,15 +546,16 @@ class QuantifiedFormula(Formula):
             return inner_sprint
 
         if mode == 'latex':
+            atom = self.get_any_atomic_formula()
             symbol = self._latex_symbol
-            var = sympy.latex(self.args[0])
+            var = atom.term_to_latex(self.var) if atom else self.var
             spacing = self._latex_symbol_spacing
         else:
             assert mode == 'text'
             symbol = self._text_symbol
-            var = self.args[0].__str__()
+            var = self.var.__str__()
             spacing = self._text_symbol_spacing
-        return f'{symbol} {var}{spacing}{arg_in_parens(self.args[1])}'
+        return f'{symbol} {var}{spacing}{arg_in_parens(self.arg)}'
 
     def sympy(self, *args, **kwargs):
         raise NotImplementedError(f'sympy does not know {type(self)}')
@@ -558,6 +585,9 @@ class QuantifiedFormula(Formula):
     def subs(self: Self, substitution: dict) -> Self:
         """Substitution.
         """
+        atom = self.get_any_atomic_formula()
+        if not atom:
+            return self
         # A copy of the mutual could be avoided by keeping track of the changes
         # and undoing them at the end.
         substitution = substitution.copy()
@@ -568,11 +598,11 @@ class QuantifiedFormula(Formula):
         # Collect all variables on the right hand sides of substitutions:
         substituted_vars = set()
         for term in substitution.values():
-            substituted_vars |= sympy.S(term).atoms(sympy.Symbol)
+            substituted_vars |= atom.get_term_vars(term)
         # (2) Make sure the quantified variable is not a key and does not occur
         # in a value of substitution:
         if self.var in substituted_vars or self.var in substitution:
-            var = rename(self.var)
+            var = atom.rename_variable(self.var)
             # We now know the following:
             #   (i) var is not a key,
             #  (ii) var does not occur in the values,
@@ -657,6 +687,13 @@ class BooleanFormula(Formula):
     is_atomic = False
     is_boolean = True
     is_quantified = False
+
+    def get_any_atomic_formula(self: Self) -> Union[AtomicFormula, None]:
+        for arg in self.args:
+            atom = arg.get_any_atomic_formula()
+            if atom:
+                return atom
+        return None
 
     def _count_alternations(self: Self) -> tuple:
         best_count = -1
@@ -1165,6 +1202,7 @@ class TruthValue(BooleanFormula):
         return Variables()
 
 
+@final
 class _T(TruthValue):
     """The constant Formula that is always true.
 
@@ -1199,6 +1237,7 @@ class _T(TruthValue):
 T = _T()
 
 
+@final
 class _F(TruthValue):
     """The constant Formula that is always false.
 
@@ -1243,16 +1282,50 @@ class AtomicFormula(BooleanFormula):
     is_boolean = False
     is_quantified = False
 
+    @staticmethod
+    @abstractmethod
+    def get_term_vars(term: Any) -> set:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def rename_variable(variable: Any) -> Any:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def term_to_latex(term: Any) -> str:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def term_type():
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def variable_type():
+        ...
+
+    @final
     def _count_alternations(self: Self) -> tuple:
         return (-1, {Ex, All})
 
+    @final
+    def get_any_atomic_formula(self: Self) -> AtomicFormula:
+        return self
+
+    @final
     def qvars(self: Self) -> set:
         return set()
 
-    # Override Formula.sympy() to prevent recursion into terms
+    @final
     def sympy(self, **kwargs):
+        """Override Formula.sympy() to prevent recursion into terms
+        """
         return self._sympy_func(*self.args, **kwargs)
 
+    @final
     def _to_distinct_vars(self: Self, badlist: set) -> Self:
         return self
 
@@ -1269,22 +1342,24 @@ class AtomicFormula(BooleanFormula):
             return Not(self)
         return self
 
+    @final
     def _to_pnf(self: Self) -> Formula:
         """Prenex normal form. self must be in negation normal form.
         """
         return {Ex: self, All: self}
 
-    @abstractclassmethod
+    @abstractmethod
     def _sprint(self: Self, mode: str) -> str:
         ...
 
-    @abstractclassmethod
+    @abstractmethod
     def subs(self: Self, substitution: dict) -> Self:
         ...
 
+    @final
     def transform_atoms(self: Self, transformation: Callable) -> Self:
         return transformation(self)
 
-    @abstractclassmethod
+    @abstractmethod
     def vars(self: Self, assume_quantified: set = set()) -> Variables:
         ...

@@ -4,13 +4,35 @@ import sympy
 
 from ..firstorder import formula
 from ..support.containers import Variables
+from ..support.renaming import rename
 
 Term = sympy.Expr
+Variable = sympy.Symbol
 
 
 class AtomicFormula(formula.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
+
+    @staticmethod
+    def get_term_vars(term: Term) -> set:
+        return sympy.S(term).atoms(sympy.Symbol)
+
+    @staticmethod
+    def rename_variable(variable: Variable) -> Variable:
+        return rename(variable)
+
+    @staticmethod
+    def term_to_latex(term: Term) -> str:
+        return sympy.latex(term)
+
+    @staticmethod
+    def term_type():
+        return Term
+
+    @staticmethod
+    def variable_type():
+        return Variable
 
     @classmethod
     def interactive_new(cls, *args):
