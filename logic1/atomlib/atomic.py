@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Tuple
+
 import sympy
 
 from ..firstorder import formula
@@ -14,9 +16,11 @@ class AtomicFormula(formula.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
 
+    args: Tuple[Term, ...]
+
     @staticmethod
-    def get_term_vars(term: Term) -> set:
-        return sympy.S(term).atoms(sympy.Symbol)
+    def get_term_vars(term: Term) -> set[Variable]:
+        return sympy.S(term).atoms(Variable)
 
     @staticmethod
     def rename_variable(variable: Variable) -> Variable:
@@ -27,18 +31,21 @@ class AtomicFormula(formula.AtomicFormula):
         return sympy.latex(term)
 
     @staticmethod
-    def term_type():
+    def term_type() -> type[Term]:
         return Term
 
     @staticmethod
-    def variable_type():
+    def variable_type() -> type[Variable]:
         return Variable
 
     @classmethod
-    def interactive_new(cls, *args):
+    def interactive_new(cls, *args) -> Self:
         args_ = []
         for arg in args:
-            args_.append(sympy.Integer(arg) if isinstance(arg, int) else arg)
+            arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
+            if not isinstance(arg_, Term):
+                raise TypeError(f"{arg} is not a Term")
+            args_.append(arg_)
         return cls(*args_)
 
     def subs(self, substitution: dict) -> Self:
@@ -54,6 +61,9 @@ class AtomicFormula(formula.AtomicFormula):
 
 
 class BinaryAtomicFormula(AtomicFormula):
+
+    args: Tuple[Term, Term]
+
     @property
     def lhs(self) -> Term:
         """The left-hand side of the BinaryAtomicFormula."""
@@ -63,6 +73,10 @@ class BinaryAtomicFormula(AtomicFormula):
     def rhs(self) -> Term:
         """The right-hand side of the BinaryAtomicFormula."""
         return self.args[1]
+
+    def __init__(self, lhs: Term, rhs: Term) -> None:
+        self.func = self.__class__
+        self.args = (lhs, rhs)
 
     # Override BooleanFormula._sprint() to prevent recursion into terms
     def _sprint(self, mode: str) -> str:
@@ -92,14 +106,17 @@ class Eq(BinaryAtomicFormula):
     sympy_func = sympy.Eq
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
         if conditional:
             return Ne
         return Eq
 
-    def __init__(self, lhs, rhs):
-        self.func = Eq
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Eq
+        return Eq
 
 
 EQ = Eq.interactive_new
@@ -116,14 +133,17 @@ class Ne(BinaryAtomicFormula):
     sympy_func = sympy.Ne
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
         if conditional:
             return Eq
         return Ne
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
-        self.func = Ne
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Ne
+        return Ne
 
 
 NE = Ne.interactive_new
@@ -136,9 +156,18 @@ class Ge(BinaryAtomicFormula):
 
     sympy_func = sympy.Ge
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
-        self.func = Ge
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Lt
+        return Ge
+
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Le
+        return Ge
 
 
 GE = Ge.interactive_new
@@ -151,9 +180,18 @@ class Le(BinaryAtomicFormula):
 
     sympy_func = sympy.Le
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
-        self.func = Le
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Gt
+        return Le
+
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Ge
+        return Le
 
 
 LE = Le.interactive_new
@@ -166,9 +204,18 @@ class Gt(BinaryAtomicFormula):
 
     sympy_func = sympy.Gt
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
-        self.func = Gt
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Le
+        return Gt
+
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Lt
+        return Gt
 
 
 GT = Gt.interactive_new
@@ -181,9 +228,18 @@ class Lt(BinaryAtomicFormula):
 
     sympy_func = sympy.Lt
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
-        self.func = Lt
-        self.args = (lhs, rhs)
+    @staticmethod
+    def to_complementary(conditional: bool = True) \
+            -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Ge
+        return Lt
+
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Gt
+        return Lt
 
 
 LT = Lt.interactive_new

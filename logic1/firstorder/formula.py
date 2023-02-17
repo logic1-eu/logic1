@@ -31,7 +31,7 @@ constructors REL can check that only valid L-terms are used.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, final, Union
+from typing import Any, Callable, ClassVar, final, Tuple, Union
 
 import sympy
 
@@ -44,8 +44,19 @@ class Formula(ABC):
     """An abstract base class for first-order formulas.
     """
 
+    latex_symbol_spacing: ClassVar[str]
+    latex_symbol: ClassVar[str]
+    print_style: ClassVar[str]
+    print_precedence: ClassVar[int]
+    text_symbol: ClassVar[str]
+
+    sympy_func: ClassVar[type[sympy.core.basic.Basic]]
+
+    func: type[Formula]
+    args: Tuple
+
     @final
-    def __and__(self, other):
+    def __and__(self, other: Self) -> Self:
         """Override the ``&`` operator to apply logical AND.
 
         Note that ``&`` delegates to the convenience wrapper AND in contrast to
@@ -71,7 +82,7 @@ class Formula(ABC):
         return Not.interactive_new(self)
 
     @final
-    def __lshift__(self, other):
+    def __lshift__(self, other: Self) -> Self:
         """Override ``>>`` operator to apply logical IMPL.
 
         Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
@@ -85,7 +96,7 @@ class Formula(ABC):
         return Implies.interactive_new(other, self)
 
     @final
-    def __or__(self, other):
+    def __or__(self, other: Self) -> Self:
         """Override the ``|`` operator to apply logical OR.
 
         Note that ``|`` delegates to the convenience wrapper OR in contrast to
@@ -99,7 +110,7 @@ class Formula(ABC):
         return Or.interactive_new(self, other)
 
     @final
-    def __rshift__(self, other):
+    def __rshift__(self, other: Self) -> Self:
         """Override the ``<<`` operator to apply logical IMPL with reversed
         sides.
 
@@ -113,7 +124,7 @@ class Formula(ABC):
         """
         return Implies.interactive_new(self, other)
 
-    def __eq__(self, other):
+    def __eq__(self, other: Self) -> bool:
         """Recursive equality of the formulas self and other.
 
         This is *not* logical ``equal.``
@@ -129,11 +140,11 @@ class Formula(ABC):
         return self.func == other.func and self.args == other.args
 
     @abstractmethod
-    def __init__(self, *args):
+    def __init__(self, *args) -> None:
         ...
 
     @final
-    def __repr__(self):
+    def __repr__(self) -> str:
         """Representation of the Formula suitable for use as an input.
         """
         r = self.func.__name__
@@ -146,13 +157,13 @@ class Formula(ABC):
         return r
 
     @final
-    def __str__(self):
+    def __str__(self) -> str:
         """Representation of the Formula used in printing.
         """
         return self._sprint(mode='text')
 
     @final
-    def _repr_latex_(self):
+    def _repr_latex_(self) -> str:
         r"""A LaTeX representation of the formula as it is used within jupyter
         notebooks
 
@@ -287,7 +298,8 @@ class Formula(ABC):
         NotImplementedError:
             sympy does not know <class 'logic1.firstorder.formula.All'>
         """
-        return self.__class__.sympy_func(*(a.sympy(**kwargs) for a in self.args))
+        args_sympy = (arg.sympy(**kwargs) for arg in self.args)
+        return self.__class__.sympy_func(*args_sympy)
 
     @final
     def to_distinct_vars(self) -> Self:
@@ -443,6 +455,8 @@ class QuantifiedFormula(Formula):
     text_symbol_spacing = ' '
     latex_symbol_spacing = ' \\, '
 
+    func: type[QuantifiedFormula]
+
     @property
     def var(self):
         """The variable of the quantifier.
@@ -470,6 +484,11 @@ class QuantifiedFormula(Formula):
         Ex(y, Eq(x, y))
         """
         return self.args[1]
+
+    @staticmethod
+    @abstractmethod
+    def to_dual(conditional: bool = True):
+        ...
 
     @classmethod
     def interactive_new(cls, variable, arg):
@@ -519,7 +538,7 @@ class QuantifiedFormula(Formula):
 
     def _count_alternations(self) -> tuple:
         count, quantifiers = self.arg._count_alternations()
-        if self.func.dualize() in quantifiers:
+        if self.func.to_dual() in quantifiers:
             return (count + 1, {self.func})
         return (count, quantifiers)
 
@@ -569,7 +588,7 @@ class QuantifiedFormula(Formula):
 
     def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
-        func_nnf = self.func.dualize(conditional=implicit_not)
+        func_nnf = self.func.to_dual(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not,
                                   to_positive=to_positive)
         return func_nnf(self.var, arg_nnf)
@@ -634,7 +653,7 @@ class Ex(QuantifiedFormula):
     latex_symbol = '\\exists'
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return All
         return Ex
@@ -658,7 +677,7 @@ class All(QuantifiedFormula):
     latex_symbol = '\\forall'
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return Ex
         return All
@@ -731,7 +750,7 @@ class BooleanFormula(Formula):
         if self.__class__.print_style == 'constant':
             return symbol
         if self.__class__.print_style == 'not':
-            return f'{symbol}{spacing}{not_arg(self, self.arg)}'
+            return f'{symbol}{spacing}{not_arg(self, self.args[0])}'
         if self.__class__.print_style == 'infix':
             s = infix_arg(self, self.args[0])
             for a in self.args[1:]:
@@ -893,6 +912,13 @@ class AndOr(BooleanFormula):
     print_style = 'infix'
     print_precedence = 50
 
+    func: type[AndOr]
+
+    @staticmethod
+    @abstractmethod
+    def to_dual(conditional: bool = True):
+        ...
+
     @classmethod
     def interactive_new(cls, *args):
         for arg in args:
@@ -917,9 +943,9 @@ class AndOr(BooleanFormula):
         >>> f.simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
-        gAnd = And.dualize(conditional=self.func is Or)
-        gT = _T.dualize(conditional=self.func is Or)()
-        gF = _F.dualize(conditional=self.func is Or)()
+        gAnd = And.to_dual(conditional=self.func is Or)
+        gT = _T.to_dual(conditional=self.func is Or)()
+        gF = _F.to_dual(conditional=self.func is Or)()
         # gAnd is an AndOr func, gT and gF are complete TruthValue singletons
         simplified_args = []
         for arg in self.args:
@@ -942,7 +968,7 @@ class AndOr(BooleanFormula):
                to_positive: bool = True) -> Self:
         """Convert to Negation Normal Form.
         """
-        func_nnf = self.func.dualize(conditional=implicit_not)
+        func_nnf = self.func.to_dual(conditional=implicit_not)
         args_nnf = []
         for arg in self.args:
             arg_nnf = arg.to_nnf(implicit_not=implicit_not,
@@ -972,7 +998,7 @@ class AndOr(BooleanFormula):
                     args[i] = arg_i
                 if not found_quantifier:
                     break
-                q = q.dualize()
+                q = q.to_dual()
             # The lifting of quantifiers above can introduce direct nested
             # ocurrences of self.func, which is one of And, Or. We
             # flatten those now, but not any others.
@@ -982,7 +1008,7 @@ class AndOr(BooleanFormula):
                     args_pnf += arg.args
                 else:
                     args_pnf += [arg]
-            pnf = self.func(*args_pnf)
+            pnf: Formula = self.func(*args_pnf)
             for q, v in reversed(quantifiers):
                 pnf = q(v, pnf)
             return pnf
@@ -1030,7 +1056,7 @@ class And(AndOr):
     sympy_func = sympy.And
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return Or
         return And
@@ -1067,7 +1093,7 @@ class Or(AndOr):
     sympy_func = sympy.Or
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return And
         return Or
@@ -1095,6 +1121,10 @@ class Not(BooleanFormula):
     latex_symbol = '\\neg'
 
     sympy_func = sympy.Not
+
+    @staticmethod
+    def to_dual(conditional: bool = True):
+        return Not
 
     @property
     def arg(self):
@@ -1161,7 +1191,7 @@ def involutive_not(arg: Formula):
     >>> involutive_not(T)
     Not(T)
     """
-    if arg.func is Not:
+    if isinstance(arg, Not):
         return arg.arg
     return Not(arg)
 
@@ -1170,6 +1200,13 @@ class TruthValue(BooleanFormula):
 
     print_style = 'constant'
     print_precedence = 99
+
+    func: type[TruthValue]
+
+    @staticmethod
+    @abstractmethod
+    def to_dual(conditional: bool = True):
+        ...
 
     def _count_alternations(self) -> tuple:
         return (-1, {Ex, All})
@@ -1183,7 +1220,7 @@ class TruthValue(BooleanFormula):
     def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         if to_positive:
-            return self.func.dualize(conditional=implicit_not)()
+            return self.func.to_dual(conditional=implicit_not)()
         if implicit_not:
             return Not(self)
         return self
@@ -1216,7 +1253,7 @@ class _T(TruthValue):
         return cls._instance
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return _F
         return _T
@@ -1251,7 +1288,7 @@ class _F(TruthValue):
         return cls._instance
 
     @staticmethod
-    def dualize(conditional: bool = True):
+    def to_dual(conditional: bool = True):
         if conditional:
             return _T
         return _F
@@ -1267,11 +1304,13 @@ class _F(TruthValue):
 F = _F()
 
 
-class AtomicFormula(BooleanFormula):
+class AtomicFormula(Formula):
 
     print_precedence = 99
     text_symbol_spacing = ' '
     latex_symbol_spacing = ' '
+
+    func: type[AtomicFormula]
 
     @staticmethod
     @abstractmethod
@@ -1291,6 +1330,16 @@ class AtomicFormula(BooleanFormula):
     @staticmethod
     @abstractmethod
     def term_type():
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def to_complementary(conditional: bool = True) -> type[AtomicFormula]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def to_dual(conditional: bool = True) -> type[AtomicFormula]:
         ...
 
     @staticmethod
@@ -1325,7 +1374,7 @@ class AtomicFormula(BooleanFormula):
         if implicit_not:
             if to_positive:
                 try:
-                    tmp = self.func.dualize()(*self.args)
+                    tmp = self.func.to_complementary()(*self.args)
                 except AttributeError:
                     pass
                 else:
