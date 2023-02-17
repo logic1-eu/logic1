@@ -67,16 +67,16 @@ class BinaryAtomicFormula(AtomicFormula):
     # Override BooleanFormula._sprint() to prevent recursion into terms
     def _sprint(self, mode: str) -> str:
         if mode == 'latex':
-            symbol = self._latex_symbol
+            symbol = self.__class__.latex_symbol
             lhs = sympy.latex(self.lhs)
             rhs = sympy.latex(self.rhs)
-            spacing = self._latex_symbol_spacing
+            spacing = self.__class__.latex_symbol_spacing
         else:
             assert mode == 'text'
-            symbol = self._text_symbol
+            symbol = self.__class__.text_symbol
             lhs = self.lhs.__str__()
             rhs = self.rhs.__str__()
-            spacing = self._text_symbol_spacing
+            spacing = self.__class__.text_symbol_spacing
         return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
 
 
@@ -86,10 +86,10 @@ class Eq(BinaryAtomicFormula):
     >>> Eq(x, x)
     Eq(x, x)
     """
-    _text_symbol = '='
-    _latex_symbol = '='
+    text_symbol = '='
+    latex_symbol = '='
 
-    _sympy_func = sympy.Eq
+    sympy_func = sympy.Eq
 
     @staticmethod
     def dualize(conditional: bool = True):
@@ -110,10 +110,10 @@ class Ne(BinaryAtomicFormula):
     >>> Ne(1, 0)
     Ne(1, 0)
     """
-    _text_symbol = '!='
-    _latex_symbol = '\\neq'
+    text_symbol = '!='
+    latex_symbol = '\\neq'
 
-    _sympy_func = sympy.Ne
+    sympy_func = sympy.Ne
 
     @staticmethod
     def dualize(conditional: bool = True):
@@ -131,10 +131,10 @@ NE = Ne.interactive_new
 
 class Ge(BinaryAtomicFormula):
 
-    _text_symbol = '>='
-    _latex_symbol = '\\geq'
+    text_symbol = '>='
+    latex_symbol = '\\geq'
 
-    _sympy_func = sympy.Ge
+    sympy_func = sympy.Ge
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         self.func = Ge
@@ -146,10 +146,10 @@ GE = Ge.interactive_new
 
 class Le(BinaryAtomicFormula):
 
-    _text_symbol = '<='
-    _latex_symbol = '\\leq'
+    text_symbol = '<='
+    latex_symbol = '\\leq'
 
-    _sympy_func = sympy.Le
+    sympy_func = sympy.Le
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         self.func = Le
@@ -161,10 +161,10 @@ LE = Le.interactive_new
 
 class Gt(BinaryAtomicFormula):
 
-    _text_symbol = '>'
-    _latex_symbol = '>'
+    text_symbol = '>'
+    latex_symbol = '>'
 
-    _sympy_func = sympy.Gt
+    sympy_func = sympy.Gt
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         self.func = Gt
@@ -176,10 +176,10 @@ GT = Gt.interactive_new
 
 class Lt(BinaryAtomicFormula):
 
-    _text_symbol = '<'
-    _latex_symbol = '<'
+    text_symbol = '<'
+    latex_symbol = '<'
 
-    _sympy_func = sympy.Lt
+    sympy_func = sympy.Lt
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         self.func = Lt
