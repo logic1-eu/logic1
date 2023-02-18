@@ -558,7 +558,7 @@ class QuantifiedFormula(Formula):
     def _sprint(self, mode: str) -> str:
         def arg_in_parens(inner):
             inner_sprint = inner._sprint(mode)
-            if inner not in (Ex, All, Not):
+            if inner.func not in (Ex, All, Not):
                 inner_sprint = '(' + inner_sprint + ')'
             return inner_sprint
 
@@ -615,7 +615,7 @@ class QuantifiedFormula(Formula):
         # Collect all variables on the right hand sides of substitutions:
         substituted_vars = set()
         for term in substitution.values():
-            substituted_vars |= atom.get_term_vars(term)
+            substituted_vars |= atom.get_variables_from_term(term)
         # (2) Make sure the quantified variable is not a key and does not occur
         # in a value of substitution:
         if self.var in substituted_vars or self.var in substitution:
@@ -1314,7 +1314,7 @@ class AtomicFormula(Formula):
 
     @staticmethod
     @abstractmethod
-    def get_term_vars(term: Any) -> set:
+    def get_variables_from_term(term: Any) -> set:
         ...
 
     @staticmethod

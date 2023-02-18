@@ -8,18 +8,15 @@ from ..firstorder import formula
 from ..support.containers import Variables
 from ..support.renaming import rename
 
+
 Term = sympy.Expr
 Variable = sympy.Symbol
 
 
-class AtomicFormula(formula.AtomicFormula):
-    """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
-    """
-
-    args: Tuple[Term, ...]
+class TermMixin():
 
     @staticmethod
-    def get_term_vars(term: Term) -> set[Variable]:
+    def get_variables_from_term(term: Term) -> set[Variable]:
         return sympy.S(term).atoms(Variable)
 
     @staticmethod
@@ -38,12 +35,19 @@ class AtomicFormula(formula.AtomicFormula):
     def variable_type() -> type[Variable]:
         return Variable
 
+
+class AtomicFormula(TermMixin, formula.AtomicFormula):
+    """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
+    """
+
+    args: Tuple[Term, ...]
+
     @classmethod
     def interactive_new(cls, *args) -> Self:
         args_ = []
         for arg in args:
             arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
-            if not isinstance(arg_, Term):
+            if not isinstance(arg_, cls.term_type()):
                 raise TypeError(f"{arg} is not a Term")
             args_.append(arg_)
         return cls(*args_)
@@ -96,9 +100,9 @@ class BinaryAtomicFormula(AtomicFormula):
 
 class Eq(BinaryAtomicFormula):
     """
-    >>> from sympy.abc import x
-    >>> Eq(x, x)
-    Eq(x, x)
+    >>> from sympy import exp, I, pi
+    >>> Eq(exp(I * pi, evaluate=False), -1)
+    Eq(exp(I*pi), -1)
     """
     text_symbol = '='
     latex_symbol = '='
