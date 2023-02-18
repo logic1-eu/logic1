@@ -3,7 +3,7 @@
 There are classes Ex, All, Equivaelent, Implies, And, Or, Not, _T, _F which
 provide constructors for corresponding (sub)formulas. Furthermore, there are
 interactive constructors EX, ALL, EQUIV, IMPL (>>), AND (&), OR (|), NOT (~),
-T, F, which do some error checking.
+T, F, which do some additional error checking.
 
 There is no language L in the sense of model theory specified. Application
 modules implement L as follows:
@@ -138,6 +138,9 @@ class Formula(ABC):
         False
         """
         return self.func == other.func and self.args == other.args
+
+    def __hash__(self) -> int:
+        return hash((self.func, self.args))
 
     @abstractmethod
     def __init__(self, *args) -> None:
