@@ -33,6 +33,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Callable, ClassVar, final, Tuple, Union
 
+import pyeda.inter
 import sympy
 
 from ..support.containers import Variables
@@ -766,9 +767,68 @@ class BooleanFormula(Formula):
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
+    def _to_bnf(self, bnf: str):
+
+        _to_dict: final = {Equivalent: pyeda.boolalg.expr.Equal,
+                           Implies: pyeda.boolalg.expr.Implies,
+                           And: pyeda.boolalg.expr.And,
+                           Or: pyeda.boolalg.expr.Or,
+                           Not: pyeda.boolalg.expr.Not}
+
+        _from_dict: final = {'Implies': Implies, 'Or': Or, 'And': And,
+                             'Not': Not}
+
+        def _logic1_to_pyeda(f: BooleanFormula, d: dict, c: list = [0]) \
+                -> pyeda.boolalg.expr:
+            if isinstance(f, AtomicFormula):
+                if f in d:
+                    return d[f]
+                if f.to_complement() in d:
+                    return _to_dict[Not](d[f.to_complement()])
+                d[f] = pyeda.boolalg.expr.exprvar('a', c[0])
+                c[0] += 1
+                return d[f]
+            NAME = _to_dict[f.func]
+            xs = (_logic1_to_pyeda(arg, d, c) for arg in f.args)
+            return NAME(*xs, simplify=False)
+
+        def _logic1_from_pyeda(f: pyeda.boolalg.expr, d: dict) \
+                -> BooleanFormula:
+            if isinstance(f, pyeda.boolalg.expr.Variable):
+                return d[f]
+            if isinstance(f, pyeda.boolalg.expr.Complement):
+                variable = pyeda.boolalg.expr.Not(f, simplify=True)
+                return d[variable].to_complement()
+            assert isinstance(f, pyeda.boolalg.expr.Operator)
+            func = _from_dict[f.NAME]
+            args = (_logic1_from_pyeda(arg, d) for arg in f.xs)
+            return func(*args)
+
+        d = {}
+        self_pyeda = _logic1_to_pyeda(self, d)
+        print(d)
+        d = dict(map(reversed, d.items()))
+        if bnf == 'dnf':
+            self_pyeda_bnf = self_pyeda.to_dnf()
+        else:
+            assert bnf == 'cnf'
+            self_pyeda_bnf = self_pyeda.to_cnf()
+        print(self_pyeda_bnf)
+        self_pyeda_bnf, = \
+            pyeda.boolalg.minimization.espresso_exprs(self_pyeda_bnf)
+        print(self_pyeda_bnf)
+        self_bnf = _logic1_from_pyeda(self_pyeda_bnf, d)
+        return self_bnf
+
     def _to_distinct_vars(self, badlist: set) -> Self:
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
+
+    def to_cnf(self) -> Self:
+        return self._to_bnf(bnf='cnf')
+
+    def to_dnf(self) -> Self:
+        return self._to_bnf(bnf='dnf')
 
     def transform_atoms(self, transformation: Callable) -> Self:
         return self.func(*(arg.transform_atoms(transformation)
