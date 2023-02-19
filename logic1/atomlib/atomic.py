@@ -56,6 +56,9 @@ class AtomicFormula(TermMixin, formula.AtomicFormula):
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
         return self.func(*args)
 
+    def to_complement(self) -> Self:
+        return self.func.to_complementary()(*self.args)
+
     def vars(self, assume_quantified: set = set()) -> Variables:
         all_vars = set()
         for term in self.args:
