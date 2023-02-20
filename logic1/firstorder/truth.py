@@ -5,7 +5,9 @@ from typing import final
 
 from ..support.containers import Variables
 
-from .formula import Formula, Ex, All, BooleanFormula, Not
+from .formula import Formula
+from .quantified import Ex, All
+from .boolean import BooleanFormula, Not
 
 
 class TruthValue(BooleanFormula):

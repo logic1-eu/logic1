@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Any, Callable, TYPE_CHECKING, Union
 
-from .formula import Formula, Not
+from .formula import Formula
 from ..support.containers import Variables
 from ..support.renaming import rename
 
@@ -254,3 +254,7 @@ class All(QuantifiedFormula):
 
 
 ALL = All.interactive_new
+
+
+# The following import is intentionally late to avoid circularity.
+from .boolean import Not

@@ -5,7 +5,9 @@ from typing import Any, Callable, final
 
 import pyeda.inter  # type: ignore
 
-from .formula import Formula, Ex, All, Not
+from .boolean import Not
+from .formula import Formula
+from .quantified import Ex, All
 from ..support.containers import Variables
 
 
