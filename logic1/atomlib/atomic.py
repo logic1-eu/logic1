@@ -4,7 +4,7 @@ from typing import Tuple
 
 import sympy
 
-from ..firstorder import formula
+from ..firstorder import atomic
 from ..support.containers import Variables
 from ..support.renaming import rename
 
@@ -36,7 +36,7 @@ class TermMixin():
         return Variable
 
 
-class AtomicFormula(TermMixin, formula.AtomicFormula):
+class AtomicFormula(TermMixin, atomic.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
 
@@ -55,9 +55,6 @@ class AtomicFormula(TermMixin, formula.AtomicFormula):
     def subs(self, substitution: dict) -> Self:
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
         return self.func(*args)
-
-    def to_complement(self) -> Self:
-        return self.func.to_complementary()(*self.args)
 
     def vars(self, assume_quantified: set = set()) -> Variables:
         all_vars = set()

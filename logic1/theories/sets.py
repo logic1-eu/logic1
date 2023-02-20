@@ -3,8 +3,7 @@ from __future__ import annotations
 import sympy
 
 from ..atomlib import atomic
-from ..firstorder import *
-
+from ..firstorder.formula import Formula, BooleanFormula
 
 Term = sympy.Symbol
 Variable = sympy.Symbol

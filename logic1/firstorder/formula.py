@@ -31,14 +31,18 @@ constructors REL can check that only valid L-terms are used.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, ClassVar, final, Tuple, Union
+from typing import Any, Callable, ClassVar, final, Tuple, TYPE_CHECKING, Union
 
-import pyeda.inter
+import pyeda.inter  # type: ignore
+from pyeda.inter import expr, exprvar
 import sympy
 
 from ..support.containers import Variables
 from ..support.renaming import rename
 # from ..support.tracing import trace
+
+if TYPE_CHECKING:
+    from .atomic import AtomicFormula
 
 
 class Formula(ABC):
@@ -647,7 +651,8 @@ class QuantifiedFormula(Formula):
 
 
 class Ex(QuantifiedFormula):
-    """
+    """Existentially quantified formula factory.
+
     >>> from logic1.atomlib.atomic import EQ
     >>> from sympy.abc import x
     >>> Ex(x, EQ(x, 1))
@@ -671,7 +676,8 @@ EX = Ex.interactive_new
 
 
 class All(QuantifiedFormula):
-    """
+    """Universally quantified formula factory.
+
     >>> from logic1.atomlib.atomic import EQ
     >>> from sympy.abc import x, y
     >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
@@ -704,6 +710,19 @@ class BooleanFormula(Formula):
     """
     text_symbol_spacing = ' '
     latex_symbol_spacing = ' \\, '
+
+    @staticmethod
+    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) -> Formula:
+        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
+        if isinstance(f, pyeda.boolalg.expr.Variable):
+            return d[f]
+        if isinstance(f, pyeda.boolalg.expr.Complement):
+            variable = pyeda.boolalg.expr.Not(f, simplify=True)
+            return d[variable].to_complement()
+        assert isinstance(f, pyeda.boolalg.expr.Operator)
+        func = from_dict[f.NAME]
+        args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
+        return func(*args)
 
     def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
         for arg in self.args:
@@ -767,68 +786,47 @@ class BooleanFormula(Formula):
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def _to_bnf(self, bnf: str):
-
-        _to_dict: final = {Equivalent: pyeda.boolalg.expr.Equal,
-                           Implies: pyeda.boolalg.expr.Implies,
-                           And: pyeda.boolalg.expr.And,
-                           Or: pyeda.boolalg.expr.Or,
-                           Not: pyeda.boolalg.expr.Not}
-
-        _from_dict: final = {'Implies': Implies, 'Or': Or, 'And': And,
-                             'Not': Not}
-
-        def _logic1_to_pyeda(f: BooleanFormula, d: dict, c: list = [0]) \
-                -> pyeda.boolalg.expr:
-            if isinstance(f, AtomicFormula):
-                if f in d:
-                    return d[f]
-                if f.to_complement() in d:
-                    return _to_dict[Not](d[f.to_complement()])
-                d[f] = pyeda.boolalg.expr.exprvar('a', c[0])
-                c[0] += 1
-                return d[f]
-            NAME = _to_dict[f.func]
-            xs = (_logic1_to_pyeda(arg, d, c) for arg in f.args)
-            return NAME(*xs, simplify=False)
-
-        def _logic1_from_pyeda(f: pyeda.boolalg.expr, d: dict) \
-                -> BooleanFormula:
-            if isinstance(f, pyeda.boolalg.expr.Variable):
-                return d[f]
-            if isinstance(f, pyeda.boolalg.expr.Complement):
-                variable = pyeda.boolalg.expr.Not(f, simplify=True)
-                return d[variable].to_complement()
-            assert isinstance(f, pyeda.boolalg.expr.Operator)
-            func = _from_dict[f.NAME]
-            args = (_logic1_from_pyeda(arg, d) for arg in f.xs)
-            return func(*args)
-
-        d = {}
-        self_pyeda = _logic1_to_pyeda(self, d)
-        print(d)
-        d = dict(map(reversed, d.items()))
-        if bnf == 'dnf':
-            self_pyeda_bnf = self_pyeda.to_dnf()
-        else:
-            assert bnf == 'cnf'
-            self_pyeda_bnf = self_pyeda.to_cnf()
-        print(self_pyeda_bnf)
-        self_pyeda_bnf, = \
-            pyeda.boolalg.minimization.espresso_exprs(self_pyeda_bnf)
-        print(self_pyeda_bnf)
-        self_bnf = _logic1_from_pyeda(self_pyeda_bnf, d)
-        return self_bnf
-
     def _to_distinct_vars(self, badlist: set) -> Self:
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
 
     def to_cnf(self) -> Self:
-        return self._to_bnf(bnf='cnf')
+        """ Convert to Conjunctive Normal Form.
+
+        >>> from logic1.atomlib.atomic import EQ, NE
+        >>> from sympy.abc import a
+        >>> ((EQ(a, 0) & NE(a, 1) | ~EQ(a, 0) | NE(a, 2)) >> NE(a, 1)).to_cnf()
+        And(Or(Ne(a, 1), Eq(a, 2)), Or(Eq(a, 0), Ne(a, 1)))
+        """
+        return Not(self).to_dnf().to_nnf(implicit_not=True)
 
     def to_dnf(self) -> Self:
-        return self._to_bnf(bnf='dnf')
+        """ Convert to Disjunctive Normal Form.
+
+        >>> from logic1.atomlib.atomic import EQ, NE
+        >>> from sympy.abc import a
+        >>> ((EQ(a, 0) & NE(a, 1) | ~EQ(a, 0) | NE(a, 2)) >> NE(a, 1)).to_dnf()
+        Or(Ne(a, 1), And(Eq(a, 0), Eq(a, 2)))
+        """
+        d: dict[AtomicFormula, exprvar] = {}
+        self_pyeda = self._to_pyeda(d)
+        # _to_pyeda() has populated the mutable dictionary d
+        d_rev: dict[exprvar, AtomicFormula] = dict(map(reversed, d.items()))
+        dnf = self_pyeda.to_dnf()
+        dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
+        self_dnf = BooleanFormula._from_pyeda(dnf, d_rev)
+        return self_dnf
+
+    def _to_pyeda(self, d: dict[AtomicFormula, exprvar], c: list = [0]) \
+            -> pyeda.boolalg.expr:
+        to_dict = {Equivalent: pyeda.boolalg.expr.Equal,
+                   Implies: pyeda.boolalg.expr.Implies,
+                   And: pyeda.boolalg.expr.And,
+                   Or: pyeda.boolalg.expr.Or,
+                   Not: pyeda.boolalg.expr.Not}
+        NAME = to_dict[self.func]
+        xs = (arg._to_pyeda(d, c) for arg in self.args)
+        return NAME(*xs, simplify=False)
 
     def transform_atoms(self, transformation: Callable) -> Self:
         return self.func(*(arg.transform_atoms(transformation)
@@ -1280,6 +1278,22 @@ class TruthValue(BooleanFormula):
     def sympy(self):
         raise NotImplementedError(f'sympy does not know {self.func}')
 
+    def to_cnf(self) -> Self:
+        """ Convert to Conjunctive Normal Form.
+
+        >>> F.to_dnf()
+        F
+        """
+        return self
+
+    def to_dnf(self) -> Self:
+        """ Convert to Disjunctive Normal Form.
+
+        >>> T.to_dnf()
+        T
+        """
+        return self
+
     def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
         if to_positive:
@@ -1365,104 +1379,3 @@ class _F(TruthValue):
 
 
 F = _F()
-
-
-class AtomicFormula(Formula):
-
-    print_precedence = 99
-    text_symbol_spacing = ' '
-    latex_symbol_spacing = ' '
-
-    func: type[AtomicFormula]
-
-    @staticmethod
-    @abstractmethod
-    def get_variables_from_term(term: Any) -> set:
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def rename_variable(variable: Any) -> Any:
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def term_to_latex(term: Any) -> str:
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def term_type():
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def to_complementary(conditional: bool = True) -> type[AtomicFormula]:
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True) -> type[AtomicFormula]:
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def variable_type():
-        ...
-
-    @final
-    def _count_alternations(self) -> tuple:
-        return (-1, {Ex, All})
-
-    @final
-    def get_any_atomic_formula(self) -> AtomicFormula:
-        return self
-
-    @final
-    def qvars(self) -> set:
-        return set()
-
-    @final
-    def sympy(self, **kwargs):
-        """Override Formula.sympy() to prevent recursion into terms
-        """
-        return self.__class__.sympy_func(*self.args, **kwargs)
-
-    @final
-    def _to_distinct_vars(self, badlist: set) -> Self:
-        return self
-
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
-        if implicit_not:
-            if to_positive:
-                try:
-                    tmp = self.func.to_complementary()(*self.args)
-                except AttributeError:
-                    pass
-                else:
-                    return tmp
-            return Not(self)
-        return self
-
-    @final
-    def _to_pnf(self) -> dict:
-        """Prenex normal form. self must be in negation normal form.
-        """
-        return {Ex: self, All: self}
-
-    @abstractmethod
-    def _sprint(self, mode: str) -> str:
-        ...
-
-    @abstractmethod
-    def subs(self, substitution: dict) -> Self:
-        ...
-
-    @final
-    def transform_atoms(self, transformation: Callable) -> Self:
-        return transformation(self)
-
-    @abstractmethod
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        ...
