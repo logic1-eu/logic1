@@ -1,7 +1,9 @@
-from .formula import (EX, ALL, EQUIV, IMPL, AND, OR, NOT, Ex, All, Equivalent,
-                      Implies, And, Or, Not, Formula, QuantifiedFormula,
+from .formula import (EQUIV, IMPL, AND, OR, NOT, Equivalent,  # noqa
+                      Implies, And, Or, Not, Formula,
                       BooleanFormula)
 
-from .truth import T, F
+from .quantified import QuantifiedFormula, EX, ALL, Ex, All  # noqa
 
-from .atomic import AtomicFormula
+from .truth import T, F  # noqa
+
+from .atomic import AtomicFormula  # noqa
