@@ -39,6 +39,7 @@ import sympy
 
 from ..support.containers import Variables
 from ..support.renaming import rename
+
 # from ..support.tracing import trace
 
 if TYPE_CHECKING:
@@ -297,7 +298,7 @@ class Formula(ABC):
         Traceback (most recent call last):
         ...
         NotImplementedError:
-            sympy does not know <class 'logic1.firstorder.formula._T'>
+            sympy does not know <class 'logic1.firstorder.truth._T'>
 
         >>> e4 = All(x, Ex(y, EQ(x, y)))
         >>> e4.sympy()
@@ -950,8 +951,7 @@ class Implies(BooleanFormula):
             return rhs_simplify
         if rhs_simplify is F:
             return involutive_not(lhs_simplify)
-        assert not isinstance(lhs_simplify, TruthValue)
-        assert not isinstance(rhs_simplify, TruthValue)
+        assert {lhs_simplify, rhs_simplify}.isdisjoint({T, F})
         if lhs_simplify == rhs_simplify:
             return T
         return Implies(lhs_simplify, rhs_simplify)
@@ -1257,125 +1257,5 @@ def involutive_not(arg: Formula):
     return Not(arg)
 
 
-class TruthValue(BooleanFormula):
-
-    print_style = 'constant'
-    print_precedence = 99
-
-    func: type[TruthValue]
-
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True):
-        ...
-
-    def _count_alternations(self) -> tuple:
-        return (-1, {Ex, All})
-
-    def qvars(self) -> set:
-        return set()
-
-    def sympy(self):
-        raise NotImplementedError(f'sympy does not know {self.func}')
-
-    def to_cnf(self) -> Self:
-        """ Convert to Conjunctive Normal Form.
-
-        >>> F.to_dnf()
-        F
-        """
-        return self
-
-    def to_dnf(self) -> Self:
-        """ Convert to Disjunctive Normal Form.
-
-        >>> T.to_dnf()
-        T
-        """
-        return self
-
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
-        if to_positive:
-            return self.func.to_dual(conditional=implicit_not)()
-        if implicit_not:
-            return Not(self)
-        return self
-
-    def _to_pnf(self) -> dict:
-        """Prenex normal form. self must be in negation normal form.
-        """
-        return {Ex: self, All: self}
-
-    def vars(self, assume_quantified: set = set()):
-        return Variables()
-
-
-@final
-class _T(TruthValue):
-    """The constant Formula that is always true.
-
-    This is a quite basic implementation of a singleton class. It does not
-    support subclassing. We do not use a module because we need _T to be a
-    subclass itself.
-    """
-    text_symbol = 'T'
-    latex_symbol = '\\top'
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    @staticmethod
-    def to_dual(conditional: bool = True):
-        if conditional:
-            return _F
-        return _T
-
-    def __init__(self):
-        self.func = _T
-        self.args = ()
-
-    def __repr__(self):
-        return 'T'
-
-
-T = _T()
-
-
-@final
-class _F(TruthValue):
-    """The constant Formula that is always false.
-
-    This is a quite basic implementation of a singleton class. It does not
-    support subclassing. We do not use a module because we need _F to be a
-    subclass itself.
-    """
-    text_symbol = 'F'
-    latex_symbol = '\\bot'
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    @staticmethod
-    def to_dual(conditional: bool = True):
-        if conditional:
-            return _T
-        return _F
-
-    def __init__(self):
-        self.func = _F
-        self.args = ()
-
-    def __repr__(self):
-        return 'F'
-
-
-F = _F()
+# The following import is intentionally late to avoid circularity.
+from .truth import _T, _F, T, F
