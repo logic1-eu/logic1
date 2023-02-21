@@ -1,5 +1,9 @@
 __pycache__
 
+# Coverage
+.coverage
+htmlcov
+
 # Jupyter Notebook
 .ipynb_checkpoints
 *.ipynb
