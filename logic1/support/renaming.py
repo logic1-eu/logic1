@@ -2,7 +2,7 @@ from sympy import Symbol
 
 _key = 'R'
 _index = 0
-_stack = []
+_stack: list[int] = []
 
 
 def pop() -> None:
