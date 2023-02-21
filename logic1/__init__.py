@@ -7,4 +7,4 @@ ___license__ = 'BSD 2-Clause "Simplified" License'
 ___status__ = 'Prototype'
 
 from .firstorder import *  # noqa
-from .support.renaming import *  # noqa
+from .support.renaming import push, pop, rename  # noqa

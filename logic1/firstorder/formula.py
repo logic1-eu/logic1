@@ -33,7 +33,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Callable, ClassVar, final, Tuple, TYPE_CHECKING, Union
 
-from ..support.containers import Variables
+from ..support.containers import GetVars
 # from ..support.tracing import trace
 
 if TYPE_CHECKING:
@@ -176,19 +176,10 @@ class Formula(ABC):
         >>> F._repr_latex_()
         '$\\displaystyle \\bot$'
 
-        Subclasses have latex() methods yielding plain LaTeX without the
+        Subclasses have to_latex() methods yielding plain LaTeX without the
         surrounding $\\displaystyle ... $.
         """
-        return '$\\displaystyle ' + self.latex() + '$'
-
-    @abstractmethod
-    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
-        """Return any atomic formula contained in self, None if there is none.
-
-        A typical use cass is getting access to methods of classes derived from
-        AtomicFormula elsewhere.
-        """
-        ...
+        return '$\\displaystyle ' + self.to_latex() + '$'
 
     @final
     def count_alternations(self) -> int:
@@ -208,23 +199,44 @@ class Formula(ABC):
     def _count_alternations(self) -> tuple:
         ...
 
-    @final
-    def latex(self) -> str:
-        """Convert to LaTeX representation.
+    @abstractmethod
+    def get_any_atom(self) -> Union[AtomicFormula, None]:
+        """Return any atomic formula contained in self, None if there is none.
+
+        A typical use cass is getting access to methods of classes derived from
+        AtomicFormula elsewhere.
         """
-        return self._sprint(mode='latex')
+        ...
 
     @abstractmethod
-    def qvars(self) -> set:
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Get variables.
+
+        >>> from logic1 import EX, ALL
+        >>> from logic1.atomlib.sympy import EQ
+        >>> from sympy.abc import x, y, z
+        >>> f = EQ(3 * x, 0) \
+                >> ALL(z, ALL(x, (~ EQ(x, 0) >> EX(y, EQ(x * y, 1)))))
+        >>> f.get_vars().free == {x}
+        True
+        >>> f.get_vars().bound == {x, y}
+        True
+        >>> z not in f.get_vars().all
+        True
+        """
+        ...
+
+    @abstractmethod
+    def get_qvars(self) -> set:
         """The set of all variables that are quantified in self.
 
         This should not be confused with bound ocurrences of variables. Compare
-        the Formula.vars() method.
+        the Formula.get_vars() method.
 
         >>> from logic1 import EX, ALL
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, b, c, x, y, z
-        >>> ALL(y, EX(x, EQ(a, y)) & EX(z, EQ(a, y))).qvars() == {x, y, z}
+        >>> ALL(y, EX(x, EQ(a, y)) & EX(z, EQ(a, y))).get_qvars() == {x, y, z}
         True
         """
         ...
@@ -267,47 +279,6 @@ class Formula(ABC):
         """
         ...
 
-    def sympy(self, **kwargs) -> sympy.Basic:
-        """Provide a sympy representation of the Formula if possible.
-
-        Subclasses that have no match in sympy can raise NotImplementedError.
-
-        >>> from logic1 import Equivalent, T
-        >>> from logic1.atomlib.sympy import EQ
-        >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(EQ(x, y), EQ(x + 1, y + 1))
-        >>> e1
-        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
-        >>> type(e1)
-        <class 'logic1.firstorder.boolean.Equivalent'>
-        >>> e1.sympy()
-        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
-        >>> type(e1.sympy())
-        Equivalent
-
-        >>> e2 = Equivalent(EQ(x, y), EQ(y, x))
-        >>> e2
-        Equivalent(Eq(x, y), Eq(y, x))
-        >>> e2.sympy()
-        True
-
-        >>> e3 = T
-        >>> e3.sympy()
-        Traceback (most recent call last):
-        ...
-        NotImplementedError:
-            sympy does not know <class 'logic1.firstorder.truth._T'>
-
-        >>> e4 = All(x, Ex(y, EQ(x, y)))
-        >>> e4.sympy()
-        Traceback (most recent call last):
-        ...
-        NotImplementedError:
-            sympy does not know <class 'logic1.firstorder.quantified.All'>
-        """
-        args_sympy = (arg.sympy(**kwargs) for arg in self.args)
-        return self.__class__.sympy_func(*args_sympy)
-
     @final
     def to_distinct_vars(self) -> Self:
         """Convert to equivalent formulas with distinct variables.
@@ -330,7 +301,7 @@ class Formula(ABC):
         """
         # Recursion starts with a badlist (technically a set) of all free
         # variables.
-        return self._to_distinct_vars(self.vars().free)
+        return self._to_distinct_vars(self.get_vars().free)
 
     @abstractmethod
     def _to_distinct_vars(self, badlist: set) -> Self:
@@ -340,6 +311,12 @@ class Formula(ABC):
         # for the future. Note that this can includes variables that do not
         # *occur* in a mathematical sense.
         ...
+
+    @final
+    def to_latex(self) -> str:
+        """Convert to LaTeX representation.
+        """
+        return self._sprint(mode='latex')
 
     @abstractmethod
     def to_nnf(self, implicit_not: bool = False,
@@ -431,30 +408,53 @@ class Formula(ABC):
         """
         raise NotImplementedError(f'{self.func} is not an NNF operator')
 
+    def to_sympy(self, **kwargs) -> sympy.Basic:
+        """Provide a sympy representation of the Formula if possible.
+
+        Subclasses that have no match in sympy can raise NotImplementedError.
+
+        >>> from logic1 import Equivalent, T
+        >>> from logic1.atomlib.sympy import EQ
+        >>> from sympy.abc import x, y
+        >>> e1 = Equivalent(EQ(x, y), EQ(x + 1, y + 1))
+        >>> e1
+        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
+        >>> type(e1)
+        <class 'logic1.firstorder.boolean.Equivalent'>
+        >>> e1.to_sympy()
+        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
+        >>> type(e1.to_sympy())
+        Equivalent
+
+        >>> e2 = Equivalent(EQ(x, y), EQ(y, x))
+        >>> e2
+        Equivalent(Eq(x, y), Eq(y, x))
+        >>> e2.to_sympy()
+        True
+
+        >>> e3 = T
+        >>> e3.to_sympy()
+        Traceback (most recent call last):
+        ...
+        NotImplementedError:
+            sympy does not know <class 'logic1.firstorder.truth._T'>
+
+        >>> e4 = All(x, Ex(y, EQ(x, y)))
+        >>> e4.to_sympy()
+        Traceback (most recent call last):
+        ...
+        NotImplementedError:
+            sympy does not know <class 'logic1.firstorder.quantified.All'>
+        """
+        args_sympy = (arg.to_sympy(**kwargs) for arg in self.args)
+        return self.__class__.sympy_func(*args_sympy)
+
     @abstractmethod
     def transform_atoms(self, transformation: Callable) -> Self:
         ...
 
-    @abstractmethod
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        """Get variables.
 
-        >>> from logic1 import EX, ALL
-        >>> from logic1.atomlib.sympy import EQ
-        >>> from sympy.abc import x, y, z
-        >>> f = EQ(3 * x, 0) \
-                >> ALL(z, ALL(x, (~ EQ(x, 0) >> EX(y, EQ(x * y, 1)))))
-        >>> f.vars().free == {x}
-        True
-        >>> f.vars().bound == {x, y}
-        True
-        >>> z not in f.vars().all
-        True
-        """
-        ...
-
-
-latex = Formula.latex
+latex = Formula.to_latex
 
 
 # The following imports are intentionally late to avoid circularity.

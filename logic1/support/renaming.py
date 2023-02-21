@@ -5,6 +5,14 @@ _index = 0
 _stack = []
 
 
+def pop() -> None:
+    """
+    Pop the counter for rename(). The current counter is lost.
+    """
+    global _index, _stack
+    _index = _stack.pop()
+
+
 def push() -> None:
     """
     Push the counter for rename() and start from 1.
@@ -12,14 +20,6 @@ def push() -> None:
     global _index, _stack
     _stack.append(_index)
     _index = 0
-
-
-def pop() -> None:
-    """
-    Pop the counter for rename(). The current counter is lost.
-    """
-    global _index, _stack
-    _index = _stack.pop()
 
 
 def rename(var: Symbol) -> Symbol:

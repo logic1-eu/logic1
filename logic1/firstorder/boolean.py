@@ -8,7 +8,7 @@ from pyeda.inter import expr, exprvar
 import sympy
 
 from .formula import Formula
-from ..support.containers import Variables
+from ..support.containers import GetVars
 
 # from ..support.tracing import trace
 
@@ -24,8 +24,8 @@ class BooleanFormula(Formula):
     BooleanFormula start, in the sense of prefix notation, with a Boolean
     operator but may have quantified subformulas deeper in the expression tree.
     """
-    text_symbol_spacing = ' '
     latex_symbol_spacing = ' \\, '
+    text_symbol_spacing = ' '
 
     @staticmethod
     def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) -> Formula:
@@ -40,13 +40,7 @@ class BooleanFormula(Formula):
         args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
         return func(*args)
 
-    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
-        for arg in self.args:
-            atom = arg.get_any_atomic_formula()
-            if atom:
-                return atom
-        return None
-
+    # Instance methods
     def _count_alternations(self) -> tuple:
         best_count = -1
         best_quantifiers = {Ex, All}
@@ -59,11 +53,24 @@ class BooleanFormula(Formula):
                 best_quantifiers |= quantifiers
         return (best_count, best_quantifiers)
 
-    def qvars(self) -> set:
+    def get_any_atom(self) -> Union[AtomicFormula, None]:
+        for arg in self.args:
+            atom = arg.get_any_atom()
+            if atom:
+                return atom
+        return None
+
+    def get_qvars(self) -> set:
         qvars = set()
         for arg in self.args:
-            qvars |= arg.qvars()
+            qvars |= arg.get_qvars()
         return qvars
+
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        vars = GetVars()
+        for arg in self.args:
+            vars |= arg.get_vars(assume_quantified=assume_quantified)
+        return vars
 
     def _sprint(self, mode: str) -> str:
         def not_arg(outer, inner) -> str:
@@ -102,10 +109,6 @@ class BooleanFormula(Formula):
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def _to_distinct_vars(self, badlist: set) -> Self:
-        return self.func(*(arg._to_distinct_vars(badlist)
-                           for arg in self.args))
-
     def to_cnf(self) -> Self:
         """ Convert to Conjunctive Normal Form.
 
@@ -115,6 +118,10 @@ class BooleanFormula(Formula):
         And(Or(Ne(a, 1), Eq(a, 2)), Or(Eq(a, 0), Ne(a, 1)))
         """
         return Not(self).to_dnf().to_nnf(implicit_not=True)
+
+    def _to_distinct_vars(self, badlist: set) -> Self:
+        return self.func(*(arg._to_distinct_vars(badlist)
+                           for arg in self.args))
 
     def to_dnf(self) -> Self:
         """ Convert to Disjunctive Normal Form.
@@ -148,19 +155,14 @@ class BooleanFormula(Formula):
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
 
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        vars = Variables()
-        for arg in self.args:
-            vars |= arg.vars(assume_quantified=assume_quantified)
-        return vars
-
 
 class Equivalent(BooleanFormula):
 
-    print_style = 'infix'
     print_precedence = 10
-    text_symbol = '<-->'
+    print_style = 'infix'
+
     latex_symbol = '\\longleftrightarrow'
+    text_symbol = '<-->'
 
     sympy_func = sympy.Equivalent
 
@@ -185,11 +187,6 @@ class Equivalent(BooleanFormula):
     def __init__(self, lhs, rhs):
         self.func = Equivalent
         self.args = (lhs, rhs)
-
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
-        tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
-        return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
 
     def simplify(self, Theta=None):
         """Recursively simplify the Equivalence.
@@ -218,16 +215,22 @@ class Equivalent(BooleanFormula):
             return True
         return Equivalent(lhs, rhs)
 
+    def to_nnf(self, implicit_not: bool = False,
+               to_positive: bool = True) -> Formula:
+        tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
+        return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
+
 
 EQUIV = Equivalent.interactive_new
 
 
 class Implies(BooleanFormula):
 
-    print_style = 'infix'
     print_precedence = 10
-    text_symbol = '-->'
+    print_style = 'infix'
+
     latex_symbol = '\\longrightarrow'
+    text_symbol = '-->'
 
     sympy_func = sympy.Implies
 
@@ -285,8 +288,8 @@ IMPL = Implies.interactive_new
 
 class AndOr(BooleanFormula):
 
-    print_style = 'infix'
     print_precedence = 50
+    print_style = 'infix'
 
     func: type[AndOr]
 
@@ -426,8 +429,8 @@ class And(AndOr):
     >>> And(EQ(x, 0), EQ(x, y), EQ(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
-    text_symbol = '&'
     latex_symbol = '\\wedge'
+    text_symbol = '&'
 
     sympy_func = sympy.And
 
@@ -463,8 +466,8 @@ class Or(AndOr):
     >>> Or(EQ(1, 0), EQ(2, 0), EQ(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
-    text_symbol = '|'
     latex_symbol = '\\vee'
+    text_symbol = '|'
 
     sympy_func = sympy.Or
 
@@ -491,10 +494,11 @@ OR = Or.interactive_new
 
 class Not(BooleanFormula):
 
-    print_precedence = 99
     print_style = 'not'
-    text_symbol = '~'
+    print_precedence = 99
+
     latex_symbol = '\\neg'
+    text_symbol = '~'
 
     sympy_func = sympy.Not
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import final
 
-from ..support.containers import Variables
+from ..support.containers import GetVars
 
 from .formula import Formula
 from .quantified import Ex, All
@@ -12,8 +12,8 @@ from .boolean import BooleanFormula, Not
 
 class TruthValue(BooleanFormula):
 
-    print_style = 'constant'
     print_precedence = 99
+    print_style = 'constant'
 
     func: type[TruthValue]
 
@@ -22,14 +22,15 @@ class TruthValue(BooleanFormula):
     def to_dual(conditional: bool = True):
         ...
 
+    # Instance methods
     def _count_alternations(self) -> tuple:
         return (-1, {Ex, All})
 
-    def qvars(self) -> set:
+    def get_qvars(self) -> set:
         return set()
 
-    def sympy(self):
-        raise NotImplementedError(f'sympy does not know {self.func}')
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        return GetVars()
 
     def to_cnf(self) -> Self:
         """ Convert to Conjunctive Normal Form.
@@ -60,8 +61,8 @@ class TruthValue(BooleanFormula):
         """
         return {Ex: self, All: self}
 
-    def vars(self, assume_quantified: set = set()):
-        return Variables()
+    def to_sympy(self):
+        raise NotImplementedError(f'sympy does not know {self.func}')
 
 
 @final
@@ -72,8 +73,8 @@ class _T(TruthValue):
     support subclassing. We do not use a module because we need _T to be a
     subclass itself.
     """
-    text_symbol = 'T'
     latex_symbol = '\\top'
+    text_symbol = 'T'
 
     _instance = None
 
@@ -107,8 +108,8 @@ class _F(TruthValue):
     support subclassing. We do not use a module because we need _F to be a
     subclass itself.
     """
-    text_symbol = 'F'
     latex_symbol = '\\bot'
+    text_symbol = 'F'
 
     _instance = None
 

@@ -4,7 +4,7 @@ from abc import abstractmethod
 from typing import Any, Callable, TYPE_CHECKING, Union
 
 from .formula import Formula
-from ..support.containers import Variables
+from ..support.containers import GetVars
 from ..support.renaming import rename
 
 # from ..support.tracing import trace
@@ -16,8 +16,9 @@ if TYPE_CHECKING:
 class QuantifiedFormula(Formula):
 
     print_precedence = 99
-    text_symbol_spacing = ' '
+
     latex_symbol_spacing = ' \\, '
+    text_symbol_spacing = ' '
 
     func: type[QuantifiedFormula]
 
@@ -87,7 +88,7 @@ class QuantifiedFormula(Formula):
         """
         if not isinstance(arg, Formula):
             raise TypeError(f'{repr(arg)} is not a Formula')
-        atom = arg.get_any_atomic_formula()
+        atom = arg.get_any_atom()
         # If atom is None, then arg does not contain any atomic formula.
         # Therefore we cannot know what are valid variables, and we will accept
         # anything. Otherwise atom has a static method providing the type of
@@ -97,17 +98,22 @@ class QuantifiedFormula(Formula):
             raise TypeError(f'{repr(variable)} is not a Variable')
         return cls(variable, arg)
 
-    def get_any_atomic_formula(self) -> Union[AtomicFormula, None]:
-        return self.arg.get_any_atomic_formula()
-
+    # Instance methods
     def _count_alternations(self) -> tuple:
         count, quantifiers = self.arg._count_alternations()
         if self.func.to_dual() in quantifiers:
             return (count + 1, {self.func})
         return (count, quantifiers)
 
-    def qvars(self) -> set:
-        return self.arg.qvars() | {self.var}
+    def get_any_atom(self) -> Union[AtomicFormula, None]:
+        return self.arg.get_any_atom()
+
+    def get_qvars(self) -> set:
+        return self.arg.get_qvars() | {self.var}
+
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        quantified = assume_quantified | {self.var}
+        return self.arg.get_vars(assume_quantified=quantified)
 
     def simplify(self, Theta=None):
         """Simplification.
@@ -127,7 +133,7 @@ class QuantifiedFormula(Formula):
             return inner_sprint
 
         if mode == 'latex':
-            atom = self.get_any_atomic_formula()
+            atom = self.get_any_atom()
             symbol = self.__class__.latex_symbol
             var = atom.term_to_latex(self.var) if atom else self.var
             spacing = self.__class__.latex_symbol_spacing
@@ -138,8 +144,39 @@ class QuantifiedFormula(Formula):
             spacing = self.__class__.text_symbol_spacing
         return f'{symbol} {var}{spacing}{arg_in_parens(self.arg)}'
 
-    def sympy(self, *args, **kwargs):
-        raise NotImplementedError(f'sympy does not know {type(self)}')
+    def subs(self, substitution: dict) -> Self:
+        """Substitution.
+        """
+        atom = self.get_any_atom()
+        if not atom:
+            return self
+        # A copy of the mutual could be avoided by keeping track of the changes
+        # and undoing them at the end.
+        substitution = substitution.copy()
+        # (1) Remove substitution for the quantified variable. In principle,
+        # this is covered by (2) below, but deleting here preserves the name.
+        if self.var in substitution:
+            del substitution[self.var]
+        # Collect all variables on the right hand sides of substitutions:
+        substituted_vars = set()
+        for term in substitution.values():
+            substituted_vars |= atom.term_get_vars(term)
+        # (2) Make sure the quantified variable is not a key and does not occur
+        # in a value of substitution:
+        if self.var in substituted_vars or self.var in substitution:
+            var = atom.rename_var(self.var)
+            # We now know the following:
+            #   (i) var is not a key,
+            #  (ii) var does not occur in the values,
+            # (iii) self.var is not a key.
+            # We do *not* know whether self.var occurs in the values.
+            substitution[self.var] = var
+            # All free occurrences of self.var in self.arg will be renamed to
+            # var. In case of (iv) above, substitution will introduce new free
+            # occurrences of self.var, which do not clash with the new
+            # quantified variable var:
+            return self.func(var, self.arg.subs(substitution))
+        return self.func(self.var, self.arg.subs(substitution))
 
     def _to_distinct_vars(self, badlist: set) -> Self:
         arg = self.arg._to_distinct_vars(badlist)
@@ -163,47 +200,12 @@ class QuantifiedFormula(Formula):
         pnf = self.func(self.var, self.arg._to_pnf()[self.func])
         return {Ex: pnf, All: pnf}
 
-    def subs(self, substitution: dict) -> Self:
-        """Substitution.
-        """
-        atom = self.get_any_atomic_formula()
-        if not atom:
-            return self
-        # A copy of the mutual could be avoided by keeping track of the changes
-        # and undoing them at the end.
-        substitution = substitution.copy()
-        # (1) Remove substitution for the quantified variable. In principle,
-        # this is covered by (2) below, but deleting here preserves the name.
-        if self.var in substitution:
-            del substitution[self.var]
-        # Collect all variables on the right hand sides of substitutions:
-        substituted_vars = set()
-        for term in substitution.values():
-            substituted_vars |= atom.get_variables_from_term(term)
-        # (2) Make sure the quantified variable is not a key and does not occur
-        # in a value of substitution:
-        if self.var in substituted_vars or self.var in substitution:
-            var = atom.rename_variable(self.var)
-            # We now know the following:
-            #   (i) var is not a key,
-            #  (ii) var does not occur in the values,
-            # (iii) self.var is not a key.
-            # We do *not* know whether self.var occurs in the values.
-            substitution[self.var] = var
-            # All free occurrences of self.var in self.arg will be renamed to
-            # var. In case of (iv) above, substitution will introduce new free
-            # occurrences of self.var, which do not clash with the new
-            # quantified variable var:
-            return self.func(var, self.arg.subs(substitution))
-        return self.func(self.var, self.arg.subs(substitution))
+    def to_sympy(self, *args, **kwargs):
+        raise NotImplementedError(f'sympy does not know {type(self)}')
 
     def transform_atoms(self, transformation: Callable) -> Self:
         return self.func(self.var,
                          self.arg.transform_atoms(transformation))
-
-    def vars(self, assume_quantified: set = set()) -> Variables:
-        quantified = assume_quantified | {self.var}
-        return self.arg.vars(assume_quantified=quantified)
 
 
 class Ex(QuantifiedFormula):
@@ -214,8 +216,8 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, EQ(x, 1))
     Ex(x, Eq(x, 1))
     """
-    text_symbol = 'Ex'
     latex_symbol = '\\exists'
+    text_symbol = 'Ex'
 
     @staticmethod
     def to_dual(conditional: bool = True):
@@ -239,8 +241,8 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
-    text_symbol = 'All'
     latex_symbol = '\\forall'
+    text_symbol = 'All'
 
     @staticmethod
     def to_dual(conditional: bool = True):

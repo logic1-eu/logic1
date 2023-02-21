@@ -5,7 +5,7 @@ from typing import Tuple
 import sympy
 
 from ..firstorder import atomic
-from ..support.containers import Variables
+from ..support.containers import GetVars
 from ..support.renaming import rename
 
 
@@ -16,24 +16,24 @@ Variable = sympy.Symbol
 class TermMixin():
 
     @staticmethod
-    def get_variables_from_term(term: Term) -> set[Variable]:
-        return sympy.S(term).atoms(Variable)
+    def term_type() -> type[Term]:
+        return Term
 
     @staticmethod
-    def rename_variable(variable: Variable) -> Variable:
-        return rename(variable)
+    def term_get_vars(term: Term) -> set[Variable]:
+        return sympy.S(term).atoms(Variable)
 
     @staticmethod
     def term_to_latex(term: Term) -> str:
         return sympy.latex(term)
 
     @staticmethod
-    def term_type() -> type[Term]:
-        return Term
-
-    @staticmethod
     def variable_type() -> type[Variable]:
         return Variable
+
+    @staticmethod
+    def rename_var(variable: Variable) -> Variable:
+        return rename(variable)
 
 
 class AtomicFormula(TermMixin, atomic.AtomicFormula):
@@ -52,16 +52,16 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
             args_.append(arg_)
         return cls(*args_)
 
-    def subs(self, substitution: dict) -> Self:
-        args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
-        return self.func(*args)
-
-    def vars(self, assume_quantified: set = set()) -> Variables:
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
         all_vars = set()
         for term in self.args:
             all_vars |= term.atoms(sympy.Symbol)
-        return Variables(free=all_vars - assume_quantified,
+        return GetVars(free=all_vars - assume_quantified,
                          bound=all_vars & assume_quantified)
+
+    def subs(self, substitution: dict) -> Self:
+        args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
+        return self.func(*args)
 
 
 class BinaryAtomicFormula(AtomicFormula):
