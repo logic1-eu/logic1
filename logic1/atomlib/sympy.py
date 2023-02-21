@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Tuple
+from abc import abstractmethod
+from typing import ClassVar, final, Literal, Tuple, Type, Union
 
 import sympy
 
@@ -11,6 +12,8 @@ from ..support.renaming import rename
 
 Term = sympy.Expr
 Variable = sympy.Symbol
+
+oo = sympy.oo
 
 
 class TermMixin():
@@ -40,6 +43,7 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
 
+    func: Type[AtomicFormula]
     args: Tuple[Term, ...]
 
     @classmethod
@@ -57,7 +61,7 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
         for term in self.args:
             all_vars |= term.atoms(sympy.Symbol)
         return GetVars(free=all_vars - assume_quantified,
-                         bound=all_vars & assume_quantified)
+                       bound=all_vars & assume_quantified)
 
     def subs(self, substitution: dict) -> Self:
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
@@ -66,6 +70,7 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
 
 class BinaryAtomicFormula(AtomicFormula):
 
+    func: Type[BinaryAtomicFormula]
     args: Tuple[Term, Term]
 
     @property
@@ -78,12 +83,55 @@ class BinaryAtomicFormula(AtomicFormula):
         """The right-hand side of the BinaryAtomicFormula."""
         return self.args[1]
 
+    # Relations
+    @staticmethod
+    @abstractmethod
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        """Returns the converse R ** (-1) of a relation R derived from
+        BinaryAtomicFormula if conditional is True, else R.
+
+        If R is defined on S x T, then R ** (-1) = { (x, y) in T x S | (y, x)
+        in R }. For instance,
+
+        >>> Le.rel_converse()
+        <class 'logic1.atomlib.sympy.Ge'>
+        >>> Eq.rel_converse()
+        <class 'logic1.atomlib.sympy.Eq'>
+        >>> Le.rel_complement(9 ** 2 < 80)
+        <class 'logic1.atomlib.sympy.Le'>
+
+        Compare the notions of the complement relation R' of R, and
+        of the dual relation (R') ** (-1), which equals (R ** (-1))'.
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        """Returns the dual (R') ** (-1) of a relation R derived from
+        BinaryAtomicFormula if conditional is True, else R.
+
+        For instance,
+
+        >>> Le.rel_dual()
+        <class 'logic1.atomlib.sympy.Lt'>
+        >>> Eq.rel_dual()
+        <class 'logic1.atomlib.sympy.Ne'>
+        >>> Le.rel_dual(9 ** 2 < 80)
+        <class 'logic1.atomlib.sympy.Le'>
+
+        Note that (R') ** (-1)  equals (R ** (-1))'. Compare the notions of the
+        converse relation R ** (-1) and of the complement relation R' of R.
+        """
+        ...
+
+    # Instance methods
     def __init__(self, lhs: Term, rhs: Term) -> None:
         self.func = self.__class__
         self.args = (lhs, rhs)
 
-    # Override BooleanFormula._sprint() to prevent recursion into terms
     def _sprint(self, mode: str) -> str:
+        # Override BooleanFormula._sprint() to prevent recursion into terms
         if mode == 'latex':
             symbol = self.__class__.latex_symbol
             lhs = sympy.latex(self.lhs)
@@ -96,6 +144,22 @@ class BinaryAtomicFormula(AtomicFormula):
             rhs = self.rhs.__str__()
             spacing = self.__class__.text_symbol_spacing
         return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
+
+    @final
+    def to_converse(self, conditional: bool = True) -> Self:
+        # Do not pass on but check conditional in order to avoid construction
+        # in case of False.
+        if conditional:
+            return self.func.rel_converse()(*self.args)
+        return self
+
+    @final
+    def to_dual(self, conditional: bool = True) -> Self:
+        # Do not pass on but check conditional in order to avoid construction
+        # in case of False.
+        if conditional:
+            return self.func.rel_dual()(*self.args)
+        return self
 
 
 class Eq(BinaryAtomicFormula):
@@ -110,16 +174,19 @@ class Eq(BinaryAtomicFormula):
     sympy_func = sympy.Eq
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Ne
         return Eq
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        return Eq
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
-            return Eq
+            return Ne
         return Eq
 
 
@@ -137,16 +204,19 @@ class Ne(BinaryAtomicFormula):
     sympy_func = sympy.Ne
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Eq
         return Ne
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        return Ne
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
-            return Ne
+            return Eq
         return Ne
 
 
@@ -161,16 +231,21 @@ class Ge(BinaryAtomicFormula):
     sympy_func = sympy.Ge
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Lt
         return Ge
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Le
+        return Ge
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Gt
         return Ge
 
 
@@ -185,16 +260,21 @@ class Le(BinaryAtomicFormula):
     sympy_func = sympy.Le
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Gt
         return Le
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Ge
+        return Le
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Lt
         return Le
 
 
@@ -209,16 +289,21 @@ class Gt(BinaryAtomicFormula):
     sympy_func = sympy.Gt
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Le
         return Gt
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Lt
+        return Gt
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Ge
         return Gt
 
 
@@ -233,16 +318,21 @@ class Lt(BinaryAtomicFormula):
     sympy_func = sympy.Lt
 
     @staticmethod
-    def to_complementary(conditional: bool = True) \
-            -> type[BinaryAtomicFormula]:
+    def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Ge
         return Lt
 
     @staticmethod
-    def to_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+    def rel_converse(conditional: bool = True) -> type[BinaryAtomicFormula]:
         if conditional:
             return Gt
+        return Lt
+
+    @staticmethod
+    def rel_dual(conditional: bool = True) -> type[BinaryAtomicFormula]:
+        if conditional:
+            return Le
         return Lt
 
 

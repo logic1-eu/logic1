@@ -50,12 +50,24 @@ class AtomicFormula(Formula):
     # Relations
     @staticmethod
     @abstractmethod
-    def to_complementary(conditional: bool = True) -> type[AtomicFormula]:
-        ...
+    def rel_complement(conditional: bool = True) -> type[AtomicFormula]:
+        """Returns the complement R' of a relation R derived from AtomicFormula
+        if conditional is True, else R.
 
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True) -> type[AtomicFormula]:
+        Assume that R is defined on a Cartesian product P. Then R' = P - R. For
+        instance,
+
+        >>> from logic1.atomlib.sympy import Le, Eq
+        >>> Le.rel_complement()
+        <class 'logic1.atomlib.sympy.Gt'>
+        >>> Eq.rel_complement()
+        <class 'logic1.atomlib.sympy.Ne'>
+        >>> Le.rel_complement(9 ** 2 < 80)
+        <class 'logic1.atomlib.sympy.Le'>
+
+        Compare the notions of the converse relation R ** (-1) of R, and of the
+        dual relation (R') ** (-1), which equals (R ** (-1))'.
+        """
         ...
 
     # Instance methods
@@ -95,8 +107,12 @@ class AtomicFormula(Formula):
         return self
 
     @final
-    def to_complement(self) -> Self:
-        return self.func.to_complementary()(*self.args)
+    def to_complement(self, conditional: bool = True) -> Formula:
+        # Do not pass on but check conditional in order to avoid construction
+        # in case of False.
+        if conditional:
+            return self.func.rel_complement()(*self.args)
+        return self
 
     @final
     def _to_distinct_vars(self, badlist: set) -> Self:
@@ -115,16 +131,7 @@ class AtomicFormula(Formula):
 
     def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
-        if implicit_not:
-            if to_positive:
-                try:
-                    tmp = self.func.to_complementary()(*self.args)
-                except AttributeError:
-                    pass
-                else:
-                    return tmp
-            return Not(self)
-        return self
+        return self.to_complement() if implicit_not else self
 
     @final
     def _to_pnf(self) -> dict:
