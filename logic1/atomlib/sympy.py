@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import ClassVar, final, Literal, Tuple, Type, Union
+from typing import ClassVar, final, Union
 
 import sympy
 
@@ -9,6 +9,8 @@ from ..firstorder import atomic
 from ..support.containers import GetVars
 from ..support.renaming import rename
 
+# Type alias
+Card = Union[int, sympy.core.numbers.Infinity]
 
 Term = sympy.Expr
 Variable = sympy.Symbol
@@ -43,11 +45,11 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
 
-    func: Type[AtomicFormula]
-    args: Tuple[Term, ...]
+    func: type[AtomicFormula]
+    args: tuple
 
     @classmethod
-    def interactive_new(cls, *args) -> Self:
+    def interactive_new(cls, *args):
         args_ = []
         for arg in args:
             arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
@@ -63,15 +65,15 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
         return GetVars(free=all_vars - assume_quantified,
                        bound=all_vars & assume_quantified)
 
-    def subs(self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> AtomicFormula:
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
         return self.func(*args)
 
 
 class BinaryAtomicFormula(AtomicFormula):
 
-    func: Type[BinaryAtomicFormula]
-    args: Tuple[Term, Term]
+    func: type[BinaryAtomicFormula]
+    args: tuple[Term, Term]
 
     @property
     def lhs(self) -> Term:
@@ -131,7 +133,6 @@ class BinaryAtomicFormula(AtomicFormula):
         self.args = (lhs, rhs)
 
     def _sprint(self, mode: str) -> str:
-        # Override BooleanFormula._sprint() to prevent recursion into terms
         if mode == 'latex':
             symbol = self.__class__.latex_symbol
             lhs = sympy.latex(self.lhs)
@@ -146,7 +147,7 @@ class BinaryAtomicFormula(AtomicFormula):
         return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
 
     @final
-    def to_converse(self, conditional: bool = True) -> Self:
+    def to_converse(self, conditional: bool = True) -> BinaryAtomicFormula:
         # Do not pass on but check conditional in order to avoid construction
         # in case of False.
         if conditional:
@@ -154,7 +155,7 @@ class BinaryAtomicFormula(AtomicFormula):
         return self
 
     @final
-    def to_dual(self, conditional: bool = True) -> Self:
+    def to_dual(self, conditional: bool = True) -> BinaryAtomicFormula:
         # Do not pass on but check conditional in order to avoid construction
         # in case of False.
         if conditional:
@@ -337,3 +338,94 @@ class Lt(BinaryAtomicFormula):
 
 
 LT = Lt.interactive_new
+
+
+class Cardinality(AtomicFormula):
+
+    @classmethod
+    def interactive_new(cls, n):
+        if not isinstance(n, (int, sympy.core.numbers.Infinity)):
+            raise TypeError(f"{repr(n)} is not a Cardinality")
+        return cls(n)
+
+
+class _C(Cardinality):
+    """
+    >>> c_0_1 = C(0)
+    >>> c_0_2 = C(0)
+    >>> c_oo = C(oo)
+    >>> c_0_1 is c_0_2
+    True
+    >>> c_0_1 == c_oo
+    False
+    """
+    _instances: ClassVar[dict] = {}
+
+    def __new__(cls, n: Card):
+        if n not in cls._instances:
+            cls._instances[n] = super().__new__(cls)
+        return cls._instances[n]
+
+    @staticmethod
+    def rel_complement(conditional: bool = True) -> type[AtomicFormula]:
+        if conditional:
+            return _C_bar
+        return _C
+
+    def __init__(self, n: Card) -> None:
+        self.func = _C
+        self.args = (n,)
+        self.n = n
+
+    def __repr__(self):
+        return f'C({self.n})'
+
+    def _sprint(self, mode: str) -> str:
+        if mode == 'latex':
+            k = str(self.n) if isinstance(self.n, int) else '\\infty'
+            return f'C_{k}'
+        return repr(self)
+
+
+C = _C
+
+
+class _C_bar(Cardinality):
+    """
+    >>> c_0_1 = C_bar(0)
+    >>> c_0_2 = C_bar(0)
+    >>> c_oo = C_bar(oo)
+    >>> c_0_1 is c_0_2
+    True
+    >>> c_0_1 == c_oo
+    False
+    """
+    _instances: ClassVar[dict] = {}
+
+    def __new__(cls, n: Card):
+        if n not in cls._instances:
+            cls._instances[n] = super().__new__(cls)
+        return cls._instances[n]
+
+    @staticmethod
+    def rel_complement(conditional: bool = True) -> type[AtomicFormula]:
+        if conditional:
+            return _C
+        return _C_bar
+
+    def __init__(self, n: Card) -> None:
+        self.func = _C_bar
+        self.args = (n,)
+        self.n = n
+
+    def __repr__(self) -> str:
+        return f'C_bar({self.n})'
+
+    def _sprint(self, mode: str) -> str:
+        if mode == 'latex':
+            k = str(self.n) if isinstance(self.n, int) else '\\infty'
+            return f'\\overline{{C_{k}}}'
+        return repr(self)
+
+
+C_bar = _C_bar
