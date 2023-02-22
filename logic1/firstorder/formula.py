@@ -31,7 +31,8 @@ constructors REL can check that only valid L-terms are used.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, ClassVar, final, Tuple, TYPE_CHECKING, Union
+from typing import Callable, ClassVar, final, Optional, TYPE_CHECKING
+from typing_extensions import Self
 
 from ..support.containers import GetVars
 # from ..support.tracing import trace
@@ -55,10 +56,10 @@ class Formula(ABC):
     sympy_func: ClassVar[type[sympy.Basic]]
 
     func: type[Formula]
-    args: Tuple
+    args: tuple
 
     @final
-    def __and__(self, other: Self) -> Self:
+    def __and__(self, other: Formula) -> Formula:
         """Override the ``&`` operator to apply logical AND.
 
         Note that ``&`` delegates to the convenience wrapper AND in contrast to
@@ -71,7 +72,7 @@ class Formula(ABC):
         return And.interactive_new(self, other)
 
     @final
-    def __invert__(self) -> Self:
+    def __invert__(self) -> Formula:
         """Override the ``~`` operator to apply logical NOT.
 
         Note that ``~`` delegates to the convenience wrapper NOT in contrast to
@@ -84,7 +85,7 @@ class Formula(ABC):
         return Not.interactive_new(self)
 
     @final
-    def __lshift__(self, other: Self) -> Self:
+    def __lshift__(self, other: Self) -> Formula:
         """Override ``>>`` operator to apply logical IMPL.
 
         Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
@@ -98,7 +99,7 @@ class Formula(ABC):
         return Implies.interactive_new(other, self)
 
     @final
-    def __or__(self, other: Self) -> Self:
+    def __or__(self, other: Self) -> Formula:
         """Override the ``|`` operator to apply logical OR.
 
         Note that ``|`` delegates to the convenience wrapper OR in contrast to
@@ -112,7 +113,7 @@ class Formula(ABC):
         return Or.interactive_new(self, other)
 
     @final
-    def __rshift__(self, other: Self) -> Self:
+    def __rshift__(self, other: Self) -> Formula:
         """Override the ``<<`` operator to apply logical IMPL with reversed
         sides.
 
@@ -126,7 +127,7 @@ class Formula(ABC):
         """
         return Implies.interactive_new(self, other)
 
-    def __eq__(self, other: Self) -> bool:
+    def __eq__(self, other: object) -> bool:
         """Recursive equality of the formulas self and other.
 
         This is *not* logical ``equal.``
@@ -139,7 +140,14 @@ class Formula(ABC):
         >>> e1 is e2
         False
         """
+        if self is other:
+            return True
+        if not isinstance(other, Formula):
+            return NotImplemented
         return self.func == other.func and self.args == other.args
+
+    def __ne__(self, other: object) -> bool:
+        return not self == other
 
     def __hash__(self) -> int:
         return hash((self.func, self.args))
@@ -148,7 +156,6 @@ class Formula(ABC):
     def __init__(self, *args) -> None:
         ...
 
-    @final
     def __repr__(self) -> str:
         """Representation of the Formula suitable for use as an input.
         """
@@ -200,7 +207,7 @@ class Formula(ABC):
         ...
 
     @abstractmethod
-    def get_any_atom(self) -> Union[AtomicFormula, None]:
+    def get_any_atom(self) -> Optional[AtomicFormula]:
         """Return any atomic formula contained in self, None if there is none.
 
         A typical use cass is getting access to methods of classes derived from
@@ -241,7 +248,7 @@ class Formula(ABC):
         """
         ...
 
-    def simplify(self, Theta=None) -> Self:
+    def simplify(self, Theta=None) -> Formula:
         """Identity as a default implemenation of a simplifier for formulas.
 
         This should be overridden in the majority of the classes that
@@ -320,7 +327,7 @@ class Formula(ABC):
 
     @abstractmethod
     def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Self:
+               to_positive: bool = True) -> Formula:
         """Convert to Negation Normal Form.
 
         An NNF is a formula where logical Not is only applied to atomic
@@ -341,7 +348,7 @@ class Formula(ABC):
 
     @final
     def to_pnf(self, prefer_universal: bool = False,
-               is_admissible: bool = False) -> Self:
+               is_admissible: bool = False) -> Formula:
         """Convert to Prenex Normal Form.
 
         A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) where all

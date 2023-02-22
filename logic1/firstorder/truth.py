@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from typing import final
+from typing_extensions import Self
 
 from ..support.containers import GetVars
 
@@ -48,8 +49,8 @@ class TruthValue(BooleanFormula):
         """
         return self
 
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
+    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True)\
+            -> Formula:
         if to_positive:
             return self.func.to_dual(conditional=implicit_not)()
         if implicit_not:
@@ -89,11 +90,11 @@ class _T(TruthValue):
             return _F
         return _T
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.func = _T
         self.args = ()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'T'
 
 
@@ -124,11 +125,11 @@ class _F(TruthValue):
             return _T
         return _F
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.func = _F
         self.args = ()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return 'F'
 
 

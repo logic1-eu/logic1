@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import sympy
 
-from .. import atomlib
-from ..firstorder.boolean import BooleanFormula
-from ..firstorder.formula import Formula
+import logic1
+from logic1.firstorder.formula import Formula
 
 Term = sympy.Symbol
 Variable = sympy.Symbol
@@ -21,7 +20,7 @@ class TermMixin():
         return Variable
 
 
-class Eq(TermMixin, atomlib.sympy.Eq):
+class Eq(TermMixin, logic1.atomlib.sympy.Eq):
     """Equations with only variables as terms.
 
     This implements that fact that the language of sets has no functions and,
@@ -46,7 +45,7 @@ class Eq(TermMixin, atomlib.sympy.Eq):
 EQ = Eq.interactive_new
 
 
-class Ne(TermMixin, atomlib.sympy.Ne):
+class Ne(TermMixin, logic1.atomlib.sympy.Ne):
     """Inequations with only variables as terms.
 
     This implements that fact that the language of sets has no functions and,
@@ -66,5 +65,5 @@ class Ne(TermMixin, atomlib.sympy.Ne):
 NE = Ne.interactive_new
 
 
-def qe(f: Formula) -> BooleanFormula:
-    pass
+def qe(f: Formula) -> Formula:
+    return f

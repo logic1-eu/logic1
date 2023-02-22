@@ -8,3 +8,5 @@ ___status__ = 'Prototype'
 
 from .firstorder import *  # noqa
 from .support.renaming import push, pop, rename  # noqa
+
+from . import atomlib  # noqa

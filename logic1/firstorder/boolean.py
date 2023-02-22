@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Callable, TYPE_CHECKING, Union
+from typing import Callable, Optional, TYPE_CHECKING
+from typing_extensions import Self
 
 import pyeda.inter  # type: ignore
 from pyeda.inter import expr, exprvar
@@ -24,11 +25,15 @@ class BooleanFormula(Formula):
     BooleanFormula start, in the sense of prefix notation, with a Boolean
     operator but may have quantified subformulas deeper in the expression tree.
     """
+    func: type[BooleanFormula]
+    args: tuple
+
     latex_symbol_spacing = ' \\, '
     text_symbol_spacing = ' '
 
     @staticmethod
-    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) -> Formula:
+    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) \
+            -> BooleanFormula | AtomicFormula:
         from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
         if isinstance(f, pyeda.boolalg.expr.Variable):
             return d[f]
@@ -53,7 +58,7 @@ class BooleanFormula(Formula):
                 best_quantifiers |= quantifiers
         return (best_count, best_quantifiers)
 
-    def get_any_atom(self) -> Union[AtomicFormula, None]:
+    def get_any_atom(self) -> Optional[AtomicFormula]:
         for arg in self.args:
             atom = arg.get_any_atom()
             if atom:
@@ -104,12 +109,12 @@ class BooleanFormula(Formula):
             return s
         assert False
 
-    def subs(self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> BooleanFormula:
         """Substitution.
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def to_cnf(self) -> Self:
+    def to_cnf(self) -> Formula:
         """ Convert to Conjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import EQ, NE
@@ -119,11 +124,11 @@ class BooleanFormula(Formula):
         """
         return Not(self).to_dnf().to_nnf(implicit_not=True)
 
-    def _to_distinct_vars(self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> BooleanFormula:
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
 
-    def to_dnf(self) -> Self:
+    def to_dnf(self) -> BooleanFormula | AtomicFormula:
         """ Convert to Disjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import EQ, NE
@@ -134,7 +139,8 @@ class BooleanFormula(Formula):
         d: dict[AtomicFormula, exprvar] = {}
         self_pyeda = self._to_pyeda(d)
         # _to_pyeda() has populated the mutable dictionary d
-        d_rev: dict[exprvar, AtomicFormula] = dict(map(reversed, d.items()))
+        d_rev: dict[exprvar, AtomicFormula]
+        d_rev = dict(map(reversed, d.items()))  # type: ignore
         dnf = self_pyeda.to_dnf()
         dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
         self_dnf = BooleanFormula._from_pyeda(dnf, d_rev)
@@ -151,7 +157,7 @@ class BooleanFormula(Formula):
         xs = (arg._to_pyeda(d, c) for arg in self.args)
         return NAME(*xs, simplify=False)
 
-    def transform_atoms(self, transformation: Callable) -> Self:
+    def transform_atoms(self, transformation: Callable) -> BooleanFormula:
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
 
@@ -216,7 +222,7 @@ class Equivalent(BooleanFormula):
         return Equivalent(lhs, rhs)
 
     def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
+               to_positive: bool = True) -> BooleanFormula | AtomicFormula:
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
 
@@ -275,7 +281,7 @@ class Implies(BooleanFormula):
         return Implies(lhs_simplify, rhs_simplify)
 
     def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
+               to_positive: bool = True) -> BooleanFormula | AtomicFormula:
         if self.rhs.func is Or:
             tmp = Or(Not(self.lhs), *self.rhs.args)
         else:
@@ -362,7 +368,7 @@ class AndOr(BooleanFormula):
         """Convert to Prenex Normal Form. self must be in NNF.
         """
 
-        def interchange(self: AndOr, q: Union[type[Ex], type[All]]) -> Formula:
+        def interchange(self: AndOr, q: type[Ex] | type[All]) -> Formula:
             quantifiers = []
             quantifier_positions = set()
             args = list(self.args)
@@ -493,6 +499,7 @@ OR = Or.interactive_new
 
 
 class Not(BooleanFormula):
+    func: type[Not]
 
     print_style = 'not'
     print_precedence = 99
@@ -539,7 +546,7 @@ class Not(BooleanFormula):
         return involutive_not(arg_simplify)
 
     def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Self:
+               to_positive: bool = True) -> BooleanFormula | AtomicFormula:
         """Negation normal form.
 
         >>> from logic1 import EX, ALL

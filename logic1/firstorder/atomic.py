@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from typing import Any, Callable, final
+from typing_extensions import Self
 
 import pyeda.inter  # type: ignore
 
-from .boolean import Not
 from .formula import Formula
 from .quantified import Ex, All
 from ..support.containers import GetVars
@@ -107,7 +107,7 @@ class AtomicFormula(Formula):
         return self
 
     @final
-    def to_complement(self, conditional: bool = True) -> Formula:
+    def to_complement(self, conditional: bool = True) -> AtomicFormula:
         # Do not pass on but check conditional in order to avoid construction
         # in case of False.
         if conditional:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, TYPE_CHECKING, Union
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -105,7 +105,7 @@ class QuantifiedFormula(Formula):
             return (count + 1, {self.func})
         return (count, quantifiers)
 
-    def get_any_atom(self) -> Union[AtomicFormula, None]:
+    def get_any_atom(self) -> Optional[AtomicFormula]:
         return self.arg.get_any_atom()
 
     def get_qvars(self) -> set:
@@ -115,7 +115,7 @@ class QuantifiedFormula(Formula):
         quantified = assume_quantified | {self.var}
         return self.arg.get_vars(assume_quantified=quantified)
 
-    def simplify(self, Theta=None):
+    def simplify(self, Theta=None) -> Formula:
         """Simplification.
 
         >>> from logic1.atomlib.sympy import EQ
@@ -144,7 +144,7 @@ class QuantifiedFormula(Formula):
             spacing = self.__class__.text_symbol_spacing
         return f'{symbol} {var}{spacing}{arg_in_parens(self.arg)}'
 
-    def subs(self, substitution: dict) -> Self:
+    def subs(self, substitution: dict) -> QuantifiedFormula:
         """Substitution.
         """
         atom = self.get_any_atom()
@@ -178,7 +178,7 @@ class QuantifiedFormula(Formula):
             return self.func(var, self.arg.subs(substitution))
         return self.func(self.var, self.arg.subs(substitution))
 
-    def _to_distinct_vars(self, badlist: set) -> Self:
+    def _to_distinct_vars(self, badlist: set) -> QuantifiedFormula:
         arg = self.arg._to_distinct_vars(badlist)
         if self.var in badlist:
             var = rename(self.var)
@@ -187,8 +187,8 @@ class QuantifiedFormula(Formula):
             return self.func(var, arg)
         return self.func(self.var, arg)
 
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
+    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True)\
+            -> Formula:
         func_nnf = self.func.to_dual(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not,
                                   to_positive=to_positive)
@@ -203,9 +203,8 @@ class QuantifiedFormula(Formula):
     def to_sympy(self, *args, **kwargs):
         raise NotImplementedError(f'sympy does not know {type(self)}')
 
-    def transform_atoms(self, transformation: Callable) -> Self:
-        return self.func(self.var,
-                         self.arg.transform_atoms(transformation))
+    def transform_atoms(self, transformation: Callable) -> QuantifiedFormula:
+        return self.func(self.var, self.arg.transform_atoms(transformation))
 
 
 class Ex(QuantifiedFormula):
