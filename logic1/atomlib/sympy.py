@@ -33,6 +33,10 @@ class TermMixin():
         return sympy.latex(term)
 
     @staticmethod
+    def term_to_sympy(term: Term) -> sympy.Basic:
+        return term
+
+    @staticmethod
     def variable_type() -> type[Variable]:
         return Variable
 
@@ -169,10 +173,11 @@ class Eq(BinaryAtomicFormula):
     >>> Eq(exp(I * pi, evaluate=False), -1)
     Eq(exp(I*pi), -1)
     """
-    text_symbol = '='
-    latex_symbol = '='
+    latex_symbol: ClassVar[str] = '='
+    sympy_func: ClassVar[type[sympy.Eq]] = sympy.Eq
+    text_symbol: ClassVar[str] = '='
 
-    sympy_func = sympy.Eq
+    func: type[Eq]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -199,10 +204,11 @@ class Ne(BinaryAtomicFormula):
     >>> Ne(1, 0)
     Ne(1, 0)
     """
-    text_symbol = '!='
-    latex_symbol = '\\neq'
+    latex_symbol: ClassVar[str] = '\\neq'
+    sympy_func: ClassVar[type[sympy.Ne]] = sympy.Ne
+    text_symbol: ClassVar[str] = '!='
 
-    sympy_func = sympy.Ne
+    func: type[Ne]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -226,10 +232,11 @@ NE = Ne.interactive_new
 
 class Ge(BinaryAtomicFormula):
 
-    text_symbol = '>='
-    latex_symbol = '\\geq'
+    latex_symbol: ClassVar[str] = '\\geq'
+    sympy_func: ClassVar[type[sympy.Ge]] = sympy.Ge
+    text_symbol: ClassVar[str] = '>='
 
-    sympy_func = sympy.Ge
+    func: type[Ge]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -255,10 +262,11 @@ GE = Ge.interactive_new
 
 class Le(BinaryAtomicFormula):
 
-    text_symbol = '<='
-    latex_symbol = '\\leq'
+    latex_symbol: ClassVar[str] = '\\leq'
+    sympy_func: ClassVar[type[sympy.Le]] = sympy.Le
+    text_symbol: ClassVar[str] = '<='
 
-    sympy_func = sympy.Le
+    func: type[Le]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -284,10 +292,11 @@ LE = Le.interactive_new
 
 class Gt(BinaryAtomicFormula):
 
-    text_symbol = '>'
-    latex_symbol = '>'
+    latex_symbol: ClassVar[str] = '>'
+    sympy_func: ClassVar[type[sympy.Gt]] = sympy.Gt
+    text_symbol: ClassVar[str] = '>'
 
-    sympy_func = sympy.Gt
+    func: type[Gt]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -313,10 +322,11 @@ GT = Gt.interactive_new
 
 class Lt(BinaryAtomicFormula):
 
-    text_symbol = '<'
-    latex_symbol = '<'
+    latex_symbol: ClassVar[str] = '<'
+    sympy_func: ClassVar[type[sympy.Lt]] = sympy.Lt
+    text_symbol: ClassVar[str] = '<'
 
-    sympy_func = sympy.Lt
+    func: type[Lt]
 
     @staticmethod
     def rel_complement(conditional: bool = True) -> type[BinaryAtomicFormula]:
@@ -343,9 +353,12 @@ LT = Lt.interactive_new
 class Cardinality(AtomicFormula):
 
     @classmethod
-    def interactive_new(cls, n):
+    def interactive_new(cls, *args):
+        if len(args) != 1:
+            raise TypeError(f"bad number of arguments")
+        n = args[0]
         if not isinstance(n, (int, sympy.core.numbers.Infinity)):
-            raise TypeError(f"{repr(n)} is not a Cardinality")
+            raise TypeError(f"{n!r} is not a Cardinality")
         return cls(n)
 
 
@@ -381,10 +394,11 @@ class _C(Cardinality):
         return f'C({self.n})'
 
     def _sprint(self, mode: str) -> str:
-        if mode == 'latex':
-            k = str(self.n) if isinstance(self.n, int) else '\\infty'
-            return f'C_{k}'
-        return repr(self)
+        if mode == 'text':
+            return repr(self)
+        assert mode == 'latex', f'bad print mode {mode!r}'
+        k = str(self.n) if isinstance(self.n, int) else '\\infty'
+        return f'C_{k}'
 
 
 C = _C
@@ -422,10 +436,11 @@ class _C_bar(Cardinality):
         return f'C_bar({self.n})'
 
     def _sprint(self, mode: str) -> str:
-        if mode == 'latex':
-            k = str(self.n) if isinstance(self.n, int) else '\\infty'
-            return f'\\overline{{C_{k}}}'
-        return repr(self)
+        if mode == 'text':
+            return repr(self)
+        assert mode == 'latex', f'bad print mode {mode!r}'
+        k = str(self.n) if isinstance(self.n, int) else '\\infty'
+        return f'\\overline{{C_{k}}}'
 
 
 C_bar = _C_bar

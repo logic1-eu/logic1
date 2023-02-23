@@ -51,9 +51,8 @@ class Formula(ABC):
     latex_symbol: ClassVar[str]
     print_style: ClassVar[str]
     print_precedence: ClassVar[int]
-    text_symbol: ClassVar[str]
-
     sympy_func: ClassVar[type[sympy.Basic]]
+    text_symbol: ClassVar[str]
 
     func: type[Formula]
     args: tuple
@@ -85,7 +84,7 @@ class Formula(ABC):
         return Not.interactive_new(self)
 
     @final
-    def __lshift__(self, other: Self) -> Formula:
+    def __lshift__(self, other: Formula) -> Formula:
         """Override ``>>`` operator to apply logical IMPL.
 
         Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
@@ -99,7 +98,7 @@ class Formula(ABC):
         return Implies.interactive_new(other, self)
 
     @final
-    def __or__(self, other: Self) -> Formula:
+    def __or__(self, other: Formula) -> Formula:
         """Override the ``|`` operator to apply logical OR.
 
         Note that ``|`` delegates to the convenience wrapper OR in contrast to
@@ -113,7 +112,7 @@ class Formula(ABC):
         return Or.interactive_new(self, other)
 
     @final
-    def __rshift__(self, other: Self) -> Formula:
+    def __rshift__(self, other: Formula) -> Formula:
         """Override the ``<<`` operator to apply logical IMPL with reversed
         sides.
 
@@ -203,7 +202,7 @@ class Formula(ABC):
         return self._count_alternations()[0]
 
     @abstractmethod
-    def _count_alternations(self) -> tuple:
+    def _count_alternations(self) -> tuple[int, set]:
         ...
 
     @abstractmethod

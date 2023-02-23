@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -15,15 +15,15 @@ if TYPE_CHECKING:
 
 class QuantifiedFormula(Formula):
 
-    print_precedence = 99
-
-    latex_symbol_spacing = ' \\, '
-    text_symbol_spacing = ' '
+    latex_symbol_spacing: ClassVar[str] = ' \\, '
+    text_symbol_spacing: ClassVar[str] = ' '
+    print_precedence: ClassVar[int] = 99
 
     func: type[QuantifiedFormula]
+    args: tuple
 
     @property
-    def var(self):
+    def var(self) -> Any:
         """The variable of the quantifier.
 
         >>> from logic1.atomlib.sympy import EQ
@@ -35,11 +35,11 @@ class QuantifiedFormula(Formula):
         return self.args[0]
 
     @var.setter
-    def var(self, value: Any):
+    def var(self, value: Any) -> None:
         self.args = (value, *self.args[1:])
 
     @property
-    def arg(self):
+    def arg(self) -> Formula:
         """The subformula in the scope of the QuantifiedFormula.
 
         >>> from logic1.atomlib.sympy import EQ
@@ -52,11 +52,11 @@ class QuantifiedFormula(Formula):
 
     @staticmethod
     @abstractmethod
-    def to_dual(conditional: bool = True):
+    def to_dual(conditional: bool = True) -> type[QuantifiedFormula]:
         ...
 
     @classmethod
-    def interactive_new(cls, variable, arg):
+    def interactive_new(cls, variable: Any, arg: Formula):
         """A type-checking convenience wrapper for the constructor.
 
         This is intended for inteactive use.
@@ -99,7 +99,7 @@ class QuantifiedFormula(Formula):
         return cls(variable, arg)
 
     # Instance methods
-    def _count_alternations(self) -> tuple:
+    def _count_alternations(self) -> tuple[int, set]:
         count, quantifiers = self.arg._count_alternations()
         if self.func.to_dual() in quantifiers:
             return (count + 1, {self.func})
@@ -187,8 +187,8 @@ class QuantifiedFormula(Formula):
             return self.func(var, arg)
         return self.func(self.var, arg)
 
-    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True)\
-            -> Formula:
+    def to_nnf(self, implicit_not: bool = False,
+               to_positive: bool = True) -> Formula:
         func_nnf = self.func.to_dual(conditional=implicit_not)
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not,
                                   to_positive=to_positive)
@@ -215,16 +215,20 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, EQ(x, 1))
     Ex(x, Eq(x, 1))
     """
-    latex_symbol = '\\exists'
-    text_symbol = 'Ex'
+    latex_symbol: ClassVar[str] = '\\exists'
+    text_symbol: ClassVar[str] = 'Ex'
+
+    func: type[Ex]
+    var: Any
+    arg: Formula
 
     @staticmethod
-    def to_dual(conditional: bool = True):
+    def to_dual(conditional: bool = True) -> type[Ex] | type[All]:
         if conditional:
             return All
         return Ex
 
-    def __init__(self, variable, arg):
+    def __init__(self, variable: Any, arg: Formula) -> None:
         self.func = Ex
         self.args = (variable, arg)
 
@@ -240,16 +244,20 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
-    latex_symbol = '\\forall'
-    text_symbol = 'All'
+    latex_symbol: ClassVar[str] = '\\forall'
+    text_symbol: ClassVar[str] = 'All'
+
+    func: type[All]
+    var: Any
+    arg: Formula
 
     @staticmethod
-    def to_dual(conditional: bool = True):
+    def to_dual(conditional: bool = True) -> type[Ex] | type[All]:
         if conditional:
             return Ex
         return All
 
-    def __init__(self, variable, arg):
+    def __init__(self, variable: Any, arg: Formula) -> None:
         self.func = All
         self.args = (variable, arg)
 

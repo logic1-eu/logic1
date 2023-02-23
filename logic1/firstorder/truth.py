@@ -1,22 +1,23 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import final
+from typing import ClassVar, final, Optional
 from typing_extensions import Self
 
 from ..support.containers import GetVars
 
+from .boolean import BooleanFormula, Not
 from .formula import Formula
 from .quantified import Ex, All
-from .boolean import BooleanFormula, Not
 
 
 class TruthValue(BooleanFormula):
 
-    print_precedence = 99
-    print_style = 'constant'
+    print_precedence: ClassVar[int] = 99
+    print_style: ClassVar[str] = 'constant'
 
     func: type[TruthValue]
+    args: tuple[()]
 
     @staticmethod
     @abstractmethod
@@ -24,7 +25,7 @@ class TruthValue(BooleanFormula):
         ...
 
     # Instance methods
-    def _count_alternations(self) -> tuple:
+    def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
 
     def get_qvars(self) -> set:
@@ -74,21 +75,23 @@ class _T(TruthValue):
     support subclassing. We do not use a module because we need _T to be a
     subclass itself.
     """
-    latex_symbol = '\\top'
-    text_symbol = 'T'
+    latex_symbol: ClassVar[str] = '\\top'
+    text_symbol: ClassVar[str] = 'T'
 
-    _instance = None
+    _instance: ClassVar[Optional[_T]] = None
+
+    func: type[_T]
+
+    @staticmethod
+    def to_dual(conditional: bool = True) -> type[_T] | type[_F]:
+        if conditional:
+            return _F
+        return _T
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-
-    @staticmethod
-    def to_dual(conditional: bool = True):
-        if conditional:
-            return _F
-        return _T
 
     def __init__(self) -> None:
         self.func = _T
@@ -109,10 +112,12 @@ class _F(TruthValue):
     support subclassing. We do not use a module because we need _F to be a
     subclass itself.
     """
-    latex_symbol = '\\bot'
-    text_symbol = 'F'
+    latex_symbol: ClassVar[str] = '\\bot'
+    text_symbol: ClassVar[str] = 'F'
 
-    _instance = None
+    _instance: ClassVar[Optional[_F]] = None
+
+    func: type[_F]
 
     def __new__(cls):
         if cls._instance is None:
@@ -120,7 +125,7 @@ class _F(TruthValue):
         return cls._instance
 
     @staticmethod
-    def to_dual(conditional: bool = True):
+    def to_dual(conditional: bool = True) -> type[_T] | type[_F]:
         if conditional:
             return _T
         return _F
