@@ -34,13 +34,17 @@ class BooleanFormula(Formula):
     @staticmethod
     def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) \
             -> BooleanFormula | AtomicFormula:
-        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
+        if isinstance(f, pyeda.boolalg.expr._Zero):
+            return F
+        if isinstance(f, pyeda.boolalg.expr._One):
+            return T
         if isinstance(f, pyeda.boolalg.expr.Variable):
             return d[f]
         if isinstance(f, pyeda.boolalg.expr.Complement):
             variable = pyeda.boolalg.expr.Not(f, simplify=True)
             return d[variable].to_complement()
         assert isinstance(f, pyeda.boolalg.expr.Operator)
+        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
         func = from_dict[f.NAME]
         args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
         return func(*args)
@@ -142,7 +146,8 @@ class BooleanFormula(Formula):
         d_rev: dict[exprvar, AtomicFormula]
         d_rev = dict(map(reversed, d.items()))  # type: ignore
         dnf = self_pyeda.to_dnf()
-        dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
+        if not isinstance(dnf, pyeda.boolalg.expr.Constant):
+            dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
         self_dnf = BooleanFormula._from_pyeda(dnf, d_rev)
         return self_dnf
 
