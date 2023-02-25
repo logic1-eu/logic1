@@ -6,6 +6,7 @@ from typing import ClassVar, final, Union
 import sympy
 
 from ..firstorder import atomic
+from ..firstorder import T, F
 from ..support.containers import GetVars
 from ..support.renaming import rename
 
@@ -175,7 +176,7 @@ class Eq(BinaryAtomicFormula):
     """
     latex_symbol: ClassVar[str] = '='
     sympy_func: ClassVar[type[sympy.Eq]] = sympy.Eq
-    text_symbol: ClassVar[str] = '='
+    text_symbol: ClassVar[str] = '=='
 
     func: type[Eq]
 
@@ -194,6 +195,11 @@ class Eq(BinaryAtomicFormula):
         if conditional:
             return Ne
         return Eq
+
+    def simplify(self, Theta=None):
+        if self.lhs == self.rhs:
+            return T
+        return self
 
 
 EQ = Eq.interactive_new
@@ -225,6 +231,11 @@ class Ne(BinaryAtomicFormula):
         if conditional:
             return Eq
         return Ne
+
+    def simplify(self, Theta=None):
+        if self.lhs == self.rhs:
+            return F
+        return self
 
 
 NE = Ne.interactive_new
@@ -357,9 +368,17 @@ class Cardinality(AtomicFormula):
         if len(args) != 1:
             raise TypeError(f"bad number of arguments")
         n = args[0]
-        if not isinstance(n, (int, sympy.core.numbers.Infinity)):
-            raise TypeError(f"{n!r} is not a Cardinality")
+        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
+            raise TypeError(f"{n!r} is not an admissible cardinality")
         return cls(n)
+
+    def __init__(self, n: Card) -> None:
+        self.func = self.__class__
+        self.args = (n,)
+        self.n = n
+
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        return GetVars()
 
 
 class _C(Cardinality):
@@ -385,11 +404,6 @@ class _C(Cardinality):
             return _C_bar
         return _C
 
-    def __init__(self, n: Card) -> None:
-        self.func = _C
-        self.args = (n,)
-        self.n = n
-
     def __repr__(self):
         return f'C({self.n})'
 
@@ -401,7 +415,7 @@ class _C(Cardinality):
         return f'C_{k}'
 
 
-C = _C
+C = _C.interactive_new
 
 
 class _C_bar(Cardinality):
@@ -427,11 +441,6 @@ class _C_bar(Cardinality):
             return _C
         return _C_bar
 
-    def __init__(self, n: Card) -> None:
-        self.func = _C_bar
-        self.args = (n,)
-        self.n = n
-
     def __repr__(self) -> str:
         return f'C_bar({self.n})'
 
@@ -443,4 +452,4 @@ class _C_bar(Cardinality):
         return f'\\overline{{C_{k}}}'
 
 
-C_bar = _C_bar
+C_bar = _C_bar.interactive_new
