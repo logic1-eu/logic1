@@ -182,9 +182,10 @@ class QuantifiedFormula(Formula):
         arg = self.arg._to_distinct_vars(badlist)
         if self.var in badlist:
             var = rename(self.var)
-            badlist |= {var}  # mutable
             arg = arg.subs({self.var: var})
+            badlist |= {var}  # mutable
             return self.func(var, arg)
+        badlist |= {self.var}
         return self.func(self.var, arg)
 
     def to_nnf(self, implicit_not: bool = False,
