@@ -9,7 +9,7 @@ from logic1 import atomlib
 from logic1 import abc
 from logic1.firstorder.boolean import And, Or
 from logic1.firstorder.formula import Formula
-
+from logic1.support.decorators import classproperty
 
 logging.basicConfig(
     format='%(levelname)s[%(relativeCreated)0.0f ms]: %(message)s',
@@ -58,20 +58,20 @@ class Eq(TermMixin, atomlib.sympy.Eq):
     ...
     TypeError: 2*x is not a Term
     """
-    @staticmethod
-    def rel_complement(conditional: bool = True) -> type[Eq] | type[Ne]:
-        if conditional:
-            return Ne
-        return Eq
 
-    @staticmethod
-    def rel_converse(conditional: bool = True) -> type[Eq] | type[Ne]:
-        return Eq
+    # Class variables
+    func: type[Eq]
 
-    @staticmethod
-    def rel_dual(conditional: bool = True) -> type[Eq] | type[Ne]:
-        if conditional:
-            return Ne
+    @classproperty
+    def complement_func(cls):
+        """The complement relation Ne of Eq.
+        """
+        return Ne
+
+    @classproperty
+    def converse_func(cls):
+        """The converse relation Eq of Eq.
+        """
         return Eq
 
 
@@ -93,20 +93,20 @@ class Ne(TermMixin, atomlib.sympy.Ne):
     ...
     TypeError: y + 1 is not a Term
     """
-    @staticmethod
-    def rel_complement(conditional: bool = True) -> type[Eq] | type[Ne]:
-        if conditional:
-            return Eq
-        return Ne
 
-    @staticmethod
-    def rel_converse(conditional: bool = True) -> type[Eq] | type[Ne]:
-        return Ne
+    # Class variables
+    func: type[Ne]
 
-    @staticmethod
-    def rel_dual(conditional: bool = True) -> type[Eq] | type[Ne]:
-        if conditional:
-            return Eq
+    @classproperty
+    def complement_func(cls):
+        """The complement relation Eq of Ne.
+        """
+        return Eq
+
+    @classproperty
+    def converse_func(cls):
+        """The converse relation Me of Ne.
+        """
         return Ne
 
 
@@ -117,22 +117,22 @@ oo = atomlib.sympy.oo
 
 
 class _C(atomlib.sympy._C):
-    @staticmethod
-    def rel_complement(conditional: bool = True) -> type[_C] | type[_C_bar]:
-        if conditional:
-            return _C_bar
-        return _C
+
+    # Class variables
+    @classproperty
+    def complement_func(cls):
+        return _C_bar
 
 
 C = _C.interactive_new
 
 
 class _C_bar(atomlib.sympy._C_bar):
-    @staticmethod
-    def rel_complement(conditional: bool = True) -> type[_C] | type[_C_bar]:
-        if conditional:
-            return _C
-        return _C_bar
+
+    # Class variables
+    @classproperty
+    def complement_func(cls):
+        return _C
 
 
 C_bar = _C_bar.interactive_new
@@ -159,6 +159,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     Or(And(C(2), C(3), C(4)), C_bar(2))
     """
 
+    # Instance methods
     def __call__(self, f):
         return self.qe(f)
 
@@ -192,6 +193,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         logging.info(f'{self.qe1p.__qualname__}: result is {phi_prime}')
         return phi_prime
 
+    # Static methods
     @staticmethod
     def is_valid_atom(f: Formula) -> bool:
         return isinstance(f, (Eq, Ne, _C, _C_bar))

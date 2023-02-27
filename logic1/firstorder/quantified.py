@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Any, Callable, ClassVar, Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
+from ..support.decorators import classproperty
 from ..support.renaming import rename
 
 # from ..support.tracing import trace
@@ -15,12 +15,19 @@ if TYPE_CHECKING:
 
 class QuantifiedFormula(Formula):
 
-    latex_symbol_spacing: ClassVar[str] = ' \\, '
-    text_symbol_spacing: ClassVar[str] = ' '
-    print_precedence: ClassVar[int] = 99
+    # Class variables
+    latex_symbol_spacing = ' \\, '
+    text_symbol_spacing = ' '
+    print_precedence = 99
+
+    latex_symbol: str
+    text_symbol: str
 
     func: type[QuantifiedFormula]
-    args: tuple
+    dual_func: type[QuantifiedFormula]
+
+    # Instance variables
+    args: tuple[Any, Formula]
 
     @property
     def var(self) -> Any:
@@ -50,11 +57,7 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True) -> type[QuantifiedFormula]:
-        ...
-
+    # Class methods
     @classmethod
     def interactive_new(cls, variable: Any, arg: Formula):
         """A type-checking convenience wrapper for the constructor.
@@ -101,7 +104,7 @@ class QuantifiedFormula(Formula):
     # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
         count, quantifiers = self.arg._count_alternations()
-        if self.func.to_dual() in quantifiers:
+        if self.dual_func in quantifiers:
             return (count + 1, {self.func})
         return (count, quantifiers)
 
@@ -190,7 +193,7 @@ class QuantifiedFormula(Formula):
 
     def to_nnf(self, implicit_not: bool = False,
                to_positive: bool = True) -> Formula:
-        func_nnf = self.func.to_dual(conditional=implicit_not)
+        func_nnf = self.dual_func if implicit_not else self.func
         arg_nnf = self.arg.to_nnf(implicit_not=implicit_not,
                                   to_positive=to_positive)
         return func_nnf(self.var, arg_nnf)
@@ -216,21 +219,21 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, EQ(x, 1))
     Ex(x, Eq(x, 1))
     """
-    latex_symbol: ClassVar[str] = '\\exists'
-    text_symbol: ClassVar[str] = 'Ex'
 
-    func: type[Ex]
-    var: Any
-    arg: Formula
+    # Class variables
+    latex_symbol = '\\exists'
+    text_symbol = 'Ex'
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[Ex] | type[All]:
-        if conditional:
-            return All
-        return Ex
+    @classproperty
+    def func(cls):
+        return cls
 
+    @classproperty
+    def dual_func(cls):
+        return All
+
+    # Instance methods
     def __init__(self, variable: Any, arg: Formula) -> None:
-        self.func = Ex
         self.args = (variable, arg)
 
 
@@ -245,21 +248,21 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
-    latex_symbol: ClassVar[str] = '\\forall'
-    text_symbol: ClassVar[str] = 'All'
 
-    func: type[All]
-    var: Any
-    arg: Formula
+    # Class variables
+    latex_symbol = '\\forall'
+    text_symbol = 'All'
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[Ex] | type[All]:
-        if conditional:
-            return Ex
-        return All
+    @classproperty
+    def func(cls):
+        return cls
 
+    @classproperty
+    def dual_func(cls):
+        return Ex
+
+    # Instance methods
     def __init__(self, variable: Any, arg: Formula) -> None:
-        self.func = All
         self.args = (variable, arg)
 
 

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Callable, ClassVar, Optional, TYPE_CHECKING
-from typing_extensions import Self
+from typing import Callable, Optional
 
 import pyeda.inter  # type: ignore
 from pyeda.inter import expr, exprvar
@@ -10,11 +8,9 @@ import sympy
 
 from .formula import Formula
 from ..support.containers import GetVars
+from ..support.decorators import classproperty
 
 # from ..support.tracing import trace
-
-if TYPE_CHECKING:
-    from .atomic import AtomicFormula
 
 
 class BooleanFormula(Formula):
@@ -25,29 +21,18 @@ class BooleanFormula(Formula):
     BooleanFormula start, in the sense of prefix notation, with a Boolean
     operator but may have quantified subformulas deeper in the expression tree.
     """
-    latex_symbol_spacing: ClassVar[str] = ' \\, '
-    text_symbol_spacing: ClassVar[str] = ' '
+
+    # Class variables
+    latex_symbol: str
+    latex_symbol_spacing = ' \\, '
+    print_style: str
+    text_symbol: str
+    text_symbol_spacing = ' '
 
     func: type[BooleanFormula]
-    args: tuple
 
-    @staticmethod
-    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) \
-            -> BooleanFormula | AtomicFormula:
-        if isinstance(f, pyeda.boolalg.expr._Zero):
-            return F
-        if isinstance(f, pyeda.boolalg.expr._One):
-            return T
-        if isinstance(f, pyeda.boolalg.expr.Variable):
-            return d[f]
-        if isinstance(f, pyeda.boolalg.expr.Complement):
-            variable = pyeda.boolalg.expr.Not(f, simplify=True)
-            return d[variable].to_complement()
-        assert isinstance(f, pyeda.boolalg.expr.Operator)
-        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
-        func = from_dict[f.NAME]
-        args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
-        return func(*args)
+    # Instance variables
+    args: tuple[Formula, ...]
 
     # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
@@ -159,23 +144,51 @@ class BooleanFormula(Formula):
                    Or: pyeda.boolalg.expr.Or,
                    Not: pyeda.boolalg.expr.Not}
         name = to_dict[self.func]
-        xs = (arg._to_pyeda(d, c) for arg in self.args)
+        xs = []
+        for arg in self.args:
+            assert isinstance(arg, (BooleanFormula, AtomicFormula))
+            xs.append(arg._to_pyeda(d, c))
         return name(*xs, simplify=False)
 
     def transform_atoms(self, transformation: Callable) -> BooleanFormula:
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
 
+    # Static methods
+    @staticmethod
+    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) \
+            -> BooleanFormula | AtomicFormula:
+        if isinstance(f, pyeda.boolalg.expr._Zero):
+            return F
+        if isinstance(f, pyeda.boolalg.expr._One):
+            return T
+        if isinstance(f, pyeda.boolalg.expr.Variable):
+            return d[f]
+        if isinstance(f, pyeda.boolalg.expr.Complement):
+            variable = pyeda.boolalg.expr.Not(f, simplify=True)
+            return d[variable].to_complement()
+        assert isinstance(f, pyeda.boolalg.expr.Operator)
+        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
+        func = from_dict[f.NAME]
+        args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
+        return func(*args)
+
 
 class Equivalent(BooleanFormula):
 
-    latex_symbol: ClassVar[str] = '\\longleftrightarrow'
-    print_precedence: ClassVar[int] = 10
-    print_style: ClassVar[str] = 'infix'
-    sympy_func: ClassVar[type[sympy.Equivalent]] = sympy.Equivalent
-    text_symbol: ClassVar[str] = '<-->'
+    # Class variables
+    latex_symbol = '\\longleftrightarrow'
+    print_precedence = 10
+    print_style = 'infix'
+    sympy_func = sympy.Equivalent
+    text_symbol = '<-->'
 
-    func: type[Equivalent]
+    @classproperty
+    def func(cls):
+        return cls
+
+    # Instance variables
+    args: tuple[Formula, Formula]
 
     @property
     def lhs(self) -> Formula:
@@ -187,6 +200,7 @@ class Equivalent(BooleanFormula):
         """The right-hand side of the Equivalence."""
         return self.args[1]
 
+    # Class methods
     @classmethod
     def interactive_new(cls, lhs: Formula, rhs: Formula):
         if not isinstance(lhs, Formula):
@@ -195,8 +209,8 @@ class Equivalent(BooleanFormula):
             raise TypeError(f'{rhs} is not a Formula')
         return cls(lhs, rhs)
 
+    # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
-        self.func = Equivalent
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
@@ -237,13 +251,19 @@ EQUIV = Equivalent.interactive_new
 
 class Implies(BooleanFormula):
 
-    latex_symbol: ClassVar[str] = '\\longrightarrow'
-    print_precedence: ClassVar[int] = 10
-    print_style: ClassVar[str] = 'infix'
-    sympy_func: ClassVar[type[sympy.Implies]] = sympy.Implies
-    text_symbol: ClassVar[str] = '-->'
+    # Class variables
+    latex_symbol = '\\longrightarrow'
+    print_precedence = 10
+    print_style = 'infix'
+    sympy_func = sympy.Implies
+    text_symbol = '-->'
 
-    func: type[Implies]
+    @classproperty
+    def func(cls):
+        return cls
+
+    # Instance variables
+    args: tuple[Formula, Formula]
 
     @property
     def lhs(self) -> Formula:
@@ -255,6 +275,7 @@ class Implies(BooleanFormula):
         """The right-hand side of the Implies."""
         return self.args[1]
 
+    # Class methods
     @classmethod
     def interactive_new(cls, lhs: Formula, rhs: Formula):
         if not isinstance(lhs, Formula):
@@ -263,8 +284,8 @@ class Implies(BooleanFormula):
             raise TypeError(f'{rhs} is not a Formula')
         return cls(lhs, rhs)
 
+    # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
-        self.func = Implies
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
@@ -299,17 +320,17 @@ IMPL = Implies.interactive_new
 
 class AndOr(BooleanFormula):
 
-    print_precedence: ClassVar[int] = 50
-    print_style: ClassVar[str] = 'infix'
+    # Class variables
+    print_precedence = 50
+    print_style = 'infix'
 
     func: type[AndOr]
+    dual_func: type[AndOr]
+
+    # Instance variables
     args: tuple[Formula, ...]
 
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True):
-        ...
-
+    # Class methods
     @classmethod
     def interactive_new(cls, *args):
         for arg in args:
@@ -323,6 +344,7 @@ class AndOr(BooleanFormula):
                 args_flat.append(arg)
         return cls(*args_flat)
 
+    # Instance methods
     def simplify(self, Theta=None):
         """Simplification.
 
@@ -334,10 +356,9 @@ class AndOr(BooleanFormula):
         >>> f.simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
-        gAnd = And.to_dual(conditional=self.func is Or)
-        gT = _T.to_dual(conditional=self.func is Or)()
-        gF = _F.to_dual(conditional=self.func is Or)()
-        # gAnd is an AndOr func, gT and gF are complete TruthValue singletons
+        gAnd = And if self.func is And else Or
+        gT = T if self.func is And else F
+        gF = F if self.func is And else T
         simplified_args = []
         for arg in self.args:
             arg_simplify = arg.simplify()
@@ -356,10 +377,10 @@ class AndOr(BooleanFormula):
         return gAnd(*simplified_args)
 
     def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Self:
+               to_positive: bool = True) -> AndOr:
         """Convert to Negation Normal Form.
         """
-        func_nnf = self.func.to_dual(conditional=implicit_not)
+        func_nnf = self.dual_func if implicit_not else self.func
         args_nnf: list[Formula] = []
         for arg in self.args:
             arg_nnf = arg.to_nnf(implicit_not=implicit_not,
@@ -392,7 +413,7 @@ class AndOr(BooleanFormula):
                     args[i] = arg_i
                 if not found_quantifier:
                     break
-                q = q.to_dual()
+                q = q.dual_func
             # The lifting of quantifiers above can introduce direct nested
             # ocurrences of self.func, which is one of And, Or. We
             # flatten those now, but not any other nestings.
@@ -444,19 +465,24 @@ class And(AndOr):
     >>> And(EQ(x, 0), EQ(x, y), EQ(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
-    latex_symbol: ClassVar[str] = '\\wedge'
-    sympy_func: ClassVar[type[sympy.And]] = sympy.And
-    text_symbol: ClassVar[str] = '&'
 
-    func: type[And]
+    # Class variables
+    latex_symbol = '\\wedge'
+    sympy_func = sympy.And
+    text_symbol = '&'
+
+    @classproperty
+    def func(cls):
+        return cls
+
+    @classproperty
+    def dual_func(cls):
+        return Or
+
+    # Instance variables
     args: tuple[Formula, ...]
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[And] | type[Or]:
-        if conditional:
-            return Or
-        return And
-
+    # Class methods
     def __new__(cls, *args):
         if not args:
             return T
@@ -464,8 +490,8 @@ class And(AndOr):
             return args[0]
         return super().__new__(cls)
 
+    # Instance methods
     def __init__(self, *args) -> None:
-        self.func = And
         self.args = args
 
 
@@ -483,19 +509,24 @@ class Or(AndOr):
     >>> Or(EQ(1, 0), EQ(2, 0), EQ(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
-    latex_symbol: ClassVar[str] = '\\vee'
-    sympy_func: ClassVar[type[sympy.Or]] = sympy.Or
-    text_symbol: ClassVar[str] = '|'
 
-    func: type[Or]
+    # Class variables
+    latex_symbol = '\\vee'
+    sympy_func = sympy.Or
+    text_symbol = '|'
+
+    @classproperty
+    def func(cls):
+        return cls
+
+    @classproperty
+    def dual_func(cls):
+        return And
+
+    # Instance variables
     args: tuple[Formula, ...]
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[And] | type[Or]:
-        if conditional:
-            return And
-        return Or
-
+    # Class methods
     def __new__(cls, *args):
         if not args:
             return F
@@ -503,8 +534,8 @@ class Or(AndOr):
             return args[0]
         return super().__new__(cls)
 
+    # Instance methods
     def __init__(self, *args) -> None:
-        self.func = Or
         self.args = args
 
 
@@ -513,31 +544,32 @@ OR = Or.interactive_new
 
 class Not(BooleanFormula):
 
-    latex_symbol: ClassVar[str] = '\\neg'
-    print_style: ClassVar[str] = 'not'
-    print_precedence: ClassVar[int] = 99
-    sympy_func: ClassVar[type[sympy.Not]] = sympy.Not
-    text_symbol: ClassVar[str] = '~'
+    # Class variables
+    latex_symbol = '\\neg'
+    print_precedence = 99
+    print_style = 'not'
+    sympy_func = sympy.Not
+    text_symbol = '~'
 
-    func: type[Not]
+    @classproperty
+    def func(cls):
+        return cls
 
+    # Instance variables
     @property
     def arg(self) -> Formula:
         """The one argument of the Not."""
         return self.args[0]
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[Not]:
-        return Not
-
+    # Class methods
     @classmethod
     def interactive_new(cls, arg: Formula):
         if not isinstance(arg, Formula):
             raise TypeError(f'{repr(arg)} is not a Formula')
         return cls(arg)
 
+    # Instance methods
     def __init__(self, arg: Formula) -> None:
-        self.func = Not
         self.args = (arg, )
 
     def simplify(self, Theta=None) -> Formula:
@@ -598,5 +630,6 @@ def involutive_not(arg: Formula) -> Formula:
 
 
 # The following imports are intentionally late to avoid circularity.
+from .atomic import AtomicFormula
 from .quantified import Ex, All
-from .truth import _T, _F, T, F
+from .truth import T, F

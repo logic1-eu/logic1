@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import ClassVar, final, Optional
+from typing import final, Optional
 from typing_extensions import Self
 
 from ..support.containers import GetVars
+from ..support.decorators import classproperty
 
 from .boolean import BooleanFormula, Not
 from .formula import Formula
@@ -13,16 +13,15 @@ from .quantified import Ex, All
 
 class TruthValue(BooleanFormula):
 
-    print_precedence: ClassVar[int] = 99
-    print_style: ClassVar[str] = 'constant'
+    # Class variables
+    print_precedence = 99
+    print_style = 'constant'
 
     func: type[TruthValue]
-    args: tuple[()]
+    dual_func: type[TruthValue]
 
-    @staticmethod
-    @abstractmethod
-    def to_dual(conditional: bool = True):
-        ...
+    # Instance variables
+    args: tuple[()]
 
     # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
@@ -53,7 +52,7 @@ class TruthValue(BooleanFormula):
     def to_nnf(self, implicit_not: bool = False, to_positive: bool = True)\
             -> Formula:
         if to_positive:
-            return self.func.to_dual(conditional=implicit_not)()
+            return self.dual_func() if implicit_not else self
         if implicit_not:
             return Not(self)
         return self
@@ -75,26 +74,29 @@ class _T(TruthValue):
     support subclassing. We do not use a module because we need _T to be a
     subclass itself.
     """
-    latex_symbol: ClassVar[str] = '\\top'
-    text_symbol: ClassVar[str] = 'T'
 
-    _instance: ClassVar[Optional[_T]] = None
+    # Class variables
+    latex_symbol = '\\top'
+    text_symbol = 'T'
 
-    func: type[_T]
+    @classproperty
+    def func(cls):
+        return cls
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[_T] | type[_F]:
-        if conditional:
-            return _F
-        return _T
+    @classproperty
+    def dual_func(cls):
+        return _F
 
+    _instance: Optional[_T] = None
+
+    # Class methods
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
+    # Instance methods
     def __init__(self) -> None:
-        self.func = _T
         self.args = ()
 
     def __repr__(self) -> str:
@@ -112,26 +114,29 @@ class _F(TruthValue):
     support subclassing. We do not use a module because we need _F to be a
     subclass itself.
     """
-    latex_symbol: ClassVar[str] = '\\bot'
-    text_symbol: ClassVar[str] = 'F'
 
-    _instance: ClassVar[Optional[_F]] = None
+    # Class variables
+    latex_symbol = '\\bot'
+    text_symbol = 'F'
 
-    func: type[_F]
+    @classproperty
+    def func(cls):
+        return cls
 
+    @classproperty
+    def dual_func(cls):
+        return (lambda: _T)()
+
+    _instance: Optional[_F] = None
+
+    # Class methods
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    @staticmethod
-    def to_dual(conditional: bool = True) -> type[_T] | type[_F]:
-        if conditional:
-            return _T
-        return _F
-
+    # Instance methods
     def __init__(self) -> None:
-        self.func = _F
         self.args = ()
 
     def __repr__(self) -> str:

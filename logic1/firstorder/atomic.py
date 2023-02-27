@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, ClassVar, final
+from typing import Any, Callable, final
 from typing_extensions import Self
 
 import pyeda.inter  # type: ignore
@@ -10,17 +10,26 @@ import sympy
 from .formula import Formula
 from .quantified import Ex, All
 from ..support.containers import GetVars
+from ..support.decorators import classproperty
 
 
 class AtomicFormula(Formula):
 
-    latex_symbol_spacing: ClassVar[str] = ' '
-    print_precedence: ClassVar[int] = 99
-    text_symbol_spacing: ClassVar[str] = ' '
+    # Class variables
+    latex_symbol_spacing = ' '
+    print_precedence = 99
+    text_symbol_spacing = ' '
 
-    func: type[AtomicFormula]
+    @classproperty
+    def func(cls):
+        return cls
 
-    # Terms
+    complement_func: type[AtomicFormula]
+
+    # Instance variables
+    args: tuple
+
+    # Static methods on terms
     @staticmethod
     @abstractmethod
     def term_type() -> Any:
@@ -41,7 +50,7 @@ class AtomicFormula(Formula):
     def term_to_sympy(term: Any) -> sympy.Basic:
         ...
 
-    # Variables
+    # Static methods on variables
     @staticmethod
     @abstractmethod
     def variable_type() -> Any:
@@ -52,30 +61,10 @@ class AtomicFormula(Formula):
     def rename_var(variable: Any) -> Any:
         ...
 
-    # Relations
-    @staticmethod
-    @abstractmethod
-    def rel_complement(conditional: bool = True) -> type[AtomicFormula]:
-        """Returns the complement R' of a relation R derived from AtomicFormula
-        if conditional is True, else R.
-
-        Assume that R is defined on a Cartesian product P. Then R' = P - R. For
-        instance,
-
-        >>> from logic1.atomlib.sympy import Le, Eq
-        >>> Le.rel_complement()
-        <class 'logic1.atomlib.sympy.Gt'>
-        >>> Eq.rel_complement()
-        <class 'logic1.atomlib.sympy.Ne'>
-        >>> Le.rel_complement(9 ** 2 < 80)
-        <class 'logic1.atomlib.sympy.Le'>
-
-        Compare the notions of the converse relation R ** (-1) of R, and of the
-        dual relation (R') ** (-1), which equals (R ** (-1))'.
-        """
-        ...
-
     # Instance methods
+    def __init__(self, *args) -> None:
+        self.args = args
+
     @final
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
@@ -116,7 +105,7 @@ class AtomicFormula(Formula):
         # Do not pass on but check conditional in order to avoid construction
         # in case of False.
         if conditional:
-            return self.func.rel_complement()(*self.args)
+            return self.complement_func(*self.args)
         return self
 
     @final

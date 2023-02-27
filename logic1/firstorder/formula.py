@@ -31,7 +31,7 @@ constructors REL can check that only valid L-terms are used.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, ClassVar, final, Optional, TYPE_CHECKING
+from typing import Callable, final, Optional, TYPE_CHECKING
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -47,16 +47,14 @@ class Formula(ABC):
     """An abstract base class for first-order formulas.
     """
 
-    latex_symbol_spacing: ClassVar[str]
-    latex_symbol: ClassVar[str]
-    print_style: ClassVar[str]
-    print_precedence: ClassVar[int]
-    sympy_func: ClassVar[type[sympy.Basic]]
-    text_symbol: ClassVar[str]
-
+    # Class variables
     func: type[Formula]
+    sympy_func: type[sympy.Basic]
+
+    # Instance variables
     args: tuple
 
+    # Instance methods
     @final
     def __and__(self, other: Formula) -> Formula:
         """Override the ``&`` operator to apply logical AND.
@@ -193,6 +191,7 @@ class Formula(ABC):
 
         Returns the maximal number of quantifier alternations along a path in
         the expression tree. Occurrence of quantified variables is not checked.
+
         >>> from logic1 import EX, ALL, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
