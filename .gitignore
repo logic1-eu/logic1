@@ -12,3 +12,6 @@ htmlcov
 *.sublime-*
 
 tracing.py
+
+# Sphinx
+doc/build
