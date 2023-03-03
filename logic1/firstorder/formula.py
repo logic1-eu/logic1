@@ -81,17 +81,14 @@ class Formula(ABC):
 
     @final
     def __lshift__(self, other: Formula) -> Formula:
-        """Override ``>>`` operator to apply logical IMPL.
-
-        Note that ``>>`` delegates to the convenience wrapper IMPL in contrast
-        to the constructor Implies.
+        """Override ``>>`` operator to apply logical Implies.
 
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
         >>> EQ(x + z, y + z) << EQ(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies.interactive_new(other, self)
+        return Implies(other, self)
 
     @final
     def __or__(self, other: Formula) -> Formula:
@@ -109,18 +106,15 @@ class Formula(ABC):
 
     @final
     def __rshift__(self, other: Formula) -> Formula:
-        """Override the ``<<`` operator to apply logical IMPL with reversed
+        """Override the ``<<`` operator to apply logical Implies with reversed
         sides.
-
-        Note that ``<<`` uses the convenience wrapper IMPL in contrast to the
-        constructor implies.
 
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
         >>> EQ(x, y) >> EQ(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
-        return Implies.interactive_new(self, other)
+        return Implies(self, other)
 
     def __eq__(self, other: object) -> bool:
         """Recursive equality of the formulas self and other.

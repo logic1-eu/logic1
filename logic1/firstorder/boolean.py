@@ -273,13 +273,12 @@ class Implies(BooleanFormula):
         return self.args[1]
 
     # Class methods
-    @classmethod
-    def interactive_new(cls, lhs: Formula, rhs: Formula):
+    def __new__(cls, lhs: Formula, rhs: Formula):
         if not isinstance(lhs, Formula):
-            raise ValueError(f'{lhs} is not a Formula')
+            raise ValueError(f'{lhs!r} is not a Formula')
         if not isinstance(rhs, Formula):
-            raise ValueError(f'{rhs} is not a Formula')
-        return cls(lhs, rhs)
+            raise ValueError(f'{rhs!r} is not a Formula')
+        return super().__new__(cls)
 
     # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
@@ -310,9 +309,6 @@ class Implies(BooleanFormula):
         else:
             tmp = Or(Not(self.lhs), self.rhs)
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
-
-
-IMPL = Implies.interactive_new
 
 
 class AndOr(BooleanFormula):
