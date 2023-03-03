@@ -575,11 +575,11 @@ class Not(BooleanFormula):
     def simplify(self, Theta=None) -> Formula:
         """Simplification.
 
-        >>> from logic1 import EX, ALL
+        >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
         >>> f = And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))
-        >>> ~ ALL(x, EX(y, f)).simplify()
+        >>> ~ All(x, Ex(y, f)).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
         """
         arg_simplify = self.arg.simplify(Theta=Theta)
@@ -593,10 +593,10 @@ class Not(BooleanFormula):
             -> Formula:
         """Negation normal form.
 
-        >>> from logic1 import EX, ALL
+        >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = ALL(x, EX(y, And(EQ(x, y), T, EQ(x, y), EQ(x, z) & EQ(y, x))))
+        >>> f = All(x, Ex(y, And(EQ(x, y), T, EQ(x, y), EQ(x, z) & EQ(y, x))))
         >>> (~f).to_nnf()
         Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
         """

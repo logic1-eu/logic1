@@ -143,17 +143,17 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
 
     >>> from logic1 import *
     >>> from sympy.abc import a, u, v, w, x, y, z
-    >>> f = ALL(u, EX(w, ALL(x, EX(y, EX(v, \
+    >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, \
             (EQ(u, v) | NE(v, w)) & ~ EQUIV(EQ(u, x), NE(u, w)) & EQ(y, a))))))
     >>> qe(f)
     C_bar(2)
 
-    >>> g = EX(x, EX(y, EX(z, NE(x, y) & NE(x, z) & NE(y, z) \
-            & ALL(u, EQ(u, x) | EQ(u, y) | EQ(u, z)))))
+    >>> g = Ex(x, Ex(y, Ex(z, NE(x, y) & NE(x, z) & NE(y, z) \
+            & All(u, EQ(u, x) | EQ(u, y) | EQ(u, z)))))
     >>> qe(g)
     And(C(2), C(3), C_bar(4))
 
-    >>> h = EX(w, EX(x, NE(w, x))) >> EX(w, EX(x, EX(y, EX(z, \
+    >>> h = Ex(w, Ex(x, NE(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z, \
             NE(w, x) & NE(w, y) & NE(w, z) & NE(x, y) & NE(x, z) & NE(y, z)))))
     >>> qe(h)
     Or(And(C(2), C(3), C(4)), C_bar(2))

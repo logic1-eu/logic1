@@ -58,48 +58,36 @@ class QuantifiedFormula(Formula):
         return self.args[1]
 
     # Class methods
-    @classmethod
-    def interactive_new(cls, variable: Any, arg: Formula):
-        """A type-checking convenience wrapper for the constructor.
+    def __new__(cls, variable: Any, arg: Formula):
+        """A type-checking constructor.
 
-        This is intended for inteactive use.
-
-        >>> from logic1 import EX
+        >>> from logic1 import Ex
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x
-        >>> EX(x, EQ(x, x))
+        >>> Ex(x, EQ(x, x))
         Ex(x, Eq(x, x))
 
-        For efficiency reasons, the constructors of subclasses of Formula do
-        not check argument types. Trouble following later on can be hard to
-        diagnose:
-
-        >>> f = Ex('x', 'y')
-        >>> f
-        Ex('x', 'y')
-        >>> f.simplify()
+        >>> Ex('x', 'y')
         Traceback (most recent call last):
         ...
-        AttributeError: 'str' object has no attribute 'simplify'
+        ValueError: 'y' is not a Formula
 
-        EX checks and raises an exception immediately:
-
-        >>> EX('x', EQ(x, x))
+        >>> Ex('x', EQ(x, x))
         Traceback (most recent call last):
         ...
-        TypeError: 'x' is not a Variable
+        ValueError: 'x' is not a Variable
         """
         if not isinstance(arg, Formula):
-            raise TypeError(f'{repr(arg)} is not a Formula')
+            raise ValueError(f'{arg!r} is not a Formula')
         atom = arg.get_any_atom()
         # If atom is None, then arg does not contain any atomic formula.
         # Therefore we cannot know what are valid variables, and we will accept
         # anything. Otherwise atom has a static method providing the type of
         # variables. This assumes that there is only one class of atomic
         # formulas used within a formula.
-        if atom and not isinstance(variable, atom.variable_type()):
-            raise TypeError(f'{repr(variable)} is not a Variable')
-        return cls(variable, arg)
+        if atom is not None and not isinstance(variable, atom.variable_type()):
+            raise ValueError(f'{variable!r} is not a Variable')
+        return super().__new__(cls)
 
     # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
@@ -123,7 +111,7 @@ class QuantifiedFormula(Formula):
 
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y
-        >>> ALL(x, EX(y, EQ(x, y))).simplify()
+        >>> All(x, Ex(y, EQ(x, y))).simplify()
         All(x, Ex(y, Eq(x, y)))
         """
         return self.func(self.var, self.arg.simplify())
@@ -237,9 +225,6 @@ class Ex(QuantifiedFormula):
         self.args = (variable, arg)
 
 
-EX = Ex.interactive_new
-
-
 class All(QuantifiedFormula):
     """Universally quantified formula factory.
 
@@ -264,9 +249,6 @@ class All(QuantifiedFormula):
     # Instance methods
     def __init__(self, variable: Any, arg: Formula) -> None:
         self.args = (variable, arg)
-
-
-ALL = All.interactive_new
 
 
 # The following import is intentionally late to avoid circularity.

@@ -1,9 +1,7 @@
 """Module for first-order formulas.
 
-There are classes Ex, All, Equivaelent, Implies, And, Or, Not, _T, _F which
-provide constructors for corresponding (sub)formulas. Furthermore, there are
-interactive constructors EX, ALL, EQUIV, IMPL (>>), AND (&), OR (|), NOT (~),
-T, F, which do some additional error checking.
+There are classes Ex, All, Equivalent, Implies (>>), And (&), Or (|), Not (~),
+_T (T), and _F (F) which provide constructors for corresponding (sub)formulas.
 
 There is no language L in the sense of model theory specified. Application
 modules implement L as follows:
@@ -16,7 +14,7 @@ modules implement L as follows:
    specified by firstorder.AtomicFormula.
 
 3. In combination with the first-order constructors above, the constructors Rel
-   allow the construction of first-order L-formulas. Similarly to EX, ALL etc.
+   allow the construction of first-order L-formulas. Similarly to Ex, All etc.
    above, respective interactive constructors REL can provide error checking.
 
 The firstorder module imposes no restrictions on the representation of atomic
@@ -192,10 +190,10 @@ class Formula(ABC):
         Returns the maximal number of quantifier alternations along a path in
         the expression tree. Occurrence of quantified variables is not checked.
 
-        >>> from logic1 import EX, ALL, T
+        >>> from logic1 import Ex, All, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
-        >>> EX(x, EQ(x, y) & ALL(x, EX(y, EX(z, T)))).count_alternations()
+        >>> Ex(x, EQ(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
         2
         """
         return self._count_alternations()[0]
@@ -217,15 +215,18 @@ class Formula(ABC):
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
         """Get variables.
 
-        >>> from logic1 import EX, ALL
+        >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
-        >>> f = EQ(3 * x, 0) \
-                >> ALL(z, ALL(x, (~ EQ(x, 0) >> EX(y, EQ(x * y, 1)))))
+
+        >>> f = EQ(3 * x, 0) >> All(z, All(x,
+        ...     ~ EQ(x, 0) >> Ex(y, EQ(x * y, 1))))
         >>> f.get_vars().free == {x}
         True
+
         >>> f.get_vars().bound == {x, y}
         True
+
         >>> z not in f.get_vars().all
         True
         """
@@ -238,10 +239,10 @@ class Formula(ABC):
         This should not be confused with bound ocurrences of variables. Compare
         the Formula.get_vars() method.
 
-        >>> from logic1 import EX, ALL
+        >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, b, c, x, y, z
-        >>> ALL(y, EX(x, EQ(a, y)) & EX(z, EQ(a, y))).get_qvars() == {x, y, z}
+        >>> All(y, Ex(x, EQ(a, y)) & Ex(z, EQ(a, y))).get_qvars() == {x, y, z}
         True
         """
         ...
@@ -264,15 +265,15 @@ class Formula(ABC):
     def subs(self, substitution: dict) -> Self:
         """Substitution.
 
-        >>> from logic1 import push, pop, EX
+        >>> from logic1 import push, pop, Ex
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, b, c, x, y, z
         >>> push()
 
-        >>> EX(x, EQ(x, a)).subs({x: a})
+        >>> Ex(x, EQ(x, a)).subs({x: a})
         Ex(x, Eq(x, a))
 
-        >>> f = EX(x, EQ(x, a)).subs({a: x})
+        >>> f = Ex(x, EQ(x, a)).subs({a: x})
         >>> g = Ex(x, f & EQ(b, 0))
         >>> g
         Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
@@ -293,12 +294,12 @@ class Formula(ABC):
         Furthermore, each bound variables occurs with one and only one
         quantifier.
 
-        >>> from logic1 import push, pop, EX, ALL, T
+        >>> from logic1 import push, pop, Ex, All, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
         >>> push()
-        >>> f0 = ALL(z, EX(y, EQ(x, y) & EQ(y, z) & EX(x, T)))
-        >>> f = EQ(x, y) & EX(x, EQ(x, y) & f0)
+        >>> f0 = All(z, Ex(y, EQ(x, y) & EQ(y, z) & Ex(x, T)))
+        >>> f = EQ(x, y) & Ex(x, EQ(x, y) & f0)
         >>> f.to_distinct_vars()
         And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
             All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
@@ -334,10 +335,10 @@ class Formula(ABC):
         quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
         not introduce any quanitfiers.
 
-        >>> from logic1 import EX, EQUIV, NOT, T
+        >>> from logic1 import Ex, EQUIV, NOT, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, y
-        >>> f = EQUIV(EQ(a, 0) & T, EX(y, ~ EQ(y, a)))
+        >>> f = EQUIV(EQ(a, 0) & T, Ex(y, ~ EQ(y, a)))
         >>> f.to_nnf()
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
@@ -358,14 +359,14 @@ class Formula(ABC):
 
         Burhenne p.88:
 
-        >>> from logic1 import push, pop, EX, ALL, T, F
+        >>> from logic1 import push, pop, Ex, All, T, F
         >>> from logic1.atomlib.sympy import EQ
         >>> import sympy
         >>> push()
         >>> x = sympy.symbols('x:8')
-        >>> f1 = EX(x[1], ALL(x[2], ALL(x[3], T)))
-        >>> f2 = ALL(x[4], EX(x[5], ALL(x[6], F)))
-        >>> f3 = EX(x[7], EQ(x[0], 0))
+        >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
+        >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
+        >>> f3 = Ex(x[7], EQ(x[0], 0))
         >>> (f1 & f2 & f3).to_pnf()
         All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
             And(T, F, Eq(x0, 0)))))))))
@@ -377,7 +378,7 @@ class Formula(ABC):
         >>> from logic1 import EQUIV, AND, OR
         >>> from sympy.abc import a, b, y
         >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
-        >>> f2 = EX(y, EQ(y, a) | EQ(a, 0))
+        >>> f2 = Ex(y, EQ(y, a) | EQ(a, 0))
         >>> EQUIV(f1, f2).to_pnf()
         Ex(y_R1, All(y_R2,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
