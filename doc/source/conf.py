@@ -21,12 +21,15 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.doctest',
     'sphinx.ext.viewcode',
+    'sphinx_togglebutton'
 ]
 
 templates_path = ['_templates']
 exclude_patterns = []
 
 language = 'en'
+
+doctest_path = ['~/Documents/Dynamic/src/python/Logic1/logic1/logic1']
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
