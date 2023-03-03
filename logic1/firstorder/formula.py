@@ -68,16 +68,13 @@ class Formula(ABC):
 
     @final
     def __invert__(self) -> Formula:
-        """Override the ``~`` operator to apply logical NOT.
-
-        Note that ``~`` delegates to the convenience wrapper NOT in contrast to
-        the constructor Not.
+        """Override the ``~`` operator to apply logical Not.
 
         >>> from logic1.atomlib.sympy import EQ
         >>> ~ EQ(1,0)
         Not(Eq(1, 0))
         """
-        return Not.interactive_new(self)
+        return Not(self)
 
     @final
     def __lshift__(self, other: Formula) -> Formula:
@@ -329,7 +326,7 @@ class Formula(ABC):
         quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
         not introduce any quanitfiers.
 
-        >>> from logic1 import Ex, Equivalent, NOT, T
+        >>> from logic1 import Ex, Equivalent, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, y
         >>> f = Equivalent(EQ(a, 0) & T, Ex(y, ~ EQ(y, a)))

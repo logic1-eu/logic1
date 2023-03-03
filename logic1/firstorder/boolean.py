@@ -555,11 +555,10 @@ class Not(BooleanFormula):
         return self.args[0]
 
     # Class methods
-    @classmethod
-    def interactive_new(cls, arg: Formula):
+    def __new__(cls, arg: Formula):
         if not isinstance(arg, Formula):
-            raise ValueError(f'{repr(arg)} is not a Formula')
-        return cls(arg)
+            raise ValueError(f'{arg!r} is not a Formula')
+        return super().__new__(cls)
 
     # Instance methods
     def __init__(self, arg: Formula) -> None:
@@ -600,9 +599,6 @@ class Not(BooleanFormula):
         """Convert to Prenex Normal Form. self must be in NNF.
         """
         return {Ex: self, All: self}
-
-
-NOT = Not.interactive_new
 
 
 def involutive_not(arg: Formula) -> Formula:
