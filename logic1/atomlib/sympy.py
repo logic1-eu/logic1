@@ -1,3 +1,6 @@
+"""This module provides a library of atomic formulas based on SymPy terms.
+"""
+
 from __future__ import annotations
 
 from typing import ClassVar, Union
@@ -57,7 +60,7 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
         for arg in args:
             arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
             if not isinstance(arg_, cls.term_type()):
-                raise TypeError(f"{arg} is not a Term")
+                raise TypeError(f"{arg!r} is not a Term")
             args_.append(arg_)
         return cls(*args_)
 
@@ -194,10 +197,17 @@ class BinaryAtomicFormula(AtomicFormula):
 
 
 class Eq(BinaryAtomicFormula):
-    """
+    """Represent equations as atomic formulas.
+
     >>> from sympy import exp, I, pi
-    >>> Eq(exp(I * pi, evaluate=False), -1)
-    Eq(exp(I*pi), -1)
+    >>> from sympy.abc import t
+    >>> equation = Eq(exp(t * I * pi, evaluate=False), -1)
+    >>> equation
+    Eq(exp(I*pi*t), -1)
+    >>> equation.lhs
+    exp(I*pi*t)
+    >>> equation.rhs
+    -1
     """
 
     # Class variables
@@ -309,7 +319,8 @@ LE = Le.interactive_new
 
 
 class Gt(BinaryAtomicFormula):
-
+    """A class holding binary atomic formulas with the relation `>`.
+    """
     # Class variables
     latex_symbol = '>'
     sympy_func = sympy.Gt
