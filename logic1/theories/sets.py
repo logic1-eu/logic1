@@ -51,12 +51,12 @@ class Eq(TermMixin, atomlib.sympy.Eq):
     >>> Eq(x, 0)
     Traceback (most recent call last):
     ...
-    TypeError: 0 is not a Term
+    ValueError: 0 is not a Term
 
     >>> Eq(x + x, y)
     Traceback (most recent call last):
     ...
-    TypeError: 2*x is not a Term
+    ValueError: 2*x is not a Term
     """
 
     # Class variables
@@ -91,7 +91,7 @@ class Ne(TermMixin, atomlib.sympy.Ne):
     >>> Ne(x, y + 1)
     Traceback (most recent call last):
     ...
-    TypeError: y + 1 is not a Term
+    ValueError: y + 1 is not a Term
     """
 
     # Class variables

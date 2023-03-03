@@ -165,12 +165,12 @@ class BinaryAtomicFormula(AtomicFormula):
     # Instance methods
     def __init__(self, *args):
         if len(args) != 2:
-            raise TypeError(f'bad number of arguments for binary relation')
+            raise ValueError(f'bad number of arguments for binary relation')
         args_ = []
         for arg in args:
             arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
             if not isinstance(arg_, self.term_type()):
-                raise TypeError(f"{arg!r} is not a Term")
+                raise ValueError(f"{arg!r} is not a Term")
             args_.append(arg_)
         super().__init__(*args_)
 
@@ -351,10 +351,10 @@ class Cardinality(AtomicFormula):
     @classmethod
     def interactive_new(cls, *args):
         if len(args) != 1:
-            raise TypeError(f"bad number of arguments")
+            raise ValueError(f"bad number of arguments")
         n = args[0]
         if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
-            raise TypeError(f"{n!r} is not an admissible cardinality")
+            raise ValueError(f"{n!r} is not an admissible cardinality")
         return cls(n)
 
     # Instance methods
