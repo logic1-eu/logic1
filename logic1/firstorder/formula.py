@@ -55,16 +55,13 @@ class Formula(ABC):
     # Instance methods
     @final
     def __and__(self, other: Formula) -> Formula:
-        """Override the ``&`` operator to apply logical AND.
-
-        Note that ``&`` delegates to the convenience wrapper AND in contrast to
-        the constructor And.
+        """Override the ``&`` operator to apply logical And.
 
         >>> from logic1.atomlib.sympy import EQ
         >>> EQ(0, 0) & EQ(1 + 1, 2) & EQ(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
-        return And.interactive_new(self, other)
+        return And(self, other)
 
     @final
     def __invert__(self) -> Formula:
@@ -89,17 +86,14 @@ class Formula(ABC):
 
     @final
     def __or__(self, other: Formula) -> Formula:
-        """Override the ``|`` operator to apply logical OR.
-
-        Note that ``|`` delegates to the convenience wrapper OR in contrast to
-        the constructor Or.
+        """Override the ``|`` operator to apply logical Or.
 
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y, z
         >>> EQ(x, 0) | EQ(x, y) | EQ(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
-        return Or.interactive_new(self, other)
+        return Or(self, other)
 
     @final
     def __rshift__(self, other: Formula) -> Formula:
@@ -366,7 +360,7 @@ class Formula(ABC):
         Derived from redlog.tst:
 
         >>> push()
-        >>> from logic1 import Equivalent, AND, OR
+        >>> from logic1 import Equivalent, And, Or
         >>> from sympy.abc import a, b, y
         >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
         >>> f2 = Ex(y, EQ(y, a) | EQ(a, 0))

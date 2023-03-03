@@ -323,20 +323,6 @@ class AndOr(BooleanFormula):
     # Instance variables
     args: tuple[Formula, ...]
 
-    # Class methods
-    @classmethod
-    def interactive_new(cls, *args):
-        for arg in args:
-            if not isinstance(arg, Formula):
-                raise ValueError(f'{arg} is not a Formula')
-        args_flat = []
-        for arg in args:
-            if isinstance(arg, cls):
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        return cls(*args_flat)
-
     # Instance methods
     def simplify(self, Theta=None):
         """Simplification.
@@ -476,19 +462,28 @@ class And(AndOr):
     args: tuple[Formula, ...]
 
     # Class methods
-    def __new__(cls, *args):
+    def __new__(cls, *args, flatten: bool = True):
         if not args:
             return T
+        for arg in args:
+            if not isinstance(arg, Formula):
+                raise ValueError(f'{arg!r} is not a Formula')
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
     # Instance methods
-    def __init__(self, *args) -> None:
-        self.args = args
-
-
-AND = And.interactive_new
+    def __init__(self, *args, flatten: bool = True) -> None:
+        if flatten:
+            args_flat = []
+            for arg in args:
+                if isinstance(arg, And):
+                    args_flat.extend(list(arg.args))
+                else:
+                    args_flat.append(arg)
+            self.args = tuple(args_flat)
+        else:
+            self.args = args
 
 
 class Or(AndOr):
@@ -520,19 +515,28 @@ class Or(AndOr):
     args: tuple[Formula, ...]
 
     # Class methods
-    def __new__(cls, *args):
+    def __new__(cls, *args, flatten: bool = True):
         if not args:
             return F
+        for arg in args:
+            if not isinstance(arg, Formula):
+                raise ValueError(f'{arg!r} is not a Formula')
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
     # Instance methods
-    def __init__(self, *args) -> None:
-        self.args = args
-
-
-OR = Or.interactive_new
+    def __init__(self, *args, flatten: bool = True) -> None:
+        if flatten:
+            args_flat = []
+            for arg in args:
+                if isinstance(arg, Or):
+                    args_flat.extend(list(arg.args))
+                else:
+                    args_flat.append(arg)
+            self.args = tuple(args_flat)
+        else:
+            self.args = args
 
 
 class Not(BooleanFormula):
