@@ -4,5 +4,13 @@
   API Reference
 ########################
 
-.. automodule:: logic1.firstorder.formula
-   :members:
+
+.. testsetup:: *
+     from logic1 import *
+
+.. doctest::
+  :options: +NORMALIZE_WHITESPACE
+
+.. automodule:: logic1.firstorder.boolean
+  :members:
+  :show-inheritance:
