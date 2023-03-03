@@ -144,7 +144,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     >>> from logic1 import *
     >>> from sympy.abc import a, u, v, w, x, y, z
     >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, \
-            (EQ(u, v) | NE(v, w)) & ~ EQUIV(EQ(u, x), NE(u, w)) & EQ(y, a))))))
+            (EQ(u, v) | NE(v, w)) & ~ Equivalent(EQ(u, x), NE(u, w)) & EQ(y, a))))))
     >>> qe(f)
     C_bar(2)
 

@@ -201,13 +201,13 @@ class Equivalent(BooleanFormula):
         return self.args[1]
 
     # Class methods
-    @classmethod
-    def interactive_new(cls, lhs: Formula, rhs: Formula):
+
+    def __new__(cls, lhs: Formula, rhs: Formula):
         if not isinstance(lhs, Formula):
-            raise TypeError(f'{lhs} is not a Formula')
+            raise ValueError(f'{lhs!r} is not a Formula')
         if not isinstance(rhs, Formula):
-            raise TypeError(f'{rhs} is not a Formula')
-        return cls(lhs, rhs)
+            raise ValueError(f'{rhs!r} is not a Formula')
+        return super().__new__(cls)
 
     # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
@@ -218,7 +218,7 @@ class Equivalent(BooleanFormula):
 
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import x, y
-        >>> e1 = EQUIV(~ EQ(x, y), F)
+        >>> e1 = Equivalent(~ EQ(x, y), F)
         >>> e1.simplify()
         Eq(x, y)
         """
@@ -244,9 +244,6 @@ class Equivalent(BooleanFormula):
             -> BooleanFormula | AtomicFormula:
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
         return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
-
-
-EQUIV = Equivalent.interactive_new
 
 
 class Implies(BooleanFormula):
@@ -279,9 +276,9 @@ class Implies(BooleanFormula):
     @classmethod
     def interactive_new(cls, lhs: Formula, rhs: Formula):
         if not isinstance(lhs, Formula):
-            raise TypeError(f'{lhs} is not a Formula')
+            raise ValueError(f'{lhs} is not a Formula')
         if not isinstance(rhs, Formula):
-            raise TypeError(f'{rhs} is not a Formula')
+            raise ValueError(f'{rhs} is not a Formula')
         return cls(lhs, rhs)
 
     # Instance methods
@@ -335,7 +332,7 @@ class AndOr(BooleanFormula):
     def interactive_new(cls, *args):
         for arg in args:
             if not isinstance(arg, Formula):
-                raise TypeError(f'{arg} is not a Formula')
+                raise ValueError(f'{arg} is not a Formula')
         args_flat = []
         for arg in args:
             if isinstance(arg, cls):
@@ -565,7 +562,7 @@ class Not(BooleanFormula):
     @classmethod
     def interactive_new(cls, arg: Formula):
         if not isinstance(arg, Formula):
-            raise TypeError(f'{repr(arg)} is not a Formula')
+            raise ValueError(f'{repr(arg)} is not a Formula')
         return cls(arg)
 
     # Instance methods

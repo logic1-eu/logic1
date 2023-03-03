@@ -335,10 +335,10 @@ class Formula(ABC):
         quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
         not introduce any quanitfiers.
 
-        >>> from logic1 import Ex, EQUIV, NOT, T
+        >>> from logic1 import Ex, Equivalent, NOT, T
         >>> from logic1.atomlib.sympy import EQ
         >>> from sympy.abc import a, y
-        >>> f = EQUIV(EQ(a, 0) & T, Ex(y, ~ EQ(y, a)))
+        >>> f = Equivalent(EQ(a, 0) & T, Ex(y, ~ EQ(y, a)))
         >>> f.to_nnf()
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
@@ -375,11 +375,11 @@ class Formula(ABC):
         Derived from redlog.tst:
 
         >>> push()
-        >>> from logic1 import EQUIV, AND, OR
+        >>> from logic1 import Equivalent, AND, OR
         >>> from sympy.abc import a, b, y
         >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
         >>> f2 = Ex(y, EQ(y, a) | EQ(a, 0))
-        >>> EQUIV(f1, f2).to_pnf()
+        >>> Equivalent(f1, f2).to_pnf()
         Ex(y_R1, All(y_R2,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
@@ -387,7 +387,7 @@ class Formula(ABC):
         >>> pop()
 
         >>> push()
-        >>> EQUIV(f1, f2).to_pnf(prefer_universal=True)
+        >>> Equivalent(f1, f2).to_pnf(prefer_universal=True)
         All(y_R2, Ex(y_R1,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
