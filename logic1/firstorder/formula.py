@@ -57,8 +57,8 @@ class Formula(ABC):
     def __and__(self, other: Formula) -> Formula:
         """Override the ``&`` operator to apply logical And.
 
-        >>> from logic1.atomlib.sympy import EQ
-        >>> EQ(0, 0) & EQ(1 + 1, 2) & EQ(1 + 1 + 1, 3)
+        >>> from logic1.atomlib.sympy import Eq
+        >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
         return And(self, other)
@@ -67,8 +67,8 @@ class Formula(ABC):
     def __invert__(self) -> Formula:
         """Override the ``~`` operator to apply logical Not.
 
-        >>> from logic1.atomlib.sympy import EQ
-        >>> ~ EQ(1,0)
+        >>> from logic1.atomlib.sympy import Eq
+        >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
         return Not(self)
@@ -77,9 +77,9 @@ class Formula(ABC):
     def __lshift__(self, other: Formula) -> Formula:
         """Override ``>>`` operator to apply logical Implies.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> EQ(x + z, y + z) << EQ(x, y)
+        >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
         return Implies(other, self)
@@ -88,9 +88,9 @@ class Formula(ABC):
     def __or__(self, other: Formula) -> Formula:
         """Override the ``|`` operator to apply logical Or.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> EQ(x, 0) | EQ(x, y) | EQ(x, z)
+        >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
         return Or(self, other)
@@ -100,9 +100,9 @@ class Formula(ABC):
         """Override the ``<<`` operator to apply logical Implies with reversed
         sides.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> EQ(x, y) >> EQ(x + z, y + z)
+        >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
         return Implies(self, other)
@@ -112,9 +112,9 @@ class Formula(ABC):
 
         This is *not* logical ``equal.``
 
-        >>> from logic1.atomlib.sympy import NE
-        >>> e1 = NE(1, 0)
-        >>> e2 = NE(1, 0)
+        >>> from logic1.atomlib.sympy import Ne
+        >>> e1 = Ne(1, 0)
+        >>> e2 = Ne(1, 0)
         >>> e1 == e2
         True
         >>> e1 is e2
@@ -176,9 +176,9 @@ class Formula(ABC):
         the expression tree. Occurrence of quantified variables is not checked.
 
         >>> from logic1 import Ex, All, T
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> Ex(x, EQ(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
+        >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
         2
         """
         return self._count_alternations()[0]
@@ -201,11 +201,11 @@ class Formula(ABC):
         """Get variables.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
 
-        >>> f = EQ(3 * x, 0) >> All(z, All(x,
-        ...     ~ EQ(x, 0) >> Ex(y, EQ(x * y, 1))))
+        >>> f = Eq(3 * x, 0) >> All(z, All(x,
+        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
         >>> f.get_vars().free == {x}
         True
 
@@ -225,9 +225,9 @@ class Formula(ABC):
         the Formula.get_vars() method.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b, c, x, y, z
-        >>> All(y, Ex(x, EQ(a, y)) & Ex(z, EQ(a, y))).get_qvars() == {x, y, z}
+        >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
         True
         """
         ...
@@ -251,15 +251,15 @@ class Formula(ABC):
         """Substitution.
 
         >>> from logic1 import push, pop, Ex
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b, c, x, y, z
         >>> push()
 
-        >>> Ex(x, EQ(x, a)).subs({x: a})
+        >>> Ex(x, Eq(x, a)).subs({x: a})
         Ex(x, Eq(x, a))
 
-        >>> f = Ex(x, EQ(x, a)).subs({a: x})
-        >>> g = Ex(x, f & EQ(b, 0))
+        >>> f = Ex(x, Eq(x, a)).subs({a: x})
+        >>> g = Ex(x, f & Eq(b, 0))
         >>> g
         Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
 
@@ -280,11 +280,11 @@ class Formula(ABC):
         quantifier.
 
         >>> from logic1 import push, pop, Ex, All, T
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
         >>> push()
-        >>> f0 = All(z, Ex(y, EQ(x, y) & EQ(y, z) & Ex(x, T)))
-        >>> f = EQ(x, y) & Ex(x, EQ(x, y) & f0)
+        >>> f0 = All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T)))
+        >>> f = Eq(x, y) & Ex(x, Eq(x, y) & f0)
         >>> f.to_distinct_vars()
         And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
             All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
@@ -321,9 +321,9 @@ class Formula(ABC):
         not introduce any quanitfiers.
 
         >>> from logic1 import Ex, Equivalent, T
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, y
-        >>> f = Equivalent(EQ(a, 0) & T, Ex(y, ~ EQ(y, a)))
+        >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
         >>> f.to_nnf()
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
@@ -345,13 +345,13 @@ class Formula(ABC):
         Burhenne p.88:
 
         >>> from logic1 import push, pop, Ex, All, T, F
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> import sympy
         >>> push()
         >>> x = sympy.symbols('x:8')
         >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
         >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
-        >>> f3 = Ex(x[7], EQ(x[0], 0))
+        >>> f3 = Ex(x[7], Eq(x[0], 0))
         >>> (f1 & f2 & f3).to_pnf()
         All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
             And(T, F, Eq(x0, 0)))))))))
@@ -362,8 +362,8 @@ class Formula(ABC):
         >>> push()
         >>> from logic1 import Equivalent, And, Or
         >>> from sympy.abc import a, b, y
-        >>> f1 = EQ(a, 0) & EQ(b, 0) & EQ(y, 0)
-        >>> f2 = Ex(y, EQ(y, a) | EQ(a, 0))
+        >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
+        >>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
         >>> Equivalent(f1, f2).to_pnf()
         Ex(y_R1, All(y_R2,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
@@ -405,9 +405,9 @@ class Formula(ABC):
         Subclasses that have no match in sympy can raise NotImplementedError.
 
         >>> from logic1 import Equivalent, T
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(EQ(x, y), EQ(x + 1, y + 1))
+        >>> e1 = Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> e1
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1)
@@ -417,7 +417,7 @@ class Formula(ABC):
         >>> type(e1.to_sympy())
         Equivalent
 
-        >>> e2 = Equivalent(EQ(x, y), EQ(y, x))
+        >>> e2 = Equivalent(Eq(x, y), Eq(y, x))
         >>> e2
         Equivalent(Eq(x, y), Eq(y, x))
         >>> e2.to_sympy()
@@ -430,7 +430,7 @@ class Formula(ABC):
         NotImplementedError:
             sympy does not know <class 'logic1.firstorder.truth._T'>
 
-        >>> e4 = All(x, Ex(y, EQ(x, y)))
+        >>> e4 = All(x, Ex(y, Eq(x, y)))
         >>> e4.to_sympy()
         Traceback (most recent call last):
         ...

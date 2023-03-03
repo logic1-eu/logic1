@@ -93,9 +93,9 @@ class AtomicFormula(Formula):
     def to_cnf(self) -> Self:
         """ Convert to Conjunctive Normal Form.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b
-        >>> EQ(a, 0).to_cnf()
+        >>> Eq(a, 0).to_cnf()
         Eq(a, 0)
         """
         return self
@@ -116,9 +116,9 @@ class AtomicFormula(Formula):
     def to_dnf(self) -> Self:
         """ Convert to Disjunctive Normal Form.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b
-        >>> EQ(a, 0).to_dnf()
+        >>> Eq(a, 0).to_dnf()
         Eq(a, 0)
         """
         return self

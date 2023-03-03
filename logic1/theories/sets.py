@@ -45,15 +45,15 @@ class Eq(TermMixin, atomlib.sympy.Eq):
     in particular, no constants.
 
     >>> from sympy.abc import x, y
-    >>> EQ(x, y)
+    >>> Eq(x, y)
     Eq(x, y)
 
-    >>> EQ(x, 0)
+    >>> Eq(x, 0)
     Traceback (most recent call last):
     ...
     TypeError: 0 is not a Term
 
-    >>> EQ(x + x, y)
+    >>> Eq(x + x, y)
     Traceback (most recent call last):
     ...
     TypeError: 2*x is not a Term
@@ -74,8 +74,8 @@ class Eq(TermMixin, atomlib.sympy.Eq):
         """
         return Eq
 
-
-EQ = Eq.interactive_new
+    def __init__(self, *args):
+        super().__init__(*args)
 
 
 class Ne(TermMixin, atomlib.sympy.Ne):
@@ -85,10 +85,10 @@ class Ne(TermMixin, atomlib.sympy.Ne):
     in particular, no constants.
 
     >>> from sympy.abc import x, y
-    >>> NE(y, x)
+    >>> Ne(y, x)
     Ne(y, x)
 
-    >>> NE(x, y + 1)
+    >>> Ne(x, y + 1)
     Traceback (most recent call last):
     ...
     TypeError: y + 1 is not a Term
@@ -108,9 +108,6 @@ class Ne(TermMixin, atomlib.sympy.Ne):
         """The converse relation Me of Ne.
         """
         return Ne
-
-
-NE = Ne.interactive_new
 
 
 oo = atomlib.sympy.oo
@@ -144,17 +141,17 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     >>> from logic1 import *
     >>> from sympy.abc import a, u, v, w, x, y, z
     >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, \
-            (EQ(u, v) | NE(v, w)) & ~ Equivalent(EQ(u, x), NE(u, w)) & EQ(y, a))))))
+            (Eq(u, v) | Ne(v, w)) & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
     >>> qe(f)
     C_bar(2)
 
-    >>> g = Ex(x, Ex(y, Ex(z, NE(x, y) & NE(x, z) & NE(y, z) \
-            & All(u, EQ(u, x) | EQ(u, y) | EQ(u, z)))))
+    >>> g = Ex(x, Ex(y, Ex(z, Ne(x, y) & Ne(x, z) & Ne(y, z) \
+            & All(u, Eq(u, x) | Eq(u, y) | Eq(u, z)))))
     >>> qe(g)
     And(C(2), C(3), C_bar(4))
 
-    >>> h = Ex(w, Ex(x, NE(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z, \
-            NE(w, x) & NE(w, y) & NE(w, z) & NE(x, y) & NE(x, z) & NE(y, z)))))
+    >>> h = Ex(w, Ex(x, Ne(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z, \
+            Ne(w, x) & Ne(w, y) & Ne(w, z) & Ne(x, y) & Ne(x, z) & Ne(y, z)))))
     >>> qe(h)
     Or(And(C(2), C(3), C(4)), C_bar(2))
     """

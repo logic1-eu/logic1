@@ -33,9 +33,9 @@ class QuantifiedFormula(Formula):
     def var(self) -> Any:
         """The variable of the quantifier.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
-        >>> e1 = All(x, Ex(y, EQ(x, y)))
+        >>> e1 = All(x, Ex(y, Eq(x, y)))
         >>> e1.var
         x
         """
@@ -49,9 +49,9 @@ class QuantifiedFormula(Formula):
     def arg(self) -> Formula:
         """The subformula in the scope of the QuantifiedFormula.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
-        >>> e1 = All(x, Ex(y, EQ(x, y)))
+        >>> e1 = All(x, Ex(y, Eq(x, y)))
         >>> e1.arg
         Ex(y, Eq(x, y))
         """
@@ -62,9 +62,9 @@ class QuantifiedFormula(Formula):
         """A type-checking constructor.
 
         >>> from logic1 import Ex
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x
-        >>> Ex(x, EQ(x, x))
+        >>> Ex(x, Eq(x, x))
         Ex(x, Eq(x, x))
 
         >>> Ex('x', 'y')
@@ -72,7 +72,7 @@ class QuantifiedFormula(Formula):
         ...
         ValueError: 'y' is not a Formula
 
-        >>> Ex('x', EQ(x, x))
+        >>> Ex('x', Eq(x, x))
         Traceback (most recent call last):
         ...
         ValueError: 'x' is not a Variable
@@ -109,9 +109,9 @@ class QuantifiedFormula(Formula):
     def simplify(self, Theta=None) -> Formula:
         """Simplification.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
-        >>> All(x, Ex(y, EQ(x, y))).simplify()
+        >>> All(x, Ex(y, Eq(x, y))).simplify()
         All(x, Ex(y, Eq(x, y)))
         """
         return self.func(self.var, self.arg.simplify())
@@ -202,9 +202,9 @@ class QuantifiedFormula(Formula):
 class Ex(QuantifiedFormula):
     """Existentially quantified formula factory.
 
-    >>> from logic1.atomlib.sympy import EQ
+    >>> from logic1.atomlib.sympy import Eq
     >>> from sympy.abc import x
-    >>> Ex(x, EQ(x, 1))
+    >>> Ex(x, Eq(x, 1))
     Ex(x, Eq(x, 1))
     """
 
@@ -228,9 +228,9 @@ class Ex(QuantifiedFormula):
 class All(QuantifiedFormula):
     """Universally quantified formula factory.
 
-    >>> from logic1.atomlib.sympy import EQ
+    >>> from logic1.atomlib.sympy import Eq
     >>> from sympy.abc import x, y
-    >>> All(x, All(y, EQ((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
+    >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     """
 

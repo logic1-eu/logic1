@@ -106,9 +106,9 @@ class BooleanFormula(Formula):
     def to_cnf(self) -> Formula:
         """ Convert to Conjunctive Normal Form.
 
-        >>> from logic1.atomlib.sympy import EQ, NE
+        >>> from logic1.atomlib.sympy import Eq, Ne
         >>> from sympy.abc import a
-        >>> ((EQ(a, 0) & NE(a, 1) | ~EQ(a, 0) | NE(a, 2)) >> NE(a, 1)).to_cnf()
+        >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_cnf()
         And(Or(Ne(a, 1), Eq(a, 2)), Or(Eq(a, 0), Ne(a, 1)))
         """
         return Not(self).to_dnf().to_nnf(implicit_not=True)
@@ -120,9 +120,9 @@ class BooleanFormula(Formula):
     def to_dnf(self) -> BooleanFormula | AtomicFormula:
         """ Convert to Disjunctive Normal Form.
 
-        >>> from logic1.atomlib.sympy import EQ, NE
+        >>> from logic1.atomlib.sympy import Eq, Ne
         >>> from sympy.abc import a
-        >>> ((EQ(a, 0) & NE(a, 1) | ~EQ(a, 0) | NE(a, 2)) >> NE(a, 1)).to_dnf()
+        >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_dnf()
         Or(Ne(a, 1), And(Eq(a, 0), Eq(a, 2)))
         """
         d: dict[AtomicFormula, exprvar] = {}
@@ -216,9 +216,9 @@ class Equivalent(BooleanFormula):
     def simplify(self, Theta=None) -> Formula:
         """Recursively simplify the Equivalence.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
-        >>> e1 = Equivalent(~ EQ(x, y), F)
+        >>> e1 = Equivalent(~ Eq(x, y), F)
         >>> e1.simplify()
         Eq(x, y)
         """
@@ -327,11 +327,11 @@ class AndOr(BooleanFormula):
     def simplify(self, Theta=None):
         """Simplification.
 
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(x, x + z))).simplify()
+        >>> And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))).simplify()
         And(Eq(x, y), Eq(x, z), Eq(x, x + z))
-        >>> f = Or(EQ(x, 0), Or(EQ(x, 1), EQ(x, 2)), And(EQ(x, y), EQ(x, z)))
+        >>> f = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
         >>> f.simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
@@ -435,13 +435,13 @@ class AndOr(BooleanFormula):
 class And(AndOr):
     """Constructor for conjunctions of Formulas.
 
-    >>> from logic1.atomlib.sympy import EQ
+    >>> from logic1.atomlib.sympy import Eq
     >>> from sympy.abc import x, y, z
     >>> And()
     T
-    >>> And(EQ(0, 0))
+    >>> And(Eq(0, 0))
     Eq(0, 0)
-    >>> And(EQ(x, 0), EQ(x, y), EQ(y, z))
+    >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
 
@@ -489,12 +489,12 @@ class And(AndOr):
 class Or(AndOr):
     """Constructor for disjunctions of Formulas.
 
-    >>> from logic1.atomlib.sympy import EQ
+    >>> from logic1.atomlib.sympy import Eq
     >>> Or()
     F
-    >>> Or(EQ(1, 0))
+    >>> Or(Eq(1, 0))
     Eq(1, 0)
-    >>> Or(EQ(1, 0), EQ(2, 0), EQ(3, 0))
+    >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
 
@@ -572,9 +572,9 @@ class Not(BooleanFormula):
         """Simplification.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> f = And(EQ(x, y), T, EQ(x, y), And(EQ(x, z), EQ(y, x)))
+        >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
         >>> ~ All(x, Ex(y, f)).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
         """
@@ -590,9 +590,9 @@ class Not(BooleanFormula):
         """Negation normal form.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import EQ
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> f = All(x, Ex(y, And(EQ(x, y), T, EQ(x, y), EQ(x, z) & EQ(y, x))))
+        >>> f = All(x, Ex(y, And(Eq(x, y), T, Eq(x, y), Eq(x, z) & Eq(y, x))))
         >>> (~f).to_nnf()
         Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
         """
@@ -609,10 +609,10 @@ def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.atomlib.sympy import EQ
-    >>> involutive_not(EQ(0, 0))
+    >>> from logic1.atomlib.sympy import Eq
+    >>> involutive_not(Eq(0, 0))
     Not(Eq(0, 0))
-    >>> involutive_not(~EQ(1, 0))
+    >>> involutive_not(~Eq(1, 0))
     Eq(1, 0)
     >>> involutive_not(T)
     Not(T)

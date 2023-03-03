@@ -53,17 +53,6 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
     """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
     """
 
-    # Class methods
-    @classmethod
-    def interactive_new(cls, *args):
-        args_ = []
-        for arg in args:
-            arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
-            if not isinstance(arg_, cls.term_type()):
-                raise TypeError(f"{arg!r} is not a Term")
-            args_.append(arg_)
-        return cls(*args_)
-
     # Instance methods
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
         all_vars = set()
@@ -173,14 +162,18 @@ class BinaryAtomicFormula(AtomicFormula):
         """The right-hand side of the BinaryAtomicFormula."""
         return self.args[1]
 
-    # Class methods
-    @classmethod
-    def interactive_new(cls, *args):
+    # Instance methods
+    def __init__(self, *args):
         if len(args) != 2:
             raise TypeError(f'bad number of arguments for binary relation')
-        return super().interactive_new(*args)
+        args_ = []
+        for arg in args:
+            arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
+            if not isinstance(arg_, self.term_type()):
+                raise TypeError(f"{arg!r} is not a Term")
+            args_.append(arg_)
+        super().__init__(*args_)
 
-    # Instance methods
     def _sprint(self, mode: str) -> str:
         if mode == 'latex':
             symbol = self.__class__.latex_symbol
@@ -236,9 +229,6 @@ class Eq(BinaryAtomicFormula):
         return self
 
 
-EQ = Eq.interactive_new
-
-
 class Ne(BinaryAtomicFormula):
     """
     >>> Ne(1, 0)
@@ -269,9 +259,6 @@ class Ne(BinaryAtomicFormula):
         return self
 
 
-NE = Ne.interactive_new
-
-
 class Ge(BinaryAtomicFormula):
 
     # Class variables
@@ -292,9 +279,6 @@ class Ge(BinaryAtomicFormula):
         return Le
 
 
-GE = Ge.interactive_new
-
-
 class Le(BinaryAtomicFormula):
 
     # Class variables
@@ -313,9 +297,6 @@ class Le(BinaryAtomicFormula):
     @classproperty
     def converse_func(cls):
         return Ge
-
-
-LE = Le.interactive_new
 
 
 class Gt(BinaryAtomicFormula):
@@ -339,9 +320,6 @@ class Gt(BinaryAtomicFormula):
         return Lt
 
 
-GT = Gt.interactive_new
-
-
 class Lt(BinaryAtomicFormula):
 
     # Class variables
@@ -360,9 +338,6 @@ class Lt(BinaryAtomicFormula):
     @classproperty
     def converse_func(cls):
         return Gt
-
-
-LT = Lt.interactive_new
 
 
 class Cardinality(AtomicFormula):
