@@ -344,25 +344,15 @@ class Cardinality(AtomicFormula):
 
     # Instance variables
     @property
-    def n(self):
+    def index(self):
         return self.args[0]
-
-    # Class methods
-    @classmethod
-    def interactive_new(cls, *args):
-        if len(args) != 1:
-            raise ValueError(f"bad number of arguments")
-        n = args[0]
-        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
-            raise ValueError(f"{n!r} is not an admissible cardinality")
-        return cls(n)
 
     # Instance methods
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
         return GetVars()
 
 
-class _C(Cardinality):
+class C(Cardinality):
     """
     >>> c_0_1 = C(0)
     >>> c_0_2 = C(0)
@@ -374,45 +364,47 @@ class _C(Cardinality):
     """
 
     # Class variables
-    func: type[_C]
+    func: type[C]
 
     @classproperty
     def complement_func(cls):
-        """The complement relation _C_bar of _C.
+        """The complement relation _C_ of _C.
         """
-        return _C_bar
+        return C_
 
     _instances: ClassVar[dict] = {}
 
     # Instance variables
-    args: tuple[()]
+    args: tuple[int]
 
     # Class methods
-    def __new__(cls, n: Card):
+    def __new__(cls, *args):
+        if len(args) != 1:
+            raise ValueError(f"bad number of arguments")
+        n = args[0]
+        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
+            raise ValueError(f"{n!r} is not an admissible cardinality")
         if n not in cls._instances:
             cls._instances[n] = super().__new__(cls)
         return cls._instances[n]
 
     # Instance methods
     def __repr__(self):
-        return f'C({self.n})'
+        return f'C({self.index})'
 
     def _sprint(self, mode: str) -> str:
         if mode == 'text':
             return repr(self)
         assert mode == 'latex', f'bad print mode {mode!r}'
-        k = str(self.n) if isinstance(self.n, int) else '\\infty'
+        k = str(self.index) if isinstance(self.index, int) else '\\infty'
         return f'C_{k}'
 
 
-C = _C.interactive_new
-
-
-class _C_bar(Cardinality):
+class C_(Cardinality):
     """
-    >>> c_0_1 = C_bar(0)
-    >>> c_0_2 = C_bar(0)
-    >>> c_oo = C_bar(oo)
+    >>> c_0_1 = C_(0)
+    >>> c_0_2 = C_(0)
+    >>> c_oo = C_(oo)
     >>> c_0_1 is c_0_2
     True
     >>> c_0_1 == c_oo
@@ -420,35 +412,37 @@ class _C_bar(Cardinality):
     """
 
     # Class variables
-    func: type[_C_bar]
+    func: type[C_]
 
     @classproperty
     def complement_func(cls):
-        """The complement relation _C of _C_bar.
+        """The complement relation C of C_.
         """
-        return _C
+        return C
 
     _instances: ClassVar[dict] = {}
 
     # Instance variables
-    args: tuple[()]
+    args: tuple[int]
 
     # Class methods
-    def __new__(cls, n: Card):
+    def __new__(cls, *args):
+        if len(args) != 1:
+            raise ValueError(f"bad number of arguments")
+        n = args[0]
+        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
+            raise ValueError(f"{n!r} is not an admissible cardinality")
         if n not in cls._instances:
             cls._instances[n] = super().__new__(cls)
         return cls._instances[n]
 
     # Instance methods
     def __repr__(self) -> str:
-        return f'C_bar({self.n})'
+        return f'C_({self.index})'
 
     def _sprint(self, mode: str) -> str:
         if mode == 'text':
             return repr(self)
         assert mode == 'latex', f'bad print mode {mode!r}'
-        k = str(self.n) if isinstance(self.n, int) else '\\infty'
+        k = str(self.index) if isinstance(self.index, int) else '\\infty'
         return f'\\overline{{C_{k}}}'
-
-
-C_bar = _C_bar.interactive_new

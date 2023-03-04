@@ -113,26 +113,20 @@ class Ne(TermMixin, atomlib.sympy.Ne):
 oo = atomlib.sympy.oo
 
 
-class _C(atomlib.sympy._C):
+class C(atomlib.sympy.C):
 
     # Class variables
     @classproperty
     def complement_func(cls):
-        return _C_bar
+        return C_
 
 
-C = _C.interactive_new
-
-
-class _C_bar(atomlib.sympy._C_bar):
+class C_(atomlib.sympy.C_):
 
     # Class variables
     @classproperty
     def complement_func(cls):
-        return _C
-
-
-C_bar = _C_bar.interactive_new
+        return C
 
 
 class QuantifierElimination(abc.qe.QuantifierElimination):
@@ -140,20 +134,20 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
 
     >>> from logic1 import *
     >>> from sympy.abc import a, u, v, w, x, y, z
-    >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, \
-            (Eq(u, v) | Ne(v, w)) & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
+    >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, (Eq(u, v) | Ne(v, w))
+    ...     & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
     >>> qe(f)
-    C_bar(2)
+    C_(2)
 
-    >>> g = Ex(x, Ex(y, Ex(z, Ne(x, y) & Ne(x, z) & Ne(y, z) \
-            & All(u, Eq(u, x) | Eq(u, y) | Eq(u, z)))))
+    >>> g = Ex(x, Ex(y, Ex(z, Ne(x, y) & Ne(x, z) & Ne(y, z)
+    ...     & All(u, Eq(u, x) | Eq(u, y) | Eq(u, z)))))
     >>> qe(g)
-    And(C(2), C(3), C_bar(4))
+    And(C(2), C(3), C_(4))
 
-    >>> h = Ex(w, Ex(x, Ne(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z, \
-            Ne(w, x) & Ne(w, y) & Ne(w, z) & Ne(x, y) & Ne(x, z) & Ne(y, z)))))
+    >>> h = Ex(w, Ex(x, Ne(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z,
+    ...     Ne(w, x) & Ne(w, y) & Ne(w, z) & Ne(x, y) & Ne(x, z) & Ne(y, z)))))
     >>> qe(h)
-    Or(And(C(2), C(3), C(4)), C_bar(2))
+    Or(And(C(2), C(3), C(4)), C_(2))
     """
 
     # Instance methods
@@ -193,7 +187,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     # Static methods
     @staticmethod
     def is_valid_atom(f: Formula) -> bool:
-        return isinstance(f, (Eq, Ne, _C, _C_bar))
+        return isinstance(f, (Eq, Ne, C, C_))
 
     @staticmethod
     def _split_by_relation(f) -> tuple[list[type[Eq]], list[type[Ne]]]:
