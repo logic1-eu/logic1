@@ -21,6 +21,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.doctest',
     'sphinx.ext.viewcode',
+    'sphinx.ext.intersphinx',
     'sphinx_togglebutton'
 ]
 
@@ -30,6 +31,8 @@ exclude_patterns = []
 language = 'en'
 
 doctest_path = ['~/Documents/Dynamic/src/python/Logic1/logic1/logic1']
+
+intersphinx_mapping = {'sympy': ('https://docs.sympy.org/latest', None)}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

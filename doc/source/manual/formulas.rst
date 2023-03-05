@@ -39,13 +39,12 @@ Terms
 =====
 |logic1| supports `SymPy <https://www.sympy.org/>`_ expressions as terms with
 SymPy symbols as variables. Find more details in the `SymPy documentation
-<https://docs.sympy.org/>`_. Get started with the short sections on `Symbols
-<https://docs.sympy.org/latest/tutorials/intro-tutorial/gotchas.html#symbols>`_
-and `Basic Operations
-<https://docs.sympy.org/latest/tutorials/intro-tutorial/basic_operations.html>`_.
+<https://docs.sympy.org/>`_. Get started with the
+:external:ref:`intro-tutorial`.
 
-SymPy supports several ways to define symbols and expressions. The most basic
-and flexible one is the use of the function :func:`sympy.symbols`. We give an
+SymPy supports several ways to define :external:ref:`symbols` and
+:external:ref:`symbolic-expressions`. The most basic and flexible one is the use
+of the function :external:func:`sympy.core.symbol.symbols`. We give an
 example:
 
 .. doctest::
@@ -62,11 +61,8 @@ example:
   >>> term
   x**2 - 2*x*y + y**2
 
-Find all details on :func:`sympy.symbols` in SymPy's API Reference `here
-<https://docs.sympy.org/latest/modules/core.html#module-sympy.core.symbol>`_.
-
-There is an alternative method for introducing Latin and Greek one-letter
-symbols:
+Latin and Greek one-letter symbols can be conveniently imported from
+:external:mod:`sympy.abc`:
 
 .. doctest::
 
@@ -74,25 +70,27 @@ symbols:
   >>> (x + epsilon) ** 2
   (epsilon + x)**2
 
-Another convenient method uses :func:`sympy.sympify`, which has a short name
-:func:`sympy.S`. This function parses strings into SymPy expressions. Symbols
-newly introduced this way are not implicitly available as Python variables.
-The idea is that one can generally use :func:`sympy.S` also for symbols.
-Note that symbols with the same name are identical:
+Another approach uses
+:external:func:`sympy.core.sympify.sympify`. This function parses
+strings into SymPy expressions. Symbols newly introduced this way are not
+implicitly available as Python variables. However, one can generally
+use :external:func:`sympy.core.sympify.sympify`, since symbols with
+the same name are identical:
 
 .. doctest::
 
-  >>> from sympy import S
-  >>> term = S('y + delta')
+  >>> import sympy
+  >>> s = sympy.sympify
+  >>> term = s('y + delta')
   >>> term
   delta + y
   >>> y
   Traceback (most recent call last):
   ...
   NameError: name 'y' is not defined
-  >>> S('y')
+  >>> s('y')
   y
-  >>> S('y') is term.args[1]
+  >>> s('y') is term.args[1]
   True
 
 Atomic Formulas
@@ -163,25 +161,21 @@ available in the :ref:`API Reference <api-index>`.
   # Class data attributes:
 
   .. attribute:: func
-    :canonical: logic1.atomlib.sympy.Lt.func
     :value: Lt
 
     The relation symbol of the atomic formula.
 
   .. attribute:: complement_func
-    :canonical: logic1.atomlib.sympy.complement_func.
     :value: Ge
 
     The complement relation symbol of :attr:`func`.
 
   .. attribute:: converse_func
-    :canonical: logic1.atomlib.sympy.Lt.converse_func
     :value: Gt
 
     The converse relation symbol of :attr:`func`.
 
   .. attribute:: dual_func
-    :canonical: logic1.atomlib.sympy.dual_func
     :value: Le
 
     The dual relation symbol of :attr:`func`.
