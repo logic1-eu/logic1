@@ -149,10 +149,11 @@ equations and inequalities as their instances.
 
 We have a closer look at the class :class:`Lt`. The other classes are similar.
 The following snippet is not complete and it contains attributes that are
-actually inherited from super classes. Precise comprehensive descriptions are
-available in the :ref:`API Reference <api-index>`.
+actually inherited from super classes. Compare the documentation of :class:`Lt`
+in the :ref:`API Reference <api-index>`.
 
 .. class:: Lt
+  :noindex:
 
   Bases: :class:`logic1.atomlib.sympy.BinaryAtomicFormula`
 
@@ -161,21 +162,25 @@ available in the :ref:`API Reference <api-index>`.
   # Class data attributes:
 
   .. attribute:: func
+    :noindex:
     :value: Lt
 
     The relation symbol of the atomic formula.
 
   .. attribute:: complement_func
+    :noindex:
     :value: Ge
 
     The complement relation symbol of :attr:`func`.
 
   .. attribute:: converse_func
+    :noindex:
     :value: Gt
 
     The converse relation symbol of :attr:`func`.
 
   .. attribute:: dual_func
+    :noindex:
     :value: Le
 
     The dual relation symbol of :attr:`func`.
@@ -183,16 +188,19 @@ available in the :ref:`API Reference <api-index>`.
   # Instance data attributes:
 
   .. attribute:: args
+    :noindex:
     :type: tuple
 
     The tuple of arguments of :attr:`func`, which equals ``(lhs, rhs)``.
 
   .. property:: lhs
+    :noindex:
     :type: sympy.core.expr.Expr
 
     The left hand side term of the atomic formula, which is ``args[0]``.
 
   .. property:: rhs
+    :noindex:
     :type: sympy.core.expr.Expr
 
     The right hand side term of the atomic formula, which is ``args[1]``.
@@ -358,6 +366,7 @@ their instances.
   +------------------------+---------+---------------------------------+-------------+---------+
 
 .. class:: C
+  :noindex:
 
   Bases: :class:`logic1.atomlib.sympy.Cardinality`
 
@@ -367,11 +376,13 @@ their instances.
   # Class data attributes:
 
   .. attribute:: func
+    :noindex:
     :value: C
 
     The relation symbol of the atomic formula.
 
   .. attribute:: complement_func
+    :noindex:
     :value: C_
 
     The complement relation symbol of :attr:`func`.
@@ -379,11 +390,13 @@ their instances.
   # Instance data attributes:
 
   .. attribute:: args
+    :noindex:
     :type: tuple
 
     The tuple of arguments of the constructor :attr:`func`, which equals ``(index,)``.
 
   .. property:: index
+    :noindex:
     :type: int | sympy.core.numbers.Infinity
 
     The index :math:`n` of :math:C_n`, which is :attr:`args [0]`.
@@ -408,8 +421,8 @@ p-arity:
   arity 1.
 
 We will encounter a similar situation with quantifiers in
-:ref:`first-order formulas <firstorder-index>` in the next section, where both
-the m-arity and the p-arity will be positive.
+the next section on :ref:`first-order-formulas`, where
+both the m-arity and the p-arity will be positive.
 
 Cardinality Constraints of the same class and with the same index are identical:
 
@@ -423,6 +436,8 @@ Cardinality Constraints of the same class and with the same index are identical:
     True
     >>> a1 == a3
     False
+
+.. _first-order-formulas:
 
 First-order Formulas
 ====================
