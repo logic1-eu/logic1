@@ -27,6 +27,10 @@ specified set of *relation* symbols with specified arities. Finally,
 *first-order formulas* formulas are recursively built from atomic formulas and a
 fixed set of *logical operators*.
 
+|logic1| focuses on *interpreted* first-order logic, where the above-mentioned
+function and relation symbols have an implicit semantics, which is not
+explicitly expressed via axioms within the logical framework.
+
 
 .. index::
   SymPy
@@ -455,98 +459,3 @@ the following *logical* operators:
   +-----------------------------+---------+------------+---------------------+---------+-----------+
   | :math:`\forall x`           | 1       | for all    | :class:`All`        | 2       |           |
   +-----------------------------+---------+------------+---------------------+---------+-----------+
-
-Basic Operations on Formulas
-============================
-
-Data Extraction
----------------
-
-.. autofunction:: logic1.firstorder.formula.Formula.count_alternations
-  :noindex:
-
-.. autofunction:: logic1.firstorder.formula.Formula.get_vars
-  :noindex:
-
-.. autofunction:: logic1.firstorder.formula.Formula.get_qvars
-  :noindex:
-
-.. index::
-  Normal Forms
-
-Transformations
----------------
-
-.. index::
-  substitution
-
-.. autofunction:: logic1.firstorder.formula.Formula.subs
-  :noindex:
-
-.. index::
-  simplification
-
-.. autofunction:: logic1.firstorder.formula.Formula.simplify
-  :noindex:
-
-.. index::
-  LaTeX; connversion to
-
-.. autofunction:: logic1.firstorder.formula.Formula.to_latex
-  :noindex:
-
-.. autofunction:: logic1.firstorder.formula.Formula.to_sympy
-  :noindex:
-
-.. autofunction:: logic1.firstorder.formula.Formula.transform_atoms
-  :noindex:
-
-This often allows to write uniform code
-for objects where the number or types of elements of :attr:`args` are not
-known, in particular in recursions.
-
-.. autofunction:: logic1.firstorder.formula.Formula.to_distinct_vars
-  :noindex:
-
-
-Normal Forms
-============
-
-.. index::
-  negation normal form
-  NNF
-
-Negation Normal Form
---------------------
-
-.. autofunction:: logic1.firstorder.formula.Formula.to_nnf
-  :noindex:
-
-.. index::
-  prenex normal form
-  PNF
-
-Prenex Normal Form
-------------------
-.. autofunction:: logic1.firstorder.formula.Formula.to_pnf
-   :noindex:
-
-
-.. index::
-  conjunctive normal form
-  CNF
-  disjunctive normal form
-  DNF
-
-Conjunctive and Disjunctive Normal Form
----------------------------------------
-.. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_cnf
-   :noindex:
-.. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_dnf
-   :noindex:
-
-Remarks
-=======
-|logic1| focuses on *interpreted* first-order logic, where the specified
-functions and relations mentioned above have a fixed semantics, which is not
-explicitly expressed in the logical framework.
