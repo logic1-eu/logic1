@@ -3,6 +3,8 @@
 .. |logic1| replace:: Logic1
 .. |Card| replace:: :math:`n \in \mathbb{N} \cup \{\infty\}`
 
+.. default-domain:: py
+
 ##############################
 First-order Logic and Formulas
 ##############################
@@ -17,6 +19,7 @@ First-order Logic and Formulas
   atomic formula
   relation
 
+
 First-order logic recursively builds *terms* from *variables* and a specified
 set of *function* symbols with specified arities, which includes *constant*
 symbols with arity zero. Next, *atomic formulas* are built from terms and a
@@ -24,230 +27,290 @@ specified set of *relation* symbols with specified arities. Finally,
 *first-order formulas* formulas are recursively built from atomic formulas and a
 fixed set of *logical operators*.
 
+
 .. index::
   SymPy
 
 Terms
 =====
 |logic1| supports `SymPy <https://www.sympy.org/>`_ expressions as terms with
-SymPy symbols as variables. Here is an example:
+SymPy symbols as variables. Find more details in the `SymPy documentation
+<https://docs.sympy.org/>`_. Get started with the short sections on `Symbols
+<https://docs.sympy.org/latest/tutorials/intro-tutorial/gotchas.html#symbols>`_
+and `Basic Operations
+<https://docs.sympy.org/latest/tutorials/intro-tutorial/basic_operations.html>`_.
 
->>> import sympy
->>> x, y = sympy.symbols('x, y')
->>> term = x**2 - 2*x*y + y**2
+SymPy supports several ways to define symbols and expressions. The most basic
+and flexible one is the use of the function :func:`sympy.symbols`. We give an
+example:
 
-.. seealso::
-  We refer to two short sections in the  `SymPy documentation
-  <https://docs.sympy.org/>`_ for further details: Get started with the section
-  on `Symbols
-  <https://docs.sympy.org/latest/tutorials/intro-tutorial/gotchas.html#symbols>`_,
-  and maybe also have a look at `Basic Operations
-  <https://docs.sympy.org/latest/tutorials/intro-tutorial/basic_operations.html>`_.
+.. doctest::
 
+  >>> import sympy
+  >>> x, y = sympy.symbols('x, y')
+  >>> isinstance(x, sympy.core.symbol.Symbol)
+  True
+  >>> x
+  x
+  >>> term = x**2 - 2*x*y + y**2
+  >>> isinstance(term, sympy.core.expr.Expr)
+  True
+  >>> term
+  x**2 - 2*x*y + y**2
+
+Find all details on :func:`sympy.symbols` in SymPy's API Reference `here
+<https://docs.sympy.org/latest/modules/core.html#module-sympy.core.symbol>`_.
+
+There is an alternative method for introducing Latin and Greek one-letter
+symbols:
+
+.. doctest::
+
+  >>> from sympy.abc import x, epsilon
+  >>> (x + epsilon) ** 2
+  (epsilon + x)**2
+
+Another convenient method uses :func:`sympy.sympify`, which has a short name
+:func:`sympy.S`. This function parses strings into SymPy expressions. Symbols
+newly introduced this way are not implicitly available as Python variables.
+The idea is that one can generally use :func:`sympy.S` also for symbols.
+Note that symbols with the same name are identical:
+
+.. doctest::
+
+  >>> from sympy import S
+  >>> term = S('y + delta')
+  >>> term
+  delta + y
+  >>> y
+  Traceback (most recent call last):
+  ...
+  NameError: name 'y' is not defined
+  >>> S('y')
+  y
+  >>> S('y') is term.args[1]
+  True
 
 Atomic Formulas
 ===============
-|logic1| does *not* use any relations from SymPy but implements its own
-relations, along with corresponding atomic formulas. The module
-:py:mod:`logic1.atomlib.sympy` provides a library of atomic formulas based on
-SymPy terms.
+|logic1| does not use any relations from SymPy but implements its own relations.
+We distinguish between *relation symbols*, like :math:`\leq`, and *atomic
+formulas* built from relation symbols with a suitable number of argument terms,
+like :math:`x \leq x+1`.
 
-.. py:currentmodule:: logic1.atomlib.sympy
+|logic1| primarily aims at interpreted first-order logic. For many algorithms in
+this setting the choice of admissible relation symbols, and also of admissible
+function symbols, plays a crucial rule in the sense that slight variations of
+those choices lead to entirely different algorithmic approaches for the same
+problems. Examples for such algorithms are simplification, quantifier
+elimination, and decision procedures. The choice of admissible function and
+relation symbols takes place with the implementation of :ref:`theories
+<theories-index>`, which we discuss later on. It is also theories that fix a
+domain of computation and give function and relation symbol a semantics in that
+domain.
+
+The module :mod:`logic1.atomlib.sympy` provides a library of classes for atomic
+formulas with SymPy terms. Theories can select a set classes from this
+collection, possibly modify via subclassing, and implement additional atomic
+formulas on their own. In particular, subclassing allows to restrict the set of
+admissible function symbols via argument checking in the constructors and
+initializers of the derived classes.
+
+.. currentmodule:: logic1.atomlib.sympy
 
 Equations and Inequalities
 --------------------------
 
-+--------------+-------+---------------+----------------+---------------+
-|relation      | arity | in words      | class          | interactive   |
-+==============+=======+===============+================+===============+
-| :math:`=`    | 2     | equal         | :py:class:`Eq` | :py:func:`EQ` |
-+--------------+-------+---------------+----------------+---------------+
-| :math:`\neq` | 2     | not equal     | :py:class:`Ne` | :py:func:`NE` |
-+--------------+-------+---------------+----------------+---------------+
-| :math:`\geq` | 2     | greater-equal | :py:class:`Ge` | :py:func:`GE` |
-+--------------+-------+---------------+----------------+---------------+
-| :math:`\leq` | 2     | less-equal    | :py:class:`Le` | :py:func:`LE` |
-+--------------+-------+---------------+----------------+---------------+
-| :math:`>`    | 2     | greater than  | :py:class:`Gt` | :py:func:`GT` |
-+--------------+-------+---------------+----------------+---------------+
-| :math:`<`    | 2     | less than     | :py:class:`Lt` | :py:func:`LT` |
-+--------------+-------+---------------+----------------+---------------+
+Equations and inequalities are a popular kind of atomic formulas. They appear in
+many interesting theories including Ordered Sets, Presburger Arithmetic, and
+Real Closed Fields. The classes in the following table allow to realize
+equations and inequalities as their instances.
 
-Equations and inequalities as atomic formulas  are instances of the classes
-given in the table. Let us have a closer look at :py:class:`Lt`. The other
-classes are analogous:
+.. table::
+  :widths: 80 50 80 40
 
-.. py:class:: logic1.atomlib.sympy.Lt
+  +--------------+-------+---------------+-------------+
+  |relation      | arity | in words      | class       |
+  +==============+=======+===============+=============+
+  | :math:`=`    | 2     | equal         | :class:`Eq` |
+  +--------------+-------+---------------+-------------+
+  | :math:`\neq` | 2     | not equal     | :class:`Ne` |
+  +--------------+-------+---------------+-------------+
+  | :math:`\geq` | 2     | greater-equal | :class:`Ge` |
+  +--------------+-------+---------------+-------------+
+  | :math:`\leq` | 2     | less-equal    | :class:`Le` |
+  +--------------+-------+---------------+-------------+
+  | :math:`>`    | 2     | greater than  | :class:`Gt` |
+  +--------------+-------+---------------+-------------+
+  | :math:`<`    | 2     | less than     | :class:`Lt` |
+  +--------------+-------+---------------+-------------+
 
-  Bases: :py:class:`logic1.atomlib.sympy.BinaryAtomicFormula`
+We have a closer look at the class :class:`Lt`. The other classes are similar.
+The following snippet is not complete and it contains attributes that are
+actually inherited from super classes. Precise comprehensive descriptions are
+available in the :ref:`API Reference <api-index>`.
+
+.. class:: Lt
+
+  Bases: :class:`logic1.atomlib.sympy.BinaryAtomicFormula`
 
   A class for atomic formulas with relation :math:`<`.
 
   # Class data attributes:
 
-  .. py:attribute:: func
-    :canonical: logic1.atomlib.sympy.func
+  .. attribute:: func
+    :canonical: logic1.atomlib.sympy.Lt.func
     :value: Lt
 
     The relation symbol of the atomic formula.
 
-  .. py:attribute:: complement_func
-    :canonical: logic1.atomlib.sympy.complement_func
+  .. attribute:: complement_func
+    :canonical: logic1.atomlib.sympy.complement_func.
     :value: Ge
 
-    The complement relation symbol :py:attr:`func`'.
+    The complement relation symbol of :attr:`func`.
 
-  .. py:attribute:: converse_func
-    :canonical: logic1.atomlib.sympy.converse_func
+  .. attribute:: converse_func
+    :canonical: logic1.atomlib.sympy.Lt.converse_func
     :value: Gt
 
-    The converse relation symbol :py:attr:`func`:math:`^{-1}`.
+    The converse relation symbol of :attr:`func`.
 
-  .. py:attribute:: dual_func
+  .. attribute:: dual_func
     :canonical: logic1.atomlib.sympy.dual_func
     :value: Le
 
-    The dual relation symbol :math:`(`:py:attr:`func`':math:`)^{-1}`.
+    The dual relation symbol of :attr:`func`.
 
   # Instance data attributes:
 
-  .. py:attribute:: args
+  .. attribute:: args
     :type: tuple
 
-    The tuple of arguments of the constructor :py:attr:`func`.
+    The tuple of arguments of :attr:`func`, which equals ``(lhs, rhs)``.
 
-  .. py:property:: lhs
+  .. property:: lhs
     :type: sympy.core.expr.Expr
 
     The left hand side term of the atomic formula, which is ``args[0]``.
 
-  .. py:property:: rhs
+  .. property:: rhs
     :type: sympy.core.expr.Expr
 
     The right hand side term of the atomic formula, which is ``args[1]``.
 
-  # Class methods:
-
-  .. py:classmethod:: interactive_new(cls, *args)
-
-    Construct instances of :py:class:`Lt` dynamically checking `*args` and
-    raising TypeError with an informative message for invalid arguments.
-
-.. py:function:: logic1.atomlib.sympy.LT(*args) -> Lt
-
-  Convenient access to Lt.interactive_new(*args)
-
-The attributes :py:attr:`func`, :py:attr:`lhs`, and :py:attr:`rhs` allow to
-access the components of a given atomic formula.
+The attributes :attr:`func`, :attr:`lhs`, and :attr:`rhs` give
+access to the mathematical components of an atomic formula:
 
 .. doctest::
 
   >>> from logic1.atomlib.sympy import *
-  >>> atom = LT(1, 0)
+  >>> atom = Lt(0, 1)
   >>> atom
-  Lt(1, 0)
+  Lt(0, 1)
   >>> atom.func, atom.lhs, atom.rhs
   (<class 'logic1.atomlib.sympy.Lt'>, 1, 0)
 
-Since :py:attr:`func` is the class :py:class:`Lt` itself, it is callable, and we
-have everything together to decompose and contruct atomic formulas:
+Since :attr:`func` is the class :class:`Lt` itself, it is callable as a
+constructor, and we have everything together to decompose and construct atomic
+formulas:
 
 .. doctest::
 
   >>> new_atom = atom.func(atom.lhs, atom.rhs)
   >>> new_atom
-  Gt(1, 0)
+  Lt(0, 1)
   >>> new_atom == atom
   True
   >>> new_atom is atom
   False
+  >> Gt(2, new_atom.rhs)
+  Gt(2, 1)
 
-More abstractly, one can use the argument tuple :py:attr:`args` instead of of
-:py:attr:`lhs` and :py:attr:`rhs`:
+More generally, one can use the argument tuple :attr:`args` instead of
+:attr:`lhs` and :attr:`rhs`:
 
-.. admonition:: Important
+.. important::
 
   If ``f`` is any of our atomic formulas, then ``f == f.func(*f.args)``.
 
-The attributes :py:attr:`func` and :py:attr:`args` are available throughout
-|logic1| also for non-atomic formulas. This systematic has been adopted from
-SymPy, which explains the generic attribute name :py:attr:`func` in the context
-of relations.
+The same holds for SymPy expressions, which is discussed in the section
+`Recursing through an Expression Tree
+<https://docs.sympy.org/latest/tutorials/intro-tutorial/manipulation.html#recursing-through-an-expression-tree>`_
+of the SymPy documentation. This explains our generic attribute name
+:attr:`func` when actually referring to relations.
+The attributes :attr:`func` and :attr:`args` will be available throughout
+|logic1| also for non-atomic formulas.
 
-.. seealso::
-
-  The SymPy documentiation on `Recursing through an Expression Tree
-  <https://docs.sympy.org/latest/tutorials/intro-tutorial/manipulation.html#recursing-through-an-expression-tree>`_.
-
-Note that the regular constructor :py:meth:`Lt.__new__` of :py:class:`Lt` does
-not check the validity of its arguments. This is desirable for the production of
-efficient software based on |logic1|.
-
-In contrast, the interactive constructor :py:meth:`Lt.interactive_new` of
-:py:class:`Lt` does check its arguments and raises informative errors when
-problems are detected. It is conveniently available es :py:func:`LT` and
-should be prferred interactively or for code at a scripting level:
+The constructors and initializers of our classes here check the validity of
+their arguments and raise :exc:`ValueError` with additional information when
+problems are detected:
 
 .. doctest::
 
-  >>> bad = Lt('1', 0)  # slips through unnoticed
-  >>> oops = LT('1', 0)
+  >>> oops = Lt('1', 0)
   Traceback (most recent call last):
   ...
-  TypeError: '1' is not a Term
+  ValueError: '1' is not a Term
 
-It remains to clarify the values of :py:attr:`complement_func`,
-:py:attr:`converse_func`, and :py:attr:`dual_func` in general.
+It remains to clarify the values of :attr:`complement_func`,
+:attr:`converse_func`, and :attr:`dual_func` in general.
 
-.. admonition:: Read about the mathematical background
-  :class: dropdown
+.. admonition:: Mathematical definitions
 
   Let :math:`\varrho \subseteq A^n` be an  :math:`n`-ary relation. Then
   the *complement relation* is defined as
 
   .. math::
-    \varrho' = A^n \setminus \varrho.
+    \overline{\varrho} = A^n \setminus \varrho.
 
-  It follows that :math:`\varrho'(a_1, \dots, a_n)` is equivalent to :math:`\lnot
-  \varrho(a_1, \dots, a_n)`, which is an important property for |logic1|. If
-  :math:`\varrho` is binary, then the *converse relation* is defined as
+  It follows that :math:`\overline{\varrho}(a_1, \dots, a_n)` is equivalent to
+  :math:`\lnot
+  \varrho(a_1, \dots, a_n)`, which is an important property for |logic1|.
+
+  If :math:`\varrho` is binary, then the *converse relation* is defined as
 
   .. math::
     \varrho^{-1} = \{\,(y, x) \in A^2 \mid (x, y) \in \varrho\,\}.
 
-  In other words, it swaps sides. The converse is the inverse with respect to
+  In other words, the converse swaps sides. It is the inverse with respect to
   composition, i.e., :math:`\varrho \circ \varrho^{-1} = \varrho^{-1}
-  \circ \varrho = \Delta_A`, where the *diagonal* :math:`\Delta_A` is equality
-  on :math:`A`. Finally, the *dual relation* is defined as
+  \circ \varrho = \Delta_A`. The diagonal :math:`\Delta_A = \{\,(x, y) \in A^2
+  \mid x = y\,\}` is equality on :math:`A`.
+
+  Finally, the *dual relation* is defined as
 
   .. math::
-    \varrho^d = (\varrho')^{-1},
+    \varrho^d = \overline{\varrho^{-1}},
 
-  which generally equals :math:`(\varrho^{-1})'`. For our relations here,
-  dualization amounts to turning strict relations into weak relations, and vice
-  versa.
+  which generally equals :math:`(\overline{\varrho})^{-1}`. For our relations
+  here, dualization amounts to turning strict relations into weak relations, and
+  vice versa.
 
   Each of these transformations of relations is involutive in the sense that
-  :math:`(\varrho')' = (\varrho^{-1})^{-1} = (\varrho^d)^d = \varrho`.
+  :math:`\overline{\overline{\varrho}} = (\varrho^{-1})^{-1} = (\varrho^d)^d =
+  \varrho`.
 
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:attr:`func` | :py:attr:`complement_func` | :py:attr:`converse_func` | :py:attr:`dual_func` |
-+=================+============================+==========================+======================+
-| :py:class:`Eq`  | :py:class:`Ne`             | :py:class:`Eq`           | :py:class:`Ne`       |
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:class:`Ne`  | :py:class:`Eq`             | :py:class:`Ne`           | :py:class:`Eq`       |
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:class:`Ge`  | :py:class:`Lt`             | :py:class:`Le`           | :py:class:`Gt`       |
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:class:`Le`  | :py:class:`Gt`             | :py:class:`Ge`           | :py:class:`Lt`       |
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:class:`Gt`  | :py:class:`Le`             | :py:class:`Lt`           | :py:class:`Ge`       |
-+-----------------+----------------------------+--------------------------+----------------------+
-| :py:class:`Lt`  | :py:class:`Ge`             | :py:class:`Gt`           | :py:class:`Le`       |
-+-----------------+----------------------------+--------------------------+----------------------+
+.. table::
 
-Of course, :py:attr:`complement_func`, :py:attr:`converse_func`, and
-:py:attr:`dual_func` work as constructors in the same way as :py:attr:`func`:
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :attr:`func` | :attr:`complement_func` | :attr:`converse_func` | :attr:`dual_func` |
+  +==============+=========================+=======================+===================+
+  | :class:`Eq`  | :class:`Ne`             | :class:`Eq`           | :class:`Ne`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :class:`Ne`  | :class:`Eq`             | :class:`Ne`           | :class:`Eq`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :class:`Ge`  | :class:`Lt`             | :class:`Le`           | :class:`Gt`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :class:`Le`  | :class:`Gt`             | :class:`Ge`           | :class:`Lt`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :class:`Gt`  | :class:`Le`             | :class:`Lt`           | :class:`Ge`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+  | :class:`Lt`  | :class:`Ge`             | :class:`Gt`           | :class:`Le`       |
+  +--------------+-------------------------+-----------------------+-------------------+
+
+Of course, :attr:`complement_func`, :attr:`converse_func`, and
+:attr:`dual_func` work as constructors in the same way as :attr:`func`:
 
 .. doctest::
 
@@ -256,76 +319,112 @@ Of course, :py:attr:`complement_func`, :py:attr:`converse_func`, and
   >>> atom.dual_func(atom.lhs, atom.rhs)
   Le(1, 0)
 
+.. note::
+
+  Recall that we are working at a syntactic level here, where domains and
+  semantics of the relations are not specified yet. The concrete specifications
+  of complement, converse, and dual relation symbols aims to have this set of
+  relation symbols used in theories that correspond to it.
+
+  As a counterexample consider a theory of partially ordered sets, in which all
+  of our relation symbols are meaningful. However, with a partial order,
+  :math:`\geq` is not the complement relation of :math:`<`. Consequently, such a
+  theory would find another suitable set of relations somewhere, or implement it
+  itself.
+
+
 Cardinality Constraints
 -----------------------
-Next, we introduce infinitely many relation symbols of arity zero. The absence
-of argument terms does not imply that those relations are semantically
-equivalent to true or false. They can still make a statement about the domain of
-the relation. For :math:`n \in \mathbb{N} \cup \{\infty\}` we have constant
-relation symbols :math:`C_n` and :math:`\overline{C}_n`.
+Cardinality constraints are constant atomic formulas, built from relation
+symbols with arity 0. A cardinality constraint holds in a given theory if the
+cardinality of the corresponding domain satisfies the requirements imposed by
+the constraint. For instance, a constraint :math:`C_2` can be used to state that
+the domain has at least two elements. It holds in the field
+:math:`\mathbb{R}` but not in the field :math:`\mathbb{Z}/3`. A typical use case
+is the theory of :ref:`sets-index`, which requires infinitely many constant
+relation symbols :math:`C_n` for :math:`n \in \mathbb{N}` in order to admit
+quantifier elimination.
+
+The classes in the following table allow to realize cardinality constraints as
+their instances.
 
 .. table::
-  :widths: 10 10 12 10 10 10
+  :widths: 5 5 10 4 5
 
-  +------------------------+---------+---------------------------------+--------------------+------------------+---------+
-  | relation               | m-arity | in words                        | class              | interactive      | p-arity |
-  +========================+=========+=================================+====================+==================+=========+
-  | :math:`C_n`            | 0       | cardinality at least :math:`n`  | :py:class:`_C`     | :py:func:`C`     | 1       |
-  +------------------------+---------+---------------------------------+--------------------+------------------+---------+
-  | :math:`\overline{C}_n` | 0       | cardinality less than :math:`n` | :py:class:`_C_bar` | :py:func:`C_bar` | 1       |
-  +------------------------+---------+---------------------------------+--------------------+------------------+---------+
+  +------------------------+---------+---------------------------------+-------------+---------+
+  | relation               | m-arity | in words                        | class       | p-arity |
+  +========================+=========+=================================+=============+=========+
+  | :math:`C_n`            | 0       | cardinality at least :math:`n`  | :class:`C`  | 1       |
+  +------------------------+---------+---------------------------------+-------------+---------+
+  | :math:`\overline{C}_n` | 0       | cardinality less than :math:`n` | :class:`C_` | 1       |
+  +------------------------+---------+---------------------------------+-------------+---------+
 
-.. py:class:: logic1.atomlib.sympy._C
+.. class:: C
 
-  Bases: :py:class:`logic1.atomlib.sympy.Cardinality`
+  Bases: :class:`logic1.atomlib.sympy.Cardinality`
 
   A class for atomic formulas with relation :math:`C_n` for :math:`n \in
   \mathbb{N} \cup \{\infty\}`.
 
   # Class data attributes:
 
-  .. py:attribute:: func
-    :canonical: logic1.atomlib.sympy.func
-    :value: _C
+  .. attribute:: func
+    :value: C
 
     The relation symbol of the atomic formula.
 
-  .. py:attribute:: complement_func
-    :canonical: logic1.atomlib.sympy.complement_func
-    :value: _C_bar
+  .. attribute:: complement_func
+    :value: C_
 
-    The complement relation symbol :py:attr:`func`'.
-
-  .. py:attribute:: args = ()
-    :type: tuple
-
-    The tuple of arguments of the constructor :py:attr:`func`.
+    The complement relation symbol of :attr:`func`.
 
   # Instance data attributes:
 
-  .. py:attribute:: n
-    :type: int
+  .. attribute:: args
+    :type: tuple
 
-    The index :math:`n \in \mathbb{N} \cup \{\infty\}`.
+    The tuple of arguments of the constructor :attr:`func`, which equals ``(index,)``.
 
-  # Class methods:
+  .. property:: index
+    :type: int | sympy.core.numbers.Infinity
 
-  .. py:classmethod:: interactive_new(cls, *args)
+    The index :math:`n` of :math:C_n`, which is :attr:`args [0]`.
 
-    Construct instances of :py:class:`_C` dynamically checking `*args` and
-    raising TypeError with an informative message for invalid arguments.
+Infinity :math:`\infty` denotes the cardinal :math:`\aleph_0`. It is available
+as
 
-.. py:function:: logic1.atomlib.sympy.C(n) -> _C
+.. data:: oo
+  :value: sympy.oo
 
-  Convenient access to _C.interactive_new(n)
+Note that we are dealing with two different notions of arity here:
 
+m-arity:
+  From a mathematical viewpoint we have two families :math:`\{C_n\}_{n \in
+  \mathbb{N} \cup \{\infty\}}` and :math:`\{\overline{C}_n\}_{n \in \mathbb{N}
+  \cup \{\infty\}}` of relations, where each relation has aritiy 0.
 
-The idea is that the relation :math:`C_n` holds in its domain :math:`A` if and
-only if :math:`|A| \geq n`. To be precise, :math:`\infty` represents the
-cardinal :math:`\aleph_0`. Furthermore, :math:`\overline{C}_n` denotes the
-complement relation :math:`C_n'` of :math:`C_n`. For instance, :math:`C_{12}`
-holds in the field
-:math:`\mathbb{R}` but not in the field :math:`\mathbb{Z}/3`.
+p-arity:
+  From a Python viewpoint we have two classes :class:`C` and :class:`C_`.
+  Each class has an instance data attribute :data:`n`, which is a
+  non-negative integer or :data:`oo`. There is a corresponding constructor of
+  arity 1.
+
+We will encounter a similar situation with quantifiers in
+:ref:`first-order formulas <firstorder-index>` in the next section, where both
+the m-arity and the p-arity will be positive.
+
+Cardinality Constraints of the same class and with the same index are identical:
+
+.. doctest::
+
+    >>> from logic1.atomlib.sympy import C, oo
+    >>> a1 = C(0)
+    >>> a2 = C(0)
+    >>> a3 = C(oo)
+    >>> a1 is a2
+    True
+    >>> a1 == a3
+    False
 
 First-order Formulas
 ====================
@@ -333,28 +432,29 @@ First-order Formulas
 the following *logical* operators:
 
 .. table::
+  :widths: 5 5 6 6 5 5
 
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | logical operator             | m-arity | in words   | class                  | interactive      | p-arity | Python operator |
-  +==============================+=========+============+========================+==================+=========+=================+
-  | :math:`\bot`                 | 0       | false      | :py:class:`_F`         | :py:obj:`F`      | 0       |                 |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\top`                 | 0       | true       | :py:class:`_T`         | :py:obj:`T`      | 0       |                 |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\lnot`                | 1       | not        | :py:class:`Not`        | :py:func:`NOT`   | 1       | :py:obj:`~~`    |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\land`                | \*      | and        | :py:class:`And`        | :py:func:`AND`   | \*      | :py:obj:`&`     |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\lor`                 | \*      | or         | :py:class:`Or`         | :py:func:`OR`    | \*      | :py:obj:`|`     |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\longrightarrow`      | 2       | implies    | :py:class:`Implies`    | :py:func:`IMPL`  | 2       | :py:obj:`>>`    |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\longleftrightarrow`  | 2       | equivalent | :py:class:`Equivalent` | :py:func:`EQUIV` | 2       |                 |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\exists x`            | 1       | exists     | :py:class:`Ex`         | :py:func:`EX`    | 2       |                 |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
-  | :math:`\forall x`            | 1       | for all    | :py:class:`All`        | :py:func:`ALL`   | 2       |                 |
-  +------------------------------+---------+------------+------------------------+------------------+---------+-----------------+
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | operator                    | m-arity | in words   | class               | p-arity | short     |
+  +=============================+=========+============+=====================+=========+===========+
+  | :math:`\bot`                | 0       | false      | :class:`_F`         | 0       | :obj:`F`  |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\top`                | 0       | true       | :class:`_T`         | 0       | :obj:`T`  |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\lnot`               | 1       | not        | :class:`Not`        | 1       | :obj:`~~` |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\land`               | \*      | and        | :class:`And`        | \*      | :obj:`&`  |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\lor`                | \*      | or         | :class:`Or`         | \*      | :obj:`|`  |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\longrightarrow`     | 2       | implies    | :class:`Implies`    | 2       | :obj:`>>` |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\longleftrightarrow` | 2       | equivalent | :class:`Equivalent` | 2       |           |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\exists x`           | 1       | exists     | :class:`Ex`         | 2       |           |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
+  | :math:`\forall x`           | 1       | for all    | :class:`All`        | 2       |           |
+  +-----------------------------+---------+------------+---------------------+---------+-----------+
 
 Basic Operations on Formulas
 ============================
@@ -402,7 +502,7 @@ Transformations
   :noindex:
 
 This often allows to write uniform code
-for objects where the number or types of elements of :py:attr:`args` are not
+for objects where the number or types of elements of :attr:`args` are not
 known, in particular in recursions.
 
 .. autofunction:: logic1.firstorder.formula.Formula.to_distinct_vars
