@@ -20,7 +20,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.mathjax',
     'sphinx.ext.doctest',
-    'sphinx.ext.viewcode',
+    # 'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
     'sphinx_togglebutton'
 ]
@@ -31,6 +31,11 @@ exclude_patterns = []
 language = 'en'
 
 doctest_path = ['~/Documents/Dynamic/src/python/Logic1/logic1/logic1']
+
+autodoc_default_options = {
+    'member-order': 'bysource',
+    'show-inheritance': True
+}
 
 intersphinx_mapping = {'sympy': ('https://docs.sympy.org/latest', None)}
 
