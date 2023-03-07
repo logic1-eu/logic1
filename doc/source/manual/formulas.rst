@@ -405,6 +405,7 @@ Infinity :math:`\infty` denotes the cardinal :math:`\aleph_0`. It is available
 as
 
 .. data:: oo
+  :noindex:
   :value: sympy.oo
 
 Note that we are dealing with two different notions of arity here:
