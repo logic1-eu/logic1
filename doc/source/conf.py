@@ -53,12 +53,13 @@ html_logo = None
 html_static_path = ['_static']
 html_theme = 'sphinx_book_theme'
 html_theme_options = {'home_page_in_toc': True,
-                      'extra_navbar': None,
-                      'extra_footer': None,
+                      # 'extra_navbar': None,
+                      # 'extra_footer': None,
                       "repository_url":
                       "https://github.com/thomas-sturm/logic1",
                       "show_navbar_depth": 1,
                       "use_repository_button": True}
-html_title = '<span class="logo">Logic1</span>'
+# html_context = {"default_mode": "auto"}
+html_title = 'Logic1'
 
-pygments_style = 'tango'
+# pygments_style = 'tango'

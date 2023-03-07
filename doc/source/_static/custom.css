@@ -1,12 +1,31 @@
 @import url('https://fonts.googleapis.com/css2?family=Special+Elite&display=swap');
 
-.logo {
+.bd-sidebar-primary {
+    overflow: hidden;
+}
+
+.navbar-brand .logo__title {
   font-family:'Special Elite';
   font-size: var(--pst-font-size-h1);
-  font-weight:400;
+  font-weight:500;
   font-style:normal;
   font-optical-sizing:auto;
-  color: black;
-/*  color: color(srgb 0.20 0.15 0.10);*/
-/*  color: color(srgb 0.40 0.38 0.32);*/
+  color: var(--pst-color-muted);
+}
+
+/* anything related to the dark theme */
+html[data-theme="dark"] .bd-sidebar-primary {
+  border-right: 0.01px solid var(--pst-color-border);
+}
+
+html[data-theme="dark"] .sidebar-secondary-item {
+  border-left: 0.01px solid var(--pst-color-border);
+}
+
+html[data-theme="dark"] footer.bd-footer-content {
+  border-top: 0.01px solid #ccc;
+}
+
+html[data-theme="dark"] .bd-footer {
+  border-top: 0.00px solid var(--pst-color-border);
 }
