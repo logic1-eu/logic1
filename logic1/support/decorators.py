@@ -1,12 +1,13 @@
+"""The classproperty decorator has been adpopted from the Astropy library. See
+LICENSE in the toplevel directory for details.
+"""
+
 import functools
 import threading
 
 
 _NotFound = object()
 
-
-# The following classproperty decorator has been adpopted from the Astropy
-# library. See LICENSE in the toplevel directory for details.
 
 class classproperty(property):
     """

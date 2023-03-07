@@ -14,25 +14,43 @@ from ..support.decorators import classproperty
 
 
 class BooleanFormula(Formula):
-    """Boolean Formulas have a Boolean operator at the top level.
+    r"""A class whose instances are Boolean formulas in the sense that their
+    toplevel operator is one of the Boolean operators :math:`\lnot`,
+    :math:`\wedge`, :math:`\vee`, :math:`\longrightarrow`,
+    :math:`\longleftrightarrow`.
 
-    An operator of a Formula is either a quantifier Ex, All or a Boolean
-    operator And, Or, Not, Implies, Equivaelent, T, F. Note that members of
-    BooleanFormula start, in the sense of prefix notation, with a Boolean
-    operator but may have quantified subformulas deeper in the expression tree.
+    Note that members of :class:`BooleanFormula` may have subformulas with
+    other logical operators deeper in the expression tree.
     """
 
     # Class variables
-    latex_symbol: str
     latex_symbol_spacing = ' \\, '
-    print_style: str
-    text_symbol: str
+    """A class variable holding LaTeX spacing that comes after prefix operators
+    and around infix operators.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol_spacing = ' '
+    """A class variable holding spacing that comes after prefix operators
+    and around infix operators in string representation.
 
-    func: type[BooleanFormula]
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
 
-    # Instance variables
-    args: tuple[Formula, ...]
+    # The following would be abstract class variables, which are not available
+    # at the moment.
+    latex_symbol: str  #: :meta private:
+    text_symbol: str  #: :meta private:
+    print_style: str  #: :meta private:
+
+    func: type[BooleanFormula]  #: :meta private:
+    dual_func: type[BooleanFormula]  #: :meta private:
+
+    # Similarly the following would be an abstract instance variable:
+    args: tuple[Formula, ...]  #: :meta private:
 
     # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
@@ -48,6 +66,9 @@ class BooleanFormula(Formula):
         return (best_count, best_quantifiers)
 
     def get_any_atom(self) -> Optional[AtomicFormula]:
+        """Implements the abstract method :meth:`Formula.get_any_atom()
+        <.formula.Formula.get_any_atom>`.
+        """
         for arg in self.args:
             atom = arg.get_any_atom()
             if atom:
@@ -55,12 +76,18 @@ class BooleanFormula(Formula):
         return None
 
     def get_qvars(self) -> set:
+        """Implements the abstract method :meth:`Formula.get_qvars()
+        <.formula.Formula.get_qvars>`.
+        """
         qvars = set()
         for arg in self.args:
             qvars |= arg.get_qvars()
         return qvars
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Implements the abstract method :meth:`Formula.get_vars()
+        <.formula.Formula.get_vars>`.
+        """
         vars = GetVars()
         for arg in self.args:
             vars |= arg.get_vars(assume_quantified=assume_quantified)
@@ -99,19 +126,23 @@ class BooleanFormula(Formula):
         assert False
 
     def subs(self, substitution: dict) -> BooleanFormula:
-        """Substitution.
+        """Implements the abstract method :meth:`Formula.subs()
+        <.formula.Formula.subs>`.
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
     def to_cnf(self) -> Formula:
         """ Convert to Conjunctive Normal Form.
 
+
+
         >>> from logic1.atomlib.sympy import Eq, Ne
         >>> from sympy.abc import a
+        >>>
         >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_cnf()
         And(Or(Ne(a, 1), Eq(a, 2)), Or(Eq(a, 0), Ne(a, 1)))
         """
-        return Not(self).to_dnf().to_nnf(implicit_not=True)
+        return Not(self).to_dnf().to_nnf(_implicit_not=True)
 
     def _to_distinct_vars(self, badlist: set) -> BooleanFormula:
         return self.func(*(arg._to_distinct_vars(badlist)
@@ -122,6 +153,7 @@ class BooleanFormula(Formula):
 
         >>> from logic1.atomlib.sympy import Eq, Ne
         >>> from sympy.abc import a
+        >>>
         >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_dnf()
         Or(Ne(a, 1), And(Eq(a, 0), Eq(a, 2)))
         """
@@ -151,6 +183,9 @@ class BooleanFormula(Formula):
         return name(*xs, simplify=False)
 
     def transform_atoms(self, transformation: Callable) -> BooleanFormula:
+        """Implements the abstract method :meth:`Formula.transform_atoms
+        <.formula.Formula.transform_atoms>`.
+        """
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
 
@@ -175,16 +210,46 @@ class BooleanFormula(Formula):
 
 
 class Equivalent(BooleanFormula):
+    r"""A class whose instances are equivalences in the sense that their
+    toplevel operator represents the Boolean operator
+    :math:`\longleftrightarrow`.
+    """
 
     # Class variables
     latex_symbol = '\\longleftrightarrow'
-    print_precedence = 10
-    print_style = 'infix'
-    sympy_func = sympy.Equivalent
+    """A class variable holding a LaTeX symbol for :class:`Equivalent`.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '<-->'
+    """A class variable holding a representation of :class:`Equivalent`
+    suitable for string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    print_precedence = 10
+    """A class variable holding the precedence of :data:`latex_symbol` and
+    :data:`text_symbol` in LaTeX and string conversions.
+
+    This is compared with the corresponding `print_precedence` of other classes
+    for placing parentheses.
+    """
+
+    print_style = 'infix'
+    """A class variable indicating the use of of :data:`latex_symbol` and
+    :data:`text_symbol` as an infix operators in LaTeX and string conversions.
+    """
+
+    sympy_func = sympy.Equivalent  #: :meta private:
 
     @classproperty
     def func(cls):
+        """A class property yielding the class :class:`Equivalent` itself.
+        """
         return cls
 
     # Instance variables
@@ -192,12 +257,12 @@ class Equivalent(BooleanFormula):
 
     @property
     def lhs(self) -> Formula:
-        """The left-hand side of the Equivalence."""
+        """The left-hand side of the equivalence."""
         return self.args[0]
 
     @property
     def rhs(self) -> Formula:
-        """The right-hand side of the Equivalence."""
+        """The right-hand side of the equivalence."""
         return self.args[1]
 
     # Class methods
@@ -214,10 +279,12 @@ class Equivalent(BooleanFormula):
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
-        """Recursively simplify the Equivalence.
+        """Compare the parent method :meth:`Formula.simplify
+        <.formula.Formula.simplify>`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
+        >>>
         >>> e1 = Equivalent(~ Eq(x, y), F)
         >>> e1.simplify()
         Eq(x, y)
@@ -240,23 +307,55 @@ class Equivalent(BooleanFormula):
             return T
         return Equivalent(lhs, rhs)
 
-    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True) \
-            -> BooleanFormula | AtomicFormula:
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
+        """Implements the abstract method :meth:`Formula.to_nnf
+        <.formula.Formula.to_nnf>`.
+        """
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
-        return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
+        return tmp.to_nnf(to_positive=to_positive, _implicit_not=_implicit_not)
 
 
 class Implies(BooleanFormula):
+    r"""A class whose instances are equivalences in the sense that their
+    toplevel operator represents the Boolean operator :math:`\longrightarrow`.
+    """
 
     # Class variables
     latex_symbol = '\\longrightarrow'
-    print_precedence = 10
-    print_style = 'infix'
-    sympy_func = sympy.Implies
+    """A class variable holding a LaTeX symbol for :class:`Implies`.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '-->'
+    """A class variable holding a representation of :class:`Implies` suitable
+    for string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    print_precedence = 10
+    """A class variable holding the precedence of :data:`latex_symbol` and
+    :data:`text_symbol` in LaTeX and string conversions.
+
+    This is compared with the corresponding `print_precedence` of other classes
+    for placing parentheses.
+    """
+
+    print_style = 'infix'
+    """A class variable indicating the use of of :data:`latex_symbol` and
+    :data:`text_symbol` as an infix operators in LaTeX and string conversions.
+    """
+
+    sympy_func = sympy.Implies  #: :meta private:
 
     @classproperty
     def func(cls):
+        """A class property yielding the class :class:`Equivalent` itself.
+        """
         return cls
 
     # Instance variables
@@ -264,12 +363,12 @@ class Implies(BooleanFormula):
 
     @property
     def lhs(self) -> Formula:
-        """The left-hand side of the Implies."""
+        """The left-hand side of the implication."""
         return self.args[0]
 
     @property
     def rhs(self) -> Formula:
-        """The right-hand side of the Implies."""
+        """The right-hand side of the implication."""
         return self.args[1]
 
     # Class methods
@@ -285,6 +384,9 @@ class Implies(BooleanFormula):
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
+        """Compare the parent method :meth:`Formula.simplify
+        <.formula.Formula.simplify>`.
+        """
         if self.rhs is T:
             return self.lhs
         lhs_simplify = self.lhs.simplify(Theta=Theta)
@@ -302,37 +404,56 @@ class Implies(BooleanFormula):
             return T
         return Implies(lhs_simplify, rhs_simplify)
 
-    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True) \
-            -> BooleanFormula | AtomicFormula:
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
+        """Implements the abstract method :meth:`Formula.to_nnf
+        <.formula.Formula.to_nnf>`.
+        """
         if isinstance(self.rhs, Or):
             tmp = Or(Not(self.lhs), *self.rhs.args)
         else:
             tmp = Or(Not(self.lhs), self.rhs)
-        return tmp.to_nnf(implicit_not=implicit_not, to_positive=to_positive)
+        return tmp.to_nnf(to_positive=to_positive, _implicit_not=_implicit_not)
 
 
 class AndOr(BooleanFormula):
 
     # Class variables
     print_precedence = 50
+    """A class variable holding the precedence of the operators of instances of
+    :class:`AndOr` in LaTeX and string conversions.
+
+    This is compared with the corresponding `print_precedence` of other classes
+    for placing parentheses.
+    """
+
     print_style = 'infix'
+    """A class variable indicating the use of operators of instances of
+    :class:`AndOr` as infix in LaTeX and string conversions.
+    """
 
-    func: type[AndOr]
-    dual_func: type[AndOr]
+    # The following would be abstract class variables, which are not available
+    # at the moment.
+    func: type[AndOr]  #: :meta private:
+    dual_func: type[AndOr]  #: :meta private:
 
-    # Instance variables
-    args: tuple[Formula, ...]
+    # Similarly the following would be an abstract instance variable:
+    args: tuple[Formula, ...]  #: :meta private:
 
     # Instance methods
     def simplify(self, Theta=None):
-        """Simplification.
+        """Compare the parent method :meth:`Formula.simplify
+        <.formula.Formula.simplify>`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z))).simplify()
+        >>>
+        >>> f1 = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z)))
+        >>> f1.simplify()
         And(Eq(x, y), Eq(x, z), Eq(x, x + z))
-        >>> f = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
-        >>> f.simplify()
+        >>>
+        >>> f2 = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
+        >>> f2.simplify()
         Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
         """
         gAnd = And if self.func is And else Or
@@ -355,15 +476,16 @@ class AndOr(BooleanFormula):
             return gT
         return gAnd(*simplified_args)
 
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> AndOr:
-        """Convert to Negation Normal Form.
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> AndOr:
+        """Implements the abstract method :meth:`Formula.to_nnf
+        <.formula.Formula.to_nnf>`.
         """
-        func_nnf = self.dual_func if implicit_not else self.func
+        func_nnf = self.dual_func if _implicit_not else self.func
         args_nnf: list[Formula] = []
         for arg in self.args:
-            arg_nnf = arg.to_nnf(implicit_not=implicit_not,
-                                 to_positive=to_positive)
+            arg_nnf = arg.to_nnf(to_positive=to_positive,
+                                 _implicit_not=_implicit_not)
             if arg_nnf.func is func_nnf:
                 args_nnf += arg_nnf.args
             else:
@@ -433,29 +555,52 @@ class AndOr(BooleanFormula):
 
 
 class And(AndOr):
-    """Constructor for conjunctions of Formulas.
+    r"""A class whose instances are conjunctions in the sense that their
+    toplevel operator represents the Boolean operator
+    :math:`\wedge`.
 
     >>> from logic1.atomlib.sympy import Eq
     >>> from sympy.abc import x, y, z
+    >>>
     >>> And()
     T
+    >>>
     >>> And(Eq(0, 0))
     Eq(0, 0)
+    >>>
     >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
     And(Eq(x, 0), Eq(x, y), Eq(y, z))
     """
 
     # Class variables
     latex_symbol = '\\wedge'
-    sympy_func = sympy.And
+    """A class variable holding a LaTeX symbol for :class:`And`.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '&'
+    """A class variable holding a representation of :class:`And`
+    suitable for string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.And  #: :meta private:
 
     @classproperty
     def func(cls):
+        """A class property yielding the class :class:`And` itself.
+        """
         return cls
 
     @classproperty
     def dual_func(cls):
+        r"""A class property yielding the class :class:`Or`, which implements
+        the dual operator :math:`\vee` or :math:`\wedge`.
+        """
         return Or
 
     # Instance variables
@@ -487,28 +632,51 @@ class And(AndOr):
 
 
 class Or(AndOr):
-    """Constructor for disjunctions of Formulas.
+    r"""A class whose instances are disjunctions in the sense that their
+    toplevel operator represents the Boolean operator
+    :math:`\vee`.
 
     >>> from logic1.atomlib.sympy import Eq
+    >>>
     >>> Or()
     F
+    >>>
     >>> Or(Eq(1, 0))
     Eq(1, 0)
+    >>>
     >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
 
     # Class variables
     latex_symbol = '\\vee'
-    sympy_func = sympy.Or
+    """A class variable holding a LaTeX symbol for :class:`Or`.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '|'
+    """A class variable holding a representation of :class:`Or`
+    suitable for string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Or  #: :meta private:
 
     @classproperty
     def func(cls):
+        """A class property yielding the class :class:`Or` itself.
+        """
         return cls
 
     @classproperty
     def dual_func(cls):
+        r"""A class property yielding the class :class:`And`, which implements
+        the dual operator :math:`\wedge` or :math:`\vee`.
+        """
         return And
 
     # Instance variables
@@ -540,22 +708,55 @@ class Or(AndOr):
 
 
 class Not(BooleanFormula):
+    r"""A class whose instances are negated formulas in the sense that their
+    toplevel operator is the Boolean operator
+    :math:`\neg`.
+    """
 
     # Class variables
     latex_symbol = '\\neg'
-    print_precedence = 99
-    print_style = 'not'
-    sympy_func = sympy.Not
+    """A class variable holding a LaTeX symbol for :class:`Not`.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '~'
+    """A class variable holding a representation of :class:`Not`
+    suitable for string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Not  #: :meta private:
+
+    print_precedence = 99
+    """A class variable holding the precedence of the operators of instances of
+    :class:`Not` in LaTeX and string conversions.
+
+    This is compared with the corresponding `print_precedence` of other classes
+    for placing parentheses.
+    """
+
+    print_style = 'not'
+    """A class variable indicating the use of operators of instances of
+    :class:`Not` as prefix in LaTeX and string conversions.
+    """
 
     @classproperty
     def func(cls):
+        """A class property yielding the class :class:`Not` itself.
+        """
         return cls
 
     # Instance variables
+    args: tuple[Formula]
+
     @property
     def arg(self) -> Formula:
-        """The one argument of the Not."""
+        r"""The one argument of the operator :math:`\neg`.
+        """
         return self.args[0]
 
     # Class methods
@@ -569,11 +770,13 @@ class Not(BooleanFormula):
         self.args = (arg, )
 
     def simplify(self, Theta=None) -> Formula:
-        """Simplification.
+        """Compare the parent method :meth:`Formula.simplify
+        <.formula.Formula.simplify>`.
 
         >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
         >>> ~ All(x, Ex(y, f)).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
@@ -585,19 +788,21 @@ class Not(BooleanFormula):
             return T
         return involutive_not(arg_simplify)
 
-    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True) \
-            -> Formula:
-        """Negation normal form.
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> Formula:
+        """Implements the abstract method :meth:`Formula.to_nnf
+        <.formula.Formula.to_nnf>`.
 
         >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> f = All(x, Ex(y, And(Eq(x, y), T, Eq(x, y), Eq(x, z) & Eq(y, x))))
         >>> (~f).to_nnf()
         Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
         """
-        return self.arg.to_nnf(implicit_not=not implicit_not,
-                               to_positive=to_positive)
+        return self.arg.to_nnf(to_positive=to_positive,
+                               _implicit_not=not _implicit_not)
 
     def _to_pnf(self) -> dict:
         """Convert to Prenex Normal Form. self must be in NNF.

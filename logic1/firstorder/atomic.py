@@ -123,9 +123,9 @@ class AtomicFormula(Formula):
         """
         return self
 
-    def to_nnf(self, implicit_not: bool = False, to_positive: bool = True) \
-            -> Formula:
-        return self.to_complement() if implicit_not else self
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> Formula:
+        return self.to_complement() if _implicit_not else self
 
     @final
     def _to_pnf(self) -> dict:

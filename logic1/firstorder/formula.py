@@ -1,30 +1,4 @@
-"""Module for first-order formulas.
-
-There are classes Ex, All, Equivalent, Implies (>>), And (&), Or (|), Not (~),
-_T (T), and _F (F) which provide constructors for corresponding (sub)formulas.
-
-There is no language L in the sense of model theory specified. Application
-modules implement L as follows:
-
-1. Choose sets R of admissible relation symbols and F of admissible function
-   symbols, which includes constants.
-
-2. For each relation in R derive a class Rel from the Abstract Base Class
-   firstorder.AtomicFormula and implement at least the abstract methods
-   specified by firstorder.AtomicFormula.
-
-3. In combination with the first-order constructors above, the constructors Rel
-   allow the construction of first-order L-formulas. Similarly to Ex, All etc.
-   above, respective interactive constructors REL can provide error checking.
-
-The firstorder module imposes no restrictions on the representation of atomic
-formulas and terms. It is quite natural to represent relations similarly to the
-logical operators in the subclasses of firstorder.Formula.
-
-For the argument terms, sympy.Expr are certainly an option. This will support a
-super set of the function symbols F in L, in general. The interacitve
-constructors REL can check that only valid L-terms are used.
-"""
+"""Provides an abstract base class for first-order formulas."""
 
 from __future__ import annotations
 
@@ -43,21 +17,26 @@ if TYPE_CHECKING:
 
 class Formula(ABC):
     """An abstract base class for first-order formulas.
+
+    All other classes in the :mod:`.firstorder` package are derived from
+    :class:`Formula`.
     """
 
-    # Class variables
-    func: type[Formula]
-    sympy_func: type[sympy.Basic]
+    # The following would be abstract class variables, which are not available
+    # at the moment.
+    func: type[Formula]  #: :meta private:
+    sympy_func: type[sympy.core.basic.Basic]  #: :meta private:
 
-    # Instance variables
-    args: tuple
+    # Similaryly the following would be an abstract instance variable:
+    args: tuple  #: :meta private:
 
     # Instance methods
     @final
     def __and__(self, other: Formula) -> Formula:
-        """Override the ``&`` operator to apply logical And.
+        """Override the :obj:`&` operator to apply :class:`.boolean.And`.
 
         >>> from logic1.atomlib.sympy import Eq
+        >>>
         >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
         """
@@ -65,9 +44,10 @@ class Formula(ABC):
 
     @final
     def __invert__(self) -> Formula:
-        """Override the ``~`` operator to apply logical Not.
+        """Override the :obj:`~` operator to apply :class:`.boolean.Not`.
 
         >>> from logic1.atomlib.sympy import Eq
+        >>>
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
         """
@@ -75,10 +55,12 @@ class Formula(ABC):
 
     @final
     def __lshift__(self, other: Formula) -> Formula:
-        """Override ``>>`` operator to apply logical Implies.
+        """Override :obj:`<<` operator to apply :class:`.boolean.Implies`
+        with reversed sides.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
@@ -86,10 +68,11 @@ class Formula(ABC):
 
     @final
     def __or__(self, other: Formula) -> Formula:
-        """Override the ``|`` operator to apply logical Or.
+        """Override the :obj:`|` operator to apply :class:`.boolean.Or`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
@@ -97,22 +80,24 @@ class Formula(ABC):
 
     @final
     def __rshift__(self, other: Formula) -> Formula:
-        """Override the ``<<`` operator to apply logical Implies with reversed
-        sides.
+        """Override the :obj:`>>` operator to apply :class:`.boolean.Implies`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
         """
         return Implies(self, other)
 
     def __eq__(self, other: object) -> bool:
-        """Recursive equality of the formulas self and other.
+        """A recursive test for equality of the :class:`Formula` `self`
+        and the :class:`object` `other`.
 
-        This is *not* logical ``equal.``
+        Note that this is is not a logical operator for equality.
 
         >>> from logic1.atomlib.sympy import Ne
+        >>>
         >>> e1 = Ne(1, 0)
         >>> e2 = Ne(1, 0)
         >>> e1 == e2
@@ -127,6 +112,9 @@ class Formula(ABC):
         return self.func == other.func and self.args == other.args
 
     def __ne__(self, other: object) -> bool:
+        """A recursive test for unequality of the :class:`Formula` `self`
+        and the :class:`object` `other`.
+        """
         return not self == other
 
     def __hash__(self) -> int:
@@ -134,10 +122,14 @@ class Formula(ABC):
 
     @abstractmethod
     def __init__(self, *args) -> None:
+        """This abstract base class is not supposed to have instances
+        itself.
+        """
         ...
 
     def __repr__(self) -> str:
-        """Representation of the Formula suitable for use as an input.
+        """A Representation of the :class:`Formula` `self` that is suitable for
+        use as an input.
         """
         r = self.func.__name__
         r += '('
@@ -156,10 +148,11 @@ class Formula(ABC):
 
     @final
     def _repr_latex_(self) -> str:
-        r"""A LaTeX representation of the formula as it is used within jupyter
-        notebooks
+        r"""A LaTeX representation of the :class:`Formula` `self` as it is used
+        within jupyter notebooks.
 
         >>> from logic1 import F
+        >>>
         >>> F._repr_latex_()
         '$\\displaystyle \\bot$'
 
@@ -173,11 +166,13 @@ class Formula(ABC):
         """Count number of quantifier alternations.
 
         Returns the maximal number of quantifier alternations along a path in
-        the expression tree. Occurrence of quantified variables is not checked.
+        the expression tree. Occurrence of quantified variables is not checked,
+        so that quantifiers with unused variables are counted.
 
         >>> from logic1 import Ex, All, T
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
+        >>>
         >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
         2
         """
@@ -189,30 +184,18 @@ class Formula(ABC):
 
     @abstractmethod
     def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Return any atomic formula contained in self, None if there is none.
+        """Return any atomic formula contained in *self*, or None if there is
+        none.
 
-        A typical use cass is getting access to methods of classes derived from
-        AtomicFormula elsewhere.
-        """
-        ...
+        A typical use case is getting access to static methods of classes
+        derived from :class:`.atomic.AtomicFormula` elsewhere.
 
-    @abstractmethod
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Get variables.
-
-        >>> from logic1 import Ex, All
+        >>> from logic1 import Ex, And
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-
-        >>> f = Eq(3 * x, 0) >> All(z, All(x,
-        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
-        >>> f.get_vars().free == {x}
-        True
-
-        >>> f.get_vars().bound == {x, y}
-        True
-
-        >>> z not in f.get_vars().all
+        >>>
+        >>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
+        >>> isinstance(f.var, f.get_any_atom().variable_type())
         True
         """
         ...
@@ -221,22 +204,57 @@ class Formula(ABC):
     def get_qvars(self) -> set:
         """The set of all variables that are quantified in self.
 
-        This should not be confused with bound ocurrences of variables. Compare
-        the Formula.get_vars() method.
-
         >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b, c, x, y, z
+        >>>
         >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
         True
+
+        Note that the mere quantification of a variable does not establish a
+        bound ocurrence of that variable. Compare :meth:`get_vars`.
+        """
+        ...
+
+    @abstractmethod
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Extract all variables occurring in *self*.
+
+        The result is an instance of :class:`GetVars
+        <logic1.support.containers.GetVars>`, which extract certain subsects of
+        variables as a :class:`set`.
+
+        >>> from logic1 import Ex, All
+        >>> from logic1.atomlib.sympy import Eq
+        >>> from sympy.abc import x, y, z
+        >>>
+        >>> # Variables with free occurrences:
+        >>> f = Eq(3 * x, 0) >> All(z, All(x,
+        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+        >>> f.get_vars().free == {x}
+        True
+        >>>
+        >>> # Variables with bound occurrences:
+        >>> f.get_vars().bound == {x, y}
+        True
+        >>>
+        >>> # All occurring variables:
+        >>> z not in f.get_vars().all
+        True
+
+        Note that following the common definition in logic, *occurrence* refers
+        to the occurrence in a term. Appearances of variables as a quantified
+        variables without use in any term are not considered. Compare
+        :meth:`get_qvars`.
         """
         ...
 
     def simplify(self, Theta=None) -> Formula:
-        """Identity as a default implemenation of a simplifier for formulas.
+        """Fast simplification. The result is equivalent to `self`.
 
-        This should be overridden in the majority of the classes that
-        are finally instantiated.
+        Primary simplification goals are the elimination of occurrences of
+        :data:`.truth.T` and :data:`.truth.F` and of occurrences of equal
+        subformulas as siblings in the expression tree.
         """
         return self
 
@@ -248,25 +266,26 @@ class Formula(ABC):
 
     @abstractmethod
     def subs(self, substitution: dict) -> Self:
-        """Substitution.
+        """Substitution of terms for variables.
 
-        >>> from logic1 import push, pop, Ex
+        >>> from logic1 import Ex
+        >>> from logic1.support import renaming
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b, c, x, y, z
-        >>> push()
-
-        >>> Ex(x, Eq(x, a)).subs({x: a})
+        >>> renaming.push()  # temporarily create a fresh counter for renaming
+        >>>
+        >>> f = Ex(x, Eq(x, a))
+        >>> f.subs({x: a})
         Ex(x, Eq(x, a))
-
-        >>> f = Ex(x, Eq(x, a)).subs({a: x})
-        >>> g = Ex(x, f & Eq(b, 0))
-        >>> g
-        Ex(x, And(Ex(x_R1, Eq(x_R1, x)), Eq(b, 0)))
-
+        >>>
+        >>> f.subs({a: x})
+        Ex(x_R1, Eq(x_R1, x))
+        >>>
+        >>> g = Ex(x, _ & Eq(b, 0))
         >>> g.subs({b: x})
         Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
-
-        >>> pop()
+        >>>
+        >>> renaming.pop()  # restore renaming counter
         """
         ...
 
@@ -274,21 +293,27 @@ class Formula(ABC):
     def to_distinct_vars(self) -> Self:
         """Convert to equivalent formulas with distinct variables.
 
-        Bound variables are renamed such that that set of all bound
-        variables is disjoint from the set of all free variables.
-        Furthermore, each bound variables occurs with one and only one
-        quantifier.
+        Bound variables are renamed such that that set of all bound variables
+        is disjoint from the set of all free variables. Furthermore, each bound
+        variable in the result occurs with one and only one quantifier.
 
-        >>> from logic1 import push, pop, Ex, All, T
+        >>> from logic1 import Ex, All, T
+        >>> from logic1.support import renaming
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
-        >>> push()
+        >>> renaming.push()  # temporarily create a fresh counter for renaming
+        >>>
         >>> f0 = All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T)))
         >>> f = Eq(x, y) & Ex(x, Eq(x, y) & f0)
+        >>> f
+        And(Eq(x, y), Ex(x, And(Eq(x, y),
+            All(z, Ex(y, And(Eq(x, y), Eq(y, z), Ex(x, T)))))))
+        >>>
         >>> f.to_distinct_vars()
         And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
             All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
-        >>> pop()
+        >>>
+        >>> renaming.pop()  # restore renaming counter
         """
         # Recursion starts with a badlist (technically a set) of all free
         # variables.
@@ -305,24 +330,33 @@ class Formula(ABC):
 
     @final
     def to_latex(self) -> str:
-        """Convert to LaTeX representation.
+        """Convert to a LaTeX representation.
         """
         return self._sprint(mode='latex')
 
     @abstractmethod
-    def to_nnf(self, implicit_not: bool = False,
-               to_positive: bool = True) -> Formula:
+    def to_nnf(self, to_positive: bool = True,
+               _implicit_not: bool = False) -> Formula:
         """Convert to Negation Normal Form.
 
-        An NNF is a formula where logical Not is only applied to atomic
-        formulas and thruth values. The only other allowed Boolean operators
-        are And and Or. Besides those Boolean operators, we also admit
-        quantifiers Ex and All. If the input is quanitfier-free, to_nnf will
-        not introduce any quanitfiers.
+        A Negation Normal Form (NNF) is an equivalent formula within which the
+        application of :class:`.boolean.Not` is restricted to atomic formulas,
+        i.e., instances of :class:`.atomic.AtomicFormula`, and truth values
+        :data:`.truth.T` and :data:`.truth.F`. The only other operators
+        admitted are :class:`.boolean.And`, :class:`.boolean.Or`,
+        :class:`.quantified.Ex`, and :class:`.quantified.All`.
+
+        If the input is quanitfier-free, :meth:`to_nnf` will not introduce any
+        quanitfiers.
+
+        If `to_positive` is `True`, :class:`.boolean.Not` is eliminated by
+        replacing relation symbols with their complements. The result is then
+        even a Positive Normal Form.
 
         >>> from logic1 import Ex, Equivalent, T
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, y
+        >>>
         >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
         >>> f.to_nnf()
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
@@ -332,22 +366,32 @@ class Formula(ABC):
 
     @final
     def to_pnf(self, prefer_universal: bool = False,
-               is_admissible: bool = False) -> Formula:
+               is_nnf: bool = False) -> Formula:
         """Convert to Prenex Normal Form.
 
-        A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) where all
-        quantifiers Ex and All stand at the beginning of the formula. The
-        method minimizes the number of quantifier alternations in the prenex
-        block. Results starting with an existential quantifier are prefered.
-        This can be changed by passing prefer_universal=True. The argument
-        is_nnf can be used as a hint that self is already in NNF.
+        A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
+        quantifiers :class:`.quantified.Ex` and :class:`.quantified.All` stand
+        at the beginning of the formula. The method used here minimizes the
+        number of quantifier alternations in the prenex block [Burhenne90].
 
-        Burhenne p.88:
+        If the minimal number of alternations in the result can be achieved
+        with both :class:`.quantified.Ex` and :class:`.quantified.All` as the
+        first quantifier in the result, then the former is preferred. This
+        preference can be changed with a keyword argument
+        `prefer_universal=True`.
 
-        >>> from logic1 import push, pop, Ex, All, T, F
+        An keyword argument `is_nnf=True` indicates that `self` is already in
+        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
+        be useful in time-critical situations.
+
+        Example from p.88 in [Burhenne90]_:
+
+        >>> from logic1 import Ex, All, T, F
+        >>> from logic1.support import renaming
         >>> from logic1.atomlib.sympy import Eq
         >>> import sympy
-        >>> push()
+        >>>
+        >>> renaming.push()  # temporarily create a fresh counter for renaming
         >>> x = sympy.symbols('x:8')
         >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
         >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
@@ -355,13 +399,17 @@ class Formula(ABC):
         >>> (f1 & f2 & f3).to_pnf()
         All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
             And(T, F, Eq(x0, 0)))))))))
-        >>> pop()
+        >>> renaming.pop()  # restore renaming counter
 
-        Derived from redlog.tst:
+        Derived from the `rlpnf` test in `redlog.tst
+        <https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/rl/redlog.tst>`_:
 
-        >>> push()
-        >>> from logic1 import Equivalent, And, Or
+        >>> from logic1 import Ex, All, Equivalent, And, Or
+        >>> from logic1.support import renaming
+        >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import a, b, y
+        >>>
+        >>> renaming.push()
         >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
         >>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
         >>> Equivalent(f1, f2).to_pnf()
@@ -369,17 +417,23 @@ class Formula(ABC):
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
                    And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
-        >>> pop()
-
-        >>> push()
+        >>> renaming.pop()
+        >>>
+        >>> renaming.push()
         >>> Equivalent(f1, f2).to_pnf(prefer_universal=True)
         All(y_R2, Ex(y_R1,
             And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
                 Or(And(Ne(y_R2, a), Ne(a, 0)),
                    And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
-        >>> pop()
+        >>> renaming.pop()
+
+        .. [Burhenne90]
+               Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
+               Quantorenelimination für lineare reelle Probleme.
+               Diploma Thesis, University of Passau, Germany, 1990
+
         """
-        if is_admissible:
+        if is_nnf:
             phi = self
         else:
             phi = self.to_nnf().to_distinct_vars()
@@ -399,37 +453,36 @@ class Formula(ABC):
         """
         raise NotImplementedError(f'{self.func} is not an NNF operator')
 
-    def to_sympy(self, **kwargs) -> sympy.Basic:
-        """Provide a sympy representation of the Formula if possible.
+    def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:
+        """Convert to SymPy representation if possible.
 
-        Subclasses that have no match in sympy can raise NotImplementedError.
+        Subclasses that have no match in Symy raise NotImplementedError. All
+        keyword arguments are passed on to the SymPy constructors.
 
         >>> from logic1 import Equivalent, T
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
+        >>>
         >>> e1 = Equivalent(Eq(x, y), Eq(x + 1, y + 1))
-        >>> e1
-        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1)
         <class 'logic1.firstorder.boolean.Equivalent'>
+        >>>
         >>> e1.to_sympy()
         Equivalent(Eq(x, y), Eq(x + 1, y + 1))
         >>> type(e1.to_sympy())
         Equivalent
-
+        >>>
         >>> e2 = Equivalent(Eq(x, y), Eq(y, x))
-        >>> e2
-        Equivalent(Eq(x, y), Eq(y, x))
         >>> e2.to_sympy()
         True
-
+        >>>
         >>> e3 = T
         >>> e3.to_sympy()
         Traceback (most recent call last):
         ...
         NotImplementedError:
             sympy does not know <class 'logic1.firstorder.truth._T'>
-
+        >>>
         >>> e4 = All(x, Ex(y, Eq(x, y)))
         >>> e4.to_sympy()
         Traceback (most recent call last):
@@ -442,10 +495,20 @@ class Formula(ABC):
 
     @abstractmethod
     def transform_atoms(self, transformation: Callable) -> Self:
+        """Apply `transformation` to all atomic formulas.
+
+        Replaces each atomic subformula of `self` with the :class:`Formula`
+        `transformation(self)`.
+
+        >>> from logic1 import And
+        >>> from logic1.atomlib.sympy import Eq, Lt
+        >>> from sympy.abc import x, y, z
+        >>>
+        >>> f = Eq(x, y) & Lt(y, z)
+        >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
+        And(Eq(x - y, 0), Lt(y - z, 0))
+        """
         ...
-
-
-latex = Formula.to_latex
 
 
 # The following imports are intentionally late to avoid circularity.
