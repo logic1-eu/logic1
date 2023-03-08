@@ -191,3 +191,8 @@ Module :mod:`atomic <logic1.firstorder.atomic>`
 .. autoclass:: AtomicFormula
   :members:
   :undoc-members:
+
+  .. property:: func
+    :classmethod:
+
+    A class property yielding this class or the derived subclass itself.

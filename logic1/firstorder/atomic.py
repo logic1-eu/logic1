@@ -17,14 +17,37 @@ class AtomicFormula(Formula):
 
     # Class variables
     latex_symbol_spacing = ' '
-    print_precedence = 99
+    """A class variable holding LaTeX spacing that goes around infix operators.
+
+    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
+    which is in turn used for the output in Jupyter notebooks.
+    """
+
     text_symbol_spacing = ' '
+    """A class variable holding spacing that goes around infix operators in
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with :func:`str` or
+    implicitly with :func:`print`.
+    """
+
+    print_precedence = 99
+    """A class variable holding the precedence of :data:`latex_symbol` and
+    :data:`text_symbol` in LaTeX and string conversions.
+
+    This is compared with the corresponding `print_precedence` of other classes
+    for placing parentheses.
+    """
 
     @classproperty
     def func(cls):
+        """A class property yielding this class or the derived subclass itself.
+        """
         return cls
 
-    complement_func: type[AtomicFormula]
+    # The following would be an abstract class property, which is not available
+    # at the moment.
+    complement_func: type[AtomicFormula]  #: :meta private:
 
     # Instance variables
     args: tuple
@@ -33,32 +56,49 @@ class AtomicFormula(Formula):
     @staticmethod
     @abstractmethod
     def term_type() -> Any:
+        """The Python type of terms of the respective subclass of
+        :class:`AtomicFormula`.
+        """
         ...
 
     @staticmethod
     @abstractmethod
     def term_get_vars(term: Any) -> set:
+        """Extract the set of variables occurring in `term`.
+        """
         ...
 
     @staticmethod
     @abstractmethod
     def term_to_latex(term: Any) -> str:
+        """Convert :data:`term` to LaTeX.
+        """
         ...
 
     @staticmethod
     @abstractmethod
-    def term_to_sympy(term: Any) -> sympy.Basic:
+    def term_to_sympy(term: Any) -> sympy.core.basic.Basic:
+        """Convert `term` to SymPy.
+        """
         ...
 
     # Static methods on variables
     @staticmethod
     @abstractmethod
     def variable_type() -> Any:
+        """The Python type of variables in terms of the respective subclass of
+        :class:`AtomicFormula`.
+        """
         ...
 
     @staticmethod
     @abstractmethod
     def rename_var(variable: Any) -> Any:
+        """Return a fresh variable for replacing `variable` in the course of
+        renaming.
+
+        Compare :meth:`.Formula.to_distinct_vars`, :meth:`.Formula.to_pnf`.
+        """
         ...
 
     # Instance methods
@@ -71,42 +111,35 @@ class AtomicFormula(Formula):
 
     @final
     def get_any_atom(self) -> Self:
+        """Implements the abstract method :meth:`Formula.get_any_atom()
+        <.formula.Formula.get_any_atom>`.
+        """
         return self
 
     @final
     def get_qvars(self) -> set:
+        """Implements the abstract method :meth:`Formula.get_qvars()
+        <.formula.Formula.get_qvars>`.
+        """
         return set()
-
-    @abstractmethod
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        ...
-
-    @abstractmethod
-    def _sprint(self, mode: str) -> str:
-        ...
-
-    @abstractmethod
-    def subs(self, substitution: dict) -> Self:
-        ...
 
     @final
     def to_cnf(self) -> Self:
         """ Convert to Conjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a, b
+        >>> from sympy.abc import a
+        >>>
         >>> Eq(a, 0).to_cnf()
         Eq(a, 0)
         """
         return self
 
     @final
-    def to_complement(self, conditional: bool = True) -> AtomicFormula:
-        # Do not pass on but check conditional in order to avoid construction
-        # in case of False.
-        if conditional:
-            return self.complement_func(*self.args)
-        return self
+    def to_complement(self) -> AtomicFormula:
+        """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
+        """
+        return self.complement_func(*self.args)
 
     @final
     def _to_distinct_vars(self, badlist: set) -> Self:
@@ -117,7 +150,8 @@ class AtomicFormula(Formula):
         """ Convert to Disjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a, b
+        >>> from sympy.abc import a
+        >>>
         >>> Eq(a, 0).to_dnf()
         Eq(a, 0)
         """
@@ -125,6 +159,9 @@ class AtomicFormula(Formula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
+        """Implements the abstract method :meth:`Formula.to_nnf
+        <.formula.Formula.to_nnf>`.
+        """
         return self.to_complement() if _implicit_not else self
 
     @final
@@ -145,11 +182,14 @@ class AtomicFormula(Formula):
 
     @final
     def to_sympy(self, **kwargs) -> sympy.Basic:
-        """Override Formula.to_sympy() to prevent recursion into terms
+        """Override :meth:`.Formula.to_sympy` to prevent recursion into terms.
         """
         sympy_terms = (self.__class__.term_to_sympy(arg) for arg in self.args)
         return self.__class__.sympy_func(*sympy_terms, **kwargs)
 
     @final
     def transform_atoms(self, transformation: Callable) -> Self:
+        """Implements the abstract method :meth:`Formula.transform_atoms
+        <.formula.Formula.transform_atoms>`.
+        """
         return transformation(self)
