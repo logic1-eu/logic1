@@ -3,11 +3,11 @@
 
 from __future__ import annotations
 
-from typing import ClassVar, Union
+from typing import Any, ClassVar, Union
 
 import sympy
 
-from ..firstorder import atomic
+from .. import firstorder
 from ..firstorder import T, F
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
@@ -26,35 +26,55 @@ class TermMixin():
 
     @staticmethod
     def term_type() -> type[Term]:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.term_type`.
+        """
         return Term
 
     @staticmethod
     def term_get_vars(term: Term) -> set[Variable]:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.term_get_vars`.
+        """
         return sympy.S(term).atoms(Variable)
 
     @staticmethod
     def term_to_latex(term: Term) -> str:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.term_to_latex`.
+        """
         return sympy.latex(term)
 
     @staticmethod
     def term_to_sympy(term: Term) -> sympy.Basic:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.term_to_sympy`.
+        """
         return term
 
     @staticmethod
     def variable_type() -> type[Variable]:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.variable_type`.
+        """
         return Variable
 
     @staticmethod
     def rename_var(variable: Variable) -> Variable:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.rename_var`.
+        """
         return rename(variable)
 
 
-class AtomicFormula(TermMixin, atomic.AtomicFormula):
-    """Atomic Formula with Sympy Terms. All terms are sympy.Expr.
+class AtomicFormula(TermMixin, firstorder.AtomicFormula):
+    """Atomic Formula with Sympy Terms. All terms are :class:`sympy.Expr`.
     """
 
     # Instance methods
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
+        """
         all_vars = set()
         for term in self.args:
             all_vars |= term.atoms(sympy.Symbol)
@@ -62,24 +82,30 @@ class AtomicFormula(TermMixin, atomic.AtomicFormula):
                        bound=all_vars & assume_quantified)
 
     def subs(self, substitution: dict) -> AtomicFormula:
+        """Implements the abstract method :meth:`.firstorder.Formula.subs`.
+        """
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
         return self.func(*args)
 
 
 class BinaryAtomicFormula(AtomicFormula):
-    """A base class for atomic formulas obtained from binary relations.
+    r"""A class whose instances are binary formulas in the sense that both
+    their m-arity and their p-arity is 2.
 
-    The binary relation R is available as both an instance property and a class
-    property of the respective derived classes:
+    Let `R` be a subclass of :class:`BinaryAtomicFormula` implementing atomic
+    formulas with a binary relation symbol :math:`r`. For instance, if `R` is
+    :class:`Eq`, then :math:`r` stands for the equality relation :math:`=` in
+    the following discussion:
 
     >>> Eq(0, 0).func
     <class 'logic1.atomlib.sympy.Eq'>
     >>> Eq.func
     <class 'logic1.atomlib.sympy.Eq'>
 
-    Assume that R is defined on a Cartesian product P. Then the complement
-    relation of R is R' = P - R.  It is avaialable as both an instance and a
-    class property `complement_func`, e.g.:
+    Assume that :math:`r` is defined on a domain :math:`D`. Then the
+    *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
+    \setminus r`. It is avaialable as a class property `R.complement_func`,
+    e.g.:
 
     >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
     >>> tuple(r.complement_func for r in rels)
@@ -90,13 +116,14 @@ class BinaryAtomicFormula(AtomicFormula):
      <class 'logic1.atomlib.sympy.Le'>,
      <class 'logic1.atomlib.sympy.Ge'>)
 
-    Since R'(s, t) is equivalent to Not(R(s, t)), the availability of
-    complement relations is relevant for the computation of positive negation
-    normal forms.
+    Since :math:`\overline{r}(s, t)` is equivalent to :math:`\neg r(s, t)`, the
+    availability of complement relations is relevant for the computation of
+    positive negation normal forms; compare :meth:`.firstorder.Formula.to_nnf`
+    with keyword argument `to_positive=True`.
 
-    If R is defined on S x T, then the converse relation R ** (-1) of R is
-    defined as R ** (-1) = { (x, y) in T x S | (y, x) in R }. It is avaialable
-    as both an instance and a class property `converse_func`, e.g.:
+    The *converse relation* of :math:`r` is defined as
+    :math:`r^{-1} = \{ (x, y) \in D : (y, x) \in r \}`.
+    It is avaialable as a class property `R.converse_func`, e.g.:
 
     >>> tuple(r.converse_func for r in rels)
     (<class 'logic1.atomlib.sympy.Eq'>,
@@ -108,9 +135,10 @@ class BinaryAtomicFormula(AtomicFormula):
 
     The converse relation is the inverse with respect to composition.
 
-    Finally, the dual relation (R') ** (-1) of R is availalble as both an
-    instance and a class property `dual_func`. The dual (R') ** (-1) generally
-    equals (R ** (-1))', e.g.:
+    Finally, the *dual relation* of :math:`r` is defined as
+    :math:`\overline{r}^{-1}`. It is available as a class property
+    `R.dual_func`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
+    e.g.:
 
     >>> tuple(r.dual_func for r in rels)
     (<class 'logic1.atomlib.sympy.Ne'>,
@@ -124,12 +152,12 @@ class BinaryAtomicFormula(AtomicFormula):
     >>> all(r.dual_func == r.converse_func.complement_func for r in rels)
     True
 
-    In the context of orderings, dualization turns ``strict`` inequalities into
-    ``weak`` inequalities, and vice versa. Note that we also have duality and
+    In the context of orderings, dualization turns strict inequalities into
+    weak inequalities, and vice versa. Note that we also have duality and
     corresponding properties with Boolean functions, which is defined
     differently.
 
-    All those operators are involutive:
+    All those operators on relations are involutive:
 
     >>> all(r.complement_func.complement_func == r for r in rels)
     True
@@ -139,27 +167,35 @@ class BinaryAtomicFormula(AtomicFormula):
     True
     """
 
-    # Class variables
-    latex_symbol: ClassVar[str]
-    text_symbol: ClassVar[str]
-
     @classproperty
     def dual_func(cls):
-        """The dual relation.
+        """A class property yielding the dual class of this class or of the
+        derived subclass.
+
+        There is an implicit assumption that there are abstract class
+        properties `complement_func` and `converse_func` specified, which is
+        technically not possible at the moment.
         """
         return cls.complement_func.converse_func
 
-    # Instance variables
+    # The following would be abstract class variables, which are not available
+    # at the moment.
+    latex_symbol: str  #: :meta private:
+    text_symbol: str  #: :meta private:
+
+    # Similarly the following would be an abstract instance variable:
     args: tuple[Term, Term]
 
     @property
     def lhs(self) -> Term:
-        """The left-hand side of the BinaryAtomicFormula."""
+        """The left-hand side of the :class:`BinaryAtomicFormula`.
+        """
         return self.args[0]
 
     @property
     def rhs(self) -> Term:
-        """The right-hand side of the BinaryAtomicFormula."""
+        """The right-hand side of the :class:`BinaryAtomicFormula`.
+        """
         return self.args[1]
 
     # Instance methods
@@ -190,10 +226,12 @@ class BinaryAtomicFormula(AtomicFormula):
 
 
 class Eq(BinaryAtomicFormula):
-    """Represent equations as atomic formulas.
+    """A class whose instances are equations in the sense that their toplevel
+    operator represents the relation symbol :math:`=`.
 
     >>> from sympy import exp, I, pi
     >>> from sympy.abc import t
+    >>>
     >>> equation = Eq(exp(t * I * pi, evaluate=False), -1)
     >>> equation
     Eq(exp(I*pi*t), -1)
@@ -205,155 +243,333 @@ class Eq(BinaryAtomicFormula):
 
     # Class variables
     latex_symbol = '='
-    sympy_func = sympy.Eq
+    """A class variable holding a LaTeX symbol for :class:`Eq`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '=='
+    """A class variable holding a representation of :class:`Eq` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Eq  #: :meta private:
 
     func: type[Eq]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Ne of Eq.
+        """A class property yielding the complement class :class:`Ne` of
+        :class:'Eq'.
         """
         return Ne
 
     @classproperty
     def converse_func(cls):
-        """The converse relation Eq of Eq.
+        """A class property yielding the converse class :class:`Eq` of
+        :class:'Eq'.
         """
         return Eq
 
     # Instance methods
     def simplify(self, Theta=None):
+        """Compare the parent method :meth:`.firstorder.Formula.simplify`.
+
+        >>> from sympy.abc import x, y
+        >>>
+        >>> Eq(x, x)
+        Eq(x, x)
+        >>> Eq(x, x).simplify()
+        T
+        >>> Eq(x, y).simplify()
+        Eq(x, y)
+        """
         if self.lhs == self.rhs:
             return T
         return self
 
 
 class Ne(BinaryAtomicFormula):
-    """
+    r"""A class whose instances are inequations in the sense that their
+    toplevel operator represents the relation symbol :math:`\neq`.
+
     >>> Ne(1, 0)
     Ne(1, 0)
     """
 
     # Class variables
     latex_symbol = '\\neq'
-    sympy_func = sympy.Ne
+    """A class variable holding a LaTeX symbol for :class:`Ne`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '!='
+    """A class variable holding a representation of :class:`Ne` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Ne  #: :meta private:
 
     func: type[Ne]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Eq of Ne.
+        """A class property yielding the complement class :class:`Eq` of
+        :class:'Ne'.
         """
         return Eq
 
     @classproperty
     def converse_func(cls):
+        """A class property yielding the converse class :class:`Ne` of
+        :class:'Ne'.
+        """
         return Ne
 
     # Instance methods
     def simplify(self, Theta=None):
+        """Compare the parent method :meth:`.firstorder.Formula.simplify`.
+
+        >>> from sympy.abc import x, y
+        >>>
+        >>> Ne(x, x)
+        Ne(x, x)
+        >>> Ne(x, x).simplify()
+        F
+        >>> Ne(x, y).simplify()
+        Ne(x, y)
+        """
         if self.lhs == self.rhs:
             return F
         return self
 
 
 class Ge(BinaryAtomicFormula):
+    r"""A class whose instances are inequalities where the toplevel operator
+    represents the relation symbol :math:`\geq`.
+
+    >>> Ge(1, 0)
+    Ge(1, 0)
+    """
 
     # Class variables
     latex_symbol = '\\geq'
-    sympy_func = sympy.Ge
+    """A class variable holding a LaTeX symbol for :class:`Ge`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '>='
+    """A class variable holding a representation of :class:`Ge` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Ge  #: :meta private:
 
     func: type[Ge]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Lt of Ge.
+        """A class property yielding the complement class :class:`Lt` of
+        :class:'Ge'.
         """
         return Lt
 
     @classproperty
     def converse_func(cls):
+        """A class property yielding the converse class :class:`Le` of
+        :class:'Ge'.
+        """
         return Le
 
 
 class Le(BinaryAtomicFormula):
+    r"""A class whose instances are inequalities where the toplevel operator
+    represents the relation symbol :math:`\leq`.
+
+    >>> Le(1, 0)
+    Le(1, 0)
+    """
 
     # Class variables
     latex_symbol = '\\leq'
-    sympy_func = sympy.Le
+    """A class variable holding a LaTeX symbol for :class:`Le`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '<='
+    """A class variable holding a representation of :class:`Le` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Le  #: :meta private:
 
     func: type[Le]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Gt of Le.
+        """A class property yielding the complement class :class:`Gt` of
+        :class:'Le'.
         """
         return Gt
 
     @classproperty
     def converse_func(cls):
+        """A class property yielding the converse class :class:`Ge` of
+        :class:'Le'.
+        """
         return Ge
 
 
 class Gt(BinaryAtomicFormula):
-    """A class holding binary atomic formulas with the relation `>`.
+    r"""A class whose instances are inequalities where the toplevel operator
+    represents the relation symbol :math:`>`.
+
+    >>> Gt(1, 0)
+    Gt(1, 0)
     """
     # Class variables
     latex_symbol = '>'
-    sympy_func = sympy.Gt
+    """A class variable holding a LaTeX symbol for :class:`Gt`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '>'
+    """A class variable holding a representation of :class:`Gt` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Gt  #: :meta private:
 
     func: type[Gt]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Le of Gt.
+        """A class property yielding the complement class :class:`Le` of
+        :class:'Gt'.
         """
         return Le
 
     @classproperty
     def converse_func(cls):
+        """A class property yielding the converse class :class:`Lt` of
+        :class:'Gt'.
+        """
         return Lt
 
 
 class Lt(BinaryAtomicFormula):
+    r"""A class whose instances are inequalities where the toplevel operator
+    represents the relation symbol :math:`<`.
+
+    >>> Lt(1, 0)
+    Lt(1, 0)
+    """
 
     # Class variables
     latex_symbol = '<'
-    sympy_func = sympy.Lt
+    """A class variable holding a LaTeX symbol for :class:`Lt`.
+
+    This is used with :meth:`.firstorder.Formula.to_latex`, which is in turn
+    used for the output in Jupyter notebooks.
+    """
+
     text_symbol = '<'
+    """A class variable holding a representation of :class:`Lt` suitable for
+    string representation.
+
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
+    """
+
+    sympy_func = sympy.Lt  #: :meta private:
 
     func: type[Lt]
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation Ge of Lt.
+        """A class property yielding the complement class :class:`Ge` of
+        :class:'Lt'.
         """
         return Ge
 
     @classproperty
     def converse_func(cls):
+        """A class property yielding the converse class :class:`Gt` of
+        :class:'Lt'.
+        """
         return Gt
 
 
-class Cardinality(AtomicFormula):
-
+class IndexedConstantAtomicFormula(AtomicFormula):
+    r"""A class whose instances form a family of atomic formulas with m-arity
+    0. Their p-arity is 1, where the one argument of the constructor is the
+    index.
+    """
     # Instance variables
     @property
-    def index(self):
+    def index(self) -> Any:
+        """The index of the :class:`IndexedConstantAtomicFormula`.
+        """
         return self.args[0]
 
     # Instance methods
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
+        """
         return GetVars()
 
 
-class C(Cardinality):
-    """
+class C(IndexedConstantAtomicFormula):
+    r"""A class whose instances are cardinality constraints in the sense that
+    their toplevel operator represents a constant relation symbol :math:`C_n`
+    where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical interpretation in
+    a domain :math:`D` is that :math:`C_n` holds iff :math:`|D| \geq n`.
+
+    The class constructor takes one argument, which is the index `n`. It takes
+    care that instance with equal indices are identical.
+
     >>> c_0_1 = C(0)
     >>> c_0_2 = C(0)
     >>> c_oo = C(oo)
@@ -364,18 +580,30 @@ class C(Cardinality):
     """
 
     # Class variables
-    func: type[C]
+    func: type[C]  #: :meta private:
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation _C_ of _C.
+        """A class property yielding the complement class :class:`C_` of
+        :class:`C`.
         """
         return C_
 
     _instances: ClassVar[dict] = {}
+    """A private class variable, which is a dictionary holding unique instances
+    of `C(n)` with key `n`.
+    """
 
     # Instance variables
-    args: tuple[int]
+    args: tuple[int]  #: :meta private:
+    """A type annotation for the property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+
+    :meta private:
+    """
 
     # Class methods
     def __new__(cls, *args):
@@ -400,8 +628,16 @@ class C(Cardinality):
         return f'C_{k}'
 
 
-class C_(Cardinality):
-    """
+class C_(IndexedConstantAtomicFormula):
+    r"""A class whose instances are cardinality constraints in the sense that
+    their toplevel operator represents a constant relation symbol
+    :math:`\bar{C}_n` where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical
+    interpretation in a domain :math:`D` is that :math:`\bar{C}_n` holds iff
+    :math:`|D| < n`.
+
+    The class constructor takes one argument, which is the index `n`. It takes
+    care that instance with equal indices are identical.
+
     >>> c_0_1 = C_(0)
     >>> c_0_2 = C_(0)
     >>> c_oo = C_(oo)
@@ -412,18 +648,30 @@ class C_(Cardinality):
     """
 
     # Class variables
-    func: type[C_]
+    func: type[C_]  #: :meta private:
+    """A type annotation for the class property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+    """
 
     @classproperty
     def complement_func(cls):
-        """The complement relation C of C_.
+        """A class property yielding the complement class :class:`C` of
+        :class:'C_'.
         """
         return C
 
     _instances: ClassVar[dict] = {}
+    """A private class variable, which is a dictionary holding unique instances
+    of `C_(n)` with key `n`.
+    """
 
     # Instance variables
     args: tuple[int]
+    """A type annotation for the property `func` inherited from
+    :attr:`.firstorder.AtomicFormula.func`.
+
+    :meta private:
+    """
 
     # Class methods
     def __new__(cls, *args):
