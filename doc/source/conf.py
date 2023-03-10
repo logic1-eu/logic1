@@ -37,7 +37,10 @@ autodoc_default_options = {
     'show-inheritance': True
 }
 
-intersphinx_mapping = {'sympy': ('https://docs.sympy.org/latest', None)}
+intersphinx_mapping = {
+    'sympy': ('https://docs.sympy.org/latest', None),
+    'python': ('https://docs.python.org/3', None)
+}
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -45,21 +48,36 @@ intersphinx_mapping = {'sympy': ('https://docs.sympy.org/latest', None)}
 # _extra_footer = """
 # """
 
-html_css_files = ["custom.css"]
+html_context = {
+    # 'default_mode': 'auto'
+}
+
+html_css_files = [
+    "custom.css"
+]
+
 html_last_updated_fmt = ''
+
 html_logo = None
-# html_sidebars = {'**': ['sidebar-logo.html', 'search-field.html',
-#                         'sbt-sidebar-nav.html']}
+
+# html_sidebars = {
+#     '**': ['sidebar-logo.html',
+#            'search-field.html',
+#            'sbt-sidebar-nav.html']
+# }
+
 html_static_path = ['_static']
+
 html_theme = 'sphinx_book_theme'
-html_theme_options = {'home_page_in_toc': True,
-                      # 'extra_navbar': None,
-                      # 'extra_footer': None,
-                      "repository_url":
-                      "https://github.com/thomas-sturm/logic1",
-                      "show_navbar_depth": 1,
-                      "use_repository_button": True}
-# html_context = {"default_mode": "auto"}
+
+html_theme_options = {
+    'home_page_in_toc': True,
+    'repository_url': 'https://github.com/thomas-sturm/logic1',
+    'show_navbar_depth': 1,  # default is 1
+    'show_toc_level': 1,  # default is 1
+    'use_repository_button': True
+}
+
 html_title = 'Logic1'
 
 # pygments_style = 'tango'
