@@ -27,13 +27,14 @@ class Formula(ABC):
     func: type[Formula]  #: :meta private:
     sympy_func: type[sympy.core.basic.Basic]  #: :meta private:
 
-    # Similaryly the following would be an abstract instance variable:
+    # Similarly the following would be an abstract instance variable:
     args: tuple  #: :meta private:
 
     # Instance methods
     @final
     def __and__(self, other: Formula) -> Formula:
-        """Override the :obj:`&` operator to apply :class:`.boolean.And`.
+        """Override the :obj:`& <object.__and__>` operator to apply
+        :class:`And`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>>
@@ -44,7 +45,8 @@ class Formula(ABC):
 
     @final
     def __invert__(self) -> Formula:
-        """Override the :obj:`~` operator to apply :class:`.boolean.Not`.
+        """Override the :obj:`~ <object.__invert__>` operator to apply
+        :class:`Not`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>>
@@ -55,8 +57,8 @@ class Formula(ABC):
 
     @final
     def __lshift__(self, other: Formula) -> Formula:
-        """Override :obj:`<<` operator to apply :class:`.boolean.Implies`
-        with reversed sides.
+        r"""Override the :obj:`\<\< <object.__lshift__>` operator to apply
+        :class:`Implies` with reversed sides.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
@@ -68,7 +70,7 @@ class Formula(ABC):
 
     @final
     def __or__(self, other: Formula) -> Formula:
-        """Override the :obj:`|` operator to apply :class:`.boolean.Or`.
+        """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
@@ -80,7 +82,8 @@ class Formula(ABC):
 
     @final
     def __rshift__(self, other: Formula) -> Formula:
-        """Override the :obj:`>>` operator to apply :class:`.boolean.Implies`.
+        """Override the :obj:`>> <object.__rshift__>` operator to apply
+        :class:`Implies`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
@@ -91,8 +94,7 @@ class Formula(ABC):
         return Implies(self, other)
 
     def __eq__(self, other: object) -> bool:
-        """A recursive test for equality of the :class:`Formula` `self`
-        and the :class:`object` `other`.
+        """A recursive test for equality of the `self` and `other`.
 
         Note that this is is not a logical operator for equality.
 
@@ -112,8 +114,7 @@ class Formula(ABC):
         return self.func == other.func and self.args == other.args
 
     def __ne__(self, other: object) -> bool:
-        """A recursive test for unequality of the :class:`Formula` `self`
-        and the :class:`object` `other`.
+        """A recursive test for unequality of the `self` and `other`.
         """
         return not self == other
 
@@ -253,8 +254,8 @@ class Formula(ABC):
         """Fast simplification. The result is equivalent to `self`.
 
         Primary simplification goals are the elimination of occurrences of
-        :data:`.truth.T` and :data:`.truth.F` and of occurrences of equal
-        subformulas as siblings in the expression tree.
+        :data:`T` and :data:`F` and of occurrences of equal subformulas as
+        siblings in the expression tree.
         """
         return self
 
@@ -340,18 +341,17 @@ class Formula(ABC):
         """Convert to Negation Normal Form.
 
         A Negation Normal Form (NNF) is an equivalent formula within which the
-        application of :class:`.boolean.Not` is restricted to atomic formulas,
-        i.e., instances of :class:`.atomic.AtomicFormula`, and truth values
-        :data:`.truth.T` and :data:`.truth.F`. The only other operators
-        admitted are :class:`.boolean.And`, :class:`.boolean.Or`,
-        :class:`.quantified.Ex`, and :class:`.quantified.All`.
+        application of :class:`Not` is restricted to atomic formulas, i.e.,
+        instances of :class:`AtomicFormula`, and truth values :data:`T` and
+        :data:`F`. The only other operators admitted are :class:`And`,
+        :class:`Or`, :class:`Ex`, and :class:`All`.
 
         If the input is quanitfier-free, :meth:`to_nnf` will not introduce any
         quanitfiers.
 
-        If `to_positive` is `True`, :class:`.boolean.Not` is eliminated by
-        replacing relation symbols with their complements. The result is then
-        even a Positive Normal Form.
+        If `to_positive` is `True`, :class:`Not` is eliminated via replacing
+        relation symbols with their complements. The result is then even a
+        Positive Normal Form.
 
         >>> from logic1 import Ex, Equivalent, T
         >>> from logic1.atomlib.sympy import Eq
@@ -370,15 +370,14 @@ class Formula(ABC):
         """Convert to Prenex Normal Form.
 
         A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
-        quantifiers :class:`.quantified.Ex` and :class:`.quantified.All` stand
-        at the beginning of the formula. The method used here minimizes the
-        number of quantifier alternations in the prenex block [Burhenne90].
+        quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
+        formula. The method used here minimizes the number of quantifier
+        alternations in the prenex block [Burhenne90]_.
 
         If the minimal number of alternations in the result can be achieved
-        with both :class:`.quantified.Ex` and :class:`.quantified.All` as the
-        first quantifier in the result, then the former is preferred. This
-        preference can be changed with a keyword argument
-        `prefer_universal=True`.
+        with both :class:`Ex` and :class:`All` as the first quantifier in the
+        result, then the former is preferred. This preference can be changed
+        with a keyword argument `prefer_universal=True`.
 
         An keyword argument `is_nnf=True` indicates that `self` is already in
         NNF. :meth:`to_pnf` then skips the initial NNF computation, which can

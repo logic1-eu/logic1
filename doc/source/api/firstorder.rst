@@ -1,38 +1,16 @@
 .. _api-firstorder:
 
-
-Package :mod:`logic1.firstorder`
-================================
+********************
+First-order Formulas
+********************
 
 .. automodule:: logic1.firstorder
 
-  The following code block from :file:`__init__.py` documents the re-export of
-  relevant objects:
-
-  .. code-block::
-
-    from .formula import Formula
-    from .quantified import QuantifiedFormula, Ex, All
-    from .boolean import BooleanFormula, AndOr, Equivalent, Implies, And, Or, Not
-    from .truth import T, F
-    from .atomic import AtomicFormula
-
-
-Module :mod:`formula <logic1.firstorder.formula>`
--------------------------------------------------
-
-.. automodule:: logic1.firstorder.formula
 
 .. autoclass:: Formula
   :members:
-  :undoc-members:
   :special-members: __and__, __invert__, __lshift__, __or__, __rshift__
 
-
-Module :mod:`quantified <logic1.firstorder.quantified>`
--------------------------------------------------------
-
-.. automodule:: logic1.firstorder.quantified
 
 .. autoclass:: QuantifiedFormula
   :members:
@@ -64,11 +42,6 @@ Module :mod:`quantified <logic1.firstorder.quantified>`
 
     A class property yielding the dual class :class:`Ex` of :class:`All`.
 
-
-Module :mod:`boolean <logic1.firstorder.boolean>`
--------------------------------------------------
-
-.. automodule:: logic1.firstorder.boolean
 
 .. autoclass:: BooleanFormula
   :members:
@@ -136,11 +109,6 @@ Module :mod:`boolean <logic1.firstorder.boolean>`
     A class property yielding the class :class:`Not` itself.
 
 
-Module :mod:`truth <logic1.firstorder.truth>`
----------------------------------------------
-
-.. automodule:: logic1.firstorder.truth
-
 .. autoclass:: TruthValue
   :members:
   :undoc-members:
@@ -181,12 +149,6 @@ Module :mod:`truth <logic1.firstorder.truth>`
 .. autodata:: F
   :annotation: = _F()
 
-
-Module :mod:`atomic <logic1.firstorder.atomic>`
------------------------------------------------
-
-.. automodule::
-  logic1.firstorder.atomic
 
 .. autoclass:: AtomicFormula
   :members:

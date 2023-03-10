@@ -31,16 +31,16 @@ class QuantifiedFormula(Formula):
     """A class variable holding LaTeX spacing that comes after a quantifier
     symbol and its quantified variable.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol_spacing = ' '
     """A class variable holding spacing that comes after a quantifier
     symbol and its quantified variable in string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     print_precedence = 99
@@ -132,26 +132,23 @@ class QuantifiedFormula(Formula):
         return (count, quantifiers)
 
     def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Implements the abstract method :meth:`Formula.get_any_atom()
-        <.formula.Formula.get_any_atom>`.
+        """Implements the abstract method :meth:`Formula.get_any_atom`.
         """
         return self.arg.get_any_atom()
 
     def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars()
-        <.formula.Formula.get_qvars>`.
+        """Implements the abstract method :meth:`Formula.get_qvars`.
         """
         return self.arg.get_qvars() | {self.var}
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars()
-        <.formula.Formula.get_vars>`.
+        """Implements the abstract method :meth:`Formula.get_vars`.
         """
         quantified = assume_quantified | {self.var}
         return self.arg.get_vars(assume_quantified=quantified)
 
     def simplify(self, Theta=None) -> Formula:
-        """Simplification.
+        """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
@@ -181,8 +178,7 @@ class QuantifiedFormula(Formula):
         return f'{symbol} {var}{spacing}{arg_in_parens(self.arg)}'
 
     def subs(self, substitution: dict) -> QuantifiedFormula:
-        """Implements the abstract method :meth:`Formula.subs()
-        <.formula.Formula.subs>`.
+        """Implements the abstract method :meth:`Formula.subs`.
         """
         atom = self.get_any_atom()
         if not atom:
@@ -227,8 +223,7 @@ class QuantifiedFormula(Formula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         func_nnf = self.dual_func if _implicit_not else self.func
         arg_nnf = self.arg.to_nnf(to_positive=to_positive,
@@ -248,8 +243,7 @@ class QuantifiedFormula(Formula):
         raise NotImplementedError(f'sympy does not know {type(self)}')
 
     def transform_atoms(self, transformation: Callable) -> QuantifiedFormula:
-        """Implements the abstract method :meth:`Formula.transform_atoms
-        <.formula.Formula.transform_atoms>`.
+        """Implements the abstract method :meth:`Formula.transform_atoms`.
         """
         return self.func(self.var, self.arg.transform_atoms(transformation))
 
@@ -270,16 +264,16 @@ class Ex(QuantifiedFormula):
     latex_symbol = '\\exists'
     """A class variable holding a LaTeX symbol for :class:`Ex`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = 'Ex'
     """A class variable holding a representation of :class:`Ex` suitable for
     string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     @classproperty
@@ -315,16 +309,16 @@ class All(QuantifiedFormula):
     latex_symbol = '\\forall'
     """A class variable holding a LaTeX symbol for :class:`All`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = 'All'
     """A class variable holding a representation of :class:`All` suitable for
     string representation.
 
-    This is used for string conversion, explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     @classproperty

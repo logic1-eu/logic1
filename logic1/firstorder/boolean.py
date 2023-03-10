@@ -28,16 +28,16 @@ class BooleanFormula(Formula):
     """A class variable holding LaTeX spacing that comes after prefix operators
     and around infix operators.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol_spacing = ' '
     """A class variable holding spacing that comes after prefix operators
     and around infix operators in string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     # The following would be abstract class variables, which are not available
@@ -66,8 +66,7 @@ class BooleanFormula(Formula):
         return (best_count, best_quantifiers)
 
     def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Implements the abstract method :meth:`Formula.get_any_atom()
-        <.formula.Formula.get_any_atom>`.
+        """Implements the abstract method :meth:`Formula.get_any_atom`.
         """
         for arg in self.args:
             atom = arg.get_any_atom()
@@ -76,8 +75,7 @@ class BooleanFormula(Formula):
         return None
 
     def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars()
-        <.formula.Formula.get_qvars>`.
+        """Implements the abstract method :meth:`Formula.get_qvars`.
         """
         qvars = set()
         for arg in self.args:
@@ -85,8 +83,7 @@ class BooleanFormula(Formula):
         return qvars
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars()
-        <.formula.Formula.get_vars>`.
+        """Implements the abstract method :meth:`Formula.get_vars`.
         """
         vars = GetVars()
         for arg in self.args:
@@ -126,15 +123,12 @@ class BooleanFormula(Formula):
         assert False
 
     def subs(self, substitution: dict) -> BooleanFormula:
-        """Implements the abstract method :meth:`Formula.subs()
-        <.formula.Formula.subs>`.
+        """Implements the abstract method :meth:`Formula.subs`.
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
     def to_cnf(self) -> Formula:
         """ Convert to Conjunctive Normal Form.
-
-
 
         >>> from logic1.atomlib.sympy import Eq, Ne
         >>> from sympy.abc import a
@@ -148,7 +142,7 @@ class BooleanFormula(Formula):
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
 
-    def to_dnf(self) -> BooleanFormula | AtomicFormula:
+    def to_dnf(self) -> BooleanFormula | atomic.AtomicFormula:
         """ Convert to Disjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import Eq, Ne
@@ -183,8 +177,7 @@ class BooleanFormula(Formula):
         return name(*xs, simplify=False)
 
     def transform_atoms(self, transformation: Callable) -> BooleanFormula:
-        """Implements the abstract method :meth:`Formula.transform_atoms
-        <.formula.Formula.transform_atoms>`.
+        """Implements the abstract method :meth:`Formula.transform_atoms`.
         """
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
@@ -219,16 +212,16 @@ class Equivalent(BooleanFormula):
     latex_symbol = '\\longleftrightarrow'
     """A class variable holding a LaTeX symbol for :class:`Equivalent`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = '<-->'
     """A class variable holding a representation of :class:`Equivalent`
     suitable for string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     print_precedence = 10
@@ -279,8 +272,7 @@ class Equivalent(BooleanFormula):
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify
-        <.formula.Formula.simplify>`.
+        """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
@@ -309,8 +301,7 @@ class Equivalent(BooleanFormula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
         return tmp.to_nnf(to_positive=to_positive, _implicit_not=_implicit_not)
@@ -325,16 +316,16 @@ class Implies(BooleanFormula):
     latex_symbol = '\\longrightarrow'
     """A class variable holding a LaTeX symbol for :class:`Implies`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = '-->'
     """A class variable holding a representation of :class:`Implies` suitable
     for string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     print_precedence = 10
@@ -384,8 +375,7 @@ class Implies(BooleanFormula):
         self.args = (lhs, rhs)
 
     def simplify(self, Theta=None) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify
-        <.formula.Formula.simplify>`.
+        """Compare the parent method :meth:`Formula.simplify`.
         """
         if self.rhs is T:
             return self.lhs
@@ -406,8 +396,7 @@ class Implies(BooleanFormula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         if isinstance(self.rhs, Or):
             tmp = Or(Not(self.lhs), *self.rhs.args)
@@ -442,8 +431,7 @@ class AndOr(BooleanFormula):
 
     # Instance methods
     def simplify(self, Theta=None):
-        """Compare the parent method :meth:`Formula.simplify
-        <.formula.Formula.simplify>`.
+        """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y, z
@@ -478,8 +466,7 @@ class AndOr(BooleanFormula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> AndOr:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         func_nnf = self.dual_func if _implicit_not else self.func
         args_nnf: list[Formula] = []
@@ -576,16 +563,16 @@ class And(AndOr):
     latex_symbol = '\\wedge'
     """A class variable holding a LaTeX symbol for :class:`And`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = '&'
     """A class variable holding a representation of :class:`And`
     suitable for string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     sympy_func = sympy.And  #: :meta private:
@@ -652,16 +639,16 @@ class Or(AndOr):
     latex_symbol = '\\vee'
     """A class variable holding a LaTeX symbol for :class:`Or`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = '|'
     """A class variable holding a representation of :class:`Or`
     suitable for string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     sympy_func = sympy.Or  #: :meta private:
@@ -717,16 +704,16 @@ class Not(BooleanFormula):
     latex_symbol = '\\neg'
     """A class variable holding a LaTeX symbol for :class:`Not`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = '~'
     """A class variable holding a representation of :class:`Not`
     suitable for string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     sympy_func = sympy.Not  #: :meta private:
@@ -770,8 +757,7 @@ class Not(BooleanFormula):
         self.args = (arg, )
 
     def simplify(self, Theta=None) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify
-        <.formula.Formula.simplify>`.
+        """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import Eq
@@ -790,8 +776,7 @@ class Not(BooleanFormula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
 
         >>> from logic1 import Ex, All
         >>> from logic1.atomlib.sympy import Eq
@@ -828,6 +813,7 @@ def involutive_not(arg: Formula) -> Formula:
 
 
 # The following imports are intentionally late to avoid circularity.
+from . import atomic
 from .atomic import AtomicFormula
 from .quantified import Ex, All
 from .truth import T, F

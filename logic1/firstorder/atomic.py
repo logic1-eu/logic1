@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, final
+from typing import Any, Callable, final, TYPE_CHECKING
 from typing_extensions import Self
 
 import pyeda.inter  # type: ignore
-import sympy
 
 from .formula import Formula
 from .quantified import Ex, All
-from ..support.containers import GetVars
 from ..support.decorators import classproperty
+
+if TYPE_CHECKING:
+    import sympy
 
 
 class AtomicFormula(Formula):
@@ -19,21 +20,21 @@ class AtomicFormula(Formula):
     latex_symbol_spacing = ' '
     """A class variable holding LaTeX spacing that goes around infix operators.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol_spacing = ' '
     """A class variable holding spacing that goes around infix operators in
     string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     print_precedence = 99
-    """A class variable holding the precedence of :data:`latex_symbol` and
-    :data:`text_symbol` in LaTeX and string conversions.
+    """A class variable holding the precedence of `latex_symbol` and
+    `text_symbol` with LaTeX and string conversions in subclasses.
 
     This is compared with the corresponding `print_precedence` of other classes
     for placing parentheses.
@@ -71,13 +72,13 @@ class AtomicFormula(Formula):
     @staticmethod
     @abstractmethod
     def term_to_latex(term: Any) -> str:
-        """Convert :data:`term` to LaTeX.
+        """Convert `term` to LaTeX.
         """
         ...
 
     @staticmethod
     @abstractmethod
-    def term_to_sympy(term: Any) -> sympy.core.basic.Basic:
+    def term_to_sympy(term: Any) -> sympy.Basic:
         """Convert `term` to SymPy.
         """
         ...
@@ -86,7 +87,7 @@ class AtomicFormula(Formula):
     @staticmethod
     @abstractmethod
     def variable_type() -> Any:
-        """The Python type of variables in terms of the respective subclass of
+        """The Python type of variables in terms in subclasses of
         :class:`AtomicFormula`.
         """
         ...
@@ -111,15 +112,13 @@ class AtomicFormula(Formula):
 
     @final
     def get_any_atom(self) -> Self:
-        """Implements the abstract method :meth:`Formula.get_any_atom()
-        <.formula.Formula.get_any_atom>`.
+        """Implements the abstract method :meth:`Formula.get_any_atom`.
         """
         return self
 
     @final
     def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars()
-        <.formula.Formula.get_qvars>`.
+        """Implements the abstract method :meth:`Formula.get_qvars`.
         """
         return set()
 
@@ -159,8 +158,7 @@ class AtomicFormula(Formula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         return self.to_complement() if _implicit_not else self
 
@@ -181,7 +179,7 @@ class AtomicFormula(Formula):
         return d[self]
 
     @final
-    def to_sympy(self, **kwargs) -> sympy.Basic:
+    def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:
         """Override :meth:`.Formula.to_sympy` to prevent recursion into terms.
         """
         sympy_terms = (self.__class__.term_to_sympy(arg) for arg in self.args)
@@ -189,7 +187,6 @@ class AtomicFormula(Formula):
 
     @final
     def transform_atoms(self, transformation: Callable) -> Self:
-        """Implements the abstract method :meth:`Formula.transform_atoms
-        <.formula.Formula.transform_atoms>`.
+        """Implements the abstract method :meth:`Formula.transform_atoms`.
         """
         return transformation(self)

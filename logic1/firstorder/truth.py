@@ -43,14 +43,12 @@ class TruthValue(BooleanFormula):
         return (-1, {Ex, All})
 
     def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars()
-        <.formula.Formula.get_qvars>`.
+        """Implements the abstract method :meth:`Formula.get_qvars()`.
         """
         return set()
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars()
-        <.formula.Formula.get_vars>`.
+        """Implements the abstract method :meth:`Formula.get_vars`.
         """
         return GetVars()
 
@@ -72,8 +70,7 @@ class TruthValue(BooleanFormula):
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf
-        <.formula.Formula.to_nnf>`.
+        """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         if to_positive:
             return self.dual_func() if _implicit_not else self
@@ -109,16 +106,16 @@ class _T(TruthValue):
     latex_symbol = '\\top'
     """A class variable holding a LaTeX symbol for :class:`_T`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = 'T'
     """A class variable holding a representation of :class:`Ex` suitable for
     string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     @classproperty
@@ -171,8 +168,8 @@ class _F(TruthValue):
     latex_symbol = '\\bot'
     """A class variable holding a LaTeX symbol for :class:`_T`.
 
-    This is used with :meth:`Formula.to_latex <.formula.Formula.to_latex>`,
-    which is in turn used for the output in Jupyter notebooks.
+    This is used with :meth:`Formula.to_latex`, which is in turn used for the
+    output in Jupyter notebooks.
     """
 
     text_symbol = 'F'
@@ -180,8 +177,8 @@ class _F(TruthValue):
     """A class variable holding a representation of :class:`Ex` suitable for
     string representation.
 
-    This is used for string conversions, e.g., explicitly with :func:`str` or
-    implicitly with :func:`print`.
+    This is used for string conversions, e.g., explicitly with the constructor
+    of :class:`str` or implicitly with :func:`print`.
     """
 
     @classproperty
