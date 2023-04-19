@@ -111,7 +111,7 @@ class _T(TruthValue):
     """
 
     text_symbol = 'T'
-    """A class variable holding a representation of :class:`Ex` suitable for
+    """A class variable holding a representation of :class:`_T` suitable for
     string representation.
 
     This is used for string conversions, e.g., explicitly with the constructor
@@ -173,8 +173,7 @@ class _F(TruthValue):
     """
 
     text_symbol = 'F'
-    text_symbol = 'T'
-    """A class variable holding a representation of :class:`Ex` suitable for
+    """A class variable holding a representation of :class:`_F` suitable for
     string representation.
 
     This is used for string conversions, e.g., explicitly with the constructor
