@@ -15,3 +15,8 @@ tracing.py
 
 # Sphinx
 doc/build
+
+# Pip
+build
+dist
+*.egg-info
