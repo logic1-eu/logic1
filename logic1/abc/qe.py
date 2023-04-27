@@ -57,7 +57,7 @@ class QuantifierElimination(ABC):
         self.finished = finished
 
     def __repr__(self):
-        return (f'QeState(blocks={self.blocks!r}, '
+        return (f'QuantifierElimination(blocks={self.blocks!r}, '
                 f'matrix={self.matrix!r}, '
                 f'negated={self.negated!r}, '
                 f'pool={self.pool!r}, '
