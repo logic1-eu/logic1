@@ -27,7 +27,7 @@ class QuantifierElimination(ABC):
             self.push(vars_, f)
 
         def push(self, vars_: list[Variable], f: Formula) -> None:
-            logging.info(f'res = {f}')
+            logging.debug(f'res = {f}')
             # to_dnf should be generalized to Formula
             dnf = f.simplify().to_dnf()  # type: ignore
             if dnf is T:
