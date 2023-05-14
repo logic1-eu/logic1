@@ -7,7 +7,7 @@ import sympy
 
 from logic1 import atomlib
 from logic1 import abc
-from logic1.firstorder.boolean import And, Or
+from logic1.firstorder.boolean import And, Or, T, F
 from logic1.firstorder.formula import Formula
 from logic1.support.decorators import classproperty
 
@@ -77,6 +77,15 @@ class Eq(TermMixin, atomlib.sympy.Eq):
     def __init__(self, *args):
         super().__init__(*args)
 
+    def simplify(self, Theta=None):
+        c = self.lhs.compare(self.rhs)
+        if c == 0:
+            return T
+        if c == 1:
+            return Eq(self.rhs, self.lhs)
+        assert c == -1
+        return self
+
 
 class Ne(TermMixin, atomlib.sympy.Ne):
     """Inequations with only variables as terms.
@@ -108,6 +117,15 @@ class Ne(TermMixin, atomlib.sympy.Ne):
         """The converse relation Me of Ne.
         """
         return Ne
+
+    def simplify(self, Theta=None):
+        c = self.lhs.compare(self.rhs)
+        if c == 0:
+            return F
+        if c == 1:
+            return Ne(self.rhs, self.lhs)
+        assert c == -1
+        return self
 
 
 oo = atomlib.sympy.oo
