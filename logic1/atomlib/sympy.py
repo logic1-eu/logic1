@@ -625,7 +625,7 @@ class C(IndexedConstantAtomicFormula):
             return repr(self)
         assert mode == 'latex', f'bad print mode {mode!r}'
         k = str(self.index) if isinstance(self.index, int) else '\\infty'
-        return f'C_{k}'
+        return f'C_{{{k}}}'
 
 
 class C_(IndexedConstantAtomicFormula):
@@ -693,4 +693,4 @@ class C_(IndexedConstantAtomicFormula):
             return repr(self)
         assert mode == 'latex', f'bad print mode {mode!r}'
         k = str(self.index) if isinstance(self.index, int) else '\\infty'
-        return f'\\overline{{C_{k}}}'
+        return f'\\overline{{C_{{{k}}}}}'
