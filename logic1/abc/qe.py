@@ -106,6 +106,10 @@ class QuantifierElimination(ABC):
         self.finished = None
         logging.info(f'{self.collect_finished.__qualname__}: {self}')
 
+    @classmethod
+    def get_best(cls, vars_: list, f: Formula) -> Variable:
+        return vars_.pop()
+
     def pop_block(self) -> None:
         assert self.matrix, "no matrix"
         quantifier, vars_ = self.blocks.pop()
@@ -123,7 +127,7 @@ class QuantifierElimination(ABC):
     def process_pool(self) -> None:
         while self.pool:
             vars_, f = self.pool.pop()
-            v = vars_.pop()
+            v = self.get_best(vars_, f)
             f_v, f_other = self._split_And(f, v)
             if f_v is T:
                 result = f_other

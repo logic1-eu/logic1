@@ -154,6 +154,21 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     def __call__(self, f):
         return self.qe(f)
 
+    @classmethod
+    def get_best(cls, vars_: list, f: Formula) -> Variable:
+        d = {v: 0 for v in vars_}
+        args = f.args if f.func is And else (f,)
+        for atom in args:
+            for v in atom.get_vars().free:
+                if v in vars_:
+                    d[v] += 1
+        vals = list(d.values())
+        keys = list(d.keys())
+        v = keys[vals.index(min(vals))]
+        vars_.remove(v)
+        # print(d, v)
+        return v
+
     def qe1p(self, v: Variable, f: Formula) -> Formula:
         def eta(Z: set, k: int) -> Formula:
             args = []
