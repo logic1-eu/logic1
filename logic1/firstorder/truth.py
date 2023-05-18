@@ -60,7 +60,7 @@ class TruthValue(BooleanFormula):
         """
         return self
 
-    def to_dnf(self) -> Self:
+    def _to_dnf(self) -> Self:
         """ Convert to Disjunctive Normal Form.
 
         >>> T.to_dnf()

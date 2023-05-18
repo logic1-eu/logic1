@@ -142,7 +142,7 @@ class BooleanFormula(Formula):
         return self.func(*(arg._to_distinct_vars(badlist)
                            for arg in self.args))
 
-    def to_dnf(self) -> BooleanFormula | atomic.AtomicFormula:
+    def to_dnf(self, simplify=True) -> BooleanFormula | atomic.AtomicFormula:
         """ Convert to Disjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import Eq, Ne
@@ -150,7 +150,21 @@ class BooleanFormula(Formula):
         >>>
         >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_dnf()
         Or(Ne(a, 1), And(Eq(a, 0), Eq(a, 2)))
+        >>> And(T, T).to_dnf()
+        T
+        >>> And(T, T).to_dnf(simplify=False)
+        Traceback (most recent call last):
+        ...
+        NotImplementedError: unsupported type
+            <class 'logic1.firstorder.truth._T'> in dnf computation
         """
+        if simplify:
+            f = self.simplify()
+            assert isinstance(f, (BooleanFormula, AtomicFormula))
+            return f._to_dnf()
+        return self._to_dnf()
+
+    def _to_dnf(self) -> BooleanFormula | atomic.AtomicFormula:
         d: dict[AtomicFormula, exprvar] = {}
         self_pyeda = self._to_pyeda(d)
         # _to_pyeda() has populated the mutable dictionary d
@@ -172,7 +186,10 @@ class BooleanFormula(Formula):
         name = to_dict[self.func]
         xs = []
         for arg in self.args:
-            assert isinstance(arg, (BooleanFormula, AtomicFormula))
+            if not isinstance(arg, (Equivalent, Implies, AndOr, Not,
+                                    AtomicFormula)):
+                raise NotImplementedError(
+                    f'unsupported type {type(arg)} in dnf computation')
             xs.append(arg._to_pyeda(d, c))
         return name(*xs, simplify=False)
 

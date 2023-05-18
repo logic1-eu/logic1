@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, final, TYPE_CHECKING
+from typing import Any, Callable, final, Iterator, TYPE_CHECKING
 from typing_extensions import Self
 
 import pyeda.inter  # type: ignore
 
 from .formula import Formula
+from .boolean import BooleanFormula
 from .quantified import Ex, All
 from ..support.decorators import classproperty
 
@@ -144,8 +145,15 @@ class AtomicFormula(Formula):
     def _to_distinct_vars(self, badlist: set) -> Self:
         return self
 
+    def to_dnf(self, simplify=True) -> BooleanFormula | AtomicFormula:
+        if simplify:
+            f = self.simplify()
+            assert isinstance(f, (BooleanFormula, AtomicFormula))
+            return f._to_dnf()
+        return self._to_dnf()
+
     @final
-    def to_dnf(self) -> Self:
+    def _to_dnf(self) -> Self:
         """ Convert to Disjunctive Normal Form.
 
         >>> from logic1.atomlib.sympy import Eq
