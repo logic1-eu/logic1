@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import sympy
 
@@ -28,11 +29,11 @@ Variable = sympy.Symbol
 _modulus = None
 
 
-def mod() -> int:
+def mod() -> Optional[int]:
     return _modulus
 
 
-def set_mod(modulus: int) -> int:
+def set_mod(modulus: Optional[int]) -> Optional[int]:
     global _modulus
     save_modulus = _modulus
     _modulus = modulus
@@ -92,15 +93,17 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     """
 
     # Instance methods
-    def __call__(self, f, modulus: int = None):
+    def __call__(self, f, modulus: Optional[int] = None):
         if modulus is not None:
             save_modulus = set_mod(modulus)
             result = self.qe(f)
             set_mod(save_modulus)
             return result
+        assert isinstance(_modulus, int)
         return self.qe(f)
 
     def qe1p(self, v: Variable, f: Formula) -> Formula:
+        assert isinstance(_modulus, int)
         return Or(*(f.subs({v: i}) for i in range(_modulus))).simplify()
 
     @staticmethod
