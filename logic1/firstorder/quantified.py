@@ -4,7 +4,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import Any, Callable, Iterator, Optional, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -125,6 +125,9 @@ class QuantifiedFormula(Formula):
         return super().__new__(cls)
 
     # Instance methods
+    def atoms(self) -> Iterator[AtomicFormula]:
+        yield from self.arg.atoms()
+
     def _count_alternations(self) -> tuple[int, set]:
         count, quantifiers = self.arg._count_alternations()
         if self.dual_func in quantifiers:

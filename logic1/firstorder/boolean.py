@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional, TYPE_CHECKING
 
 import pyeda.inter  # type: ignore
 from pyeda.inter import expr, exprvar
@@ -11,6 +11,9 @@ from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 # from ..support.tracing import trace
+
+if TYPE_CHECKING:
+    from .atomic import AtomicFormula
 
 
 class BooleanFormula(Formula):
@@ -53,6 +56,11 @@ class BooleanFormula(Formula):
     args: tuple[Formula, ...]  #: :meta private:
 
     # Instance methods
+
+    def atoms(self) -> Iterator[AtomicFormula]:
+        for arg in self.args:
+            yield from arg.atoms()
+
     def _count_alternations(self) -> tuple[int, set]:
         best_count = -1
         best_quantifiers = {Ex, All}

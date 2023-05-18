@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, final, Optional, TYPE_CHECKING
+from typing import Callable, final, Iterator, Optional, TYPE_CHECKING
+
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -161,6 +162,35 @@ class Formula(ABC):
         surrounding $\\displaystyle ... $.
         """
         return '$\\displaystyle ' + self.to_latex() + '$'
+
+    @abstractmethod
+    def atoms(self) -> Iterator[AtomicFormula]:
+        """
+        >>> from logic1 import Ex, All, T, F
+        >>> from logic1.atomlib.sympy import Eq
+        >>> from sympy.abc import x, y, z
+        >>>
+        >>> # Variables with free occurrences:
+        >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x,
+        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+        >>> type(f.atoms())
+        <class 'generator'>
+        >>> list(f.atoms())
+        [Eq(3*x, 0), Eq(3*x, 0), Eq(x, 0), Eq(x*y, 1)]
+        >>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
+        True
+        >>> from collections import Counter
+        >>> Counter(f.atoms())
+        Counter({Eq(3*x, 0): 2, Eq(x, 0): 1, Eq(x*y, 1): 1})
+        >>> sum(1 for _ in f.atoms())
+        4
+        >>> empty = (T & F).atoms()
+        >>> next(empty)
+        Traceback (most recent call last):
+        ...
+        StopIteration
+        """
+        ...
 
     @final
     def count_alternations(self) -> int:

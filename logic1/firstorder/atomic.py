@@ -107,6 +107,9 @@ class AtomicFormula(Formula):
     def __init__(self, *args) -> None:
         self.args = args
 
+    def atoms(self) -> Iterator[AtomicFormula]:
+        yield self
+
     @final
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
