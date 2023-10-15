@@ -450,6 +450,8 @@ class AndOr(BooleanFormula):
     # at the moment.
     func: type[AndOr]  #: :meta private:
     dual_func: type[AndOr]  #: :meta private:
+    definite_func: type[BooleanFormula]  #: :meta private:
+    neutral_func: type[BooleanFormula]  #: :meta private:
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
@@ -611,9 +613,30 @@ class And(AndOr):
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`Or`, which implements
-        the dual operator :math:`\vee` or :math:`\wedge`.
+        the dual operator :math:`\vee` of :math:`\wedge`.
         """
         return Or
+
+    @classproperty
+    def definite_func(cls):
+        r"""A class property yielding the class :class:`_F`, which implements
+        the definite operator :math:`\bot` of :math:`\wedge`. The definite
+        operator is the dual of the neutral.
+
+        Note that the return value :class:`_F` is the naked operator, in
+        contrast to the formula :data:`F`.
+        """
+        return _F
+
+    @classproperty
+    def neutral_func(cls):
+        r"""A class property yielding the class :class:`_T`, which implements
+        the neutral operator :math:`\top` of :math:`\wedge`.
+
+        Note that the return value :class:`_T` is the naked operator, in
+        contrast to the formula :data:`T`.
+        """
+        return _T
 
     # Instance variables
     args: tuple[Formula, ...]
@@ -687,9 +710,30 @@ class Or(AndOr):
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`And`, which implements
-        the dual operator :math:`\wedge` or :math:`\vee`.
+        the dual operator :math:`\wedge` of :math:`\vee`.
         """
         return And
+
+    @classproperty
+    def definite_func(cls):
+        r"""A class property yielding the class :class:`_T`, which implements
+        the definite operator :math:`\top` of :math:`\vee`. The definite
+        operator is the dual of the neutral.
+
+        Note that the return value :class:`_T` is the naked operator, in
+        contrast to the formula :data:`T`.
+        """
+        return _T
+
+    @classproperty
+    def neutral_func(cls):
+        r"""A class property yielding the class :class:`_F`, which implements
+        the neutral operator :math:`\bot` of :math:`\vee`.
+
+        Note that the return value :class:`_F` is the naked operator, in
+        contrast to the formula :data:`F`.
+        """
+        return _F
 
     # Instance variables
     args: tuple[Formula, ...]
@@ -841,4 +885,4 @@ def involutive_not(arg: Formula) -> Formula:
 from . import atomic
 from .atomic import AtomicFormula
 from .quantified import Ex, All
-from .truth import T, F
+from .truth import _T, _F, T, F
