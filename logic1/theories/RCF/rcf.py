@@ -1,11 +1,13 @@
 import sympy
+from typing import TypeAlias
 
 from logic1 import atomlib
 from logic1.support.decorators import classproperty
 from logic1.firstorder.truth import Formula, F, T
 
-Term = sympy.Expr
-Variable = sympy.Symbol
+
+Term: TypeAlias = sympy.Expr
+Variable: TypeAlias = sympy.Symbol
 
 
 class Eq(atomlib.sympy.Eq):
@@ -142,3 +144,10 @@ class Lt(atomlib.sympy.Lt):
         if not lhs.free_symbols:
             return T if sympy.StrictLessThan(lhs, sympy.Integer(0)) else F
         return Lt(lhs, 0)
+
+
+# We want to refer to RCF instances of AtomicFormula for type safety. The type
+# alias supports :code:`cast(RcfAtomicFormula, ...)`. The tuple form supports
+# :code:`assert isinstance(..., RcfAtomicFormulas)`.
+RcfAtomicFormula: TypeAlias = Eq | Ne | Ge | Le | Gt | Lt
+RcfAtomicFormulas = (Eq, Ne, Ge, Le, Gt, Lt)

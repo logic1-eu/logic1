@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar, Union
+from typing import Any, ClassVar, TypeAlias, Union
 
 import sympy
 
@@ -16,8 +16,8 @@ from ..support.renaming import rename
 # Type alias
 Card = Union[int, sympy.core.numbers.Infinity]
 
-Term = sympy.Expr
-Variable = sympy.Symbol
+Term: TypeAlias = sympy.Expr
+Variable: TypeAlias = sympy.Symbol
 
 oo = sympy.oo
 
@@ -204,7 +204,7 @@ class BinaryAtomicFormula(AtomicFormula):
             raise ValueError(f'bad number of arguments for binary relation')
         args_ = []
         for arg in args:
-            arg_ = (sympy.Integer(arg) if isinstance(arg, int) else arg)
+            arg_ = sympy.Integer(arg) if isinstance(arg, int) else arg
             if not isinstance(arg_, self.term_type()):
                 raise ValueError(f"{arg!r} is not a Term")
             args_.append(arg_)

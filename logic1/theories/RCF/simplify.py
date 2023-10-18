@@ -1,14 +1,16 @@
-from sympy import FiniteSet, Interval, oo, Rational, S
+from functools import lru_cache
 from operator import xor
+from sympy import FiniteSet, Interval, oo, Rational, S, sqf_list, sqf_part
 from typing import Iterable, Optional, Self
 
-from logic1 import abc
-from logic1.theories.RCF.rcf import Term, Variable, Eq, Ne, Ge, Le, Gt, Lt
-from logic1.firstorder.atomic import AtomicFormula
-from logic1.firstorder.boolean import And, Or
-from logic1.firstorder.formula import Formula
+from . import rcf  # need qualified names of relations for pattern matching
+from ... import abc
 
-from ...support.tracing import trace  # noqa
+from ...firstorder.formula import Formula
+from ...firstorder.boolean import And, Or
+from ...firstorder.atomic import AtomicFormula
+from ...firstorder.truth import T, F
+from .rcf import RcfAtomicFormulas, Term, Variable, Eq, Ne, Ge, Le, Gt, Lt
 
 
 class Theory(abc.simplify.Theory):
@@ -28,29 +30,31 @@ class Theory(abc.simplify.Theory):
                 rel = rel.complement_func
             ivl: Interval | FiniteSet
             exc: FiniteSet
-            match rel.__qualname__:
-                # Compare https://stackoverflow.com/q/71441761/ regarding the
-                # use of __qualname__ here. We model p in ivl \ exc.
-                case Eq.__qualname__:
+            match rel:
+                # We model p in ivl \ exc.
+                #
+                # Compare https://stackoverflow.com/q/71441761/ which suggests
+                # the use of __qualname__ here.
+                case rcf.Eq:
                     ivl = FiniteSet(q)
                     exc = S.EmptySet
-                case Ne.__qualname__:
+                case rcf.Ne:
                     ivl = S.Reals
                     exc = FiniteSet(q)
-                case Ge.__qualname__:
+                case rcf.Ge:
                     ivl = Interval(q, oo)
                     exc = S.EmptySet
-                case Le.__qualname__:
+                case rcf.Le:
                     ivl = Interval(-oo, q)
                     exc = S.EmptySet
-                case Gt.__qualname__:
+                case rcf.Gt:
                     ivl = Interval.Lopen(q, oo)
                     exc = S.EmptySet
-                case Lt.__qualname__:
+                case rcf.Lt:
                     ivl = Interval.Ropen(-oo, q)
                     exc = S.EmptySet
-                case unkown:
-                    assert False, f'unkown relation {unkown}'
+                case _:
+                    assert False
             if p in self._current:
                 cur_ivl, cur_exc = self._current[p]
                 ivl = ivl.intersection(cur_ivl)
@@ -226,14 +230,31 @@ class Simplify(abc.simplify.Simplify['Theory']):
         self.prefer_order = prefer_order
         return self.simplify(f)
 
+    @lru_cache(maxsize=None)
     def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:
         """
         >>> from sympy.abc import a, b
-        >>> f = Le(6 * (a+b)**2 + 3, 0)
-        >>> f.simplify()
-        Le(6*a**2 + 12*a*b + 6*b**2 + 3, 0)
+        >>> simplify(Le(-6 * (a+b)**2 + 3, 0))
+        Ge(2*a**2 + 4*a*b + 2*b**2 - 1, 0)
         """
-        return f.simplify()
+        assert isinstance(f, RcfAtomicFormulas)
+        lhs = f.lhs - f.rhs
+        lhs = lhs.expand()
+        if not lhs.free_symbols:
+            return T if f.sympy_func(lhs, S.Zero) else F
+        match f.func:
+            case rcf.Eq | rcf.Ne:
+                return f.func(sqf_part(lhs), S.Zero)
+            case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
+                # The multiplicities in sqf_list are Python ints.
+                content, sqf_factors = sqf_list(lhs)
+                func = f.converse_func if content < 0 else f.func
+                lhs = S.One
+                for factor, multiplicity in sqf_factors:
+                    lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
+                return func(lhs, S.Zero)
+            case _:
+                assert False
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
