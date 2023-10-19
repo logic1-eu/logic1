@@ -241,10 +241,11 @@ class Simplify(abc.simplify.Simplify['Theory']):
         lhs = f.lhs - f.rhs
         lhs = lhs.expand()
         if not lhs.free_symbols:
-            return T if f.sympy_func(lhs, S.Zero) else F
+            return T if xor(f.sympy_func(lhs, S.Zero), implicit_not) else F
         match f.func:
             case rcf.Eq | rcf.Ne:
-                return f.func(sqf_part(lhs), S.Zero)
+                func = f.func
+                lhs = sqf_part(lhs)
             case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
                 # The multiplicities in sqf_list are Python ints.
                 content, sqf_factors = sqf_list(lhs)
@@ -252,9 +253,11 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 lhs = S.One
                 for factor, multiplicity in sqf_factors:
                     lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
-                return func(lhs, S.Zero)
             case _:
                 assert False
+        if implicit_not:
+            func = func.complement_func
+        return func(lhs, S.Zero)
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)

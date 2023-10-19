@@ -11,6 +11,24 @@ And(Eq(a, 0), Or(Ne(b, 0), Le(c, 0)))
 And(Eq(a, 0), Ne(d, 0), Or(Eq(b, 0), And(Gt(d, 0), Eq(c, 0))))
 
 
+# Test implicit negation and extended Boolean operators
+>>> simplify(T)
+T
+>>> simplify(Not(T))
+F
+>>> simplify(Eq(1, 0))
+F
+>>> simplify(Not(Eq(1, 0)))
+T
+>>> simplify(Eq(a, 0))
+Eq(a, 0)
+>>> simplify(Not(Eq(a, 0)))
+Ne(a, 0)
+
+# >>> simplify(Equivalent(Eq(a, 0), Gt(b, 0)))
+# And(Or(Gt(b, 0), Ne(a, 0)), Or(Eq(a, 0), Le(b, 0)))
+
+
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\
 ...     == simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)
