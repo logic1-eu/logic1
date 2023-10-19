@@ -1,6 +1,6 @@
 from functools import lru_cache
 from operator import xor
-from sympy import FiniteSet, Interval, oo, Rational, S, sqf_list, sqf_part
+from sympy import FiniteSet, Interval, oo, ordered, Rational, S, sqf_list, sqf_part
 from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
@@ -10,7 +10,7 @@ from ...firstorder.formula import Formula
 from ...firstorder.boolean import And, Or
 from ...firstorder.atomic import AtomicFormula
 from ...firstorder.truth import T, F
-from .rcf import RcfAtomicFormulas, Term, Variable, Eq, Ne, Ge, Le, Gt, Lt
+from .rcf import RcfAtomicFormula, RcfAtomicFormulas, Term, Variable, Eq, Ne, Ge, Le, Gt, Lt
 
 
 class Theory(abc.simplify.Theory):
@@ -115,7 +115,7 @@ class Theory(abc.simplify.Theory):
         co, pp = t.as_content_primitive()
         return f.func, pp, -Rational(c, co)
 
-    def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And] | type[Or]) -> Iterable[AtomicFormula]:
         L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
@@ -201,9 +201,9 @@ class Theory(abc.simplify.Theory):
             for q in exc:
                 if q not in ref_exc:
                     L.append(self._compose_atom(Ne, p, q))
-        if gand is And:
-            return L
-        return [atom.complement_func(*atom.args) for atom in L]
+        if gand is Or:
+            L = [atom.complement_func(*atom.args) for atom in L]
+        return ordered(L)
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         theory_next = self.__class__()
@@ -242,6 +242,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         lhs = lhs.expand()
         if not lhs.free_symbols:
             return T if xor(f.sympy_func(lhs, S.Zero), implicit_not) else F
+        func: type[RcfAtomicFormula]
         match f.func:
             case rcf.Eq | rcf.Ne:
                 func = f.func

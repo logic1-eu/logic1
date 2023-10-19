@@ -1,6 +1,9 @@
-from abc import ABC, abstractmethod
 import more_itertools
+
+from sympy import ordered
 from typing import Any, Generic, Iterable, Iterator, Optional, Self, TypeVar
+
+from abc import ABC, abstractmethod
 
 from logic1.firstorder.atomic import AtomicFormula
 from logic1.firstorder.boolean import Equivalent, Implies, And, Or, Not
@@ -29,7 +32,7 @@ class Theory(ABC):
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And] | type[Or]) -> Iterable[AtomicFormula]:
         ...
 
     @abstractmethod
@@ -140,7 +143,7 @@ class Simplify(ABC, Generic[TH]):
                 simplified_others = new_others
             else:
                 simplified_others = simplified_others.union(new_others)
-        return gand(*th.extract(gand), *simplified_others)
+        return gand(*th.extract(gand), *ordered(simplified_others))
 
     @abstractmethod
     def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:
