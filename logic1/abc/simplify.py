@@ -42,6 +42,8 @@ class Theory(ABC):
 
 class Simplify(ABC, Generic[TH]):
 
+    _develop: int
+
     def simplify(self, f: Formula, assume: list[AtomicFormula] = [], implicit_not: bool = False)\
             -> Formula:
         """
@@ -143,7 +145,13 @@ class Simplify(ABC, Generic[TH]):
                 simplified_others = new_others
             else:
                 simplified_others = simplified_others.union(new_others)
-        return gand(*th.extract(gand), *ordered(simplified_others))
+        match self._develop:
+            case 0:
+                return gand(*th.extract(gand), *simplified_others)
+            case 1:
+                return gand(*th.extract(gand), *ordered(simplified_others))
+            case _:
+                assert False
 
     @abstractmethod
     def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:

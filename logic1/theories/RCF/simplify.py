@@ -80,9 +80,10 @@ class Theory(abc.simplify.Theory):
                 assert ivl is not S.EmptySet
             self._current[p] = (ivl, exc)
 
-    def __init__(self, prefer_weak: bool = False, prefer_order: bool = True) -> None:
+    def __init__(self, prefer_weak: bool, prefer_order: bool, _develop: int) -> None:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
+        self._develop = _develop
         self._reference = dict()
         self._current = dict()
 
@@ -203,12 +204,16 @@ class Theory(abc.simplify.Theory):
                     L.append(self._compose_atom(Ne, p, q))
         if gand is Or:
             L = [atom.complement_func(*atom.args) for atom in L]
-        return ordered(L)
+        match self._develop:
+            case 0:
+                return L
+            case 1:
+                return ordered(L)
+            case _:
+                assert False
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
-        theory_next = self.__class__()
-        theory_next.prefer_weak = self.prefer_weak
-        theory_next.prefer_order = self.prefer_order
+        theory_next = self.__class__(self.prefer_weak, self.prefer_order, self._develop)
         theory_next._reference = self._current
         if remove is None:
             # This is the regular case. I expect that copy is not slower than a
@@ -224,10 +229,11 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    def __call__(self, f: Formula, prefer_weak: bool = False, prefer_order: bool = True)\
-            -> Formula:
+    def __call__(self, f: Formula, prefer_weak: bool = False,
+                 prefer_order: bool = True, _develop: int = 0) -> Formula:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
+        self._develop = _develop
         return self.simplify(f)
 
     @lru_cache(maxsize=None)
@@ -261,7 +267,8 @@ class Simplify(abc.simplify.Simplify['Theory']):
         return func(lhs, S.Zero)
 
     def _Theory(self) -> Theory:
-        return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
+        return Theory(prefer_weak=self.prefer_weak,
+                      prefer_order=self.prefer_order, _develop=self._develop)
 
 
 simplify = Simplify()
