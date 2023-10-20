@@ -80,7 +80,7 @@ And(Le(a, 0), Or(Eq(a, 0), Ne(b, 0)))
 
 
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/benchmark/reals/service/rlgsn/testseries1/
-# 710 atoms, Redlog reduces to 674 atoms (10 ms)
+# 710 atoms, Redlog reduces to 674 atoms (2 ms)
 
 >>> i2, n, p1, q, td, z = sympy.symbols('i2, n, p1, q, td, z')
 
@@ -367,7 +367,7 @@ And(Le(a, 0), Or(Eq(a, 0), Ne(b, 0)))
 
 
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/benchmark/reals/service/rlgsn/testseries2/
-# 1420 atoms, Redlog simplifier reduces to 935 atoms (10 ms)
+# 1420 atoms, Redlog simplifier reduces to 935 atoms (3.6 ms)
 
 >>> testseries2 = Or(And(Eq(td, 0), Eq(i2, 0), Le(715*n - 76*td - 11400*z - 316578,
 ... 0), Le(20*n - 2*td - 300*z - 10331, 0), Ge(20*n - 2*td - 300*z - 8331, 0), Le(q
