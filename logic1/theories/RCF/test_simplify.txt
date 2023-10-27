@@ -25,7 +25,7 @@ Eq(a, 0)
 Ne(a, 0)
 
 >>> simplify(Equivalent(Eq(a, 0), Gt(b, 0)))
-And(Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0)))
+And(Or(Gt(b, 0), Ne(a, 0)), Or(Eq(a, 0), Le(b, 0)))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\

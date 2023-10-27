@@ -6,8 +6,8 @@ from logic1.support.decorators import classproperty
 from logic1.firstorder.truth import Formula, F, T
 
 
-Term: TypeAlias = sympy.Expr
-Variable: TypeAlias = sympy.Symbol
+Term: TypeAlias = atomlib.sympy.Term
+Variable: TypeAlias = atomlib.sympy.Variable
 
 
 class Eq(atomlib.sympy.Eq):

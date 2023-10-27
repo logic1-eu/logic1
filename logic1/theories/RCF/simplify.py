@@ -1,6 +1,6 @@
 from functools import lru_cache
 from operator import xor
-from sympy import FiniteSet, Interval, oo, ordered, Rational, S, sqf_list, sqf_part
+from sympy import FiniteSet, Interval, oo, Rational, S, sqf_list, sqf_part
 from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
@@ -153,7 +153,7 @@ class Theory(abc.simplify.Theory):
                             assert ref_ivl == ivl, f'{ref_ivl} != {ivl}'
                 case Interval():
                     # We know that ref_ivl is an Interval because ivl is a
-                    # subset of ref_interval.
+                    # subset of ref_ivl.
                     assert isinstance(ref_ivl, Interval)
                     if ref_ivl.start < ivl.start:
                         if ivl.start in ref_exc:
@@ -206,9 +206,9 @@ class Theory(abc.simplify.Theory):
             L = [atom.complement_func(*atom.args) for atom in L]
         match self._develop:
             case 0:
-                return L
+                return sorted(L, key=self._sortkey)
             case 1:
-                return ordered(L)
+                return L
             case _:
                 assert False
 
@@ -225,6 +225,25 @@ class Theory(abc.simplify.Theory):
             theory_next._current = {p: q for p, q in self._current.items()
                                     if remove not in p.atoms(Variable)}
         return theory_next
+
+    @staticmethod
+    def _sortkey(atom: AtomicFormula):
+        assert isinstance(atom, RcfAtomicFormulas)
+        match atom:
+            case Eq():
+                return (0, atom.lhs.sort_key())
+            case Ge():
+                return (1, atom.lhs.sort_key())
+            case Le():
+                return (2, atom.lhs.sort_key())
+            case Gt():
+                return (3, atom.lhs.sort_key())
+            case Lt():
+                return (4, atom.lhs.sort_key())
+            case Ne():
+                return (5, atom.lhs.sort_key())
+            case _:
+                assert False
 
 
 class Simplify(abc.simplify.Simplify['Theory']):

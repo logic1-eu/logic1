@@ -1,6 +1,5 @@
 import more_itertools
 
-from sympy import ordered
 from typing import Any, Generic, Iterable, Iterator, Optional, Self, TypeVar
 
 from abc import ABC, abstractmethod
@@ -147,9 +146,10 @@ class Simplify(ABC, Generic[TH]):
                 simplified_others = simplified_others.union(new_others)
         match self._develop:
             case 0:
-                return gand(*th.extract(gand), *simplified_others)
+                return gand(*th.extract(gand),
+                            *sorted(simplified_others, key=lambda x: len(x.args)))
             case 1:
-                return gand(*th.extract(gand), *ordered(simplified_others))
+                return gand(*th.extract(gand), *simplified_others)
             case _:
                 assert False
 
