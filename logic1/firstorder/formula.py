@@ -149,7 +149,7 @@ class Formula(ABC):
         return self._sprint(mode='text')
 
     @final
-    def _repr_latex_(self) -> str:
+    def _repr_latex_(self) -> Optional[str]:
         r"""A LaTeX representation of the :class:`Formula` `self` as it is used
         within jupyter notebooks.
 
@@ -161,7 +161,27 @@ class Formula(ABC):
         Subclasses have to_latex() methods yielding plain LaTeX without the
         surrounding $\\displaystyle ... $.
         """
-        return '$\\displaystyle ' + self.to_latex() + '$'
+        limit = 5000
+        as_latex = self.to_latex()
+        if len(as_latex) > limit:
+            as_latex = as_latex[:limit]
+            opc = 0
+            for pos in range(limit):
+                match as_latex[pos]:
+                    case '{':
+                        opc += 1
+                    case '}':
+                        opc -= 1
+            assert opc >= 0
+            while opc > 0:
+                match as_latex[-1]:
+                    case '{':
+                        opc -= 1
+                    case '}':
+                        opc += 1
+                as_latex = as_latex[:-1]
+            as_latex += '{}\\dots'
+        return f'$\\displaystyle {as_latex}$'
 
     @abstractmethod
     def atoms(self) -> Iterator[AtomicFormula]:
