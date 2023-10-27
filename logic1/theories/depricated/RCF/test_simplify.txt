@@ -1,6 +1,6 @@
 >>> import sympy
 >>> from logic1 import *
->>> from logic1.theories.RCF import *
+>>> from logic1.theories.depricated.RCF import *
 >>> from sympy.abc import a, b, c, d
 
 

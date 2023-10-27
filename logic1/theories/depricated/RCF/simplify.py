@@ -4,12 +4,12 @@ from sympy import FiniteSet, Interval, oo, Rational, S, sqf_list, sqf_part
 from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
-from ... import abc
+from .... import abc
 
-from ...firstorder.formula import Formula
-from ...firstorder.boolean import And, Or
-from ...firstorder.atomic import AtomicFormula
-from ...firstorder.truth import T, F
+from ....firstorder.formula import Formula
+from ....firstorder.boolean import And, Or
+from ....firstorder.atomic import AtomicFormula
+from ....firstorder.truth import T, F
 from .rcf import RcfAtomicFormula, RcfAtomicFormulas, Term, Variable, Eq, Ne, Ge, Le, Gt, Lt
 
 
@@ -106,7 +106,7 @@ class Theory(abc.simplify.Theory):
         >>> from sympy.abc import a, b
         >>> f = Le(6*a**2 + 12*a*b + 6*b**2 + 3, 0)
         >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
-        (<class 'logic1.theories.RCF.rcf.Le'>, a**2 + 2*a*b + b**2, -1/2)
+        (<class 'logic1.theories.depricated.RCF.rcf.Le'>, a**2 + 2*a*b + b**2, -1/2)
         >>> g = Theory._compose_atom(rel, p, q); g
         Le(2*a**2 + 4*a*b + 2*b**2 + 1, 0)
         >>> (f.lhs / g.lhs).simplify()
