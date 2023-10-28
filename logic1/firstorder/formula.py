@@ -234,6 +234,10 @@ class Formula(ABC):
         ...
 
     @abstractmethod
+    def depth(self) -> int:
+        ...
+
+    @abstractmethod
     def get_any_atom(self) -> Optional[AtomicFormula]:
         """Return any atomic formula contained in *self*, or None if there is
         none.

@@ -114,6 +114,9 @@ class AtomicFormula(Formula):
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
 
+    def depth(self) -> int:
+        return 0
+
     @final
     def get_any_atom(self) -> Self:
         """Implements the abstract method :meth:`Formula.get_any_atom`.

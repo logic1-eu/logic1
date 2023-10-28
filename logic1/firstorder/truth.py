@@ -42,6 +42,9 @@ class TruthValue(BooleanFormula):
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
 
+    def depth(self) -> int:
+        return 0
+
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars()`.
         """

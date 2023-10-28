@@ -134,6 +134,9 @@ class QuantifiedFormula(Formula):
             return (count + 1, {self.func})
         return (count, quantifiers)
 
+    def depth(self) -> int:
+        return self.arg.depth() + 1
+
     def get_any_atom(self) -> Optional[AtomicFormula]:
         """Implements the abstract method :meth:`Formula.get_any_atom`.
         """
