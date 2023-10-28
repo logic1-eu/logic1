@@ -2,10 +2,12 @@ wheel:
 	python setup.py bdist_wheel
 
 pytest:
-	pytest --doctest-modules
+	pytest --doctest-modules\
+		--ignore="logic1/theories/depricated"\
+		--ignore-glob="logic1/theories/Sets/*.txt"
 
 mypy:
-	mypy logic1
+	mypy logic1 --exclude logic1/theories/depricated
 
 test: mypy pytest
 

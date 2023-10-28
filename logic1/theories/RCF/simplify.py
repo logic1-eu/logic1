@@ -186,7 +186,7 @@ class Theory(abc.simplify.Theory):
         q = q / c
         return f.func, p, q
 
-    def extract(self, gand: type[And] | type[Or]) -> Iterable[AtomicFormula]:
+    def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
@@ -268,13 +268,7 @@ class Theory(abc.simplify.Theory):
                     L.append(self._compose_atom(Ne, p, q))
         if gand is Or:
             L = [atom.complement_func(*atom.args) for atom in L]
-        match self._develop:
-            case 0:
-                return sorted(L, key=self._sortkey)
-            case 1:
-                return L
-            case _:
-                assert False
+        return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         theory_next = self.__class__(self.prefer_weak, self.prefer_order, self._develop)
@@ -289,25 +283,6 @@ class Theory(abc.simplify.Theory):
             theory_next._current = {p: q for p, q in self._current.items()
                                     if remove not in p.variables()}
         return theory_next
-
-    @staticmethod
-    def _sortkey(atom: AtomicFormula):
-        assert isinstance(atom, RcfAtomicFormulas)
-        match atom:
-            case Eq():
-                return (0, atom.lhs)
-            case Ge():
-                return (1, atom.lhs)
-            case Le():
-                return (2, atom.lhs)
-            case Gt():
-                return (3, atom.lhs)
-            case Lt():
-                return (4, atom.lhs)
-            case Ne():
-                return (5, atom.lhs)
-            case _:
-                assert False
 
 
 class Simplify(abc.simplify.Simplify['Theory']):
@@ -348,14 +323,14 @@ class Simplify(abc.simplify.Simplify['Theory']):
             case rcf.Eq | rcf.Ne:
                 func = f.func
                 # Compute squarefree part
-                lhs = 1
+                lhs = Ring(1)
                 for factor, _ in factor_list:
                     lhs *= factor
                 if lhs.lc() < 0:
                     lhs = - lhs
             case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
                 unit = factor.unit()
-                lhs = 1
+                lhs = Ring(1)
                 for factor, multiplicity in factor_list:
                     lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
                 if lhs.lc() < 0:
@@ -367,6 +342,36 @@ class Simplify(abc.simplify.Simplify['Theory']):
         if implicit_not:
             func = func.complement_func
         return func(lhs, Ring(0), chk=False)
+
+    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
+        atoms.sort(key=Simplify._sort_key_at)
+
+    def sort_others(self, others: list[Formula]) -> None:
+        others.sort(key=Simplify._sort_key)
+
+    @staticmethod
+    def _sort_key(f: Formula) -> tuple[int, int, int, tuple[tuple[int, Term], ...]]:
+        assert isinstance(f, (And, Or))
+        atom_sort_keys = tuple(Simplify._sort_key_at(a) for a in f.atoms())
+        return (f.depth(), len(f.args), len(atom_sort_keys), atom_sort_keys)
+
+    @staticmethod
+    def _sort_key_at(f: AtomicFormula) -> tuple[int, Term]:
+        match f:
+            case Eq():
+                return (0, f.lhs)
+            case Ge():
+                return (1, f.lhs)
+            case Le():
+                return (2, f.lhs)
+            case Gt():
+                return (3, f.lhs)
+            case Lt():
+                return (4, f.lhs)
+            case Ne():
+                return (5, f.lhs)
+            case _:
+                assert False
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

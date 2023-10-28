@@ -144,18 +144,23 @@ class Simplify(ABC, Generic[TH]):
                 simplified_others = new_others
             else:
                 simplified_others = simplified_others.union(new_others)
-        match self._develop:
-            case 0:
-                return gand(*th.extract(gand),
-                            *sorted(simplified_others, key=lambda x: len(x.args)))
-            case 1:
-                return gand(*th.extract(gand), *simplified_others)
-            case _:
-                assert False
+        final_atoms = list(th.extract(gand))
+        self.sort_atoms(final_atoms)
+        final_others = list(simplified_others)
+        self.sort_others(final_others)
+        return gand(*final_atoms, *final_others)
 
     @abstractmethod
     def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:
-        # Doe not receive the theory by design.
+        # Does not receive the theory, by design.
+        ...
+
+    @abstractmethod
+    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
+        ...
+
+    @abstractmethod
+    def sort_others(self, others: list[Formula]) -> None:
         ...
 
     @abstractmethod

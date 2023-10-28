@@ -285,6 +285,12 @@ class Simplify(abc.simplify.Simplify['Theory']):
             func = func.complement_func
         return func(lhs, S.Zero)
 
+    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
+        pass
+
+    def sort_others(self, others: list[Formula]) -> None:
+        pass
+
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,
                       prefer_order=self.prefer_order, _develop=self._develop)
