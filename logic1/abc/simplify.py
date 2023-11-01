@@ -10,6 +10,8 @@ from logic1.firstorder.formula import Formula
 from logic1.firstorder.quantified import QuantifiedFormula
 from logic1.firstorder.truth import TruthValue, T
 
+from ..support.tracing import trace  # noqa
+
 # About Generic:
 # https://stackoverflow.com/q/74103528/
 # https://peps.python.org/pep-0484/
@@ -41,10 +43,12 @@ class Theory(ABC):
 
 class Simplify(ABC, Generic[TH]):
 
+    class NotInPnf(Exception):
+        pass
+
     _develop: int
 
-    def simplify(self, f: Formula, assume: list[AtomicFormula] = [], implicit_not: bool = False)\
-            -> Formula:
+    def simplify(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
         """
         Deep simplification according to [DS95].
 
@@ -52,45 +56,44 @@ class Simplify(ABC, Generic[TH]):
                Formulae over Ordered Fields J. Symb. Comput. 24(2):209–231,
                1997. Open access at doi:10.1006/jsco.1997.0123
         """
-        th = self._Theory()
         try:
-            th.add(And, assume)
-        except th.Inconsistent:
-            return T
-        match f:
-            case AtomicFormula():
-                return self._simplify(And(f), th, implicit_not)
-            case _:
-                return self._simplify(f, th, implicit_not)
+            th = self._Theory()
+            try:
+                th.add(And, assume)
+            except th.Inconsistent:
+                return T
+            match f:
+                case AtomicFormula():
+                    return self._simpl_nnf(And(f), th)
+                case _:
+                    return self._simpl_pnf(f, th)
+        except Simplify.NotInPnf:
+            return self.simplify(f.to_pnf(), assume)
 
-    def _simplify(self, f: Formula, th: TH, implicit_not: bool) -> Formula:
+    def _simpl_pnf(self, f: Formula, th: TH) -> Formula:
         match f:
-            # This method is expected to be time critical. I am putting the
-            # most frequent cases first.
-            case AtomicFormula():
-                return self._simpl_at(f, implicit_not)
-            case And() | Or():
-                return self._simpl_and_or(f, th, implicit_not)
-            case TruthValue():
-                if implicit_not:
-                    return f.dual_func()
-                return f
-            case Not(arg=arg):
-                return self._simplify(arg, th, not implicit_not)
-            case QuantifiedFormula(func=qua, var=var, arg=arg):
-                simplified_arg = self._simplify(arg, th.next_(remove=var), implicit_not)
+            case QuantifiedFormula(func=Q, var=var, arg=arg):
+                simplified_arg = self._simpl_pnf(arg, th.next_(remove=var))
                 if var not in simplified_arg.get_vars().free:
                     return simplified_arg
-                return qua(var, simplified_arg)
-            case Implies(lhs=lhs, rhs=rhs):
-                return self._simplify(Or(Not(lhs), rhs), th, implicit_not)
-            case Equivalent(lhs=lhs, rhs=rhs):
-                tmp = And(Implies(lhs, rhs), Implies(rhs, lhs))
-                return self._simplify(tmp, th, implicit_not)
+                return Q(var, simplified_arg)
             case _:
-                raise NotImplementedError(f'Simplify does not know {f.func}')
+                return self._simpl_nnf(f, th)
 
-    def _simpl_and_or(self, f: And | Or, th: TH, implicit_not: bool) -> Formula:
+    def _simpl_nnf(self, f: Formula, th: TH) -> Formula:
+        match f:
+            case AtomicFormula():
+                return self._simpl_at(f)
+            case And() | Or():
+                return self._simpl_and_or(f, th)
+            case TruthValue():
+                return f
+            case Not() | Implies() | Equivalent():
+                raise Simplify.NotInPnf
+            case _:
+                raise NotImplementedError(f'Simplify does not know {f.func!r}')
+
+    def _simpl_and_or(self, f: And | Or, th: TH) -> Formula:
 
         def split(args: Iterable[Formula]) -> tuple[set[Formula], Iterator[AtomicFormula]]:
             """
@@ -104,9 +107,9 @@ class Simplify(ABC, Generic[TH]):
             return set(i1), i2  # type: ignore
             # mypy would incorrectly derive that i2 is only Iterable[Formula].
 
-        gand = f.func if not implicit_not else f.dual_func
+        gand = f.func
         others, atoms = split(f.args)
-        _1 = map(lambda arg: self._simpl_at(arg, implicit_not), atoms)
+        _1 = map(lambda arg: self._simpl_at(arg), atoms)
         new_others, atoms = split(_1)
         others = others.union(new_others)
         try:
@@ -116,7 +119,7 @@ class Simplify(ABC, Generic[TH]):
         simplified_others: set[Formula] = set()
         while others:
             arg = others.pop()
-            simplified_arg = self._simplify(arg, th.next_(), implicit_not)
+            simplified_arg = self._simpl_nnf(arg, th.next_())
             match simplified_arg:
                 case gand.definite_func():
                     return simplified_arg
@@ -151,7 +154,7 @@ class Simplify(ABC, Generic[TH]):
         return gand(*final_atoms, *final_others)
 
     @abstractmethod
-    def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:
+    def _simpl_at(self, f: AtomicFormula) -> Formula:
         # Does not receive the theory, by design.
         ...
 

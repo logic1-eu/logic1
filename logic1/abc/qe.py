@@ -29,7 +29,7 @@ class QuantifierElimination(ABC):
         def push(self, vars_: list[Variable], f: Formula) -> None:
             logging.debug(f'res = {f}')
             # to_dnf should be generalized to Formula
-            dnf = f.simplify().to_dnf()  # type: ignore
+            dnf = f.to_dnf()  # type: ignore
             if dnf is T:
                 raise FoundT
             if dnf is not F:
@@ -120,7 +120,8 @@ class QuantifierElimination(ABC):
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.pool = self.Pool(vars_, matrix)
+        logging.info(f'simplify({matrix!r}) == {self.simplify(matrix)!r}')
+        self.pool = self.Pool(vars_, self.simplify(matrix))
         self.finished = []
         logging.info(f'{self.pop_block.__qualname__}: {self}')
 
@@ -134,7 +135,7 @@ class QuantifierElimination(ABC):
             else:
                 result = self._join_And(self.qe1p(v, f_v), f_other)
             if vars_:
-                self.pool.push(vars_, result)
+                self.pool.push(vars_, self.simplify(result))
             else:
                 self.finished.append(result)
             logging.info(f'{self.process_pool.__qualname__}: {self}')
@@ -152,7 +153,7 @@ class QuantifierElimination(ABC):
                 self.pool = None
                 self.finished = [T]
             self.collect_finished()
-        return self.matrix.to_nnf().simplify()
+        return self.simplify(self.matrix.to_nnf())
 
     @abstractmethod
     def qe1p(self, v: Variable, f: Formula) -> Formula:
@@ -184,6 +185,10 @@ class QuantifierElimination(ABC):
         args1 = f1.args if f1.func is And else (f1,)
         args2 = f2.args if f2.func is And else (f2,)
         return And(*args1, *args2)
+
+    @abstractmethod
+    def simplify(cls, f: Formula) -> Formula:
+        ...
 
     @classmethod
     def _split_And(cls, f: Formula, v: Variable) -> tuple[Formula, Formula]:

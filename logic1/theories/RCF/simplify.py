@@ -267,21 +267,17 @@ class Theory(abc.simplify.Theory):
                 if q not in ref_exc:
                     L.append(self._compose_atom(Ne, p, q))
         if gand is Or:
-            L = [atom.complement_func(*atom.args) for atom in L]
+            L = [atom.to_complement() for atom in L]
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         theory_next = self.__class__(self.prefer_weak, self.prefer_order, self._develop)
-        theory_next._reference = self._current
         if remove is None:
-            # This is the regular case. I expect that copy is not slower than a
-            # comprehension.
-            theory_next._current = self._current.copy()
+            theory_next._reference = self._current
         else:
-            # On the other hand, I expect a comprehension to be faster than
-            # copy + del.
-            theory_next._current = {p: q for p, q in self._current.items()
-                                    if remove not in p.variables()}
+            theory_next._reference = {p: q for p, q in self._current.items()
+                                      if remove not in p.variables()}
+        theory_next._current = theory_next._reference.copy()
         return theory_next
 
 
@@ -300,7 +296,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         return result
 
     @lru_cache(maxsize=None)
-    def _simpl_at(self, f: AtomicFormula, implicit_not: bool) -> Formula:
+    def _simpl_at(self, f: AtomicFormula) -> Formula:
         """
         >>> from .rcf import var
         >>> a, b = var.set('a', 'b')
@@ -312,7 +308,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         if lhs.is_constant():
             _python_operator = f.sage_func  # type: ignore
             eval_ = _python_operator(lhs, Ring(0))  # type: ignore
-            return T if xor(eval_, implicit_not) else F
+            return T if eval_ else F
         # Switch from Expressions to Polynomials
         lhs, _ = lhs.quo_rem(lhs.content())
         # lhs = lhs / lhs.content()
@@ -339,8 +335,6 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 func = f.converse_func if unit < 0 else f.func
             case _:
                 assert False
-        if implicit_not:
-            func = func.complement_func
         return func(lhs, Ring(0), chk=False)
 
     def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
