@@ -304,7 +304,7 @@ class Formula(ABC):
         """
         ...
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         """Fast simplification. The result is equivalent to `self`.
 
         Primary simplification goals are the elimination of occurrences of

@@ -75,9 +75,12 @@ class Eq(TermMixin, atomlib.sympy.Eq):
         return Eq
 
     def __init__(self, *args):
+        for arg in args:
+            if not isinstance(arg, Variable):
+                raise ValueError(f"{arg!r} is not a Term")
         super().__init__(*args)
 
-    def simplify(self, Theta=None):
+    def simplify(self):
         c = self.lhs.compare(self.rhs)
         if c == 0:
             return T
@@ -118,7 +121,13 @@ class Ne(TermMixin, atomlib.sympy.Ne):
         """
         return Ne
 
-    def simplify(self, Theta=None):
+    def __init__(self, *args):
+        for arg in args:
+            if not isinstance(arg, Variable):
+                raise ValueError(f"{arg!r} is not a Term")
+        super().__init__(*args)
+
+    def simplify(self):
         c = self.lhs.compare(self.rhs)
         if c == 0:
             return F

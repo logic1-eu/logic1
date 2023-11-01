@@ -24,7 +24,7 @@ class Eq(atomlib.sympy.Eq):
         """
         return Eq
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if lhs == sympy.Integer(0):
@@ -48,7 +48,7 @@ class Ne(atomlib.sympy.Ne):
         """
         return Ne
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if lhs == sympy.Integer(0):
@@ -72,7 +72,7 @@ class Ge(atomlib.sympy.Ge):
         """
         return Le
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if not lhs.free_symbols:
@@ -94,7 +94,7 @@ class Le(atomlib.sympy.Le):
         """
         return Ge
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if not lhs.free_symbols:
@@ -116,7 +116,7 @@ class Gt(atomlib.sympy.Gt):
         """
         return Lt
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if not lhs.free_symbols:
@@ -138,7 +138,7 @@ class Lt(atomlib.sympy.Lt):
         """
         return Gt
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs - self.rhs
         lhs = lhs.expand()
         if not lhs.free_symbols:

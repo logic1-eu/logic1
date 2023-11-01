@@ -299,7 +299,7 @@ class Equivalent(BooleanFormula):
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
@@ -309,8 +309,8 @@ class Equivalent(BooleanFormula):
         >>> e1.simplify()
         Eq(x, y)
         """
-        lhs = self.lhs.simplify(Theta=Theta)
-        rhs = self.rhs.simplify(Theta=Theta)
+        lhs = self.lhs.simplify()
+        rhs = self.rhs.simplify()
         if lhs is T:
             return rhs
         if rhs is T:
@@ -402,15 +402,15 @@ class Implies(BooleanFormula):
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
         """
         if self.rhs is T:
             return self.lhs
-        lhs_simplify = self.lhs.simplify(Theta=Theta)
+        lhs_simplify = self.lhs.simplify()
         if lhs_simplify is F:
             return T
-        rhs_simplify = self.rhs.simplify(Theta=Theta)
+        rhs_simplify = self.rhs.simplify()
         if rhs_simplify is T:
             return T
         if lhs_simplify is T:
@@ -460,7 +460,7 @@ class AndOr(BooleanFormula):
     args: tuple[Formula, ...]  #: :meta private:
 
     # Instance methods
-    def simplify(self, Theta=None):
+    def simplify(self):
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
@@ -828,7 +828,7 @@ class Not(BooleanFormula):
     def __init__(self, arg: Formula) -> None:
         self.args = (arg, )
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1 import Ex, All
@@ -839,7 +839,7 @@ class Not(BooleanFormula):
         >>> ~ All(x, Ex(y, f)).simplify()
         Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
         """
-        arg_simplify = self.arg.simplify(Theta=Theta)
+        arg_simplify = self.arg.simplify()
         if arg_simplify is T:
             return F
         if arg_simplify is F:

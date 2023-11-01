@@ -279,7 +279,7 @@ class Eq(BinaryAtomicFormula):
         return Eq
 
     # Instance methods
-    def simplify(self, Theta=None):
+    def simplify(self):
         """Compare the parent method :meth:`.firstorder.Formula.simplify`.
 
         >>> from sympy.abc import x, y
@@ -342,7 +342,7 @@ class Ne(BinaryAtomicFormula):
         return Ne
 
     # Instance methods
-    def simplify(self, Theta=None):
+    def simplify(self):
         """Compare the parent method :meth:`.firstorder.Formula.simplify`.
 
         >>> from sympy.abc import x, y

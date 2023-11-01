@@ -153,7 +153,7 @@ class QuantifiedFormula(Formula):
         quantified = assume_quantified | {self.var}
         return self.arg.get_vars(assume_quantified=quantified)
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1.atomlib.sympy import Eq
