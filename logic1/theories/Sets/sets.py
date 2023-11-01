@@ -152,3 +152,9 @@ class C_(atomlib.sympy.C_):
     @classproperty
     def complement_func(cls):
         return C
+
+    # def _sprint(self, mode: str) -> str:
+    #     if mode == 'text':
+    #         return repr(self)
+    #     assert mode == 'latex', f'bad print mode {mode!r}'
+    #     return f'C^{self.index - 1}'

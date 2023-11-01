@@ -79,7 +79,7 @@
 ...     [Ne(c27, c9)]]
 
 >>> psi = And(*(itertools.chain.from_iterable(gamma[1:])))
->>> qe(EX(V, psi)).simplify()
+>>> qe(EX(V, psi))
 C(4)
 
 >>> W = [c6, c13, c24, c25]  # Czechia, Hungary, Slovakia, Slovenia
@@ -87,6 +87,8 @@ C(4)
 >>> chi = Ne(c6, c24) & Ne(c24, c13) & Ne(c13, c25)
 >>> phi2 = ALL(W, chi >> EX(V_minus_W, psi))
 >>> phi2_prime = qe(phi2)
+>>> phi2_prime
+And(Or(C(4), C_(2)), Or(C(5), C_(4)))
 >>> simplify(phi2_prime.to_dnf())
 Or(C(5), C_(2))
 
@@ -96,9 +98,17 @@ Or(C(5), C_(2))
 C(5)
 
 >>> phi3 = EX(V_minus_W, psi)
->>> phi3_prime = qe(phi3, sism=False)
+>>> phi3_prime = qe(phi3)
+>>> phi3_prime
+And(C(4), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6), Or(And(Eq(c13, c6), Eq(c24,
+    c25)), And(Eq(c13, c6), Eq(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Ne(c24,
+    c25), Ne(c25, c6)), And(Eq(c24, c25), Ne(c13, c6), Ne(c25, c6)), And(C(5),
+    Ne(c13, c6), Ne(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Or(Eq(c24, c25),
+    Eq(c25, c6))), And(Eq(c24, c25), Or(Eq(c13, c6), Eq(c25, c6))), And(Ne(c13,
+    c6), Or(Eq(c24, c25), Eq(c25, c6))), And(Ne(c24, c25), Or(Eq(c13, c6),
+    Eq(c25, c6)))))
 >>> simplify(phi3_prime.to_dnf())
-Or(And(C(5), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
-   And(C(4), Eq(c13, c6), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
-   And(C(4), Eq(c24, c25), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
-   And(C(4), Eq(c25, c6), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)))
+Or(And(C(5), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c13, c6),
+    Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c24, c25), Ne(c13,
+    c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c25, c6), Ne(c13, c24),
+    Ne(c13, c25), Ne(c24, c6)))
