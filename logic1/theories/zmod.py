@@ -5,8 +5,7 @@ import sympy
 
 from logic1 import abc
 from logic1 import atomlib
-from logic1.firstorder.boolean import Or, T, F
-from logic1.firstorder.formula import Formula
+from logic1.firstorder import Formula, Or, T, F
 from logic1.support.decorators import classproperty
 
 
@@ -109,6 +108,9 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     @staticmethod
     def is_valid_atom(f: Formula) -> bool:
         return isinstance(f, (Eq, Ne))
+
+    def simplify(self, f: Formula) -> Formula:
+        return f.simplify()
 
 
 qe = quantifier_elimination = QuantifierElimination()
