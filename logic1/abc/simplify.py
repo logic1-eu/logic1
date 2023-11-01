@@ -109,8 +109,8 @@ class Simplify(ABC, Generic[TH]):
 
         gand = f.func
         others, atoms = split(f.args)
-        _1 = map(lambda arg: self._simpl_at(arg), atoms)
-        new_others, atoms = split(_1)
+        simplified_atoms = (self._simpl_at(atom) for atom in atoms)
+        new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
             th.add(gand, atoms)
