@@ -75,14 +75,10 @@ class Theory(abc.simplify.Theory):
                     self._cur_inequations = self._cur_inequations.union({atom})
                 case _:
                     assert False
-            inequations = set()
             for ne in self._cur_inequations:
                 for P in self._cur_equations:
                     if ne.lhs in P and ne.rhs in P:
-                        break
-                else:
-                    inequations.update({ne})
-            self._cur_inequations = inequations
+                        raise Theory.Inconsistent
             # # Create substitution from the equations
             # sigma = dict()
             # for P in self._cur_equations:

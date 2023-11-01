@@ -96,8 +96,9 @@ Or(C(5), C_(2))
 C(5)
 
 >>> phi3 = EX(V_minus_W, psi)
->>> phi3_prime = qe(phi3)
+>>> phi3_prime = qe(phi3, sism=False)
 >>> simplify(phi3_prime.to_dnf())
-Or(And(C(5), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c24, c25),
-   Eq(c24, c6), Ne(c13, c24), Ne(c13, c25)), And(C(4), Eq(c13, c6),
-   Eq(c24, c25), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)))
+Or(And(C(5), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
+   And(C(4), Eq(c13, c6), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
+   And(C(4), Eq(c24, c25), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)),
+   And(C(4), Eq(c25, c6), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)))
