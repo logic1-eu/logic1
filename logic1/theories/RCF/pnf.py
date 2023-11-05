@@ -1,7 +1,7 @@
 from ... import abc
 
 from ...firstorder import Formula
-from .rcf import var, Variable
+from .rcf import ring, Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -13,12 +13,12 @@ class PrenexNormalForm(abc.pnf.PrenexNormalForm):
 
     def rename(self, v: Variable) -> Variable:
         i = 0
-        vars_as_str = tuple(str(v) for v in var.get())
+        vars_as_str = tuple(str(v) for v in ring.get_vars())
         v_as_str = str(v)
         while v_as_str in vars_as_str:
             i += 1
             v_as_str = str(v) + "_R" + str(i)
-        v, = var.add(v_as_str)
+        v = ring.add_var(v_as_str)
         return v
 
 

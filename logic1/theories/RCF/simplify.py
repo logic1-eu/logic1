@@ -14,7 +14,7 @@ from ...firstorder.boolean import And, Or
 from ...firstorder.atomic import AtomicFormula
 from ...firstorder.truth import T, F
 from .rcf import (BinaryAtomicFormula, RcfAtomicFormula, RcfAtomicFormulas,
-                  Term, Variable, Ring, Eq, Ne, Ge, Le, Gt, Lt)
+                  Term, Variable, ring, Eq, Ne, Ge, Le, Gt, Lt)
 from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
@@ -155,7 +155,7 @@ class Theory(abc.simplify.Theory):
     def _compose_atom(rel: type[BinaryAtomicFormula], p: Term, q: Rational) -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
-        return rel(den * p - num, Ring(0), chk=False)
+        return rel(den * p - num, ring(0), chk=False)
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -168,8 +168,8 @@ class Theory(abc.simplify.Theory):
         right hand side is zero and its left hand side polynomial has gone
         through SymPy's :meth:`expand`.
 
-        >>> from .rcf import var
-        >>> a, b = var.set('a', 'b')
+        >>> from .rcf import ring
+        >>> a, b = ring.set_vars('a', 'b')
         >>> f = Le(6*a**2 + 12*a*b + 6*b**2 + 3, 0)
         >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
         (<class 'logic1.theories.RCF.rcf.Le'>, a^2 + 2*a*b + b^2, -1/2)
@@ -307,8 +307,8 @@ class Simplify(abc.simplify.Simplify['Theory']):
     @lru_cache(maxsize=None)
     def _simpl_at(self, f: AtomicFormula) -> Formula:
         """
-        >>> from .rcf import var
-        >>> a, b = var.set('a', 'b')
+        >>> from .rcf import ring
+        >>> a, b = ring.set_vars('a', 'b')
         >>> simplify(Le(-6 * (a+b)**2 + 3, 0))
          Ge(2*a^2 + 4*a*b + 2*b^2 - 1, 0)
         """
@@ -316,7 +316,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         lhs = f.lhs - f.rhs
         if lhs.is_constant():
             _python_operator = f.sage_func  # type: ignore
-            eval_ = _python_operator(lhs, Ring(0))  # type: ignore
+            eval_ = _python_operator(lhs, ring(0))  # type: ignore
             return T if eval_ else F
         # Switch from Expressions to Polynomials
         lhs, _ = lhs.quo_rem(lhs.content())
@@ -328,14 +328,14 @@ class Simplify(abc.simplify.Simplify['Theory']):
             case rcf.Eq | rcf.Ne:
                 func = f.func
                 # Compute squarefree part
-                lhs = Ring(1)
+                lhs = ring(1)
                 for factor, _ in factor_list:
                     lhs *= factor
                 if lhs.lc() < 0:
                     lhs = - lhs
             case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
                 unit = factor.unit()
-                lhs = Ring(1)
+                lhs = ring(1)
                 for factor, multiplicity in factor_list:
                     lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
                 if lhs.lc() < 0:
@@ -344,7 +344,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 func = f.converse_func if unit < 0 else f.func
             case _:
                 assert False
-        return func(lhs, Ring(0), chk=False)
+        return func(lhs, ring(0), chk=False)
 
     def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
         atoms.sort(key=Simplify._sort_key_at)

@@ -124,7 +124,7 @@ class BinaryAtomicFormula(AtomicFormula):
             args_ = []
             for arg in (lhs, rhs):
                 assert isinstance(arg, (int, MPolynomial_libsingular))
-                args_.append(Ring(arg))
+                args_.append(ring(arg))
             super().__init__(*args_)
         else:
             super().__init__(lhs, rhs)
@@ -146,9 +146,12 @@ class BinaryAtomicFormula(AtomicFormula):
         return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
 
 
-class _Variables:
+class _Ring:
 
-    _instance: Optional[_Variables] = None
+    _instance: Optional[_Ring] = None
+
+    def __call__(self, obj):
+        return self.sage_ring(obj)
 
     def __new__(cls):
         if cls._instance is None:
@@ -156,45 +159,49 @@ class _Variables:
         return cls._instance
 
     def __init__(self):
-        self.ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
         self.stack = []
 
-    def add(self, *args) -> tuple[Variable]:
+    def __repr__(self):
+        return str(self.sage_ring)
+
+    def add_var(self, v: str) -> Variable:
+        return self.add_vars(v)[0]
+
+    def add_vars(self, *args) -> tuple[Variable, ...]:
+        if len(args) == 0:
+            # The code below is correct also for len(args) == 0, but I do now
+            # want to recreate polynomial rings without a good reason.
+            return ()
         strings = list(args)
-        gens_as_str = [str(gen) for gen in self.ring.gens()]
+        gens_as_str = [str(gen) for gen in self.sage_ring.gens()]
         for arg in strings:
             if not isinstance(arg, str):
                 raise ValueError(f'{arg} is not a string')
             if arg in gens_as_str:
                 raise ValueError(f'{arg} is already a variable') from None
-        self.ring = PolynomialRing(ZZ, gens_as_str + strings, implementation='singular')
-        return self.ring.gens()[len(gens_as_str):]
+        self.sage_ring = PolynomialRing(ZZ, gens_as_str + strings, implementation='singular')
+        gens = self.sage_ring.gens()[len(gens_as_str):]
+        return gens
 
-    def get(self) -> tuple[Variable]:
-        return self.ring.gens()
+    def get_vars(self) -> tuple[Variable]:
+        return self.sage_ring.gens()
 
     def pop(self) -> PolynomialRing:
-        self.ring = self.stack.pop()
-        return self.ring
+        self.sage_ring = self.stack.pop()
+        return self.sage_ring
 
     def push(self) -> list[PolynomialRing]:
-        self.stack.append(self.ring)
+        self.stack.append(self.sage_ring)
         return self.stack
 
-    def new(self) -> None:
-        self.ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
-
-    def set(self, *args) -> tuple[Variable]:
-        self.new()
-        gens = self.add(*args)
+    def set_vars(self, *args) -> tuple[Variable, ...]:
+        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
+        gens = self.add_vars(*args)
         return gens
 
 
-var = _Variables()
-
-
-def Ring(obj):
-    return var.ring(obj)
+ring = _Ring()
 
 
 class Eq(BinaryAtomicFormula):
