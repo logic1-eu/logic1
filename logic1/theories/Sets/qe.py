@@ -8,6 +8,7 @@ from ...firstorder.formula import Formula
 from ...firstorder.boolean import And, Or
 
 from .sets import C, C_, Eq, Ne, Variable
+from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
 
 
@@ -57,7 +58,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return v
 
     def pnf(self, f: Formula) -> Formula:
-        return f.to_pnf()
+        return _pnf(f)
 
     def qe1p(self, v: Variable, f: Formula) -> Formula:
         def eta(Z: set, k: int) -> Formula:

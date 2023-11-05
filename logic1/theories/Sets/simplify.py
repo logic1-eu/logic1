@@ -2,15 +2,15 @@
 from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
+from sympy import default_sort_key, oo
+from sympy.core.numbers import Infinity
 
 from ...firstorder.formula import Formula
 from ...firstorder.boolean import And, Or
 from ...firstorder.atomic import AtomicFormula
 
 from .sets import C, C_, Eq, Ne, Term, Variable
-
-from sympy import default_sort_key, oo
-from sympy.core.numbers import Infinity
+from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
 
@@ -147,7 +147,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         try:
             return self.simplify(f, assume)
         except Simplify.NotInPnf:
-            return self.simplify(f.to_pnf(), assume)
+            return self.simplify(pnf(f), assume)
 
     def _simpl_at(self, f: AtomicFormula) -> Formula:
         return f.simplify()
