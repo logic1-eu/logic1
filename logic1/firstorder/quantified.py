@@ -187,7 +187,7 @@ class QuantifiedFormula(Formula):
         """Implements the abstract method :meth:`Formula.subs`.
         """
         atom = self.get_any_atom()
-        if not atom:
+        if atom is None:
             return self
         # A copy of the mutual could be avoided by keeping track of the changes
         # and undoing them at the end.
@@ -218,6 +218,7 @@ class QuantifiedFormula(Formula):
         return self.func(self.var, self.arg.subs(substitution))
 
     def _to_distinct_vars(self, badlist: set) -> QuantifiedFormula:
+        # needs revision: var should know how to rename itself
         arg = self.arg._to_distinct_vars(badlist)
         if self.var in badlist:
             var = rename(self.var)

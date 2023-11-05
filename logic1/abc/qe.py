@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import logging
 from time import time
-from typing import Any, Optional
+from typing import Any, Optional, TypeAlias
 
 from logic1.firstorder.boolean import And, Or, Not
 from logic1.firstorder.formula import Formula
@@ -13,7 +13,7 @@ from logic1.firstorder.quantified import QuantifiedFormula, All
 from logic1.firstorder.truth import T, F
 
 
-Variable = Any
+Variable: TypeAlias = Any
 
 
 class FoundT(Exception):
@@ -110,6 +110,10 @@ class QuantifierElimination(ABC):
     def get_best(cls, vars_: list, f: Formula) -> Variable:
         return vars_.pop()
 
+    @abstractmethod
+    def pnf(self, f: Formula) -> Formula:
+        ...
+
     def pop_block(self) -> None:
         assert self.matrix, "no matrix"
         quantifier, vars_ = self.blocks.pop()
@@ -160,7 +164,7 @@ class QuantifierElimination(ABC):
         ...
 
     def setup(self, f: Formula) -> None:
-        f = f.to_pnf()
+        f = self.pnf(f)
         blocks = []
         vars_ = []
         while isinstance(f, QuantifiedFormula):

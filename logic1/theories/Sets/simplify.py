@@ -1,5 +1,5 @@
 # from functools import lru_cache
-from typing import Iterable, Optional, Self
+from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
 
@@ -140,8 +140,14 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    def __call__(self, f: Formula) -> Formula:
-        return self.simplify(f)
+    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Term, Term]
+    SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
+
+    def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
+        try:
+            return self.simplify(f, assume)
+        except Simplify.NotInPnf:
+            return self.simplify(f.to_pnf(), assume)
 
     def _simpl_at(self, f: AtomicFormula) -> Formula:
         return f.simplify()
@@ -153,14 +159,13 @@ class Simplify(abc.simplify.Simplify['Theory']):
         others.sort(key=Simplify._sort_key)
 
     @staticmethod
-    def _sort_key(f: Formula) ->\
-            tuple[int, int, int, tuple[tuple[int, int] | tuple[int, Term, Term], ...]]:
+    def _sort_key(f: Formula) -> SortKey:
         assert isinstance(f, (And, Or))
         atom_sort_keys = tuple(Simplify._sort_key_at(a) for a in f.atoms())
         return (f.depth(), len(f.args), len(atom_sort_keys), atom_sort_keys)
 
     @staticmethod
-    def _sort_key_at(f: AtomicFormula) -> tuple[int, int] | tuple[int, Term, Term]:
+    def _sort_key_at(f: AtomicFormula) -> AtomicSortKey:
         match f:
             case C():
                 return (0, f.index)

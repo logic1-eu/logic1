@@ -48,7 +48,7 @@ class Simplify(ABC, Generic[TH]):
 
     _develop: int
 
-    def simplify(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
+    def simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
         """
         Deep simplification according to [DS95].
 
@@ -56,19 +56,16 @@ class Simplify(ABC, Generic[TH]):
                Formulae over Ordered Fields J. Symb. Comput. 24(2):209–231,
                1997. Open access at doi:10.1006/jsco.1997.0123
         """
+        th = self._Theory()
         try:
-            th = self._Theory()
-            try:
-                th.add(And, assume)
-            except th.Inconsistent:
-                return T
-            match f:
-                case AtomicFormula():
-                    return self._simpl_nnf(And(f), th)
-                case _:
-                    return self._simpl_pnf(f, th)
-        except Simplify.NotInPnf:
-            return self.simplify(f.to_pnf(), assume)
+            th.add(And, assume)
+        except th.Inconsistent:
+            return T
+        match f:
+            case AtomicFormula():
+                return self._simpl_nnf(And(f), th)
+            case _:
+                return self._simpl_pnf(f, th)
 
     def _simpl_pnf(self, f: Formula, th: TH) -> Formula:
         match f:
@@ -88,7 +85,7 @@ class Simplify(ABC, Generic[TH]):
                 return self._simpl_and_or(f, th)
             case TruthValue():
                 return f
-            case Not() | Implies() | Equivalent():
+            case Not() | Implies() | Equivalent() | QuantifiedFormula():
                 raise Simplify.NotInPnf
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.func!r}')
@@ -131,7 +128,7 @@ class Simplify(ABC, Generic[TH]):
                 case AtomicFormula():
                     new_others = set()
                     new_atoms = (simplified_arg,)
-                case gand.dual_func() | QuantifiedFormula():
+                case gand.dual_func() | QuantifiedFormula():  # !
                     new_others = {simplified_arg}
                     new_atoms = ()
                 case _:
@@ -140,7 +137,7 @@ class Simplify(ABC, Generic[TH]):
                     assert False
             if new_atoms:
                 try:
-                    th.add(gand, new_atoms)
+                    th.add(gand, new_atoms)  # Can save resimp if th does not change
                 except th.Inconsistent:
                     return gand.definite_func()
                 others = others.union(simplified_others)

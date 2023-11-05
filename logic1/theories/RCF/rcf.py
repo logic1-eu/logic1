@@ -13,6 +13,8 @@ from ...firstorder import Formula, T, F
 from ...support.containers import GetVars
 from ...support.decorators import classproperty
 
+from ...support.tracing import trace  # noqa
+
 
 Term: TypeAlias = MPolynomial_libsingular
 Variable: TypeAlias = MPolynomial_libsingular
@@ -60,7 +62,7 @@ class TermMixin():
         """Implements the abstract method
         :meth:`.firstorder.AtomicFormula.rename_var`.
         """
-        return NotImplemented
+        raise NotImplementedError
         # TODO
         # return var(str(rename(sympy.Symbol(str(variable)))))
 
@@ -80,10 +82,11 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
         return GetVars(free=all_vars - assume_quantified,
                        bound=all_vars & assume_quantified)
 
-    def subs(self, substitution: dict) -> AtomicFormula:
+    def subs(self, d: dict) -> AtomicFormula:
         """Implements the abstract method :meth:`.firstorder.Formula.subs`.
         """
-        args = (arg.subs(substitution) for arg in self.args)
+        sage_keywords = {str(v): t for v, t in d.items()}
+        args = (arg.subs(**sage_keywords) for arg in self.args)
         return self.func(*args)
 
 

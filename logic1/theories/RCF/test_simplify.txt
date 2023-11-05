@@ -23,8 +23,20 @@ Eq(a, 0)
 >>> simplify(Not(Eq(a, 0)))
 Ne(a, 0)
 
->>> simplify(Equivalent(Eq(a, 0), Gt(b, 0)))
-And(Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0)))
+>>> simplify(Gt(a, b) & Equivalent(Eq(a, 0), Gt(b, 0)))
+And(Gt(a - b, 0), Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0)))
+
+>>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Gt(b, 0)))
+Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0))))
+
+# Test quantifiers
+>>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))))
+Ex(a_R1, All(a_R2, Or(Gt(a - b, 0), And(Or(Eq(a, 0), Ge(b - a_R2, 0)),
+    Or(Lt(b - a_R1, 0), Ne(a, 0))))))
+
+# Test assumption
+>>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))), assume=[Eq(a, 0)])
+Ex(a_R3, Or(Gt(a - b, 0), Lt(b - a_R3, 0)))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\

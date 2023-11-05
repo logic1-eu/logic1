@@ -1,0 +1,23 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+>>> x = var.set(*('x' + str(i) for i in range(8)))
+>>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
+>>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
+>>> f3 = Ex(x[7], Eq(x[0], 0))
+>>> pnf(f1 & f2 & f3)
+All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, Eq(x0, 0)))))))))
+
+>>> a, b, y = var.set('a', 'b', 'y')
+>>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
+>>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
+>>> _ = var.push()
+>>> pnf(Equivalent(f1, f2))
+Ex(y_R1, All(y_R2,
+    And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
+        Or(And(Ne(y_R2, a), Ne(a, 0)), And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
+>>> _ = var.pop()
+>>> pnf(Equivalent(f1, f2), prefer_universal=True)
+All(y_R2, Ex(y_R1,
+    And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
+        Or(And(Ne(y_R2, a), Ne(a, 0)), And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))

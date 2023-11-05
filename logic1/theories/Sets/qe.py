@@ -56,6 +56,9 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         # print(d, v)
         return v
 
+    def pnf(self, f: Formula) -> Formula:
+        return f.to_pnf()
+
     def qe1p(self, v: Variable, f: Formula) -> Formula:
         def eta(Z: set, k: int) -> Formula:
             args = []

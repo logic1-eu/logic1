@@ -4,7 +4,7 @@ from functools import lru_cache
 from operator import xor
 from sage.all import oo, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import Iterable, Optional, Self
+from typing import Iterable, Optional, Self, TypeAlias
 
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
@@ -15,6 +15,7 @@ from ...firstorder.atomic import AtomicFormula
 from ...firstorder.truth import T, F
 from .rcf import (BinaryAtomicFormula, RcfAtomicFormula, RcfAtomicFormulas,
                   Term, Variable, Ring, Eq, Ne, Ge, Le, Gt, Lt)
+from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
 
@@ -40,9 +41,11 @@ class Theory(abc.simplify.Theory):
 
         def __init__(self, lopen: bool = False, start: Rational | MinusInfinity = -oo,
                      end: Rational | PlusInfinity = oo, ropen: bool = False) -> None:
-            assert lopen or -oo < start
-            assert ropen or end < oo
-            if start > end or ((lopen or ropen) and start == end):
+            assert lopen or start is not -oo
+            assert ropen or end is not oo
+            if start > end:
+                raise Theory.Inconsistent
+            if (lopen or ropen) and start == end:
                 raise Theory.Inconsistent
             self.lopen = lopen
             self.start = start
@@ -283,15 +286,21 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    def __call__(self, f: Formula, prefer_weak: bool = False,
-                 prefer_order: bool = True, log=logging.CRITICAL,
-                 _develop: int = 0) -> Formula:
+    AtomicSortKey: TypeAlias = tuple[int, Term]
+    SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
+
+    def __call__(self, f: Formula, assume: list[AtomicFormula] = [],
+                 prefer_weak: bool = False, prefer_order: bool = True,
+                 log=logging.CRITICAL, _develop: int = 0) -> Formula:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
         self._develop = _develop
         level = logging.getLogger().getEffectiveLevel()
         logging.getLogger().setLevel(log)
-        result = self.simplify(f)
+        try:
+            result = self.simplify(f, assume)
+        except Simplify.NotInPnf:
+            result = self.simplify(pnf(f), assume)
         logging.getLogger().setLevel(level)
         return result
 
@@ -344,13 +353,13 @@ class Simplify(abc.simplify.Simplify['Theory']):
         others.sort(key=Simplify._sort_key)
 
     @staticmethod
-    def _sort_key(f: Formula) -> tuple[int, int, int, tuple[tuple[int, Term], ...]]:
+    def _sort_key(f: Formula) -> SortKey:
         assert isinstance(f, (And, Or))
         atom_sort_keys = tuple(Simplify._sort_key_at(a) for a in f.atoms())
         return (f.depth(), len(f.args), len(atom_sort_keys), atom_sort_keys)
 
     @staticmethod
-    def _sort_key_at(f: AtomicFormula) -> tuple[int, Term]:
+    def _sort_key_at(f: AtomicFormula) -> AtomicSortKey:
         match f:
             case Eq():
                 return (0, f.lhs)

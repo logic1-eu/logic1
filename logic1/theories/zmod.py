@@ -101,6 +101,9 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         assert isinstance(_modulus, int)
         return self.qe(f)
 
+    def pnf(self, f: Formula) -> Formula:
+        return f.to_pnf()
+
     def qe1p(self, v: Variable, f: Formula) -> Formula:
         assert isinstance(_modulus, int)
         return Or(*(f.subs({v: i}) for i in range(_modulus))).simplify()

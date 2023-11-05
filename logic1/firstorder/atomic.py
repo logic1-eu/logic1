@@ -14,6 +14,8 @@ from ..support.decorators import classproperty
 if TYPE_CHECKING:
     import sympy
 
+from ..support.tracing import trace  # noqa
+
 
 class AtomicFormula(Formula):
 

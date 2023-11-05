@@ -346,7 +346,7 @@ class Formula(ABC):
 
     @final
     def to_distinct_vars(self) -> Self:
-        """Convert to equivalent formulas with distinct variables.
+        """Convert to equivalent formula with distinct variables.
 
         Bound variables are renamed such that that set of all bound variables
         is disjoint from the set of all free variables. Furthermore, each bound
@@ -484,7 +484,6 @@ class Formula(ABC):
                Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
                Quantorenelimination für lineare reelle Probleme.
                Diploma Thesis, University of Passau, Germany, 1990
-
         """
         if is_nnf:
             phi = self
