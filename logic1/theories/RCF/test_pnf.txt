@@ -1,6 +1,12 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
+# Test renaming to distinct variables:
+>>> x, y, z = ring.set_vars('x', 'y', 'z')
+>>> f = Eq(x, y) & Ex(x, Eq(x, y) & All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T))))
+>>> pnf(f)
+Ex(x_R2, All(z, Ex(y_R1, Ex(x_R1, And(Eq(x, y), Eq(x_R2, y), Eq(x_R2, y_R1), Eq(y_R1, z), T)))))
+
 # Example from p.88 in "K. Burhenne. Implementierung eines Algorithmus zur
 # Quantorenelimination für lineare reelle Probleme. Diploma Thesis, University
 # of Passau, Germany, 1990":

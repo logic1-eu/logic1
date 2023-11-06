@@ -149,10 +149,6 @@ class BooleanFormula(Formula):
         """
         return Not(self).to_dnf().to_nnf(_implicit_not=True)
 
-    def _to_distinct_vars(self, badlist: set) -> BooleanFormula:
-        return self.func(*(arg._to_distinct_vars(badlist)
-                           for arg in self.args))
-
     def to_dnf(self, simplify=True) -> BooleanFormula | atomic.AtomicFormula:
         """ Convert to Disjunctive Normal Form.
 
@@ -509,67 +505,6 @@ class AndOr(BooleanFormula):
                 args_nnf += [arg_nnf]
         return func_nnf(*args_nnf)
 
-    def _to_pnf(self) -> dict:
-        """Convert to Prenex Normal Form. self must be in NNF.
-        """
-
-        def interchange(self: AndOr, q: type[Ex] | type[All]) -> Formula:
-            quantifiers = []
-            quantifier_positions = set()
-            args = list(self.args)
-            while True:
-                found_quantifier = False
-                for i, arg_i in enumerate(args):
-                    while isinstance(arg_i, q):
-                        # I think it follows from the type hints that arg_i is
-                        # an instance of Ex or All, but mypy 1.0.1 cannot see
-                        # that.
-                        quantifiers += [(q, arg_i.var)]  # type: ignore
-                        arg_i = arg_i.arg  # type: ignore
-                        quantifier_positions |= {i}
-                        found_quantifier = True
-                    args[i] = arg_i
-                if not found_quantifier:
-                    break
-                q = q.dual_func
-            # The lifting of quantifiers above can introduce direct nested
-            # ocurrences of self.func, which is one of And, Or. We
-            # flatten those now, but not any other nestings.
-            args_pnf: list[Formula] = []
-            for i, arg in enumerate(args):
-                if i in quantifier_positions and arg.func is self.func:
-                    args_pnf += arg.args
-                else:
-                    args_pnf += [arg]
-            pnf: Formula = self.func(*args_pnf)
-            for q, v in reversed(quantifiers):
-                pnf = q(v, pnf)
-            return pnf
-
-        L1 = []
-        L2 = []
-        for arg in self.args:
-            d = arg._to_pnf()
-            L1.append(d[Ex])
-            L2.append(d[All])
-        phi1 = interchange(self.func(*L1), Ex)
-        phi2 = interchange(self.func(*L2), All)
-        if phi1.func is not Ex and phi2.func is not All:
-            # self is quantifier-free
-            return {Ex: self, All: self}
-        phi1_alternations = phi1.count_alternations()
-        phi2_alternations = phi2.count_alternations()
-        d = {}
-        if phi1_alternations == phi2_alternations:
-            d[Ex] = phi1 if phi1.func is Ex else phi2
-            d[All] = phi2 if phi2.func is All else phi1
-            return d
-        if phi1_alternations < phi2_alternations:
-            d[Ex] = d[All] = phi1
-            return d
-        d[Ex] = d[All] = phi2
-        return d
-
 
 class And(AndOr):
     r"""A class whose instances are conjunctions in the sense that their
@@ -861,11 +796,6 @@ class Not(BooleanFormula):
         return self.arg.to_nnf(to_positive=to_positive,
                                _implicit_not=not _implicit_not)
 
-    def _to_pnf(self) -> dict:
-        """Convert to Prenex Normal Form. self must be in NNF.
-        """
-        return {Ex: self, All: self}
-
 
 def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
@@ -886,6 +816,6 @@ def involutive_not(arg: Formula) -> Formula:
 
 # The following imports are intentionally late to avoid circularity.
 from . import atomic
-from .atomic import AtomicFormula
+from .atomic import AtomicFormula  # noqa
 from .quantified import Ex, All
 from .truth import _T, _F, T, F

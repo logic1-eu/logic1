@@ -81,11 +81,6 @@ class TruthValue(BooleanFormula):
             return Not(self)
         return self
 
-    def _to_pnf(self) -> dict:
-        """Prenex normal form. self must be in negation normal form.
-        """
-        return {Ex: self, All: self}
-
     def to_sympy(self):
         """Raises :exc:`NotImplementedError` since SymPy does not
         know quantifiers.

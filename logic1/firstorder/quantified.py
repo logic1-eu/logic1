@@ -9,7 +9,6 @@ from typing import Any, Callable, Iterator, Optional, TYPE_CHECKING
 from .formula import Formula
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
-from ..support.renaming import rename
 
 # from ..support.tracing import trace
 
@@ -217,17 +216,6 @@ class QuantifiedFormula(Formula):
             return self.func(var, self.arg.subs(substitution))
         return self.func(self.var, self.arg.subs(substitution))
 
-    def _to_distinct_vars(self, badlist: set) -> QuantifiedFormula:
-        # needs revision: var should know how to rename itself
-        arg = self.arg._to_distinct_vars(badlist)
-        if self.var in badlist:
-            var = rename(self.var)
-            arg = arg.subs({self.var: var})
-            badlist |= {var}  # mutable
-            return self.func(var, arg)
-        badlist |= {self.var}
-        return self.func(self.var, arg)
-
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
         """Implements the abstract method :meth:`Formula.to_nnf`.
@@ -236,12 +224,6 @@ class QuantifiedFormula(Formula):
         arg_nnf = self.arg.to_nnf(to_positive=to_positive,
                                   _implicit_not=_implicit_not)
         return func_nnf(self.var, arg_nnf)
-
-    def _to_pnf(self) -> dict:
-        """Prenex normal form. self must be in negation normal form.
-        """
-        pnf = self.func(self.var, self.arg._to_pnf()[self.func])
-        return {Ex: pnf, All: pnf}
 
     def to_sympy(self, *args, **kwargs):
         """Raises :exc:`NotImplementedError` since SymPy does not

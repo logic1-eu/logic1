@@ -345,45 +345,6 @@ class Formula(ABC):
         ...
 
     @final
-    def to_distinct_vars(self) -> Self:
-        """Convert to equivalent formula with distinct variables.
-
-        Bound variables are renamed such that that set of all bound variables
-        is disjoint from the set of all free variables. Furthermore, each bound
-        variable in the result occurs with one and only one quantifier.
-
-        >>> from logic1 import Ex, All, T
-        >>> from logic1.support import renaming
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
-        >>> renaming.push()  # temporarily create a fresh counter for renaming
-        >>>
-        >>> f0 = All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T)))
-        >>> f = Eq(x, y) & Ex(x, Eq(x, y) & f0)
-        >>> f
-        And(Eq(x, y), Ex(x, And(Eq(x, y),
-            All(z, Ex(y, And(Eq(x, y), Eq(y, z), Ex(x, T)))))))
-        >>>
-        >>> f.to_distinct_vars()
-        And(Eq(x, y), Ex(x_R3, And(Eq(x_R3, y),
-            All(z, Ex(y_R2, And(Eq(x_R3, y_R2), Eq(y_R2, z), Ex(x_R1, T)))))))
-        >>>
-        >>> renaming.pop()  # restore renaming counter
-        """
-        # Recursion starts with a badlist (technically a set) of all free
-        # variables.
-        return self._to_distinct_vars(self.get_vars().free)
-
-    @abstractmethod
-    def _to_distinct_vars(self, badlist: set) -> Self:
-        # Traverses self. If a badlisted variable is encountered as a
-        # quantified variable, it will be replaced with a fresh name in the
-        # respective QuantifiedFormula, and the fresh name will be badlisted
-        # for the future. Note that this can includes variables that do not
-        # *occur* in a mathematical sense.
-        ...
-
-    @final
     def to_latex(self) -> str:
         """Convert to a LaTeX representation.
         """
@@ -418,100 +379,13 @@ class Formula(ABC):
         """
         ...
 
-    @final
-    def to_pnf(self, prefer_universal: bool = False,
-               is_nnf: bool = False) -> Formula:
-        """Convert to Prenex Normal Form.
-
-        A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
-        quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
-        formula. The method used here minimizes the number of quantifier
-        alternations in the prenex block [Burhenne90]_.
-
-        If the minimal number of alternations in the result can be achieved
-        with both :class:`Ex` and :class:`All` as the first quantifier in the
-        result, then the former is preferred. This preference can be changed
-        with a keyword argument `prefer_universal=True`.
-
-        An keyword argument `is_nnf=True` indicates that `self` is already in
-        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
-        be useful in time-critical situations.
-
-        Example from p.88 in [Burhenne90]_:
-
-        >>> from logic1 import Ex, All, T, F
-        >>> from logic1.support import renaming
-        >>> from logic1.atomlib.sympy import Eq
-        >>> import sympy
-        >>>
-        >>> renaming.push()  # temporarily create a fresh counter for renaming
-        >>> x = sympy.symbols('x:8')
-        >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
-        >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
-        >>> f3 = Ex(x[7], Eq(x[0], 0))
-        >>> (f1 & f2 & f3).to_pnf()
-        All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6,
-            And(T, F, Eq(x0, 0)))))))))
-        >>> renaming.pop()  # restore renaming counter
-
-        Derived from the `rlpnf` test in `redlog.tst
-        <https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/rl/redlog.tst>`_:
-
-        >>> from logic1 import Ex, All, Equivalent, And, Or
-        >>> from logic1.support import renaming
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a, b, y
-        >>>
-        >>> renaming.push()
-        >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
-        >>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
-        >>> Equivalent(f1, f2).to_pnf()
-        Ex(y_R1, All(y_R2,
-            And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
-                Or(And(Ne(y_R2, a), Ne(a, 0)),
-                   And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
-        >>> renaming.pop()
-        >>>
-        >>> renaming.push()
-        >>> Equivalent(f1, f2).to_pnf(prefer_universal=True)
-        All(y_R2, Ex(y_R1,
-            And(Or(Ne(a, 0), Ne(b, 0), Ne(y, 0), Eq(y_R1, a), Eq(a, 0)),
-                Or(And(Ne(y_R2, a), Ne(a, 0)),
-                   And(Eq(a, 0), Eq(b, 0), Eq(y, 0))))))
-        >>> renaming.pop()
-
-        .. [Burhenne90]
-               Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
-               Quantorenelimination für lineare reelle Probleme.
-               Diploma Thesis, University of Passau, Germany, 1990
-        """
-        if is_nnf:
-            phi = self
-        else:
-            phi = self.to_nnf().to_distinct_vars()
-        return phi._to_pnf()[All if prefer_universal else Ex]
-
-    # abstract - see docstring
-    def _to_pnf(self) -> dict:
-        """Private convert to Prenex Normal Form.
-
-        self must be in NNF. All NNF operators (QuantifiedFormula, AndOr,
-        TruthValue, AtomicFormula) must override this method. The result is a
-        dict d with len(d) == 2. The keys are Ex and All, the values are both
-        prenex equivalents of self with the same minimized number of quantifier
-        alternations. Either d[Ex] starts with an existential quantifier and
-        d[All] starts with a universal quantifier, or d[Ex] is d[All], i.e.,
-        identity is guaranteed.
-        """
-        raise NotImplementedError(f'{self.func} is not an NNF operator')
-
     def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:
         """Convert to SymPy representation if possible.
 
         Subclasses that have no match in Symy raise NotImplementedError. All
         keyword arguments are passed on to the SymPy constructors.
 
-        >>> from logic1 import Equivalent, T
+        >>> from logic1 import All, Ex, Equivalent, T
         >>> from logic1.atomlib.sympy import Eq
         >>> from sympy.abc import x, y
         >>>
@@ -565,4 +439,3 @@ class Formula(ABC):
 
 # The following imports are intentionally late to avoid circularity.
 from .boolean import Implies, And, Or, Not
-from .quantified import Ex, All

@@ -149,10 +149,6 @@ class AtomicFormula(Formula):
         """
         return self.complement_func(*self.args)
 
-    @final
-    def _to_distinct_vars(self, badlist: set) -> Self:
-        return self
-
     def to_dnf(self, simplify=True) -> BooleanFormula | AtomicFormula:
         if simplify:
             f = self.simplify()
@@ -177,12 +173,6 @@ class AtomicFormula(Formula):
         """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         return self.to_complement() if _implicit_not else self
-
-    @final
-    def _to_pnf(self) -> dict:
-        """Prenex normal form. self must be in negation normal form.
-        """
-        return {Ex: self, All: self}
 
     @final
     def _to_pyeda(self, d: dict, c: list = [0]) -> pyeda.boolalg.expr:

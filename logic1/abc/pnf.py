@@ -40,6 +40,14 @@ class PrenexNormalForm(ABC):
         return self._pnf(f)[All if prefer_universal else Ex]
 
     def _pnf(self, f) -> dict[type[All] | type[Ex], Formula]:
+        """Private Prenex Normal Form.
+
+        f must be in NNF. Both keys of the result dict are guaranteed to be
+        exist. The values are prenex equivalents of f with the same minimized
+        number of quantifier alternations. Either d[Ex] starts with an
+        existential quantifier and d[All] starts with a universal quantifier,
+        or d[Ex] is d[All], i.e., identity is guaranteed.
+        """
         match f:
             case AtomicFormula() | TruthValue():
                 return {Ex: f, All: f}
@@ -112,6 +120,12 @@ class PrenexNormalForm(ABC):
         Bound variables are renamed such that that set of all bound variables
         is disjoint from the set of all free variables. Furthermore, each bound
         variable in the result occurs with one and only one quantifier.
+
+        Recursively traverse self. If a badlisted variable is encountered as a
+        quantified variable, it will be replaced with a fresh name in the
+        respective QuantifiedFormula, and the fresh name will be badlisted for
+        the future. Note that this can includes variables that do not *occur*
+        in a mathematical sense.
         """
         match f:
             case QuantifiedFormula(func=Q, var=var, arg=arg):
