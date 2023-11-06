@@ -6,7 +6,7 @@ import sympy
 from sage.all import latex, PolynomialRing, ZZ  # type: ignore
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular)
-from typing import Optional, TypeAlias
+from typing import Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -82,7 +82,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
         return GetVars(free=all_vars - assume_quantified,
                        bound=all_vars & assume_quantified)
 
-    def subs(self, d: dict) -> AtomicFormula:
+    def subs(self, d: dict) -> Self:
         """Implements the abstract method :meth:`.firstorder.Formula.subs`.
         """
         sage_keywords = {str(v): t for v, t in d.items()}

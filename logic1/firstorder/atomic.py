@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import pyeda.inter  # type: ignore
+
 from abc import abstractmethod
 from typing import Any, Callable, final, Iterator, TYPE_CHECKING
 from typing_extensions import Self
-
-import pyeda.inter  # type: ignore
 
 from .formula import Formula
 from .boolean import BooleanFormula

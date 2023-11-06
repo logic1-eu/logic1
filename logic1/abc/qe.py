@@ -1,17 +1,12 @@
 # mypy: strict_optional = False
 
-from __future__ import annotations
+import logging
 
 from abc import ABC, abstractmethod
-import logging
 from time import time
 from typing import Any, Optional, TypeAlias
 
-from logic1.firstorder.boolean import And, Or, Not
-from logic1.firstorder.formula import Formula
-from logic1.firstorder.quantified import QuantifiedFormula, All
-from logic1.firstorder.truth import T, F
-
+from ..firstorder import All, And, F, Formula, Not, Or, QuantifiedFormula, T
 
 Variable: TypeAlias = Any
 
@@ -22,13 +17,12 @@ class FoundT(Exception):
 
 class QuantifierElimination(ABC):
 
-    class Pool(list):
+    class Pool(list[tuple[list[Variable], Formula]]):
         def __init__(self, vars_: list[Variable], f: Formula) -> None:
             self.push(vars_, f)
 
         def push(self, vars_: list[Variable], f: Formula) -> None:
             logging.debug(f'res = {f}')
-            # to_dnf should be generalized to Formula
             dnf = f.to_dnf()  # type: ignore
             if dnf is T:
                 raise FoundT
@@ -37,9 +31,9 @@ class QuantifierElimination(ABC):
                 self.extend([(vars_.copy(), mt) for mt in split_dnf])
 
     # Types
-    Quantifier = type[QuantifiedFormula]
-    QuantifierBlock = tuple[Quantifier, list[Variable]]
-    Job = tuple[list[Variable], Formula]
+    Quantifier: TypeAlias = type[QuantifiedFormula]
+    QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
+    Job: TypeAlias = tuple[list[Variable], Formula]
 
     # Properties
     blocks: Optional[list[QuantifierBlock]]
@@ -125,7 +119,8 @@ class QuantifierElimination(ABC):
         else:
             self.negated = False
         logging.info(f'simplify({matrix!r}) == {self.simplify(matrix)!r}')
-        self.pool = self.Pool(vars_, self.simplify(matrix))
+        matrix = self.simplify(matrix)
+        self.pool = self.Pool(vars_, matrix)
         self.finished = []
         logging.info(f'{self.pop_block.__qualname__}: {self}')
 
@@ -139,7 +134,8 @@ class QuantifierElimination(ABC):
             else:
                 result = self._join_And(self.qe1p(v, f_v), f_other)
             if vars_:
-                self.pool.push(vars_, self.simplify(result))
+                result = self.simplify(result)
+                self.pool.push(vars_, result)
             else:
                 self.finished.append(result)
             logging.info(f'{self.process_pool.__qualname__}: {self}')

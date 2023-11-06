@@ -1,11 +1,10 @@
 """This module provides a library of atomic formulas based on SymPy terms.
 """
-
 from __future__ import annotations
 
-from typing import Any, ClassVar, TypeAlias, Union
-
 import sympy
+
+from typing import Any, ClassVar, TypeAlias, Union
 
 from .. import firstorder
 from ..firstorder import T, F

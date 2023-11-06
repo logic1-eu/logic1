@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-
 import logging
 import sympy
+
 from typing import TypeAlias
 
-from logic1 import atomlib
-from logic1.firstorder.boolean import T, F
-from logic1.support.decorators import classproperty
+from ... import atomlib
+
+from ...firstorder import T, F
+from ...support.decorators import classproperty
 
 logging.basicConfig(
     format='%(levelname)s[%(relativeCreated)0.0f ms]: %(message)s',

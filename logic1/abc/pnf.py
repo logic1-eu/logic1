@@ -11,13 +11,11 @@ alternations in the prenex block [Burhenne90]_.
        Diploma Thesis, University of Passau, Germany, 1990
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import Any, TypeAlias
 
-from logic1.firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex, Formula,
-                               QuantifiedFormula, TruthValue)
+from ..firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex,
+                          Formula, QuantifiedFormula, TruthValue)
 
 Variable: TypeAlias = Any
 

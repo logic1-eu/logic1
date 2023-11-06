@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from typing import Callable, final, Iterator, Optional, TYPE_CHECKING
-
 from typing_extensions import Self
 
 from ..support.containers import GetVars
+
 # from ..support.tracing import trace
 
 if TYPE_CHECKING:

@@ -1,14 +1,10 @@
 import more_itertools
 
+from abc import ABC, abstractmethod
 from typing import Any, Generic, Iterable, Iterator, Optional, Self, TypeVar
 
-from abc import ABC, abstractmethod
-
-from logic1.firstorder.atomic import AtomicFormula
-from logic1.firstorder.boolean import Equivalent, Implies, And, Or, Not
-from logic1.firstorder.formula import Formula
-from logic1.firstorder.quantified import QuantifiedFormula
-from logic1.firstorder.truth import TruthValue, T
+from ..firstorder import (And, AtomicFormula, Equivalent, Formula, Implies,
+                          Not, Or, QuantifiedFormula, T, TruthValue)
 
 from ..support.tracing import trace  # noqa
 

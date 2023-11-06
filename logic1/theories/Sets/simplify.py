@@ -1,14 +1,10 @@
-# from functools import lru_cache
+from sympy import default_sort_key, oo
+from sympy.core.numbers import Infinity
 from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
-from sympy import default_sort_key, oo
-from sympy.core.numbers import Infinity
 
-from ...firstorder.formula import Formula
-from ...firstorder.boolean import And, Or
-from ...firstorder.atomic import AtomicFormula
-
+from ...firstorder import And, AtomicFormula, Formula, Or
 from .sets import C, C_, Eq, Ne, Term, Variable
 from .pnf import pnf
 
@@ -43,7 +39,6 @@ class Theory(abc.simplify.Theory):
                 f'[{self._cur_min_card}..{self._cur_max_card}], '
                 f'{self._cur_equations}, {self._cur_inequations})')
 
-    # @trace()
     def add(self, gand: type[And] | type[Or], atoms: Iterable[AtomicFormula]) -> None:
         for atom in atoms:
             if gand is Or:
@@ -98,9 +93,7 @@ class Theory(abc.simplify.Theory):
             #         case -1:
             #             inequations.update({ne_subs})
             # self._cur_inequations = inequations
-        # print(self)
 
-    # @trace()
     def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
         if self._cur_min_card > self._ref_min_card:

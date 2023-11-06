@@ -1,6 +1,7 @@
 from typing import Optional
 
 from ... import abc
+
 from ...firstorder import Formula, Or
 from .zmodm import Eq, Ne, mod, set_mod, Variable
 from .pnf import pnf as _pnf

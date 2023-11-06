@@ -1,7 +1,6 @@
-from __future__ import annotations
+import logging
 
 from itertools import combinations
-import logging
 
 from ... import abc
 from ...firstorder import And, Formula, Or
