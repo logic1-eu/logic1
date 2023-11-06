@@ -4,7 +4,6 @@ wheel:
 pytest:
 	pytest --doctest-modules\
 		--ignore="logic1/theories/depricated"
-#		--ignore="logic1/theories/zmod.py"
 
 mypy:
 	mypy logic1 --exclude logic1/theories/depricated
@@ -12,7 +11,8 @@ mypy:
 test: mypy pytest
 
 coverage:
-	coverage run -m pytest --doctest-modules
+	coverage run -m pytest --doctest-modules\
+		--ignore="logic1/theories/depricated"
 
 coverage_html: coverage
 	coverage html
@@ -22,4 +22,4 @@ clean:
 	rm -r build dist logic1.egg-info
 
 veryclean:
-	rm -r htmlcov
+	rm -rf htmlcov .coverage

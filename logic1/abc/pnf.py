@@ -31,7 +31,7 @@ class PrenexNormalForm(ABC):
         with a keyword argument `prefer_universal=True`.
 
         An keyword argument `is_nnf=True` indicates that `self` is already in
-        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
+        NNF. :meth:`pnf` then skips the initial NNF computation, which can
         be useful in time-critical situations.
         """
         if not is_nnf:

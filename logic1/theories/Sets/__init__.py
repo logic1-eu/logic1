@@ -1,3 +1,5 @@
+from .pnf import pnf  # noqa
+
 from .qe import quantifier_elimination, qe  # noqa
 
 from .sets import C, C_, Eq, Ne, Term, Variable  # noqa

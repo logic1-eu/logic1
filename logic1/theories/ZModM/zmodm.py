@@ -3,10 +3,9 @@ from typing import Optional
 
 import sympy
 
-from logic1 import abc
-from logic1 import atomlib
-from logic1.firstorder import Formula, Or, T, F
-from logic1.support.decorators import classproperty
+from ... import atomlib
+from ...firstorder import T, F
+from ...support.decorators import classproperty
 
 
 logging.basicConfig(
@@ -85,35 +84,3 @@ class Ne(atomlib.sympy.Ne):
         if not lhs.free_symbols:
             return T
         return Ne(lhs, 0)
-
-
-class QuantifierElimination(abc.qe.QuantifierElimination):
-    """Quantifier elimination
-    """
-
-    # Instance methods
-    def __call__(self, f, modulus: Optional[int] = None):
-        if modulus is not None:
-            save_modulus = set_mod(modulus)
-            result = self.qe(f)
-            set_mod(save_modulus)
-            return result
-        assert isinstance(_modulus, int)
-        return self.qe(f)
-
-    def pnf(self, f: Formula) -> Formula:
-        return f.to_pnf()
-
-    def qe1p(self, v: Variable, f: Formula) -> Formula:
-        assert isinstance(_modulus, int)
-        return Or(*(f.subs({v: i}) for i in range(_modulus))).simplify()
-
-    @staticmethod
-    def is_valid_atom(f: Formula) -> bool:
-        return isinstance(f, (Eq, Ne))
-
-    def simplify(self, f: Formula) -> Formula:
-        return f.simplify()
-
-
-qe = quantifier_elimination = QuantifierElimination()

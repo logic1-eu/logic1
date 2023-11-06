@@ -4,9 +4,7 @@ from itertools import combinations
 import logging
 
 from ... import abc
-from ...firstorder.formula import Formula
-from ...firstorder.boolean import And, Or
-
+from ...firstorder import And, Formula, Or
 from .sets import C, C_, Eq, Ne, Variable
 from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify

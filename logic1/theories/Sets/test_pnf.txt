@@ -1,0 +1,38 @@
+>>> import sympy
+>>> from logic1 import *
+>>> from logic1.support import renaming
+>>> from logic1.theories.Sets import *
+
+>>> x = sympy.symbols('x:8')
+>>> from sympy.abc import a, b, o, y
+
+# Example from p.88 in "K. Burhenne. Implementierung eines Algorithmus zur
+# Quantorenelimination für lineare reelle Probleme. Diploma Thesis, University
+# of Passau, Germany, 1990":
+#
+>>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
+>>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
+>>> f3 = Ex(x[7], Eq(x[0], o))
+>>> pnf(f1 & f2 & f3)
+All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, Eq(x0, o)))))))))
+
+# Derived from the rlpnf test in redlog.tst at
+# https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/rl/redlog.tst
+#
+>>> renaming.push()
+>>> f1 = Eq(a, o) & Eq(b, o) & Eq(y, o)
+>>> f2 = Ex(y, Eq(y, a) | Eq(a, o))
+>>> pnf(Equivalent(f1, f2))
+Ex(y_R1, All(y_R2,
+    And(Or(Ne(a, o), Ne(b, o), Ne(y, o), Eq(y_R1, a), Eq(a, o)),
+        Or(And(Ne(y_R2, a), Ne(a, o)),
+           And(Eq(a, o), Eq(b, o), Eq(y, o))))))
+>>> renaming.pop()
+
+>>> renaming.push()
+>>> pnf(Equivalent(f1, f2), prefer_universal=True)
+All(y_R2, Ex(y_R1,
+    And(Or(Ne(a, o), Ne(b, o), Ne(y, o), Eq(y_R1, a), Eq(a, o)),
+        Or(And(Ne(y_R2, a), Ne(a, o)),
+           And(Eq(a, o), Eq(b, o), Eq(y, o))))))
+>>> renaming.pop()
