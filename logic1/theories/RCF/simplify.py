@@ -9,10 +9,7 @@ from typing import Iterable, Optional, Self, TypeAlias
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ...firstorder.formula import Formula
-from ...firstorder.boolean import And, Or
-from ...firstorder.atomic import AtomicFormula
-from ...firstorder.truth import T, F
+from ...firstorder import And, AtomicFormula, F, Formula, Or, T
 from .rcf import (BinaryAtomicFormula, RcfAtomicFormula, RcfAtomicFormulas,
                   Term, Variable, ring, Eq, Ne, Ge, Le, Gt, Lt)
 from .pnf import pnf

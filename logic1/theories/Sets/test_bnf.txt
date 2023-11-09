@@ -1,0 +1,22 @@
+>>> from logic1 import *
+>>> from logic1.theories.Sets import *
+
+>>> from sympy.abc import a, b, c, d, o
+
+>>> dnf(T)
+T
+
+>>> dnf(F)
+F
+
+>>> dnf(And(T, T))
+T
+
+>>> dnf(Eq(a, o))
+Eq(a, o)
+
+>>> dnf((Eq(a, o) | Ne(b, o)) & (Ne(a, o) | Eq(b, o)))
+Or(And(Eq(a, b), Eq(a, o)), And(Ne(a, o), Ne(b, o)))
+
+>>> dnf((Ne(a, o) | Eq(b, o)) & (Eq(a, o) | Eq(b, o)))
+Eq(b, o)

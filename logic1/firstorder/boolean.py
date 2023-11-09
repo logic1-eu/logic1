@@ -173,17 +173,17 @@ class BooleanFormula(Formula):
 
     def _to_dnf(self) -> BooleanFormula | atomic.AtomicFormula:
         d: dict[AtomicFormula, exprvar] = {}
-        self_pyeda = self._to_pyeda(d)
+        self_pyeda = self._to_pyeda(d, [0])
         # _to_pyeda() has populated the mutable dictionary d
         d_rev: dict[exprvar, AtomicFormula]
         d_rev = dict(map(reversed, d.items()))  # type: ignore
         dnf = self_pyeda.to_dnf()
-        if not isinstance(dnf, pyeda.boolalg.expr.Constant):
-            dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
+        # if not isinstance(dnf, pyeda.boolalg.expr.Constant):
+        #     dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
         self_dnf = BooleanFormula._from_pyeda(dnf, d_rev)
         return self_dnf
 
-    def _to_pyeda(self, d: dict[AtomicFormula, exprvar], c: list = [0]) \
+    def _to_pyeda(self, d: dict[AtomicFormula, exprvar], c: list) \
             -> pyeda.boolalg.expr:
         to_dict = {Equivalent: pyeda.boolalg.expr.Equal,
                    Implies: pyeda.boolalg.expr.Implies,

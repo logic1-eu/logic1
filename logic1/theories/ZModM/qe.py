@@ -1,10 +1,16 @@
 from typing import Optional
 
 from ... import abc
-
 from ...firstorder import Formula, Or
 from .zmodm import Eq, Ne, mod, set_mod, Variable
+from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
+
+
+class Pool(abc.qe.Pool):
+
+    def dnf(self, f: Formula) -> Formula:
+        return _dnf(f)
 
 
 class QuantifierElimination(abc.qe.QuantifierElimination):
@@ -19,6 +25,9 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
             return result
         assert isinstance(mod(), int)
         return self.qe(f)
+
+    def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
+        return Pool(vars_, f)
 
     def pnf(self, f: Formula) -> Formula:
         return _pnf(f)

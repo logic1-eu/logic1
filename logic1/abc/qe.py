@@ -4,31 +4,39 @@ import logging
 
 from abc import ABC, abstractmethod
 from time import time
-from typing import Any, Optional, TypeAlias
+from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
 from ..firstorder import All, And, F, Formula, Not, Or, QuantifiedFormula, T
 
 Variable: TypeAlias = Any
+
+P = TypeVar('P', bound='Pool')
 
 
 class FoundT(Exception):
     pass
 
 
-class QuantifierElimination(ABC):
+class Pool(list[tuple[list[Variable], Formula]]):
 
-    class Pool(list[tuple[list[Variable], Formula]]):
-        def __init__(self, vars_: list[Variable], f: Formula) -> None:
-            self.push(vars_, f)
+    def __init__(self, vars_: list[Variable], f: Formula) -> None:
+        self.push(vars_, f)
 
-        def push(self, vars_: list[Variable], f: Formula) -> None:
-            logging.debug(f'res = {f}')
-            dnf = f.to_dnf()  # type: ignore
-            if dnf is T:
-                raise FoundT
-            if dnf is not F:
-                split_dnf = [*dnf.args] if dnf.func is Or else [dnf]
-                self.extend([(vars_.copy(), mt) for mt in split_dnf])
+    def push(self, vars_: list[Variable], f: Formula) -> None:
+        logging.debug(f'res = {f}')
+        dnf = self.dnf(f)
+        if dnf is T:
+            raise FoundT
+        if dnf is not F:
+            split_dnf = [*dnf.args] if dnf.func is Or else [dnf]
+            self.extend([(vars_.copy(), mt) for mt in split_dnf])
+
+    @abstractmethod
+    def dnf(self, f: Formula) -> Formula:
+        ...
+
+
+class QuantifierElimination(ABC, Generic[P]):
 
     # Types
     Quantifier: TypeAlias = type[QuantifiedFormula]
@@ -39,7 +47,7 @@ class QuantifierElimination(ABC):
     blocks: Optional[list[QuantifierBlock]]
     matrix: Optional[Formula]
     negated: Optional[bool]
-    pool: Optional[Pool]
+    pool: Optional[P]
     finished: Optional[list[Formula]]
 
     def __init__(self, blocks=None, matrix=None, negated=None, pool=None,
@@ -108,6 +116,10 @@ class QuantifierElimination(ABC):
     def pnf(self, f: Formula) -> Formula:
         ...
 
+    @abstractmethod
+    def _Pool(self, vars_: list[Variable], f: Formula) -> P:
+        ...
+
     def pop_block(self) -> None:
         assert self.matrix, "no matrix"
         quantifier, vars_ = self.blocks.pop()
@@ -118,9 +130,7 @@ class QuantifierElimination(ABC):
             matrix = Not(matrix)
         else:
             self.negated = False
-        logging.info(f'simplify({matrix!r}) == {self.simplify(matrix)!r}')
-        matrix = self.simplify(matrix)
-        self.pool = self.Pool(vars_, matrix)
+        self.pool = self._Pool(vars_, matrix)
         self.finished = []
         logging.info(f'{self.pop_block.__qualname__}: {self}')
 
@@ -134,7 +144,6 @@ class QuantifierElimination(ABC):
             else:
                 result = self._join_And(self.qe1p(v, f_v), f_other)
             if vars_:
-                result = self.simplify(result)
                 self.pool.push(vars_, result)
             else:
                 self.finished.append(result)

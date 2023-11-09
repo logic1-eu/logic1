@@ -1,0 +1,25 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+>>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
+
+>>> dnf(T)
+T
+
+>>> dnf(And(T, T))
+T
+
+>>> dnf(Eq(a, 0))
+Eq(a, 0)
+
+>>> dnf(Gt(a, 0))
+Gt(a, 0)
+
+>>> dnf((Eq(a, 0) | Ne(b, 0)) & (Ne(a, 0) | Eq(b, 0)))
+Or(And(Eq(b, 0), Eq(a, 0)), And(Ne(b, 0), Ne(a, 0)))
+
+>>> dnf((Gt(a, 0) | Ne(b, 0)) & (Le(c, 0) | Eq(b, 0)))
+Or(And(Eq(b, 0), Gt(a, 0)), And(Le(c, 0), Ne(b, 0)))
+
+>>> dnf((Gt(a, 0) | Eq(b, 0)) & (Le(a, 0) | Eq(b, 0)))
+Eq(b, 0)

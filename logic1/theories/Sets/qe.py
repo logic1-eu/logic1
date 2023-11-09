@@ -5,8 +5,15 @@ from itertools import combinations
 from ... import abc
 from ...firstorder import And, Formula, Or
 from .sets import C, C_, Eq, Ne, Variable
+from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
+
+
+class Pool(abc.qe.Pool):
+
+    def dnf(self, f: Formula) -> Formula:
+        return _dnf(f)
 
 
 class QuantifierElimination(abc.qe.QuantifierElimination):
@@ -56,6 +63,9 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
 
     def pnf(self, f: Formula) -> Formula:
         return _pnf(f)
+
+    def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
+        return Pool(vars_, f)
 
     def qe1p(self, v: Variable, f: Formula) -> Formula:
         def eta(Z: set, k: int) -> Formula:
