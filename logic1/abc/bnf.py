@@ -11,15 +11,18 @@ from ..support.tracing import trace  # noqa
 class DisjunctiveNormalForm(ABC):
 
     def __call__(self, f: Formula) -> Formula:
+        if self.dualize:
+            return self.simplify(Not(self.dnf(Not(f))).to_nnf())
         return self.dnf(f)
 
-    def __init__(self):
+    def __init__(self, dualize: bool = False):
         self.logic1_to_pyeda = {Equivalent: expr.Equal, Implies: expr.Implies,
                                 And: expr.And, Or: expr.Or, Not: expr.Not,
                                 _T: expr._Zero, _F: expr._One}
+        self.dualize = dualize
         self.index = 0
-        self.atoms_to_pyeda = {}
-        self.pyeda_to_atoms = {}
+        self.atoms_to_pyeda: dict[AtomicFormula, expr.Literal] = {}
+        self.pyeda_to_atoms: dict[expr.Literal, AtomicFormula] = {}
 
     def dnf(self, f: Formula) -> Formula:
         f = self.pnf(f)
@@ -46,7 +49,7 @@ class DisjunctiveNormalForm(ABC):
         dnf = self.simplify(dnf)
         return dnf
 
-    def dnf_and_or(self, f: And | Or) -> BooleanFormula:
+    def dnf_and_or(self, f: And | Or) -> AtomicFormula | BooleanFormula:
         f_as_pyeda = self.to_pyeda(f)
         dnf_as_pyeda = f_as_pyeda.to_dnf()
         if not isinstance(dnf_as_pyeda, expr.Constant):
@@ -74,7 +77,7 @@ class DisjunctiveNormalForm(ABC):
             case _:
                 assert False
 
-    def from_pyeda(self, f: expr) -> BooleanFormula:
+    def from_pyeda(self, f: expr) -> AtomicFormula | BooleanFormula:
         xs: expr
         match f:
             case expr.Variable():

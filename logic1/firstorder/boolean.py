@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from typing import Callable, Iterator, Optional, TYPE_CHECKING
 
-import pyeda.inter  # type: ignore
-from pyeda.inter import expr, exprvar
 import sympy
 
 from .formula import Formula
@@ -138,92 +136,11 @@ class BooleanFormula(Formula):
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def to_cnf(self) -> Formula:
-        """ Convert to Conjunctive Normal Form.
-
-        >>> from logic1.atomlib.sympy import Eq, Ne
-        >>> from sympy.abc import a
-        >>>
-        >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_cnf()
-        And(Or(Ne(a, 1), Eq(a, 2)), Or(Eq(a, 0), Ne(a, 1)))
-        """
-        return Not(self).to_dnf().to_nnf(_implicit_not=True)
-
-    def to_dnf(self, simplify=True) -> BooleanFormula | atomic.AtomicFormula:
-        """ Convert to Disjunctive Normal Form.
-
-        >>> from logic1.atomlib.sympy import Eq, Ne
-        >>> from sympy.abc import a
-        >>>
-        >>> ((Eq(a, 0) & Ne(a, 1) | ~Eq(a, 0) | Ne(a, 2)) >> Ne(a, 1)).to_dnf()
-        Or(Ne(a, 1), And(Eq(a, 0), Eq(a, 2)))
-        >>> And(T, T).to_dnf()
-        T
-        >>> And(T, T).to_dnf(simplify=False)
-        Traceback (most recent call last):
-        ...
-        NotImplementedError: unsupported type
-            <class 'logic1.firstorder.truth._T'> in dnf computation
-        """
-        if simplify:
-            f = self.simplify()
-            assert isinstance(f, (BooleanFormula, AtomicFormula))
-            return f._to_dnf()
-        return self._to_dnf()
-
-    def _to_dnf(self) -> BooleanFormula | atomic.AtomicFormula:
-        d: dict[AtomicFormula, exprvar] = {}
-        self_pyeda = self._to_pyeda(d, [0])
-        # _to_pyeda() has populated the mutable dictionary d
-        d_rev: dict[exprvar, AtomicFormula]
-        d_rev = dict(map(reversed, d.items()))  # type: ignore
-        dnf = self_pyeda.to_dnf()
-        # if not isinstance(dnf, pyeda.boolalg.expr.Constant):
-        #     dnf, = pyeda.boolalg.minimization.espresso_exprs(dnf)
-        self_dnf = BooleanFormula._from_pyeda(dnf, d_rev)
-        return self_dnf
-
-    def _to_pyeda(self, d: dict[AtomicFormula, exprvar], c: list) \
-            -> pyeda.boolalg.expr:
-        to_dict = {Equivalent: pyeda.boolalg.expr.Equal,
-                   Implies: pyeda.boolalg.expr.Implies,
-                   And: pyeda.boolalg.expr.And,
-                   Or: pyeda.boolalg.expr.Or,
-                   Not: pyeda.boolalg.expr.Not}
-        name = to_dict[self.func]
-        xs = []
-        for arg in self.args:
-            if not isinstance(arg, (Equivalent, Implies, AndOr, Not,
-                                    AtomicFormula)):
-                raise NotImplementedError(
-                    f'unsupported type {type(arg)} in dnf computation')
-            xs.append(arg._to_pyeda(d, c))
-        return name(*xs, simplify=False)
-
     def transform_atoms(self, transformation: Callable) -> BooleanFormula:
         """Implements the abstract method :meth:`Formula.transform_atoms`.
         """
         return self.func(*(arg.transform_atoms(transformation)
                            for arg in self.args))
-
-    # Static methods
-    @staticmethod
-    def _from_pyeda(f: expr, d: dict[exprvar, AtomicFormula]) \
-            -> BooleanFormula | AtomicFormula:
-        if isinstance(f, pyeda.boolalg.expr._Zero):
-            return F
-        if isinstance(f, pyeda.boolalg.expr._One):
-            return T
-        if isinstance(f, pyeda.boolalg.expr.Variable):
-            return d[f]
-        if isinstance(f, pyeda.boolalg.expr.Complement):
-            variable = pyeda.boolalg.expr.Not(f, simplify=True)
-            return d[variable].to_complement()
-        assert isinstance(f, pyeda.boolalg.expr.Operator)
-        from_dict = {'Implies': Implies, 'Or': Or, 'And': And, 'Not': Not}
-        func = from_dict[f.NAME]
-        args = (BooleanFormula._from_pyeda(arg, d) for arg in f.xs)
-        return func(*args)
 
 
 class Equivalent(BooleanFormula):
@@ -815,7 +732,6 @@ def involutive_not(arg: Formula) -> Formula:
 
 
 # The following imports are intentionally late to avoid circularity.
-from . import atomic
 from .atomic import AtomicFormula  # noqa
 from .quantified import Ex, All
 from .truth import _T, _F, T, F

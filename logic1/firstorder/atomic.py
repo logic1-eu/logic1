@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import pyeda.inter  # type: ignore
-
 from abc import abstractmethod
 from typing import Any, Callable, final, Iterator, TYPE_CHECKING
 from typing_extensions import Self
 
 from .formula import Formula
-from .boolean import BooleanFormula
 from .quantified import Ex, All
 from ..support.decorators import classproperty
 
@@ -132,57 +129,16 @@ class AtomicFormula(Formula):
         return set()
 
     @final
-    def to_cnf(self) -> Self:
-        """ Convert to Conjunctive Normal Form.
-
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a
-        >>>
-        >>> Eq(a, 0).to_cnf()
-        Eq(a, 0)
-        """
-        return self
-
-    @final
     def to_complement(self) -> AtomicFormula:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)
-
-    def to_dnf(self, simplify=True) -> BooleanFormula | AtomicFormula:
-        if simplify:
-            f = self.simplify()
-            assert isinstance(f, (BooleanFormula, AtomicFormula))
-            return f._to_dnf()
-        return self._to_dnf()
-
-    @final
-    def _to_dnf(self) -> Self:
-        """ Convert to Disjunctive Normal Form.
-
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a
-        >>>
-        >>> Eq(a, 0).to_dnf()
-        Eq(a, 0)
-        """
-        return self
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:
         """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         return self.to_complement() if _implicit_not else self
-
-    @final
-    def _to_pyeda(self, d: dict, c: list = [0]) -> pyeda.boolalg.expr:
-        if self in d:
-            return d[self]
-        if self.to_complement() in d:
-            return pyeda.boolalg.expr.Not(d[self.to_complement()])
-        d[self] = pyeda.boolalg.expr.exprvar('a', c[0])
-        c[0] += 1
-        return d[self]
 
     @final
     def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:

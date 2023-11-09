@@ -15,8 +15,26 @@ T
 >>> dnf(Eq(a, o))
 Eq(a, o)
 
+>>> dnf(Equivalent(Eq(a, o), Eq(b, o)))
+Or(And(Eq(a, b), Eq(a, o)), And(Ne(a, o), Ne(b, o)))
+
 >>> dnf((Eq(a, o) | Ne(b, o)) & (Ne(a, o) | Eq(b, o)))
 Or(And(Eq(a, b), Eq(a, o)), And(Ne(a, o), Ne(b, o)))
 
 >>> dnf((Ne(a, o) | Eq(b, o)) & (Eq(a, o) | Eq(b, o)))
 Eq(b, o)
+
+>>> cnf(T)
+T
+
+>>> cnf(F)
+F
+
+>>> cnf(And(T, T))
+T
+
+>>> cnf(Eq(a, o))
+Eq(a, o)
+
+>>> cnf(Equivalent(Eq(a, o), Eq(b, o)))
+And(Or(Eq(a, o), Ne(b, o)), Or(Eq(b, o), Ne(a, o)))

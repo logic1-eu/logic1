@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from typing import final, Optional
-from typing_extensions import Self
 
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
@@ -54,22 +53,6 @@ class TruthValue(BooleanFormula):
         """Implements the abstract method :meth:`Formula.get_vars`.
         """
         return GetVars()
-
-    def to_cnf(self) -> Self:
-        """ Convert to Conjunctive Normal Form.
-
-        >>> F.to_dnf()
-        F
-        """
-        return self
-
-    def _to_dnf(self) -> Self:
-        """ Convert to Disjunctive Normal Form.
-
-        >>> T.to_dnf()
-        T
-        """
-        return self
 
     def to_nnf(self, to_positive: bool = True,
                _implicit_not: bool = False) -> Formula:

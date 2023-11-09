@@ -13,3 +13,4 @@ class DisjunctiveNormalForm(abc.bnf.DisjunctiveNormalForm):
 
 
 dnf = DisjunctiveNormalForm()
+cnf = DisjunctiveNormalForm(dualize=True)
