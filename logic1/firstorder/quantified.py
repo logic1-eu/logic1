@@ -4,7 +4,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Iterator, Optional, TYPE_CHECKING
+from typing import Any, Callable, Iterator, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -113,7 +113,7 @@ class QuantifiedFormula(Formula):
         """
         if not isinstance(arg, Formula):
             raise ValueError(f'{arg!r} is not a Formula')
-        atom = arg.get_any_atom()
+        atom = next(arg.atoms(), None)
         # If atom is None, then arg does not contain any atomic formula.
         # Therefore we cannot know what are valid variables, and we will accept
         # anything. Otherwise atom has a static method providing the type of
@@ -135,11 +135,6 @@ class QuantifiedFormula(Formula):
 
     def depth(self) -> int:
         return self.arg.depth() + 1
-
-    def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Implements the abstract method :meth:`Formula.get_any_atom`.
-        """
-        return self.arg.get_any_atom()
 
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.
@@ -171,7 +166,7 @@ class QuantifiedFormula(Formula):
             return inner_sprint
 
         if mode == 'latex':
-            atom = self.get_any_atom()
+            atom = next(self.atoms(), None)
             symbol = self.__class__.latex_symbol
             var = atom.term_to_latex(self.var) if atom else self.var
             spacing = self.__class__.latex_symbol_spacing
@@ -185,7 +180,7 @@ class QuantifiedFormula(Formula):
     def subs(self, substitution: dict) -> QuantifiedFormula:
         """Implements the abstract method :meth:`Formula.subs`.
         """
-        atom = self.get_any_atom()
+        atom = next(self.atoms(), None)
         if atom is None:
             return self
         # A copy of the mutual could be avoided by keeping track of the changes

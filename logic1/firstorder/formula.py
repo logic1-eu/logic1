@@ -209,6 +209,16 @@ class Formula(ABC):
         Traceback (most recent call last):
         ...
         StopIteration
+
+        One use case within firstorder is getting access to static methods of
+        classes derived from :class:`.atomic.AtomicFormula` elsewhere:
+        >>> from logic1 import Ex, And
+        >>> from logic1.atomlib.sympy import Eq
+        >>> from sympy.abc import x, y, z
+        >>>
+        >>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
+        >>> isinstance(f.var, next(f.atoms()).variable_type())
+        True
         """
         ...
 
@@ -235,24 +245,6 @@ class Formula(ABC):
 
     @abstractmethod
     def depth(self) -> int:
-        ...
-
-    @abstractmethod
-    def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Return any atomic formula contained in *self*, or None if there is
-        none.
-
-        A typical use case is getting access to static methods of classes
-        derived from :class:`.atomic.AtomicFormula` elsewhere.
-
-        >>> from logic1 import Ex, And
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
-        >>>
-        >>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
-        >>> isinstance(f.var, f.get_any_atom().variable_type())
-        True
-        """
         ...
 
     @abstractmethod

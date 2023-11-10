@@ -117,12 +117,6 @@ class AtomicFormula(Formula):
         return 0
 
     @final
-    def get_any_atom(self) -> Self:
-        """Implements the abstract method :meth:`Formula.get_any_atom`.
-        """
-        return self
-
-    @final
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.
         """

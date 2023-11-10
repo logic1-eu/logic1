@@ -74,15 +74,6 @@ class BooleanFormula(Formula):
     def depth(self) -> int:
         return max(arg.depth() for arg in self.args) + 1
 
-    def get_any_atom(self) -> Optional[AtomicFormula]:
-        """Implements the abstract method :meth:`Formula.get_any_atom`.
-        """
-        for arg in self.args:
-            atom = arg.get_any_atom()
-            if atom:
-                return atom
-        return None
-
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.
         """
