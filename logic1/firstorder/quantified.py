@@ -183,8 +183,8 @@ class QuantifiedFormula(Formula):
         atom = next(self.atoms(), None)
         if atom is None:
             return self
-        # A copy of the mutual could be avoided by keeping track of the changes
-        # and undoing them at the end.
+        # A copy of the mutable could be avoided by keeping track of the
+        # changes and undoing them at the end.
         substitution = substitution.copy()
         # (1) Remove substitution for the quantified variable. In principle,
         # this is covered by (2) below, but deleting here preserves the name.

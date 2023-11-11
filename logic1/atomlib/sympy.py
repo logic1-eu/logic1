@@ -24,13 +24,6 @@ oo = sympy.oo
 class TermMixin():
 
     @staticmethod
-    def term_type() -> type[Term]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_type`.
-        """
-        return Term
-
-    @staticmethod
     def term_get_vars(term: Term) -> set[Variable]:
         """Implements the abstract method
         :meth:`.firstorder.AtomicFormula.term_get_vars`.
@@ -204,7 +197,7 @@ class BinaryAtomicFormula(AtomicFormula):
         args_ = []
         for arg in args:
             arg_ = sympy.Integer(arg) if isinstance(arg, int) else arg
-            if not isinstance(arg_, self.term_type()):
+            if not isinstance(arg_, Term):
                 raise ValueError(f"{arg!r} is not a Term")
             args_.append(arg_)
         super().__init__(*args_)

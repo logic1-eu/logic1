@@ -29,10 +29,6 @@ Variable: TypeAlias = sympy.Symbol
 class TermMixin():
 
     @staticmethod
-    def term_type() -> type[Term]:
-        return Term
-
-    @staticmethod
     def variable_type() -> type[Variable]:
         return Variable
 

@@ -54,13 +54,6 @@ class AtomicFormula(Formula):
     args: tuple
 
     # Static methods on terms
-    @staticmethod
-    @abstractmethod
-    def term_type() -> Any:
-        """The Python type of terms of the respective subclass of
-        :class:`AtomicFormula`.
-        """
-        ...
 
     @staticmethod
     @abstractmethod

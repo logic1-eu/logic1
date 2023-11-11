@@ -23,13 +23,6 @@ Variable: TypeAlias = MPolynomial_libsingular
 class TermMixin():
 
     @staticmethod
-    def term_type() -> type[Term]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_type`.
-        """
-        return Term
-
-    @staticmethod
     def term_get_vars(term: Term) -> set[Variable]:
         """Implements the abstract method
         :meth:`.firstorder.AtomicFormula.term_get_vars`.
@@ -62,9 +55,14 @@ class TermMixin():
         """Implements the abstract method
         :meth:`.firstorder.AtomicFormula.rename_var`.
         """
-        raise NotImplementedError
-        # TODO
-        # return var(str(rename(sympy.Symbol(str(variable)))))
+        i = 0
+        vars_as_str = tuple(str(v) for v in ring.get_vars())
+        v_as_str = str(variable)
+        while v_as_str in vars_as_str:
+            i += 1
+            v_as_str = str(variable) + "_R" + str(i)
+        v = ring.add_var(v_as_str)
+        return v
 
 
 class AtomicFormula(TermMixin, firstorder.AtomicFormula):
