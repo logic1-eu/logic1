@@ -12,25 +12,22 @@ class L1Parser(abc.parser.L1Parser):
 
     def __call__(self, s: str):
         self.globals = {str(v): v for v in ring.get_vars()}
-        a = ast.parse(s, mode='eval')
-        # print(ast.dump(a, indent=4))
-        assert isinstance(a, ast.Expression)
-        return self.process(a.body)
+        return self.process(s)
 
-    def _process_atom(self, a: Any):
+    def process_atom(self, a: Any):
         try:
-            return self._process_atom1(a)
+            return self._process_atom(a)
         except (TypeError, NameError) as exc:
             raise abc.parser.ParserError(f'{exc.__str__()}')
 
-    def _process_atom1(self, a: Any):
+    def _process_atom(self, a: Any):
         match a:
             case ast.Compare(ops=ops, left=left, comparators=comparators):
-                eval_left = self._process_term(left)
+                eval_left = self.process_term(left)
                 L: list[RcfAtomicFormula] = []
                 assert len(ops) == len(comparators)
                 for op, right in zip(ops, comparators):
-                    eval_right = self._process_term(right)
+                    eval_right = self.process_term(right)
                     match op:
                         case ast.Eq():
                             L.append(Eq(eval_left, eval_right))
@@ -52,13 +49,13 @@ class L1Parser(abc.parser.L1Parser):
             case _:
                 raise TypeError(f'cannot parse {ast.unparse(a)}')
 
-    def _process_term(self, t: Any):
+    def process_term(self, t: Any):
         try:
             return eval(ast.unparse(t), self.globals)
         except NameError as inst:
             raise NameError(f'{inst.__str__()} in {ast.unparse(t)}')
 
-    def _process_var(self, v: Any):
+    def process_var(self, v: Any):
         # v is the first argument of a quantifier.
         match v:
             case ast.Name():

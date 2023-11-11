@@ -13,24 +13,30 @@ class ParserError(Exception):
 
 class L1Parser(ABC):
 
-    def process(self, a: ast.expr):
+    def process(self, s: str):
         try:
-            return self._process(a)
-        except ParserError as exc:
-            print(f'{exc.__str__()}', file=sys.stderr)
+            a = ast.parse(s, mode='eval')
+            # print(ast.dump(a, indent=4))
+            assert isinstance(a, ast.Expression)
+            return self._process(a.body)
+        except (SyntaxError, ParserError) as exc:
+            print(f'{exc.args[0]}', file=sys.stderr)
             raise
 
     def _process(self, a: ast.expr):
         match a:
-            case ast.Call(func=func, args=args):
+            case ast.Call(func=func, args=args, keywords=keywords):
+                if keywords:
+                    raise ParserError("expression cannot contain assignment. "
+                                      "Maybe you meant '==' instead of '='?")
                 assert isinstance(func, ast.Name)
                 match func.id:
                     case 'Ex' | 'ex':
-                        var = self._process_var(args[0])
+                        var = self.process_var(args[0])
                         return Ex(var, *(self._process(arg) for arg in args[1:]))
                     case 'All' | 'all':
                         assert isinstance(args[0], ast.Name)
-                        var = self._process_var(args[0])
+                        var = self.process_var(args[0])
                         return All(var, *(self._process(arg) for arg in args[1:]))
                     case 'Or':
                         return Or(*(self._process(arg) for arg in args))
@@ -75,12 +81,12 @@ class L1Parser(ABC):
                     case _:
                         raise ParserError(f'cannot parse {ast.unparse(a)}')
             case _:
-                return self._process_atom(a)
+                return self.process_atom(a)
 
     @abstractmethod
-    def _process_atom(self, a):
+    def process_atom(self, a):
         ...
 
     @abstractmethod
-    def _process_var(self, v):
+    def process_var(self, v):
         ...
