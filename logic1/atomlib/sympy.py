@@ -38,13 +38,6 @@ class TermMixin():
         return sympy.latex(term)
 
     @staticmethod
-    def term_to_sympy(term: Term) -> sympy.Basic:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_to_sympy`.
-        """
-        return term
-
-    @staticmethod
     def variable_type() -> type[Variable]:
         """Implements the abstract method
         :meth:`.firstorder.AtomicFormula.variable_type`.
@@ -249,8 +242,6 @@ class Eq(BinaryAtomicFormula):
     of :class:`str` or implicitly with :func:`print`.
     """
 
-    sympy_func = sympy.Eq  #: :meta private:
-
     func: type[Eq]
     """A type annotation for the class property `func` inherited from
     :attr:`.firstorder.AtomicFormula.func`.
@@ -311,8 +302,6 @@ class Ne(BinaryAtomicFormula):
     This is used for string conversions, e.g., explicitly with the constructor
     of :class:`str` or implicitly with :func:`print`.
     """
-
-    sympy_func = sympy.Ne  #: :meta private:
 
     func: type[Ne]
     """A type annotation for the class property `func` inherited from
@@ -375,8 +364,6 @@ class Ge(BinaryAtomicFormula):
     of :class:`str` or implicitly with :func:`print`.
     """
 
-    sympy_func = sympy.Ge  #: :meta private:
-
     func: type[Ge]
     """A type annotation for the class property `func` inherited from
     :attr:`.firstorder.AtomicFormula.func`.
@@ -421,8 +408,6 @@ class Le(BinaryAtomicFormula):
     of :class:`str` or implicitly with :func:`print`.
     """
 
-    sympy_func = sympy.Le  #: :meta private:
-
     func: type[Le]
     """A type annotation for the class property `func` inherited from
     :attr:`.firstorder.AtomicFormula.func`.
@@ -465,8 +450,6 @@ class Gt(BinaryAtomicFormula):
     This is used for string conversions, e.g., explicitly with the constructor
     of :class:`str` or implicitly with :func:`print`.
     """
-
-    sympy_func = sympy.Gt  #: :meta private:
 
     func: type[Gt]
     """A type annotation for the class property `func` inherited from
@@ -511,8 +494,6 @@ class Lt(BinaryAtomicFormula):
     This is used for string conversions, e.g., explicitly with the constructor
     of :class:`str` or implicitly with :func:`print`.
     """
-
-    sympy_func = sympy.Lt  #: :meta private:
 
     func: type[Lt]
     """A type annotation for the class property `func` inherited from

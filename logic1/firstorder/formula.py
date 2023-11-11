@@ -11,8 +11,6 @@ from ..support.containers import GetVars
 # from ..support.tracing import trace
 
 if TYPE_CHECKING:
-    import sympy  # noqa
-
     from .atomic import AtomicFormula
 
 
@@ -23,10 +21,9 @@ class Formula(ABC):
     :class:`Formula`.
     """
 
-    # The following would be abstract class variables, which are not available
-    # at the moment.
+    # The following would be an abstract class variables, which are not
+    # available at the moment.
     func: type[Formula]  #: :meta private:
-    sympy_func: type[sympy.core.basic.Basic]  #: :meta private:
 
     # Similarly the following would be an abstract instance variable:
     args: tuple  #: :meta private:
@@ -370,46 +367,6 @@ class Formula(ABC):
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
         """
         ...
-
-    def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:
-        """Convert to SymPy representation if possible.
-
-        Subclasses that have no match in Symy raise NotImplementedError. All
-        keyword arguments are passed on to the SymPy constructors.
-
-        >>> from logic1 import All, Ex, Equivalent, T
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y
-        >>>
-        >>> e1 = Equivalent(Eq(x, y), Eq(x + 1, y + 1))
-        >>> type(e1)
-        <class 'logic1.firstorder.boolean.Equivalent'>
-        >>>
-        >>> e1.to_sympy()
-        Equivalent(Eq(x, y), Eq(x + 1, y + 1))
-        >>> type(e1.to_sympy())
-        Equivalent
-        >>>
-        >>> e2 = Equivalent(Eq(x, y), Eq(y, x))
-        >>> e2.to_sympy()
-        True
-        >>>
-        >>> e3 = T
-        >>> e3.to_sympy()
-        Traceback (most recent call last):
-        ...
-        NotImplementedError:
-            sympy does not know <class 'logic1.firstorder.truth._T'>
-        >>>
-        >>> e4 = All(x, Ex(y, Eq(x, y)))
-        >>> e4.to_sympy()
-        Traceback (most recent call last):
-        ...
-        NotImplementedError:
-            sympy does not know <class 'logic1.firstorder.quantified.All'>
-        """
-        args_sympy = (arg.to_sympy(**kwargs) for arg in self.args)
-        return self.__class__.sympy_func(*args_sympy)
 
     @abstractmethod
     def transform_atoms(self, transformation: Callable) -> Self:

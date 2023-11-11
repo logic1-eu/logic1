@@ -64,12 +64,6 @@ class TruthValue(BooleanFormula):
             return Not(self)
         return self
 
-    def to_sympy(self):
-        """Raises :exc:`NotImplementedError` since SymPy does not
-        know quantifiers.
-        """
-        raise NotImplementedError(f'sympy does not know {self.func}')
-
 
 @final
 class _T(TruthValue):

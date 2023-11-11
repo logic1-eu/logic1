@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, final, Iterator, TYPE_CHECKING
+from typing import Any, Callable, final, Iterator
 from typing_extensions import Self
 
 from .formula import Formula
 from .quantified import Ex, All
 from ..support.decorators import classproperty
-
-if TYPE_CHECKING:
-    import sympy
 
 from ..support.tracing import trace  # noqa
 
@@ -69,13 +66,6 @@ class AtomicFormula(Formula):
         """
         ...
 
-    @staticmethod
-    @abstractmethod
-    def term_to_sympy(term: Any) -> sympy.Basic:
-        """Convert `term` to SymPy.
-        """
-        ...
-
     # Static methods on variables
     @staticmethod
     @abstractmethod
@@ -126,13 +116,6 @@ class AtomicFormula(Formula):
         """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         return self.to_complement() if _implicit_not else self
-
-    @final
-    def to_sympy(self, **kwargs) -> sympy.core.basic.Basic:
-        """Override :meth:`.Formula.to_sympy` to prevent recursion into terms.
-        """
-        sympy_terms = (self.__class__.term_to_sympy(arg) for arg in self.args)
-        return self.__class__.sympy_func(*sympy_terms, **kwargs)
 
     @final
     def transform_atoms(self, transformation: Callable) -> Self:

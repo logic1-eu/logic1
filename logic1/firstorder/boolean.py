@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Iterator, Optional, TYPE_CHECKING
-
-import sympy
+from typing import Callable, Iterator, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -169,8 +167,6 @@ class Equivalent(BooleanFormula):
     :data:`text_symbol` as an infix operators in LaTeX and string conversions.
     """
 
-    sympy_func = sympy.Equivalent  #: :meta private:
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Equivalent` itself.
@@ -272,8 +268,6 @@ class Implies(BooleanFormula):
     """A class variable indicating the use of of :data:`latex_symbol` and
     :data:`text_symbol` as an infix operators in LaTeX and string conversions.
     """
-
-    sympy_func = sympy.Implies  #: :meta private:
 
     @classproperty
     def func(cls):
@@ -448,8 +442,6 @@ class And(AndOr):
     of :class:`str` or implicitly with :func:`print`.
     """
 
-    sympy_func = sympy.And  #: :meta private:
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`And` itself.
@@ -545,8 +537,6 @@ class Or(AndOr):
     of :class:`str` or implicitly with :func:`print`.
     """
 
-    sympy_func = sympy.Or  #: :meta private:
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Or` itself.
@@ -630,8 +620,6 @@ class Not(BooleanFormula):
     This is used for string conversions, e.g., explicitly with the constructor
     of :class:`str` or implicitly with :func:`print`.
     """
-
-    sympy_func = sympy.Not  #: :meta private:
 
     print_precedence = 99
     """A class variable holding the precedence of the operators of instances of

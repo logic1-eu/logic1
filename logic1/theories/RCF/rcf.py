@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import operator
-import sympy
 
 from sage.all import latex, PolynomialRing, ZZ  # type: ignore
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
@@ -35,13 +34,6 @@ class TermMixin():
         :meth:`.firstorder.AtomicFormula.term_to_latex`.
         """
         return str(latex(term))
-
-    @staticmethod
-    def term_to_sympy(term: Term) -> sympy.Basic:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_to_sympy`.
-        """
-        return sympy.S(str(term))
 
     @staticmethod
     def variable_type() -> type[Variable]:

@@ -220,12 +220,6 @@ class QuantifiedFormula(Formula):
                                   _implicit_not=_implicit_not)
         return func_nnf(self.var, arg_nnf)
 
-    def to_sympy(self, *args, **kwargs):
-        """Raises :exc:`NotImplementedError` since SymPy does not
-        know quantifiers.
-        """
-        raise NotImplementedError(f'sympy does not know {type(self)}')
-
     def transform_atoms(self, transformation: Callable) -> QuantifiedFormula:
         """Implements the abstract method :meth:`Formula.transform_atoms`.
         """
