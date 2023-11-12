@@ -65,7 +65,7 @@ class QuantifiedFormula(Formula):
     def var(self) -> Any:
         """The variable of the quantifier.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y
         >>>
         >>> e1 = All(x, Ex(y, Eq(x, y)))
@@ -82,7 +82,7 @@ class QuantifiedFormula(Formula):
     def arg(self) -> Formula:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y
         >>>
         >>> e1 = All(x, Ex(y, Eq(x, y)))
@@ -96,7 +96,7 @@ class QuantifiedFormula(Formula):
         """A type-checking constructor.
 
         >>> from logic1 import Ex
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x
         >>> Ex(x, Eq(x, x))
         Ex(x, Eq(x, x))
@@ -150,7 +150,7 @@ class QuantifiedFormula(Formula):
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y
         >>>
         >>> All(x, Ex(y, Eq(x, y))).simplify()
@@ -231,11 +231,11 @@ class Ex(QuantifiedFormula):
     sense that their toplevel operator represents the quantifier symbol
     :math:`\exists`.
 
-    >>> from logic1.atomlib.sympy import Eq
-    >>> from sympy.abc import x
+    >>> from logic1.theories.Sets import Eq
+    >>> from sympy.abc import x, y
     >>>
-    >>> Ex(x, Eq(x, 1))
-    Ex(x, Eq(x, 1))
+    >>> Ex(x, Eq(x, y))
+    Ex(x, Eq(x, y))
     """
 
     # Class variables
@@ -276,11 +276,11 @@ class All(QuantifiedFormula):
     sense that their toplevel operator represents the quantifier symbol
     :math:`\forall`.
 
-    >>> from logic1.atomlib.sympy import Eq
-    >>> from sympy.abc import x, y
+    >>> from logic1.theories.RCF import Eq, ring
+    >>> x, y = ring.set_vars('x', 'y')
     >>>
     >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
-    All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
+    All(x, All(y, Eq(x^2 + 2*x*y + y^2 + 1, x^2 + 2*x*y + y^2)))
     """
 
     # Class variables

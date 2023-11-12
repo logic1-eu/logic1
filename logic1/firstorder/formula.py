@@ -34,7 +34,7 @@ class Formula(ABC):
         """Override the :obj:`& <object.__and__>` operator to apply
         :class:`And`.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.RCF import Eq
         >>>
         >>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
         And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
@@ -46,7 +46,7 @@ class Formula(ABC):
         """Override the :obj:`~ <object.__invert__>` operator to apply
         :class:`Not`.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.RCF import Eq
         >>>
         >>> ~ Eq(1,0)
         Not(Eq(1, 0))
@@ -58,8 +58,8 @@ class Formula(ABC):
         r"""Override the :obj:`\<\< <object.__lshift__>` operator to apply
         :class:`Implies` with reversed sides.
 
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(Eq(x, y), Eq(x + z, y + z))
@@ -70,8 +70,8 @@ class Formula(ABC):
     def __or__(self, other: Formula) -> Formula:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
@@ -83,8 +83,8 @@ class Formula(ABC):
         """Override the :obj:`>> <object.__rshift__>` operator to apply
         :class:`Implies`.
 
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(Eq(x, y), Eq(x + z, y + z))
@@ -96,7 +96,7 @@ class Formula(ABC):
 
         Note that this is is not a logical operator for equality.
 
-        >>> from logic1.atomlib.sympy import Ne
+        >>> from logic1.theories.RCF import Ne
         >>>
         >>> e1 = Ne(1, 0)
         >>> e2 = Ne(1, 0)
@@ -183,11 +183,13 @@ class Formula(ABC):
     @abstractmethod
     def atoms(self) -> Iterator[AtomicFormula]:
         """
+        An iterator over all instances of AtomicFormula occurring in
+        :data:`self`.
+
         >>> from logic1 import Ex, All, T, F
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
-        >>> # Variables with free occurrences:
         >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x,
         ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
         >>> type(f.atoms())
@@ -196,11 +198,15 @@ class Formula(ABC):
         [Eq(3*x, 0), Eq(3*x, 0), Eq(x, 0), Eq(x*y, 1)]
         >>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
         True
+
+        This admits counting using common Python constructions:
+
+        >>> sum(1 for _ in f.atoms())
+        4
         >>> from collections import Counter
         >>> Counter(f.atoms())
         Counter({Eq(3*x, 0): 2, Eq(x, 0): 1, Eq(x*y, 1): 1})
-        >>> sum(1 for _ in f.atoms())
-        4
+
         >>> empty = (T & F).atoms()
         >>> next(empty)
         Traceback (most recent call last):
@@ -209,10 +215,7 @@ class Formula(ABC):
 
         One use case within firstorder is getting access to static methods of
         classes derived from :class:`.atomic.AtomicFormula` elsewhere:
-        >>> from logic1 import Ex, And
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
-        >>>
+
         >>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
         >>> isinstance(f.var, next(f.atoms()).variable_type())
         True
@@ -228,7 +231,7 @@ class Formula(ABC):
         so that quantifiers with unused variables are counted.
 
         >>> from logic1 import Ex, All, T
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y, z
         >>>
         >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
@@ -249,7 +252,7 @@ class Formula(ABC):
         """The set of all variables that are quantified in self.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import a, b, c, x, y, z
         >>>
         >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
@@ -269,8 +272,8 @@ class Formula(ABC):
         variables as a :class:`set`.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> # Variables with free occurrences:
         >>> f = Eq(3 * x, 0) >> All(z, All(x,
@@ -313,10 +316,8 @@ class Formula(ABC):
         """Substitution of terms for variables.
 
         >>> from logic1 import Ex
-        >>> from logic1.support import renaming
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a, b, c, x, y, z
-        >>> renaming.push()  # temporarily create a fresh counter for renaming
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> a, b, x = ring.set_vars('a', 'b', 'x')
         >>>
         >>> f = Ex(x, Eq(x, a))
         >>> f.subs({x: a})
@@ -328,8 +329,6 @@ class Formula(ABC):
         >>> g = Ex(x, _ & Eq(b, 0))
         >>> g.subs({b: x})
         Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
-        >>>
-        >>> renaming.pop()  # restore renaming counter
         """
         ...
 
@@ -358,8 +357,8 @@ class Formula(ABC):
         Positive Normal Form.
 
         >>> from logic1 import Ex, Equivalent, T
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import a, y
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> a, y = ring.set_vars('a', 'y')
         >>>
         >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
         >>> f.to_nnf()
@@ -376,8 +375,8 @@ class Formula(ABC):
         `transformation(self)`.
 
         >>> from logic1 import And
-        >>> from logic1.atomlib.sympy import Eq, Lt
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, Lt, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> f = Eq(x, y) & Lt(y, z)
         >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))

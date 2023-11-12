@@ -33,7 +33,8 @@ class _Ring:
         return cls._instance
 
     def __init__(self):
-        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable',
+                                        implementation='singular')
         self.stack = []
 
     def __repr__(self):
@@ -54,7 +55,8 @@ class _Ring:
                 raise ValueError(f'{arg} is not a string')
             if arg in gens_as_str:
                 raise ValueError(f'{arg} is already a variable') from None
-        self.sage_ring = PolynomialRing(ZZ, gens_as_str + strings, implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, gens_as_str + strings,
+                                        implementation='singular')
         gens = self.sage_ring.gens()[len(gens_as_str):]
         return gens
 
@@ -70,7 +72,8 @@ class _Ring:
         return self.stack
 
     def set_vars(self, *args) -> tuple[Variable, ...]:
-        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable', implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable',
+                                        implementation='singular')
         gens = self.add_vars(*args)
         return gens
 
@@ -121,7 +124,6 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
     :class:`sage.symbolic.expression.Expression`.
     """
 
-    # Instance methods
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
         """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
         """

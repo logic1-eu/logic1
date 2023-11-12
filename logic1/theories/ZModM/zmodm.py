@@ -38,7 +38,7 @@ def set_mod(modulus: Optional[int]) -> Optional[int]:
     return save_modulus
 
 
-class Eq(atomlib.sympy.Eq):
+class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
 
     @classproperty
     def complement_func(cls):
@@ -62,7 +62,7 @@ class Eq(atomlib.sympy.Eq):
         return Eq(lhs, 0)
 
 
-class Ne(atomlib.sympy.Ne):
+class Ne(atomlib.generic.NeMixin, atomlib.sympy.BinaryAtomicFormula):
 
     @classproperty
     def complement_func(cls):

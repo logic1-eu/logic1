@@ -202,7 +202,7 @@ class Equivalent(BooleanFormula):
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y
         >>>
         >>> e1 = Equivalent(~ Eq(x, y), F)
@@ -361,16 +361,16 @@ class AndOr(BooleanFormula):
     def simplify(self):
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.atomlib.sympy import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> f1 = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z)))
         >>> f1.simplify()
-        And(Eq(x, y), Eq(x, z), Eq(x, x + z))
+        And(Eq(x - y, 0), Eq(x - z, 0), Eq(-z, 0))
         >>>
         >>> f2 = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
         >>> f2.simplify()
-        Or(Eq(x, 0), Eq(x, 1), Eq(x, 2), And(Eq(x, y), Eq(x, z)))
+        Or(Eq(x, 0), Eq(x - 1, 0), Eq(x - 2, 0), And(Eq(x - y, 0), Eq(x - z, 0)))
         """
         gAnd = And if self.func is And else Or
         gT = T if self.func is And else F
@@ -413,17 +413,17 @@ class And(AndOr):
     toplevel operator represents the Boolean operator
     :math:`\wedge`.
 
-    >>> from logic1.atomlib.sympy import Eq
-    >>> from sympy.abc import x, y, z
+    >>> from logic1.theories.Sets import Eq
+    >>> from sympy.abc import x, y, z, O
     >>>
     >>> And()
     T
     >>>
-    >>> And(Eq(0, 0))
-    Eq(0, 0)
+    >>> And(Eq(O, O))
+    Eq(O, O)
     >>>
-    >>> And(Eq(x, 0), Eq(x, y), Eq(y, z))
-    And(Eq(x, 0), Eq(x, y), Eq(y, z))
+    >>> And(Eq(x, O), Eq(x, y), Eq(y, z))
+    And(Eq(x, O), Eq(x, y), Eq(y, z))
     """
 
     # Class variables
@@ -509,8 +509,7 @@ class Or(AndOr):
     toplevel operator represents the Boolean operator
     :math:`\vee`.
 
-    >>> from logic1.atomlib.sympy import Eq
-    >>>
+    >>> from logic1.theories.RCF import Eq
     >>> Or()
     F
     >>>
@@ -663,12 +662,12 @@ class Not(BooleanFormula):
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y, z
         >>>
         >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
         >>> ~ All(x, Ex(y, f)).simplify()
-        Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z), Eq(y, x)))))
+        Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z)))))
         """
         arg_simplify = self.arg.simplify()
         if arg_simplify is T:
@@ -682,7 +681,7 @@ class Not(BooleanFormula):
         """Implements the abstract method :meth:`Formula.to_nnf`.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.atomlib.sympy import Eq
+        >>> from logic1.theories.Sets import Eq
         >>> from sympy.abc import x, y, z
         >>>
         >>> f = All(x, Ex(y, And(Eq(x, y), T, Eq(x, y), Eq(x, z) & Eq(y, x))))
@@ -697,7 +696,7 @@ def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.atomlib.sympy import Eq
+    >>> from logic1.theories.RCF import Eq
     >>> involutive_not(Eq(0, 0))
     Not(Eq(0, 0))
     >>> involutive_not(~Eq(1, 0))
