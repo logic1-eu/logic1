@@ -64,4 +64,4 @@ class L1Parser(abc.parser.L1Parser):
                 raise TypeError(f'{ast.unparse(v)} invalid as quantifed variable')
 
 
-L1 = L1Parser()
+l1 = L1Parser()
