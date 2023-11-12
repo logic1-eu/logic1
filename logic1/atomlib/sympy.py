@@ -2,23 +2,22 @@ from __future__ import annotations
 
 import sympy
 
-from typing import Any, TypeAlias, Union
+from typing import Any, Final, TypeAlias, Union
 
 from .. import firstorder
 from ..support.containers import GetVars
 from ..support.renaming import rename
 from . import generic
 
-# Type alias
-Card = Union[int, sympy.core.numbers.Infinity]
+Card: TypeAlias = Union[int, sympy.core.numbers.Infinity]
 
 Term: TypeAlias = sympy.Expr
 Variable: TypeAlias = sympy.Symbol
 
-oo = sympy.oo
+oo: Final = sympy.oo
 
 
-class TermMixin():
+class TermMixin:
 
     @staticmethod
     def term_get_vars(term: Term) -> set[Variable]:
@@ -116,82 +115,3 @@ class IndexedConstantAtomicFormula(AtomicFormula):
         """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
         """
         return GetVars()
-
-
-# Removed the following docstring from BinaryAtomicFormula above. Not sure
-# where it belongs yet.
-
-r"""Let `R` be a subclass of :class:`BinaryAtomicFormula` implementing atomic
-    formulas with a binary relation symbol :math:`r`. For instance, if `R` is
-    :class:`Eq`, then :math:`r` stands for the equality relation :math:`=` in
-    the following discussion:
-
-    >>> Eq(0, 0).func
-    <class 'logic1.atomlib.sympy.Eq'>
-    >>> Eq.func
-    <class 'logic1.atomlib.sympy.Eq'>
-
-    Assume that :math:`r` is defined on a domain :math:`D`. Then the
-    *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
-    \setminus r`. It is avaialable as a class property `R.complement_func`,
-    e.g.:
-
-    >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
-    >>> tuple(r.complement_func for r in rels)
-    (<class 'logic1.atomlib.sympy.Ne'>,
-     <class 'logic1.atomlib.sympy.Eq'>,
-     <class 'logic1.atomlib.sympy.Lt'>,
-     <class 'logic1.atomlib.sympy.Gt'>,
-     <class 'logic1.atomlib.sympy.Le'>,
-     <class 'logic1.atomlib.sympy.Ge'>)
-
-    Since :math:`\overline{r}(s, t)` is equivalent to :math:`\neg r(s, t)`, the
-    availability of complement relations is relevant for the computation of
-    positive negation normal forms; compare :meth:`.firstorder.Formula.to_nnf`
-    with keyword argument `to_positive=True`.
-
-    The *converse relation* of :math:`r` is defined as
-    :math:`r^{-1} = \{ (x, y) \in D : (y, x) \in r \}`.
-    It is avaialable as a class property `R.converse_func`, e.g.:
-
-    >>> tuple(r.converse_func for r in rels)
-    (<class 'logic1.atomlib.sympy.Eq'>,
-     <class 'logic1.atomlib.sympy.Ne'>,
-     <class 'logic1.atomlib.sympy.Le'>,
-     <class 'logic1.atomlib.sympy.Ge'>,
-     <class 'logic1.atomlib.sympy.Lt'>,
-     <class 'logic1.atomlib.sympy.Gt'>)
-
-    The converse relation is the inverse with respect to composition.
-
-    Finally, the *dual relation* of :math:`r` is defined as
-    :math:`\overline{r}^{-1}`. It is available as a class property
-    `R.dual_func`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
-    e.g.:
-
-    >>> tuple(r.dual_func for r in rels)
-    (<class 'logic1.atomlib.sympy.Ne'>,
-     <class 'logic1.atomlib.sympy.Eq'>,
-     <class 'logic1.atomlib.sympy.Gt'>,
-     <class 'logic1.atomlib.sympy.Lt'>,
-     <class 'logic1.atomlib.sympy.Ge'>,
-     <class 'logic1.atomlib.sympy.Le'>)
-    >>> all(r.dual_func == r.complement_func.converse_func for r in rels)
-    True
-    >>> all(r.dual_func == r.converse_func.complement_func for r in rels)
-    True
-
-    In the context of orderings, dualization turns strict inequalities into
-    weak inequalities, and vice versa. Note that we also have duality and
-    corresponding properties with Boolean functions, which is defined
-    differently.
-
-    All those operators on relations are involutive:
-
-    >>> all(r.complement_func.complement_func == r for r in rels)
-    True
-    >>> all(r.converse_func.converse_func == r for r in rels)
-    True
-    >>> all(r.dual_func.dual_func == r for r in rels)
-    True
-"""
