@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 
 from ... import abc
@@ -17,14 +18,21 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     """Quantifier elimination
     """
 
-    def __call__(self, f, modulus: Optional[int] = None):
+    def __call__(self, f, modulus: Optional[int] = None,
+                 show_progress: bool = False) -> Formula:
+        if show_progress:
+            save_level = logging.getLogger().getEffectiveLevel()
+            logging.getLogger().setLevel(logging.INFO)
         if modulus is not None:
             save_modulus = set_mod(modulus)
             result = self.qe(f)
             set_mod(save_modulus)
-            return result
-        assert isinstance(mod(), int)
-        return self.qe(f)
+        else:
+            assert isinstance(mod(), int)
+            result = self.qe(f)
+        if show_progress:
+            logging.getLogger().setLevel(save_level)
+        return result
 
     def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
         return Pool(vars_, f)

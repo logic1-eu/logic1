@@ -21,13 +21,6 @@ logging.basicConfig(
     level=logging.CRITICAL)
 
 
-def show_progress(flag: bool = True) -> None:
-    if flag:
-        logging.getLogger().setLevel(logging.INFO)
-    else:
-        logging.getLogger().setLevel(logging.CRITICAL)
-
-
 class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
     """Equations with only variables as terms.
 

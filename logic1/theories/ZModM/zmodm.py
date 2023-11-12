@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Optional, TypeAlias
 
 import sympy
 
@@ -13,15 +13,8 @@ logging.basicConfig(
     level=logging.CRITICAL)
 
 
-def show_progress(flag: bool = True) -> None:
-    if flag:
-        logging.getLogger().setLevel(logging.INFO)
-    else:
-        logging.getLogger().setLevel(logging.CRITICAL)
-
-
-Term = sympy.Expr
-Variable = sympy.Symbol
+Term: TypeAlias = sympy.Expr
+Variable: TypeAlias = sympy.Symbol
 
 
 _modulus = None
