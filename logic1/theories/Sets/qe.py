@@ -4,13 +4,15 @@ from itertools import combinations
 
 from ... import abc
 from ...firstorder import And, Formula, Or
-from .sets import C, C_, Eq, Ne, Variable
+from .sets import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
 
+from ...support.tracing import trace  # noqa
 
-class Pool(abc.qe.Pool):
+
+class Pool(abc.qe.PoolOnePrimitive):
 
     def dnf(self, f: Formula) -> Formula:
         return _dnf(f)
@@ -46,8 +48,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
             logging.getLogger().setLevel(save_level)
         return result
 
-    @classmethod
-    def get_best(cls, vars_: list, f: Formula) -> Variable:
+    def select_and_pop(self, vars_: list, f: Formula) -> Variable:
         d = {v: 0 for v in vars_}
         args = f.args if f.func is And else (f,)
         for atom in args:
@@ -67,7 +68,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
         return Pool(vars_, f)
 
-    def qe1p(self, v: Variable, f: Formula) -> Formula:
+    def qe1(self, v: Variable, f: Formula) -> Formula:
         def eta(Z: set, k: int) -> Formula:
             args = []
             for k_choice in combinations(Z, k):
@@ -86,7 +87,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
                 args.append(And(f1, f2))
             return Or(*args)
 
-        logging.info(f'{self.qe1p.__qualname__}: eliminating Ex {v} ({f})')
+        logging.info(f'{self.qe1.__qualname__}: eliminating Ex {v} ({f})')
         eqs, nes = self._split_by_relation(f)
         if eqs:
             solution = eqs[0].rhs if eqs[0].rhs != v else eqs[0].lhs
@@ -94,12 +95,8 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         Z = And(*nes).get_vars().free - {v}
         m = len(Z)
         phi_prime = Or(*(And(eta(Z, k), C(k + 1)) for k in range(1, m + 1)))
-        logging.info(f'{self.qe1p.__qualname__}: result is {phi_prime}')
+        logging.info(f'{self.qe1.__qualname__}: result is {phi_prime}')
         return phi_prime
-
-    @staticmethod
-    def is_valid_atom(f: Formula) -> bool:
-        return isinstance(f, (Eq, Ne, C, C_))
 
     def simplify(self, f: Formula) -> Formula:
         return _simplify(f) if self.sism else f.simplify()

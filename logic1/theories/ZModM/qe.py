@@ -3,12 +3,12 @@ from typing import Optional
 
 from ... import abc
 from ...firstorder import Formula, Or
-from .zmodm import Eq, Ne, mod, set_mod, Variable
+from .zmodm import mod, set_mod, Variable
 from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
 
 
-class Pool(abc.qe.Pool):
+class Pool(abc.qe.PoolOnePrimitive):
 
     def dnf(self, f: Formula) -> Formula:
         return _dnf(f)
@@ -40,14 +40,10 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     def pnf(self, f: Formula) -> Formula:
         return _pnf(f)
 
-    def qe1p(self, v: Variable, f: Formula) -> Formula:
+    def qe1(self, v: Variable, f: Formula) -> Formula:
         modulus = mod()
         assert isinstance(modulus, int)
-        return Or(*(f.subs({v: i}) for i in range(modulus))).simplify()
-
-    @staticmethod
-    def is_valid_atom(f: Formula) -> bool:
-        return isinstance(f, (Eq, Ne))
+        return Or(*(f.subs({v: i}) for i in range(modulus)))
 
     def simplify(self, f: Formula) -> Formula:
         return f.simplify()

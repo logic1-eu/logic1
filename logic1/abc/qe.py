@@ -1,12 +1,13 @@
 # mypy: strict_optional = False
 
+import more_itertools
 import logging
 
 from abc import ABC, abstractmethod
 from time import time
 from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
-from ..firstorder import All, And, F, Formula, Not, Or, QuantifiedFormula, T
+from ..firstorder import All, And, AtomicFormula, F, Formula, Not, Or, QuantifiedFormula, T
 
 Variable: TypeAlias = Any
 
@@ -17,10 +18,26 @@ class FoundT(Exception):
     pass
 
 
-class Pool(list[tuple[list[Variable], Formula]]):
+class Pool(ABC, list[tuple[list[Variable], Formula]]):
 
     def __init__(self, vars_: list[Variable], f: Formula) -> None:
         self.push(vars_, f)
+
+    @abstractmethod
+    def push(self, vars_: list[Variable], f: Formula) -> None:
+        ...
+
+
+class PoolOneExistential(Pool):
+
+    def push(self, vars_: list[Variable], f: Formula) -> None:
+        logging.debug(f'res = {f}')
+        if f is not F:
+            split_f = [*f.args] if f.func is Or else [f]
+            self.extend([(vars_.copy(), mt) for mt in split_f])
+
+
+class PoolOnePrimitive(Pool):
 
     def push(self, vars_: list[Variable], f: Formula) -> None:
         logging.debug(f'res = {f}')
@@ -108,9 +125,12 @@ class QuantifierElimination(ABC, Generic[P]):
         self.finished = None
         logging.info(f'{self.collect_finished.__qualname__}: {self}')
 
-    @classmethod
-    def get_best(cls, vars_: list, f: Formula) -> Variable:
+    def select_and_pop(self, vars_: list, f: Formula) -> Variable:
         return vars_.pop()
+
+    @abstractmethod
+    def simplify(self, f: Formula) -> Formula:
+        ...
 
     @abstractmethod
     def pnf(self, f: Formula) -> Formula:
@@ -137,12 +157,20 @@ class QuantifierElimination(ABC, Generic[P]):
     def process_pool(self) -> None:
         while self.pool:
             vars_, f = self.pool.pop()
-            v = self.get_best(vars_, f)
-            f_v, f_other = self._split_And(f, v)
-            if f_v is T:
-                result = f_other
-            else:
-                result = self._join_And(self.qe1p(v, f_v), f_other)
+            v = self.select_and_pop(vars_, f)
+            match f:
+                case AtomicFormula():
+                    if v in f.get_vars().free:
+                        result = self.simplify(self.qe1(v, f))
+                    else:
+                        result = f
+                case And(args=args):
+                    other_args, v_args = more_itertools.partition(
+                        lambda arg: v in arg.get_vars().free, args)
+                    f_v: Formula = And(*v_args)
+                    if f_v is not T:
+                        f_v = self.qe1(v, f_v)
+                    result = self.simplify(And(f_v, *other_args))
             if vars_:
                 self.pool.push(vars_, result)
             else:
@@ -165,7 +193,12 @@ class QuantifierElimination(ABC, Generic[P]):
         return self.simplify(self.matrix.to_nnf())
 
     @abstractmethod
-    def qe1p(self, v: Variable, f: Formula) -> Formula:
+    def qe1(self, v: Variable, f: Formula) -> Formula:
+        """Elimination of the existential quantifier from Ex(v, f).
+
+        It is guaranteed that v occurs in f. :meth:`qe1` need not apply
+        :meth:`simplify`. Its result  will go through :meth:`simplify` soon.
+        """
         ...
 
     def setup(self, f: Formula) -> None:
@@ -182,32 +215,3 @@ class QuantifierElimination(ABC, Generic[P]):
         self.blocks = blocks
         self.matrix = f
         logging.info(f'{self.setup.__qualname__}: {self}')
-
-    # Some static helpers
-    @staticmethod
-    @abstractmethod
-    def is_valid_atom(f: Formula) -> bool:
-        ...
-
-    @staticmethod
-    def _join_And(f1: Formula, f2: Formula) -> Formula:
-        args1 = f1.args if f1.func is And else (f1,)
-        args2 = f2.args if f2.func is And else (f2,)
-        return And(*args1, *args2)
-
-    @abstractmethod
-    def simplify(cls, f: Formula) -> Formula:
-        ...
-
-    @classmethod
-    def _split_And(cls, f: Formula, v: Variable) -> tuple[Formula, Formula]:
-        v_atoms = []
-        other_atoms = []
-        args = f.args if f.func is And else (f,)
-        for atom in args:
-            assert cls.is_valid_atom(atom), f'bad atom {atom} - {type(atom)}'
-            if v in atom.get_vars().free:
-                v_atoms.append(atom)
-            else:
-                other_atoms.append(atom)
-        return And(*v_atoms), And(*other_atoms)
