@@ -150,7 +150,7 @@ class QuantifierElimination(ABC, Generic[P]):
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.pool = self._Pool(vars_, matrix)
+        self.pool = self._Pool(vars_, self.simplify(matrix))
         self.finished = []
         logging.info(f'{self.pop_block.__qualname__}: {self}')
 
@@ -171,6 +171,8 @@ class QuantifierElimination(ABC, Generic[P]):
                     if f_v is not T:
                         f_v = self.qe1(v, f_v)
                     result = self.simplify(And(f_v, *other_args))
+                case _:
+                    assert False, f
             if vars_:
                 self.pool.push(vars_, result)
             else:

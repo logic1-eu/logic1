@@ -8,7 +8,7 @@ from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
 
 
-class Pool(abc.qe.PoolOnePrimitive):
+class Pool(abc.qe.PoolOneExistential):
 
     def dnf(self, f: Formula) -> Formula:
         return _dnf(f)
@@ -46,7 +46,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return Or(*(f.subs({v: i}) for i in range(modulus)))
 
     def simplify(self, f: Formula) -> Formula:
-        return f.simplify()
+        return f.to_nnf().simplify()
 
 
 qe = quantifier_elimination = QuantifierElimination()
