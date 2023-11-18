@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import operator
 
-from sage.all import latex, PolynomialRing, ZZ  # type: ignore
+from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular)
 from typing import Optional, Self, TypeAlias
@@ -147,7 +147,7 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
         if chk:
             args_ = []
             for arg in (lhs, rhs):
-                assert isinstance(arg, (int, MPolynomial_libsingular))
+                assert isinstance(arg, (int, Integer, MPolynomial_libsingular))
                 args_.append(ring(arg))
             super().__init__(*args_)
         else:
