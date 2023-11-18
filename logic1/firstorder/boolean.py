@@ -434,7 +434,7 @@ class And(AndOr):
     output in Jupyter notebooks.
     """
 
-    text_symbol = '&'
+    text_symbol = 'and'
     """A class variable holding a representation of :class:`And`
     suitable for string representation.
 
@@ -528,7 +528,7 @@ class Or(AndOr):
     output in Jupyter notebooks.
     """
 
-    text_symbol = '|'
+    text_symbol = 'or'
     """A class variable holding a representation of :class:`Or`
     suitable for string representation.
 
