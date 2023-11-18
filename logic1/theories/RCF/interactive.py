@@ -2,6 +2,7 @@ from .bnf import cnf as _cnf
 from .bnf import dnf as _dnf
 from .parser import l1
 from .pnf import pnf as _pnf
+from .qe import qe as _qe
 from .rcf import Term, Variable, ring, Eq, Ne, Ge, Le, Gt, Lt  # noqa
 from .simplify import simplify as _simplify
 
@@ -22,6 +23,12 @@ def pnf(x, *args, **kwargs):
     if isinstance(x, str):
         x = l1(x)
     return _pnf(x, *args, **kwargs)
+
+
+def qe(x, *args, **kwargs):
+    if isinstance(x, str):
+        x = l1(x)
+    return _qe(x, *args, **kwargs)
 
 
 def simplify(x, *args, **kwargs):
