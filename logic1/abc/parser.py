@@ -19,7 +19,7 @@ class L1Parser(ABC):
             # print(ast.dump(a, indent=4))
             assert isinstance(a, ast.Expression)
             return self._process(a.body)
-        except (SyntaxError, ParserError) as exc:
+        except (NameError, ParserError, SyntaxError, TypeError) as exc:
             print(f'{exc.args[0]}', file=sys.stderr)
             raise
 

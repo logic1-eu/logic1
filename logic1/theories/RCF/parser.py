@@ -53,13 +53,16 @@ class L1Parser(abc.parser.L1Parser):
         try:
             return eval(ast.unparse(t), self.globals)
         except NameError as inst:
-            raise NameError(f'{inst.__str__()} in {ast.unparse(t)}')
+            raise abc.parser.ParserError(f'{inst.__str__()} in {ast.unparse(t)}') from None
 
     def process_var(self, v: Any):
         # v is the first argument of a quantifier.
         match v:
             case ast.Name():
-                return ring(v.id)
+                try:
+                    return eval(ast.unparse(v), self.globals)
+                except NameError as inst:
+                    raise abc.parser.ParserError(f'{inst.__str__()} in quantifier') from None
             case _:
                 raise TypeError(f'{ast.unparse(v)} invalid as quantifed variable')
 
