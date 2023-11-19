@@ -6,6 +6,9 @@
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x)))')
 T
 
+>>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x and a * x + b == 0)))')
+And(Eq(b, 0), Eq(a, 0))
+
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y + z == x)))')
 F
 

@@ -4,9 +4,10 @@
 """
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
-import logging  # noqa
+import logging
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 from time import time
@@ -14,6 +15,7 @@ from typing import Optional, TypeAlias
 
 from ...firstorder import (
     All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
+from . import rcf
 from .rcf import (
     RcfAtomicFormula, RcfAtomicFormulas, ring, Term, Variable, Eq, Ne, Ge, Le,
     Gt, Lt)
@@ -61,6 +63,7 @@ class EliminationSet:
 
     variable: Variable
     test_points: list[TestPoint]
+    method: str
 
 
 @dataclass
@@ -77,6 +80,18 @@ class Node:
         return self.gauss_eset() or self.regular_eset()
 
     def gauss_eset(self) -> Optional[EliminationSet]:
+        if isinstance(self.formula, And):
+            for x in self.variables:
+                for arg in self.formula.args:
+                    if isinstance(arg, Eq):
+                        lhs = arg.lhs
+                        if lhs.degree(x) == 1:
+                            a = lhs.coefficient({x: 1})
+                            if a.is_constant():
+                                self.variables.remove(x)
+                                b = lhs.coefficient({x: 0})
+                                tp = TestPoint(num=-b, den=a)
+                                return EliminationSet(variable=x, test_points=[tp], method='g')
         return None
 
     def regular_eset(self) -> EliminationSet:
@@ -120,7 +135,7 @@ class Node:
                     test_points.append(tp)
                 case _:
                     raise DegreeViolation(atom, x, atom.lhs.degree(x))
-        return EliminationSet(variable=x, test_points=test_points)
+        return EliminationSet(variable=x, test_points=test_points, method='e')
 
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
@@ -139,7 +154,7 @@ class Node:
             """Substitute ±oo into ordering constraint.
             """
             c = lhs.coefficient({x: 0})
-            mu: Formula = atom.func(c, 0)
+            mu: Formula = func(c, 0)
             for e in range(1, lhs.degree(x) + 1):
                 c = lhs.coefficient({x: e})
                 if tp.nsp == NSP.MINUS_INFINITY and e % 2 == 1:
@@ -147,29 +162,35 @@ class Node:
                 mu = Or(Gt(c, 0), And(Eq(c, 0), mu))
             return mu
 
-        def nu() -> Formula:
-            """Substitute ±€ into any constraint.
+        def nu(lhs: Term) -> Formula:
+            """Substitute ±ε into any constraint.
             """
-            ...
+            if lhs.degree(x) <= 0:
+                return func(lhs, 0)
+            lhs_prime = lhs.derivative(x)
+            if tp.nsp == NSP.MINUS_EPSILON:
+                lhs_prime = - lhs_prime
+            return Or(Gt(lhs, 0), And(Eq(lhs, 0), nu(lhs_prime)))
 
         def sigma() -> Formula:
             """Substitute quotient into any constraint.
             """
-            fraction_field = FractionField(ring.sage_ring)
             lhs = atom.lhs
+            func = atom.func
+            fraction_field = FractionField(ring.sage_ring)
             lhs = lhs.subs(**{str(x): fraction_field(tp.num, tp.den)})
-            match atom:
-                case Eq() | Ne():
+            match func:
+                case rcf.Eq | rcf.Ne:
                     lhs = lhs.numerator()
-                case Ge() | Le() | Gt() | Lt():
+                case rcf.Ge | rcf.Le | rcf.Gt | rcf.Lt:
                     lhs = (lhs * lhs.denominator() ** 2).numerator()
                 case _:
-                    assert False, atom.func
+                    assert False, func
             assert lhs.parent() in (ring.sage_ring, ZZ), lhs.parent()
-            return atom.func(lhs, 0)
+            return func(lhs, 0)
 
         def tau():
-            """Substitute transcendental element in to equality.
+            """Substitute transcendental element into equality.
             """
             args = []
             for e in range(lhs.degree(x) + 1):
@@ -178,8 +199,8 @@ class Node:
                     continue
                 if c.is_constant():
                     return F
-                args.append(Eq(c, 0))
-            return And(*args)
+                args.append(func(c, 0))
+            return And(*args) if func is Eq else Or(*args)
 
         if tp.nsp is NSP.NONE:
             # Substitute quotient into any constraint.
@@ -187,33 +208,28 @@ class Node:
         if atom.func in (Le, Lt):
             atom = atom.converse_func(- atom.lhs, atom.rhs)
         match atom:
-            case Eq(lhs=lhs) | Ne(lhs=lhs):
+            case Eq(func=func, lhs=lhs) | Ne(func=func, lhs=lhs):
                 # Substitute transcendental element in to equality.
-                return tau()
-            case Ge(lhs=lhs):
+                result = tau()
+            case Ge(func=func, lhs=lhs) | Gt(func=func, lhs=lhs):
                 match tp.nsp:
-                    case NSP.PLUS_EPSILON:
-                        ...
-                    case NSP.MINUS_EPSILON:
-                        ...
+                    case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
+                        std_tp = TestPoint(num=tp.num, den=tp.den, nsp=NSP.NONE)
+                        result = nu(lhs).transform_atoms(lambda at: self.vsubs_atom(at, x, std_tp))
                     case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
                         # Substitute ±oo into ordering constraint.
-                        return mu()
-            case Gt(lhs=lhs):
-                match tp.nsp:
-                    case NSP.PLUS_EPSILON:
-                        ...
-                    case NSP.MINUS_EPSILON:
-                        ...
-                    case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
-                        # Substitute ±oo into ordering constraint.
-                        return mu()
-        assert False, (atom, tp)
+                        result = mu()
+            case _:
+                assert False, (atom, tp)
+        if atom.func in (Le, Lt):
+            result = Not(result)
+        return result
 
 
 class Pool(list[Node]):
 
     def __init__(self, nodes: list[Node]) -> None:
+        self.max_len = 0
         self.push(nodes)
 
     def push(self, nodes: list[Node]) -> None:
@@ -223,11 +239,25 @@ class Pool(list[Node]):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        self.append(Node(node.variables, arg, node.answer))
+                        self.append(Node(node.variables.copy(), arg, node.answer))
                 case And() | AtomicFormula():
                     self.append(node)
                 case _:
                     assert False, node
+
+    def statistics(self) -> str:
+        counter = Counter(len(node.variables) for node in self)
+        m = max(counter.keys())
+        string = f'V={m}, {counter[m]}'
+        for n in reversed(range(1, m)):
+            string += f'.{counter[n]}'
+        string += ', '
+        if self.max_len > len(string):
+            string += (self.max_len - len(string)) * ' '
+        else:
+            self.max_len = len(string)
+        string += f'P={len(self)}'
+        return string
 
 
 @dataclass
@@ -242,12 +272,21 @@ class VirtualSubstitution:
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
 
-    def __call__(self, f: Formula, show_progress: bool = False) -> Formula:
-        if show_progress:
+    def __call__(self, f: Formula, debug: bool = False,
+                 verbose: Optional[int] = None) -> Formula:
+        self.verbose = verbose
+        self.verbose_counter = 0
+        logging.basicConfig(
+            format=f'%(relativeCreated)8d ms:    %(message)s',
+            level=logging.CRITICAL)
+        if debug:
+            save_level = logging.getLogger().getEffectiveLevel()
+            logging.getLogger().setLevel(logging.DEBUG)
+        elif verbose:
             save_level = logging.getLogger().getEffectiveLevel()
             logging.getLogger().setLevel(logging.INFO)
         result = self.virtual_substitution(f)
-        if show_progress:
+        if debug or verbose:
             logging.getLogger().setLevel(save_level)
         return result
 
@@ -294,13 +333,14 @@ class VirtualSubstitution:
         self.negated = None
         self.pool = None
         self.success_nodes = None
-        logging.info(f'{self.collect_success_nodes.__qualname__}: {self}')
+        logging.debug(f'{self.collect_success_nodes.__qualname__}: {self}')
 
     def pnf(self, f: Formula) -> Formula:
         return _pnf(f)
 
     def pop_block(self) -> None:
         assert self.matrix, "no matrix"
+        logging.info(' '.join(f'{Q.__qualname__} {vars_}' for (Q, vars_) in self.blocks))
         quantifier, vars_ = self.blocks.pop()
         matrix = self.matrix
         self.matrix = None
@@ -311,10 +351,18 @@ class VirtualSubstitution:
             self.negated = False
         self.pool = Pool([Node(vars_, self.simplify(matrix), [])])
         self.success_nodes = []
-        logging.info(f'{self.pop_block.__qualname__}: {self}')
+        logging.debug(f'{self.pop_block.__qualname__}: {self}')
 
     def process_pool(self) -> None:
+
+        def vb():
+            if self.verbose and self.verbose_counter % self.verbose == 0:
+                msg = self.pool.statistics()
+                logging.info(msg)
+            self.verbose_counter += 1
+
         while self.pool:
+            vb()
             node = self.pool.pop()
             try:
                 eset = node.eset()
@@ -340,7 +388,7 @@ class VirtualSubstitution:
             vars_ = []
         self.blocks = blocks
         self.matrix = f
-        logging.info(f'{self.setup.__qualname__}: {self}')
+        logging.debug(f'{self.setup.__qualname__}: {self}')
 
     def simplify(self, *args, **kwargs) -> Formula:
         return _simplify(*args, **kwargs)
