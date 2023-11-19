@@ -32,6 +32,7 @@ class L1Parser(ABC):
                 assert isinstance(func, ast.Name)
                 match func.id:
                     case 'Ex' | 'ex':
+                        assert isinstance(args[0], ast.Name)
                         var = self.process_var(args[0])
                         return Ex(var, *(self._process(arg) for arg in args[1:]))
                     case 'All' | 'all':
