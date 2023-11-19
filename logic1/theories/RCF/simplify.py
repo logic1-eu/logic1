@@ -1,5 +1,3 @@
-import logging
-
 from functools import lru_cache
 from operator import xor
 from sage.all import oo, Rational  # type: ignore
@@ -15,11 +13,6 @@ from .rcf import (BinaryAtomicFormula, RcfAtomicFormula, RcfAtomicFormulas,
 from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
-
-
-logging.basicConfig(
-    format='%(levelname)s[%(filename)s:%(lineno)d]: %(message)s',
-    level=logging.CRITICAL)
 
 
 class Theory(abc.simplify.Theory):
@@ -140,10 +133,9 @@ class Theory(abc.simplify.Theory):
                     exc = exc.difference(ivl.end)
             self._current[p] = (ivl, exc)
 
-    def __init__(self, prefer_weak: bool, prefer_order: bool, _develop: int) -> None:
+    def __init__(self, prefer_weak: bool, prefer_order: bool) -> None:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
-        self._develop = _develop
         self._reference = dict()
         self._current = dict()
 
@@ -271,7 +263,7 @@ class Theory(abc.simplify.Theory):
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
-        theory_next = self.__class__(self.prefer_weak, self.prefer_order, self._develop)
+        theory_next = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
             theory_next._reference = self._current
         else:
@@ -287,18 +279,13 @@ class Simplify(abc.simplify.Simplify['Theory']):
     SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = [],
-                 prefer_weak: bool = False, prefer_order: bool = True,
-                 log=logging.CRITICAL, _develop: int = 0) -> Formula:
+                 prefer_weak: bool = False, prefer_order: bool = True) -> Formula:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
-        self._develop = _develop
-        level = logging.getLogger().getEffectiveLevel()
-        logging.getLogger().setLevel(log)
         try:
             result = self.simplify(f, assume)
         except Simplify.NotInPnf:
             result = self.simplify(pnf(f), assume)
-        logging.getLogger().setLevel(level)
         return result
 
     @lru_cache(maxsize=None)
@@ -375,7 +362,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,
-                      prefer_order=self.prefer_order, _develop=self._develop)
+                      prefer_order=self.prefer_order)
 
 
 simplify = Simplify()

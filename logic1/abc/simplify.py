@@ -42,8 +42,6 @@ class Simplify(ABC, Generic[TH]):
     class NotInPnf(Exception):
         pass
 
-    _develop: int
-
     def simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
         """
         Deep simplification according to [DS95].
