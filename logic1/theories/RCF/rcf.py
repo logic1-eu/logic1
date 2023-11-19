@@ -147,7 +147,7 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
         if chk:
             args_ = []
             for arg in (lhs, rhs):
-                assert isinstance(arg, (int, Integer, MPolynomial_libsingular))
+                assert isinstance(arg, (int, Integer, MPolynomial_libsingular)), arg
                 args_.append(ring(arg))
             super().__init__(*args_)
         else:
