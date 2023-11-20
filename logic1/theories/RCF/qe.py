@@ -10,23 +10,40 @@ from enum import auto, Enum
 import logging
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
-from time import time
 from typing import Optional, TypeAlias
 
 from ...firstorder import (
     All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
+from ...support.logging import DeltaTimeFormatter, TimePeriodFilter
+from ...support.tracing import trace  # noqa
 from . import rcf
+from .pnf import pnf as _pnf
 from .rcf import (
     RcfAtomicFormula, RcfAtomicFormulas, ring, Term, Variable, Eq, Ne, Ge, Le,
     Gt, Lt)
-from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
-
-from ...support.tracing import trace  # noqa
 
 
 Quantifier: TypeAlias = type[QuantifiedFormula]
 QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
+
+
+# Create filter
+filter_ = TimePeriodFilter()
+
+# Create formatter
+formatter = DeltaTimeFormatter(
+    f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s:  %(message)s')
+
+# Create handler and specify filter, formatter
+handler = logging.StreamHandler()
+handler.setFormatter(formatter)
+
+# Create logger and add handler
+logger = logging.getLogger(__name__)
+logger.addFilter(filter_)
+logger.addHandler(handler)
+logger.setLevel(logging.WARNING)
 
 
 class DegreeViolation(Exception):
@@ -273,21 +290,17 @@ class VirtualSubstitution:
     failure_nodes: Optional[list[Node]] = None
 
     def __call__(self, f: Formula, debug: bool = False,
-                 verbose: Optional[int] = None) -> Formula:
-        self.verbose = verbose
-        self.verbose_counter = 0
-        logging.basicConfig(
-            format=f'%(relativeCreated)8d ms:    %(message)s',
-            level=logging.CRITICAL)
-        if debug:
-            save_level = logging.getLogger().getEffectiveLevel()
-            logging.getLogger().setLevel(logging.DEBUG)
-        elif verbose:
-            save_level = logging.getLogger().getEffectiveLevel()
-            logging.getLogger().setLevel(logging.INFO)
-        result = self.virtual_substitution(f)
-        if debug or verbose:
-            logging.getLogger().setLevel(save_level)
+                 info: Optional[int] = None) -> Formula:
+        try:
+            if debug:
+                logger.setLevel(logging.DEBUG)
+            elif info is not None:
+                logger.setLevel(logging.INFO)
+                filter_.set_rate(info)
+            formatter.reset_clock()
+            result = self.virtual_substitution(f)
+        finally:
+            logger.setLevel(logging.WARNING)
         return result
 
     def __str__(self):
@@ -333,14 +346,14 @@ class VirtualSubstitution:
         self.negated = None
         self.pool = None
         self.success_nodes = None
-        logging.debug(f'{self.collect_success_nodes.__qualname__}: {self}')
+        logger.debug(f'{self.collect_success_nodes.__qualname__}: {self}')
 
-    def pnf(self, f: Formula) -> Formula:
-        return _pnf(f)
+    def pnf(self, *args, **kwargs) -> Formula:
+        return _pnf(*args, **kwargs)
 
     def pop_block(self) -> None:
         assert self.matrix, "no matrix"
-        logging.info(' '.join(f'{Q.__qualname__} {vars_}' for (Q, vars_) in self.blocks))
+        logger.info(' '.join(f'{Q.__qualname__} {vars_}' for (Q, vars_) in self.blocks))
         quantifier, vars_ = self.blocks.pop()
         matrix = self.matrix
         self.matrix = None
@@ -351,29 +364,26 @@ class VirtualSubstitution:
             self.negated = False
         self.pool = Pool([Node(vars_, self.simplify(matrix), [])])
         self.success_nodes = []
-        logging.debug(f'{self.pop_block.__qualname__}: {self}')
+        logger.debug(f'{self.pop_block.__qualname__}: {self}')
 
     def process_pool(self) -> None:
-
-        def vb():
-            if self.verbose and self.verbose_counter % self.verbose == 0:
-                msg = self.pool.statistics()
-                logging.info(msg)
-            self.verbose_counter += 1
-
-        while self.pool:
-            vb()
-            node = self.pool.pop()
-            try:
-                eset = node.eset()
-            except DegreeViolation:
-                self.failure_nodes.append(node)
-                continue
-            nodes = node.vsubs(eset)
-            if nodes[0].variables:
-                self.pool.push(nodes)
-            else:
-                self.success_nodes.extend(nodes)
+        try:
+            filter_.on()
+            while self.pool:
+                logger.info(self.pool.statistics())
+                node = self.pool.pop()
+                try:
+                    eset = node.eset()
+                except DegreeViolation:
+                    self.failure_nodes.append(node)
+                    continue
+                nodes = node.vsubs(eset)
+                if nodes[0].variables:
+                    self.pool.push(nodes)
+                else:
+                    self.success_nodes.extend(nodes)
+        finally:
+            filter_.off()
 
     def setup(self, f: Formula) -> None:
         f = self.pnf(f)
@@ -388,15 +398,12 @@ class VirtualSubstitution:
             vars_ = []
         self.blocks = blocks
         self.matrix = f
-        logging.debug(f'{self.setup.__qualname__}: {self}')
+        logger.debug(f'{self.setup.__qualname__}: {self}')
 
     def simplify(self, *args, **kwargs) -> Formula:
         return _simplify(*args, **kwargs)
 
     def virtual_substitution(self, f):
-        # The following manipulation of a private property is dirty. There
-        # seems to be no supported way to reset reference time.
-        logging._startTime = time()  # type: ignore
         self.setup(f)
         while self.blocks:
             try:
