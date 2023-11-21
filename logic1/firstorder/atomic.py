@@ -5,7 +5,7 @@ from typing import Any, Callable, final, Iterator
 from typing_extensions import Self
 
 from .formula import Formula
-from .quantified import Ex, All
+from .quantified import Ex, All, QuantifierBlock
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
@@ -104,6 +104,10 @@ class AtomicFormula(Formula):
         """Implements the abstract method :meth:`Formula.get_qvars`.
         """
         return set()
+
+    @final
+    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
+        return self, []
 
     @final
     def to_complement(self) -> AtomicFormula:

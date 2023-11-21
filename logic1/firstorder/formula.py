@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, final, Iterator, Optional, TYPE_CHECKING
+from typing import Any, Callable, final, Iterator, Optional, TYPE_CHECKING
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -294,6 +294,10 @@ class Formula(ABC):
         variables without use in any term are not considered. Compare
         :meth:`get_qvars`.
         """
+        ...
+
+    @abstractmethod
+    def matrix(self) -> tuple[Formula, list[tuple[Any, list]]]:
         ...
 
     def simplify(self) -> Formula:

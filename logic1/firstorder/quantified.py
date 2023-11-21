@@ -4,7 +4,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Iterator, TYPE_CHECKING
+from typing import Any, Callable, Iterator, TypeAlias, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -14,6 +14,9 @@ from ..support.decorators import classproperty
 
 if TYPE_CHECKING:
     from .atomic import AtomicFormula
+
+
+QuantifierBlock: TypeAlias = tuple[Any, list]
 
 
 class QuantifiedFormula(Formula):
@@ -146,6 +149,19 @@ class QuantifiedFormula(Formula):
         """
         quantified = assume_quantified | {self.var}
         return self.arg.get_vars(assume_quantified=quantified)
+
+    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
+        blocks = []
+        vars_ = []
+        mat: Formula = self
+        while isinstance(mat, QuantifiedFormula):
+            Q = type(mat)
+            while isinstance(mat, Q):
+                vars_.append(mat.var)
+                mat = mat.arg
+            blocks.append((Q, vars_))
+            vars_ = []
+        return mat, blocks
 
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.

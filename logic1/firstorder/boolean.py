@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, Iterator, TYPE_CHECKING
+from typing import Callable, final, Iterator, TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -10,6 +10,7 @@ from ..support.decorators import classproperty
 
 if TYPE_CHECKING:
     from .atomic import AtomicFormula
+    from .quantified import QuantifierBlock
 
 
 class BooleanFormula(Formula):
@@ -87,6 +88,10 @@ class BooleanFormula(Formula):
         for arg in self.args:
             vars |= arg.get_vars(assume_quantified=assume_quantified)
         return vars
+
+    @final
+    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
+        return self, []
 
     def _sprint(self, mode: str) -> str:
         def not_arg(outer, inner) -> str:
