@@ -8,6 +8,8 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
 import logging
+from multiprocessing import Process
+import os
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 from typing import Optional, TypeAlias
@@ -249,50 +251,6 @@ class Node:
         return result
 
 
-class Pool:
-
-    def __bool__(self):
-        return bool(self.nodes)
-
-    def __init__(self, nodes: list[Node]) -> None:
-        self.nodes: list[Node] = []
-        self.push(nodes)
-        self.max_len = 0
-
-    def __iter__(self):
-        return self.nodes.__iter__()
-
-    def pop(self) -> Node:
-        return self.nodes.pop()
-
-    def push(self, nodes: list[Node]) -> None:
-        for node in nodes:
-            match node.formula:
-                case _F():
-                    continue
-                case Or(args=args):
-                    for arg in args:
-                        self.nodes.append(Node(node.variables.copy(), arg, node.answer))
-                case And() | AtomicFormula():
-                    self.nodes.append(node)
-                case _:
-                    assert False, node
-
-    def statistics(self) -> str:
-        counter = Counter(len(node.variables) for node in self.nodes)
-        m = max(counter.keys())
-        string = f'V={m}, {counter[m]}'
-        for n in reversed(range(1, m)):
-            string += f'.{counter[n]}'
-        string += ', '
-        if self.max_len > len(string):
-            string += (self.max_len - len(string)) * ' '
-        else:
-            self.max_len = len(string)
-        string += f'P={len(self.nodes)}'
-        return string
-
-
 @dataclass
 class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
@@ -301,9 +259,11 @@ class VirtualSubstitution:
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
-    pool: Optional[Pool] = None
+    working_nodes: Optional[list[Node]] = None
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
+
+    max_len: int = 0
 
     def __call__(self, f: Formula, debug: bool = False,
                  info: Optional[int] = None) -> Formula:
@@ -320,37 +280,38 @@ class VirtualSubstitution:
         return result
 
     def __str__(self):
-        if self.blocks is not None:
-            _h = [q.__qualname__ + ' ' + str(v) for q, v in self.blocks]
-            _h = '  '.join(_h)
-            blocks = f'[{_h}]'
-        else:
-            blocks = None
-        if self.negated is None:
-            read_as = ''
-        elif self.negated is False:
-            read_as = '  # read as Ex'
-        else:
-            assert self.negated is True
-            read_as = '  # read as Not All'
-        if self.pool is not None:
-            _h = [f'{node}' for node in self.pool]
-            _h = ',\n                '.join(_h)
-            pool = f'[{_h}]'
-        else:
-            pool = None
-        if self.success_nodes is not None:
-            _h = [f'{str(f)}' for f in self.success_nodes]
-            _h = ',\n                '.join(_h)
-            success_nodes = f'[{_h}]'
-        else:
-            success_nodes = None
+
+        def format_blocks():
+            if self.blocks is None:
+                return None
+            h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
+            return f'[{h}]'
+
+        def format_negated():
+            match self.negated:
+                case None:
+                    read_as = ''
+                case False:
+                    read_as = '  # read as Ex'
+                case True:
+                    read_as = '  # read as Not All'
+                case _:
+                    assert False, self.negated
+            return f'{self.negated},{read_as}'
+
+        def format_nodes(nodes):
+            if nodes is None:
+                return None
+            h = ',\n                '.join(f'{node}' for node in nodes)
+            return f'[{h}]'
+
         return (f'{self.__class__} [\n'
-                f'    blocks   = {blocks},\n'
-                f'    matrix   = {self.matrix},\n'
-                f'    negated  = {self.negated},{read_as}\n'
-                f'    pool     = {str(pool)},\n'
-                f'    success_nodes = {success_nodes}\n'
+                f'    blocks        = {format_blocks()},\n'
+                f'    matrix        = {self.matrix},\n'
+                f'    negated       = {format_negated()}\n'
+                f'    working_nodes = {format_nodes(self.working_nodes)},\n'
+                f'    success_nodes = {format_nodes(self.success_nodes)}\n'
+                f'    failure_nodes = {format_nodes(self.failure_nodes)}\n'
                 f']')
 
     def collect_success_nodes(self) -> None:
@@ -360,8 +321,10 @@ class VirtualSubstitution:
         if self.negated:
             self.matrix = Not(self.matrix)
         self.negated = None
-        self.pool = None
+        self.working_nodes = None
         self.success_nodes = None
+        if self.failure_nodes:
+            raise NotImplementedError()
         logger.debug(f'{self.collect_success_nodes.__qualname__}: {self}')
 
     def pnf(self, *args, **kwargs) -> Formula:
@@ -378,16 +341,18 @@ class VirtualSubstitution:
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.pool = Pool([Node(vars_, self.simplify(matrix), [])])
+        self.working_nodes = []
+        self.push_to_working([Node(vars_, self.simplify(matrix), [])])
         self.success_nodes = []
+        self.failure_nodes = []
         logger.debug(f'{self.pop_block.__qualname__}: {self}')
 
-    def process_pool(self) -> None:
+    def process_block(self) -> None:
         try:
             filter_.on()
-            while self.pool:
-                logger.info(self.pool.statistics())
-                node = self.pool.pop()
+            while self.working_nodes:
+                logger.info(self.statistics())
+                node = self.working_nodes.pop()
                 try:
                     eset = node.eset()
                 except DegreeViolation:
@@ -395,11 +360,48 @@ class VirtualSubstitution:
                     continue
                 nodes = node.vsubs(eset)
                 if nodes[0].variables:
-                    self.pool.push(nodes)
+                    self.push_to_working(nodes)
                 else:
                     self.success_nodes.extend(nodes)
         finally:
             filter_.off()
+
+    def f(self, x):
+        print(os.getpid(), x)
+
+    def process_block_parallel(self) -> None:
+
+        # def worker(queues, pipes, ...)
+        #     while work_to_do():
+        #         nodes = get_next_node() # blocking?
+        #         try:
+        #             new_nodes = process(node)
+        #         except DegreeViolation:
+        #             push_to_failure(new_nodes)
+        #         except FoundT:
+        #             communicate_true()
+        #         if has_variables(nodes):
+        #             push_to_nodes(nodes)
+        #         else:
+        #             push_to_success(nodes)
+
+        print(os.getpid(), 'alice')
+        p = Process(target=self.f, args=('bob',))
+        p.start()
+        p.join()
+
+    def push_to_working(self, nodes: list[Node]) -> None:
+        for node in nodes:
+            match node.formula:
+                case _F():
+                    continue
+                case Or(args=args):
+                    for arg in args:
+                        self.working_nodes.append(Node(node.variables.copy(), arg, node.answer))
+                case And() | AtomicFormula():
+                    self.working_nodes.append(node)
+                case _:
+                    assert False, node
 
     def setup(self, f: Formula) -> None:
         f = self.pnf(f)
@@ -414,12 +416,28 @@ class VirtualSubstitution:
         while self.blocks:
             try:
                 self.pop_block()
-                self.process_pool()
+                self.process_block()
             except FoundT:
-                self.pool = None
+                self.working_nodes = None
                 self.success_nodes = [Node(variables=[], formula=T, answer=[])]
             self.collect_success_nodes()
         return self.simplify(self.matrix)
+
+    def statistics(self) -> str:
+        counter = Counter(len(node.variables) for node in self.working_nodes)
+        m = max(counter.keys())
+        string = f'V={m}, {counter[m]}'
+        for n in reversed(range(1, m)):
+            string += f'.{counter[n]}'
+        string += ', '
+        if self.max_len > len(string):
+            string += (self.max_len - len(string)) * ' '
+        else:
+            self.max_len = len(string)
+        string += (f'W={len(self.working_nodes)}, '
+                   f'S={len(self.success_nodes)}, '
+                   f'F={len(self.failure_nodes)}')
+        return string
 
 
 qe = virtual_substitution = VirtualSubstitution()
