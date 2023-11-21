@@ -35,11 +35,11 @@ filter_ = TimePeriodFilter()
 formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s:  %(message)s')
 
-# Create handler and specify filter, formatter
+# Create handler and specify formatter
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 
-# Create logger and add handler
+# Create logger, then add filter and handler
 logger = logging.getLogger(__name__)
 logger.addFilter(filter_)
 logger.addHandler(handler)
@@ -154,6 +154,9 @@ class Node:
                     raise DegreeViolation(atom, x, atom.lhs.degree(x))
         return EliminationSet(variable=x, test_points=test_points, method='e')
 
+    def simplify(self, *args, **kwargs) -> Formula:
+        return _simplify(*args, **kwargs)
+
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
         x = eset.variable
@@ -162,6 +165,9 @@ class Node:
             new_formula = self.formula.transform_atoms(lambda atom: self.vsubs_atom(atom, x, tp))
             if tp.guard is not None:
                 new_formula = And(tp.guard, new_formula)
+            new_formula = self.simplify(new_formula)
+            if new_formula is T:
+                raise FoundT()
             new_nodes.append(Node(variables.copy(), new_formula, []))
         return new_nodes
 
@@ -243,11 +249,21 @@ class Node:
         return result
 
 
-class Pool(list[Node]):
+class Pool:
+
+    def __bool__(self):
+        return bool(self.nodes)
 
     def __init__(self, nodes: list[Node]) -> None:
-        self.max_len = 0
+        self.nodes: list[Node] = []
         self.push(nodes)
+        self.max_len = 0
+
+    def __iter__(self):
+        return self.nodes.__iter__()
+
+    def pop(self) -> Node:
+        return self.nodes.pop()
 
     def push(self, nodes: list[Node]) -> None:
         for node in nodes:
@@ -256,14 +272,14 @@ class Pool(list[Node]):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        self.append(Node(node.variables.copy(), arg, node.answer))
+                        self.nodes.append(Node(node.variables.copy(), arg, node.answer))
                 case And() | AtomicFormula():
-                    self.append(node)
+                    self.nodes.append(node)
                 case _:
                     assert False, node
 
     def statistics(self) -> str:
-        counter = Counter(len(node.variables) for node in self)
+        counter = Counter(len(node.variables) for node in self.nodes)
         m = max(counter.keys())
         string = f'V={m}, {counter[m]}'
         for n in reversed(range(1, m)):
@@ -273,7 +289,7 @@ class Pool(list[Node]):
             string += (self.max_len - len(string)) * ' '
         else:
             self.max_len = len(string)
-        string += f'P={len(self)}'
+        string += f'P={len(self.nodes)}'
         return string
 
 
@@ -387,17 +403,7 @@ class VirtualSubstitution:
 
     def setup(self, f: Formula) -> None:
         f = self.pnf(f)
-        blocks = []
-        vars_ = []
-        while isinstance(f, QuantifiedFormula):
-            Q = type(f)
-            while isinstance(f, Q):
-                vars_.append(f.var)
-                f = f.arg
-            blocks.append((Q, vars_))
-            vars_ = []
-        self.blocks = blocks
-        self.matrix = f
+        self.matrix, self.blocks = f.matrix()
         logger.debug(f'{self.setup.__qualname__}: {self}')
 
     def simplify(self, *args, **kwargs) -> Formula:
