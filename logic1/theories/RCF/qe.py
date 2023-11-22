@@ -8,11 +8,14 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
 import logging
-from multiprocessing import Process
+from multiprocessing import Manager, Process
 import os
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 from typing import Optional, TypeAlias
+
+import random
+import time
 
 from ...firstorder import (
     All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
@@ -369,6 +372,20 @@ class VirtualSubstitution:
     def f(self, x):
         print(os.getpid(), x)
 
+    @staticmethod
+    def g(working_nodes, how_often):
+        for i in range(how_often):
+            time.sleep(random.random() / 100)
+            wn = list(working_nodes).copy()
+            working_nodes.append(os.getpid())
+            print(f'{os.getpid()}: {wn}\n    -> {working_nodes}')
+
+    @staticmethod
+    def h(ll, lock):
+        with lock:
+            for i in range(20):
+                ll[0] += 1
+
     def process_block_parallel(self) -> None:
 
         # def worker(queues, pipes, ...)
@@ -384,6 +401,30 @@ class VirtualSubstitution:
         #             push_to_nodes(nodes)
         #         else:
         #             push_to_success(nodes)
+
+        with Manager() as manager:
+            lock = manager.Lock()
+            ll = manager.list([0] * 10)
+            p1 = Process(target=self.h, args=(ll, lock))
+            p2 = Process(target=self.h, args=(ll, lock))
+            p1.start()
+            p2.start()
+            p1.join()
+            p2.join()
+            return list(ll)
+
+        nprocs = 5
+        how_often = 3
+        p = list(range(nprocs))
+        with Manager() as manager:
+            working_nodes = manager.list()
+            for n in range(nprocs):
+                p[n] = Process(target=self.g, args=(working_nodes, how_often))
+            for n in range(nprocs):
+                p[n].start()
+            for n in range(nprocs):
+                p[n].join()
+            return list(working_nodes)
 
         print(os.getpid(), 'alice')
         p = Process(target=self.f, args=('bob',))
