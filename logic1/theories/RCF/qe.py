@@ -8,14 +8,13 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
 import logging
-from multiprocessing import Manager, Process
+from multiprocessing import connection, Manager, Process
 import os
+import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
-from typing import Optional, TypeAlias
-
-import random
 import time
+from typing import Collection, Optional, TypeAlias
 
 from ...firstorder import (
     All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
@@ -268,8 +267,15 @@ class VirtualSubstitution:
 
     max_len: int = 0
 
-    def __call__(self, f: Formula, debug: bool = False,
+    def __call__(self, f: Formula, nprocs: int = 0, debug: bool = False,
                  info: Optional[int] = None) -> Formula:
+        """Virtual substitution entry point.
+
+        nprocs is the number of processors to use. Tge default nprocs=0 uses
+        the sequential implementation. In contrast, nprocs=1 uses the parallel
+        implementation with one worker process, which is interesting for
+        testing and debugging.
+        """
         try:
             if debug:
                 logger.setLevel(logging.DEBUG)
@@ -277,7 +283,7 @@ class VirtualSubstitution:
                 logger.setLevel(logging.INFO)
                 filter_.set_rate(info)
             formatter.reset_clock()
-            result = self.virtual_substitution(f)
+            result = self.virtual_substitution(f, nprocs)
         finally:
             logger.setLevel(logging.WARNING)
         return result
@@ -345,16 +351,25 @@ class VirtualSubstitution:
         else:
             self.negated = False
         self.working_nodes = []
-        self.push_to_working([Node(vars_, self.simplify(matrix), [])])
+        self.push_to(self.working_nodes, [Node(vars_, self.simplify(matrix), [])])
         self.success_nodes = []
         self.failure_nodes = []
         logger.debug(f'{self.pop_block.__qualname__}: {self}')
 
-    def process_block(self) -> None:
+    def process_block(self, nprocs: int) -> None:
+        assert nprocs >= 0, nprocs
+        match nprocs:
+            case 0:
+                return self.process_block_sequential()
+            case _:
+                return self.process_block_parallel(nprocs)
+
+    def process_block_sequential(self) -> None:
         try:
             filter_.on()
             while self.working_nodes:
-                logger.info(self.statistics())
+                logger.info(self.statistics(self.working_nodes, self.success_nodes,
+                                            self.failure_nodes))
                 node = self.working_nodes.pop()
                 try:
                     eset = node.eset()
@@ -363,84 +378,135 @@ class VirtualSubstitution:
                     continue
                 nodes = node.vsubs(eset)
                 if nodes[0].variables:
-                    self.push_to_working(nodes)
+                    self.push_to(self.working_nodes, nodes)
                 else:
                     self.success_nodes.extend(nodes)
         finally:
             filter_.off()
 
-    def f(self, x):
-        print(os.getpid(), x)
+    @staticmethod
+    def _pickle_dumps(obj):
+        match obj:
+            case list():
+                return [pickle.dumps(x) for x in obj]
+            case _:
+                return pickle.dumps(obj)
 
     @staticmethod
-    def g(working_nodes, how_often):
-        for i in range(how_often):
-            time.sleep(random.random() / 100)
-            wn = list(working_nodes).copy()
-            working_nodes.append(os.getpid())
-            print(f'{os.getpid()}: {wn}\n    -> {working_nodes}')
+    def _pickle_loads(obj):
+        match obj:
+            case list():
+                return [pickle.loads(x) for x in obj]
+            case _:
+                return pickle.loads(obj)
+
+    def process_block_parallel(self, nprocs: int) -> None:
+        _pd = VirtualSubstitution._pickle_dumps
+        _pl = VirtualSubstitution._pickle_loads
+        try:
+            filter_.on()
+            with Manager() as manager:
+                working_nodes = manager.list(_pd(self.working_nodes))
+                success_nodes = manager.list(_pd(self.success_nodes))
+                failure_nodes = manager.list(_pd(self.failure_nodes))
+                dictionary = manager.dict({'busy': 0})
+                working_lock = manager.Lock()
+                success_lock = manager.Lock()
+                failure_lock = manager.Lock()
+                dictionary_lock = manager.Lock()
+                p: list[Optional[Process]] = [None] * nprocs
+                s: list[Optional[int]] = [None] * nprocs
+                for i in range(nprocs):
+                    p[i] = Process(target=self.process_block_parallel_worker,
+                                   args=(working_nodes, success_nodes, failure_nodes,
+                                         dictionary, working_lock, success_lock,
+                                         failure_lock, dictionary_lock))
+                    p[i].start()
+                    s[i] = p[i].sentinel
+                still_running = s.copy()
+                while still_running:
+                    with working_lock:
+                        logger.info(self.statistics(_pl(list(working_nodes)),
+                                                    success_nodes, failure_nodes))
+                    ready = connection.wait(s, timeout=0.1)
+                    for sentinel in ready:
+                        assert isinstance(sentinel, int)
+                        still_running.remove(sentinel)
+                        finished = nprocs - len(still_running)
+                        logger.info(f'{finished} worker(s) have finished, '
+                                    f'waiting for {len(still_running)} more')
+                self.working_nodes = _pl(list(working_nodes))
+                self.success_nodes = _pl(list(success_nodes))
+                self.failure_nodes = _pl(list(failure_nodes))
+        except FoundT:
+            print('Aha!')
+        finally:
+            filter_.off()
+        # The following should be caught earlier:
+        for node in self.success_nodes:
+            print('!!!', node)
+            if node.formula is T:
+                raise FoundT()
 
     @staticmethod
-    def h(ll, lock):
-        with lock:
-            for i in range(20):
-                ll[0] += 1
+    def process_block_parallel_worker(working_nodes, success_nodes, failure_nodes,
+                                      dictionary, working_lock, success_lock,
+                                      failure_lock, dictionary_lock) -> None:
+        def work_left():
+            with working_lock:
+                return list(working_nodes) or dictionary['busy'] > 0
 
-    def process_block_parallel(self) -> None:
+        _pd = VirtualSubstitution._pickle_dumps
+        _pl = VirtualSubstitution._pickle_loads
+        print(f'worker {os.getpid()}: sage ring is {ring}')
+        while True:
+            with working_lock, dictionary_lock:
+                print(f'worker {os.getpid()}: {_pl(list(working_nodes))}')
+                if not list(working_nodes) and dictionary['busy'] == 0:
+                    break
+                try:
+                    node = _pl(working_nodes.pop())
+                except IndexError:
+                    node = None
+                else:
+                    dictionary['busy'] += 1
+            if node is None:
+                time.sleep(0.001)
+                continue
+            try:
+                eset = node.eset()
+            except DegreeViolation:
+                with failure_lock, dictionary_lock:
+                    failure_nodes.append(_pd(node))
+                    dictionary['busy'] -= 1
+                continue
+            except FoundT:
+                print('Oho!')
+            try:
+                nodes = node.vsubs(eset)
+            except FoundT:
+                raise NotImplementedError()
+            if nodes[0].variables:
+                with working_lock, dictionary_lock:
+                    VirtualSubstitution.push_to(working_nodes, _pd(nodes))
+                    dictionary['busy'] -= 1
+            else:
+                with success_lock, dictionary_lock:
+                    success_nodes.extend(_pd(nodes))
+                    dictionary['busy'] -= 1
+        print(f'worker {os.getpid()}: exiting')
 
-        # def worker(queues, pipes, ...)
-        #     while work_to_do():
-        #         nodes = get_next_node() # blocking?
-        #         try:
-        #             new_nodes = process(node)
-        #         except DegreeViolation:
-        #             push_to_failure(new_nodes)
-        #         except FoundT:
-        #             communicate_true()
-        #         if has_variables(nodes):
-        #             push_to_nodes(nodes)
-        #         else:
-        #             push_to_success(nodes)
-
-        with Manager() as manager:
-            lock = manager.Lock()
-            ll = manager.list([0] * 10)
-            p1 = Process(target=self.h, args=(ll, lock))
-            p2 = Process(target=self.h, args=(ll, lock))
-            p1.start()
-            p2.start()
-            p1.join()
-            p2.join()
-            return list(ll)
-
-        nprocs = 5
-        how_often = 3
-        p = list(range(nprocs))
-        with Manager() as manager:
-            working_nodes = manager.list()
-            for n in range(nprocs):
-                p[n] = Process(target=self.g, args=(working_nodes, how_often))
-            for n in range(nprocs):
-                p[n].start()
-            for n in range(nprocs):
-                p[n].join()
-            return list(working_nodes)
-
-        print(os.getpid(), 'alice')
-        p = Process(target=self.f, args=('bob',))
-        p.start()
-        p.join()
-
-    def push_to_working(self, nodes: list[Node]) -> None:
+    @staticmethod
+    def push_to(working_nodes, nodes: list[Node]) -> None:
         for node in nodes:
             match node.formula:
                 case _F():
                     continue
                 case Or(args=args):
                     for arg in args:
-                        self.working_nodes.append(Node(node.variables.copy(), arg, node.answer))
+                        working_nodes.append(Node(node.variables.copy(), arg, node.answer))
                 case And() | AtomicFormula():
-                    self.working_nodes.append(node)
+                    working_nodes.append(node)
                 case _:
                     assert False, node
 
@@ -452,32 +518,38 @@ class VirtualSubstitution:
     def simplify(self, *args, **kwargs) -> Formula:
         return _simplify(*args, **kwargs)
 
-    def virtual_substitution(self, f):
+    def virtual_substitution(self, f, nprocs):
+        """Virtual substitution main loop.
+        """
         self.setup(f)
         while self.blocks:
             try:
                 self.pop_block()
-                self.process_block()
+                self.process_block(nprocs)
             except FoundT:
                 self.working_nodes = None
                 self.success_nodes = [Node(variables=[], formula=T, answer=[])]
             self.collect_success_nodes()
         return self.simplify(self.matrix)
 
-    def statistics(self) -> str:
-        counter = Counter(len(node.variables) for node in self.working_nodes)
-        m = max(counter.keys())
-        string = f'V={m}, {counter[m]}'
-        for n in reversed(range(1, m)):
-            string += f'.{counter[n]}'
-        string += ', '
+    def statistics(self, working_nodes: Collection[Node], success_nodes: Collection[Node],
+                   failure_nodes: Collection[Node]) -> str:
+        counter = Counter(len(node.variables) for node in working_nodes)
+        if counter.keys():
+            m = max(counter.keys())
+            string = f'V={m}, {counter[m]}'
+            for n in reversed(range(1, m)):
+                string += f'.{counter[n]}'
+            string += ', '
+        else:
+            string = ''
         if self.max_len > len(string):
             string += (self.max_len - len(string)) * ' '
         else:
             self.max_len = len(string)
-        string += (f'W={len(self.working_nodes)}, '
-                   f'S={len(self.success_nodes)}, '
-                   f'F={len(self.failure_nodes)}')
+        string += (f'W={len(working_nodes)}, '
+                   f'S={len(success_nodes)}, '
+                   f'F={len(failure_nodes)}')
         return string
 
 
