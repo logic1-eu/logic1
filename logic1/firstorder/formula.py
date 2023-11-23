@@ -116,6 +116,9 @@ class Formula(ABC):
         """
         return not self == other
 
+    def __getnewargs__(self):
+        return self.args
+
     def __hash__(self) -> int:
         return hash((self.func, self.args))
 
