@@ -8,8 +8,7 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
 import logging
-from multiprocessing import connection, Manager, Process
-import os
+import multiprocessing
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
@@ -32,22 +31,24 @@ Quantifier: TypeAlias = type[QuantifiedFormula]
 QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
 
 
-# Create filter
-filter_ = TimePeriodFilter()
-
-# Create formatter
+# Create logger
 formatter = DeltaTimeFormatter(
-    f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s:  %(message)s')
+    f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s: %(message)s')
 
-# Create handler and specify formatter
 handler = logging.StreamHandler()
 handler.setFormatter(formatter)
 
-# Create logger, then add filter and handler
 logger = logging.getLogger(__name__)
-logger.addFilter(filter_)
 logger.addHandler(handler)
 logger.setLevel(logging.WARNING)
+
+# Create flogger
+filter_ = TimePeriodFilter()
+
+flogger = logging.getLogger(__name__ + '/F')
+flogger.addHandler(handler)
+flogger.addFilter(filter_)
+flogger.setLevel(logging.WARNING)
 
 
 class DegreeViolation(Exception):
@@ -253,6 +254,44 @@ class Node:
         return result
 
 
+class QeManager:
+
+    def __init__(self):
+        self.manager = multiprocessing.Manager()
+
+    def dict(self, *args, **kwargs):
+        return self.manager.dict(*args, **kwargs)
+
+    def list(self, nodes: list[Node]) -> QeListProxy:
+        L = [pickle.dumps(node) for node in nodes]
+        return QeListProxy(self.manager.list(L))
+
+    def Lock(self):
+        return self.manager.Lock()
+
+
+class QeListProxy:
+
+    def __init__(self, list_proxy: multiprocessing.managers.ListProxy):
+        self.list_proxy = list_proxy
+
+    def __iter__(self):
+        for pickled_node in self.list_proxy:
+            yield pickle.loads(pickled_node)
+
+    def __len__(self):
+        return len(self.list_proxy)
+
+    def append(self, node: Node):
+        self.list_proxy.append(pickle.dumps(node))
+
+    def extend(self, nodes: list[Node]):
+        self.list_proxy.extend([pickle.dumps(node) for node in nodes])
+
+    def pop(self):
+        return pickle.loads(self.list_proxy.pop())
+
+
 @dataclass
 class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
@@ -267,8 +306,8 @@ class VirtualSubstitution:
 
     max_len: int = 0
 
-    def __call__(self, f: Formula, nprocs: int = 0, debug: bool = False,
-                 info: Optional[int] = None) -> Formula:
+    def __call__(self, f: Formula, nprocs: int = 0,
+                 log: int = logging.NOTSET, log_rate: float = 0.5) -> Formula:
         """Virtual substitution entry point.
 
         nprocs is the number of processors to use. Tge default nprocs=0 uses
@@ -277,24 +316,19 @@ class VirtualSubstitution:
         testing and debugging.
         """
         try:
-            if debug:
-                logger.setLevel(logging.DEBUG)
-            elif info is not None:
-                logger.setLevel(logging.INFO)
-                filter_.set_rate(info)
+            save_level = logger.getEffectiveLevel()
+            save_flevel = flogger.getEffectiveLevel()
+            logger.setLevel(log)
+            flogger.setLevel(log)
+            filter_.set_rate(log_rate)
             formatter.reset_clock()
             result = self.virtual_substitution(f, nprocs)
         finally:
-            logger.setLevel(logging.WARNING)
+            logger.setLevel(save_level)
+            flogger.setLevel(save_flevel)
         return result
 
     def __str__(self):
-
-        def format_blocks():
-            if self.blocks is None:
-                return None
-            h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
-            return f'[{h}]'
 
         def format_negated():
             match self.negated:
@@ -308,40 +342,48 @@ class VirtualSubstitution:
                     assert False, self.negated
             return f'{self.negated},{read_as}'
 
-        def format_nodes(nodes):
-            if nodes is None:
-                return None
-            h = ',\n                '.join(f'{node}' for node in nodes)
-            return f'[{h}]'
-
-        return (f'{self.__class__} [\n'
-                f'    blocks        = {format_blocks()},\n'
+        return (f'{self.__class__.__qualname__} [\n'
+                f'    blocks        = {self.blocks_as_str()},\n'
                 f'    matrix        = {self.matrix},\n'
                 f'    negated       = {format_negated()}\n'
-                f'    working_nodes = {format_nodes(self.working_nodes)},\n'
-                f'    success_nodes = {format_nodes(self.success_nodes)}\n'
-                f'    failure_nodes = {format_nodes(self.failure_nodes)}\n'
+                f'    working_nodes = {self.nodes_as_str(self.working_nodes)},\n'
+                f'    success_nodes = {self.nodes_as_str(self.success_nodes)}\n'
+                f'    failure_nodes = {self.nodes_as_str(self.failure_nodes)}\n'
                 f']')
 
     def collect_success_nodes(self) -> None:
-        if self.failure_nodes:
-            raise DegreeViolation()
+        logger.debug(f'entering {self.collect_success_nodes.__name__}')
         self.matrix = Or(*(node.formula for node in self.success_nodes))
         if self.negated:
             self.matrix = Not(self.matrix)
         self.negated = None
         self.working_nodes = None
         self.success_nodes = None
-        if self.failure_nodes:
-            raise NotImplementedError()
-        logger.debug(f'{self.collect_success_nodes.__qualname__}: {self}')
+
+    def blocks_as_str(self):
+        if self.blocks is None:
+            return None
+        h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
+        return f'{h}'
+
+    def nodes_as_str(self, nodes):
+        if nodes is None:
+            return None
+        h = ',\n                '.join(f'{node}' for node in nodes)
+        return f'[{h}]'
 
     def pnf(self, *args, **kwargs) -> Formula:
         return _pnf(*args, **kwargs)
 
     def pop_block(self) -> None:
-        assert self.matrix, "no matrix"
-        logger.info(' '.join(f'{Q.__qualname__} {vars_}' for (Q, vars_) in self.blocks))
+        logger.debug(f'entering {self.pop_block.__name__}')
+        assert self.matrix, self.matrix
+        logger.info(self.blocks_as_str())
+        if logger.isEnabledFor(logging.DEBUG):
+            s = str(self.matrix)
+            if len(s) > 80:
+                s = s[:76] + ' ...'
+            logger.debug(s)
         quantifier, vars_ = self.blocks.pop()
         matrix = self.matrix
         self.matrix = None
@@ -354,9 +396,9 @@ class VirtualSubstitution:
         self.push_to(self.working_nodes, [Node(vars_, self.simplify(matrix), [])])
         self.success_nodes = []
         self.failure_nodes = []
-        logger.debug(f'{self.pop_block.__qualname__}: {self}')
 
     def process_block(self, nprocs: int) -> None:
+        logger.debug(f'entering {self.process_block.__name__}')
         assert nprocs >= 0, nprocs
         match nprocs:
             case 0:
@@ -365,107 +407,91 @@ class VirtualSubstitution:
                 return self.process_block_parallel(nprocs)
 
     def process_block_sequential(self) -> None:
-        try:
-            filter_.on()
-            while self.working_nodes:
-                logger.info(self.statistics(self.working_nodes, self.success_nodes,
-                                            self.failure_nodes))
-                node = self.working_nodes.pop()
-                try:
-                    eset = node.eset()
-                except DegreeViolation:
-                    self.failure_nodes.append(node)
-                    continue
-                nodes = node.vsubs(eset)
-                if nodes[0].variables:
-                    self.push_to(self.working_nodes, nodes)
-                else:
-                    self.success_nodes.extend(nodes)
-        finally:
-            filter_.off()
-
-    @staticmethod
-    def _pickle_dumps(obj):
-        match obj:
-            case list():
-                return [pickle.dumps(x) for x in obj]
-            case _:
-                return pickle.dumps(obj)
-
-    @staticmethod
-    def _pickle_loads(obj):
-        match obj:
-            case list():
-                return [pickle.loads(x) for x in obj]
-            case _:
-                return pickle.loads(obj)
+        while self.working_nodes:
+            if flogger.isEnabledFor(logging.INFO):
+                flogger.info(self.statistics(self.working_nodes,
+                                             self.success_nodes,
+                                             self.failure_nodes))
+            node = self.working_nodes.pop()
+            try:
+                eset = node.eset()
+            except DegreeViolation:
+                self.failure_nodes.append(node)
+                continue
+            nodes = node.vsubs(eset)
+            if nodes[0].variables:
+                self.push_to(self.working_nodes, nodes)
+            else:
+                self.success_nodes.extend(nodes)
 
     def process_block_parallel(self, nprocs: int) -> None:
-        _pd = VirtualSubstitution._pickle_dumps
-        _pl = VirtualSubstitution._pickle_loads
-        try:
-            filter_.on()
-            with Manager() as manager:
-                working_nodes = manager.list(_pd(self.working_nodes))
-                success_nodes = manager.list(_pd(self.success_nodes))
-                failure_nodes = manager.list(_pd(self.failure_nodes))
-                dictionary = manager.dict({'busy': 0})
-                working_lock = manager.Lock()
-                success_lock = manager.Lock()
-                failure_lock = manager.Lock()
-                dictionary_lock = manager.Lock()
-                p: list[Optional[Process]] = [None] * nprocs
-                s: list[Optional[int]] = [None] * nprocs
-                for i in range(nprocs):
-                    p[i] = Process(target=self.process_block_parallel_worker,
-                                   args=(working_nodes, success_nodes, failure_nodes,
-                                         dictionary, working_lock, success_lock,
-                                         failure_lock, dictionary_lock))
-                    p[i].start()
-                    s[i] = p[i].sentinel
-                still_running = s.copy()
+        manager = QeManager()
+        working_nodes = manager.list(self.working_nodes)
+        success_nodes = manager.list(self.success_nodes)
+        failure_nodes = manager.list(self.failure_nodes)
+        dictionary = manager.dict({'busy': 0, 'found_t': 0})
+        working_lock = manager.Lock()
+        success_lock = manager.Lock()
+        failure_lock = manager.Lock()
+        dictionary_lock = manager.Lock()
+        p: list[Optional[multiprocessing.Process]] = [None] * nprocs
+        s: list[Optional[int]] = [None] * nprocs
+        for i in range(nprocs):
+            p[i] = multiprocessing.Process(
+                target=self.process_block_parallel_worker,
+                args=(working_nodes, success_nodes, failure_nodes, dictionary,
+                      working_lock, success_lock, failure_lock, dictionary_lock,
+                      tuple(str(v) for v in ring.get_vars())))
+            p[i].start()
+            s[i] = p[i].sentinel
+        still_running = s.copy()
+        while still_running:
+            with working_lock:
+                wn = list(working_nodes)
+            with success_lock:
+                num_sn = len(success_nodes)
+            with failure_lock:
+                num_fn = len(failure_nodes)
+            if flogger.isEnabledFor(logging.INFO):
+                flogger.info(self.statistics_(wn, num_sn, num_fn))
+            if multiprocessing.connection.wait(still_running, timeout=0):
+                # All processes are going to finish now.
                 while still_running:
-                    with working_lock:
-                        logger.info(self.statistics(_pl(list(working_nodes)),
-                                                    success_nodes, failure_nodes))
-                    ready = connection.wait(s, timeout=0.1)
-                    for sentinel in ready:
-                        assert isinstance(sentinel, int)
-                        still_running.remove(sentinel)
-                        finished = nprocs - len(still_running)
-                        logger.info(f'{finished} worker(s) have finished, '
-                                    f'waiting for {len(still_running)} more')
-                self.working_nodes = _pl(list(working_nodes))
-                self.success_nodes = _pl(list(success_nodes))
-                self.failure_nodes = _pl(list(failure_nodes))
-        except FoundT:
-            print('Aha!')
-        finally:
-            filter_.off()
-        # The following should be caught earlier:
-        for node in self.success_nodes:
-            print('!!!', node)
-            if node.formula is T:
-                raise FoundT()
+                    finished = multiprocessing.connection.wait(still_running,
+                                                               timeout=0.001)
+                    if finished:
+                        for sentinel in finished:
+                            assert isinstance(sentinel, int)
+                            still_running.remove(sentinel)
+                        num_finished = nprocs - len(still_running)
+                        logger.debug(f'{num_finished} worker(s) finished, '
+                                     f'{len(still_running)} running')
+        with dictionary_lock:
+            found_t = dictionary['found_t']
+        if found_t > 0:
+            logger.debug(f'{found_t} worker found T')
+            raise FoundT()
+        self.working_nodes = list(working_nodes)
+        self.success_nodes = list(success_nodes)
+        self.failure_nodes = list(failure_nodes)
 
     @staticmethod
     def process_block_parallel_worker(working_nodes, success_nodes, failure_nodes,
                                       dictionary, working_lock, success_lock,
-                                      failure_lock, dictionary_lock) -> None:
+                                      failure_lock, dictionary_lock, ring_vars) -> None:
         def work_left():
             with working_lock:
                 return list(working_nodes) or dictionary['busy'] > 0
 
-        _pd = VirtualSubstitution._pickle_dumps
-        _pl = VirtualSubstitution._pickle_loads
-        print(f'worker {os.getpid()}: sage ring is {ring}')
+        ring.set_vars(*ring_vars)
         while True:
             with working_lock, dictionary_lock:
-                print(f'worker {os.getpid()}: {_pl(list(working_nodes))}')
-                if not list(working_nodes) and dictionary['busy'] == 0:
+                if dictionary['found_t'] > 0:
+                    break
+                if len(working_nodes) == 0 and dictionary['busy'] == 0:
                     break
                 try:
-                    node = _pl(working_nodes.pop())
+                    node = working_nodes.pop()
                 except IndexError:
                     node = None
                 else:
@@ -477,24 +503,23 @@ class VirtualSubstitution:
                 eset = node.eset()
             except DegreeViolation:
                 with failure_lock, dictionary_lock:
-                    failure_nodes.append(_pd(node))
+                    failure_nodes.append(node)
                     dictionary['busy'] -= 1
                 continue
-            except FoundT:
-                print('Oho!')
             try:
                 nodes = node.vsubs(eset)
             except FoundT:
-                raise NotImplementedError()
+                with dictionary_lock:
+                    dictionary['found_t'] += 1
+                break
             if nodes[0].variables:
                 with working_lock, dictionary_lock:
-                    VirtualSubstitution.push_to(working_nodes, _pd(nodes))
+                    VirtualSubstitution.push_to(working_nodes, nodes)
                     dictionary['busy'] -= 1
             else:
                 with success_lock, dictionary_lock:
-                    success_nodes.extend(_pd(nodes))
+                    success_nodes.extend(nodes)
                     dictionary['busy'] -= 1
-        print(f'worker {os.getpid()}: exiting')
 
     @staticmethod
     def push_to(working_nodes, nodes: list[Node]) -> None:
@@ -511,9 +536,9 @@ class VirtualSubstitution:
                     assert False, node
 
     def setup(self, f: Formula) -> None:
+        logger.debug(f'entering {self.setup.__name__}')
         f = self.pnf(f)
         self.matrix, self.blocks = f.matrix()
-        logger.debug(f'{self.setup.__qualname__}: {self}')
 
     def simplify(self, *args, **kwargs) -> Formula:
         return _simplify(*args, **kwargs)
@@ -530,10 +555,16 @@ class VirtualSubstitution:
                 self.working_nodes = None
                 self.success_nodes = [Node(variables=[], formula=T, answer=[])]
             self.collect_success_nodes()
+            if self.failure_nodes:
+                raise NotImplemented('failure_nodes = {self.failure_nodes}')
         return self.simplify(self.matrix)
 
     def statistics(self, working_nodes: Collection[Node], success_nodes: Collection[Node],
                    failure_nodes: Collection[Node]) -> str:
+        return self.statistics_(working_nodes, len(success_nodes), len(failure_nodes))
+
+    def statistics_(self, working_nodes: Collection[Node],
+                    num_success_nodes: int, num_failure_nodes: int) -> str:
         counter = Counter(len(node.variables) for node in working_nodes)
         if counter.keys():
             m = max(counter.keys())
@@ -548,8 +579,8 @@ class VirtualSubstitution:
         else:
             self.max_len = len(string)
         string += (f'W={len(working_nodes)}, '
-                   f'S={len(success_nodes)}, '
-                   f'F={len(failure_nodes)}')
+                   f'S={num_success_nodes}, '
+                   f'F={num_failure_nodes}')
         return string
 
 

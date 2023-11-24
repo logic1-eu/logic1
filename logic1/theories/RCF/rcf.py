@@ -61,7 +61,9 @@ class _Ring:
         return gens
 
     def get_vars(self) -> tuple[Variable]:
-        return self.sage_ring.gens()
+        gens = self.sage_ring.gens()
+        gens = (v for v in gens if str(v) != 'one_unused_variable')
+        return tuple(gens)
 
     def pop(self) -> PolynomialRing:
         self.sage_ring = self.stack.pop()

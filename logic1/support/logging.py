@@ -19,9 +19,10 @@ class DeltaTimeFormatter(logging.Formatter):
 
 class TimePeriodFilter(logging.Filter):
 
-    active = False
-    last_log = 0
-    rate = 0
+    def __init__(self):
+        self.active = True
+        self.last_log = 0
+        self.rate = 0
 
     def filter(self, record):
         if not self.active:

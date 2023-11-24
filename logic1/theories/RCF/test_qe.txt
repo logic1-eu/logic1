@@ -15,6 +15,9 @@ F
 >>> qe('ex(x, a * x + b == 0)')
 Or(Eq(b, 0), Ne(a, 0))
 
+>>> qe('ex(x, a * x + b == 0)', nprocs=2)
+Or(Eq(b, 0), Ne(a, 0))
+
 >>> qe('ex(x, a * x + b <= 0)')
 Or(Le(b, 0), Ne(a, 0))
 
