@@ -8,12 +8,12 @@ from collections import Counter
 from dataclasses import dataclass
 from enum import auto, Enum
 import logging
-import multiprocessing
+import multiprocessing as mp
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 import time
-from typing import Collection, Optional, TypeAlias
+from typing import Optional, TypeAlias
 
 from ...firstorder import (
     All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
@@ -25,7 +25,6 @@ from .rcf import (
     RcfAtomicFormula, RcfAtomicFormulas, ring, Term, Variable, Eq, Ne, Ge, Le,
     Gt, Lt)
 from .simplify import simplify as _simplify
-
 
 Quantifier: TypeAlias = type[QuantifiedFormula]
 QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
@@ -256,23 +255,23 @@ class Node:
 
 class QeManager:
 
-    def __init__(self):
-        self.manager = multiprocessing.Manager()
+    def __init__(self) -> None:
+        self.manager = mp.Manager()
 
-    def dict(self, *args, **kwargs):
+    def dict(self, *args, **kwargs) -> mp.managers.DictProxy:
         return self.manager.dict(*args, **kwargs)
 
     def list(self, nodes: list[Node]) -> QeListProxy:
         L = [pickle.dumps(node) for node in nodes]
         return QeListProxy(self.manager.list(L))
 
-    def Lock(self):
+    def Lock(self) -> mp.managers.AcquirerProxy:  # type: ignore
         return self.manager.Lock()
 
 
 class QeListProxy:
 
-    def __init__(self, list_proxy: multiprocessing.managers.ListProxy):
+    def __init__(self, list_proxy: mp.managers.ListProxy):
         self.list_proxy = list_proxy
 
     def __iter__(self):
@@ -297,6 +296,7 @@ class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
     """
 
+    nprocs: int = 0
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
@@ -304,7 +304,7 @@ class VirtualSubstitution:
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
 
-    max_len: int = 0
+    _statistics_max_len: int = 0
 
     def __call__(self, f: Formula, nprocs: int = 0,
                  log: int = logging.NOTSET, log_rate: float = 0.5) -> Formula:
@@ -328,9 +328,9 @@ class VirtualSubstitution:
             flogger.setLevel(save_flevel)
         return result
 
-    def __str__(self):
+    def __str__(self) -> str:
 
-        def format_negated():
+        def format_negated() -> str:
             match self.negated:
                 case None:
                     read_as = ''
@@ -360,13 +360,13 @@ class VirtualSubstitution:
         self.working_nodes = None
         self.success_nodes = None
 
-    def blocks_as_str(self):
+    def blocks_as_str(self) -> str:
         if self.blocks is None:
             return None
         h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
         return f'{h}'
 
-    def nodes_as_str(self, nodes):
+    def nodes_as_str(self, nodes: list[Node]) -> str:
         if nodes is None:
             return None
         h = ',\n                '.join(f'{node}' for node in nodes)
@@ -397,21 +397,16 @@ class VirtualSubstitution:
         self.success_nodes = []
         self.failure_nodes = []
 
-    def process_block(self, nprocs: int) -> None:
+    def process_block(self) -> None:
         logger.debug(f'entering {self.process_block.__name__}')
-        assert nprocs >= 0, nprocs
-        match nprocs:
-            case 0:
-                return self.process_block_sequential()
-            case _:
-                return self.process_block_parallel(nprocs)
+        if self.nprocs > 0:
+            return self.process_block_parallel()
+        return self.process_block_sequential()
 
     def process_block_sequential(self) -> None:
         while self.working_nodes:
             if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.statistics(self.working_nodes,
-                                             self.success_nodes,
-                                             self.failure_nodes))
+                flogger.info(self.statistics_sequential())
             node = self.working_nodes.pop()
             try:
                 eset = node.eset()
@@ -424,7 +419,7 @@ class VirtualSubstitution:
             else:
                 self.success_nodes.extend(nodes)
 
-    def process_block_parallel(self, nprocs: int) -> None:
+    def process_block_parallel(self) -> None:
         manager = QeManager()
         working_nodes = manager.list(self.working_nodes)
         success_nodes = manager.list(self.success_nodes)
@@ -434,10 +429,10 @@ class VirtualSubstitution:
         success_lock = manager.Lock()
         failure_lock = manager.Lock()
         dictionary_lock = manager.Lock()
-        p: list[Optional[multiprocessing.Process]] = [None] * nprocs
-        s: list[Optional[int]] = [None] * nprocs
-        for i in range(nprocs):
-            p[i] = multiprocessing.Process(
+        p: list[Optional[mp.Process]] = [None] * self.nprocs
+        s: list[Optional[int]] = [None] * self.nprocs
+        for i in range(self.nprocs):
+            p[i] = mp.Process(
                 target=self.process_block_parallel_worker,
                 args=(working_nodes, success_nodes, failure_nodes, dictionary,
                       working_lock, success_lock, failure_lock, dictionary_lock,
@@ -446,24 +441,19 @@ class VirtualSubstitution:
             s[i] = p[i].sentinel
         still_running = s.copy()
         while still_running:
-            with working_lock:
-                wn = list(working_nodes)
-            with success_lock:
-                num_sn = len(success_nodes)
-            with failure_lock:
-                num_fn = len(failure_nodes)
             if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.statistics_(wn, num_sn, num_fn))
-            if multiprocessing.connection.wait(still_running, timeout=0):
+                flogger.info(self.statistics_parallel(
+                    working_nodes, success_nodes, failure_nodes,
+                    working_lock, success_lock, failure_lock))
+            if mp.connection.wait(still_running, timeout=0):
                 # All processes are going to finish now.
                 while still_running:
-                    finished = multiprocessing.connection.wait(still_running,
-                                                               timeout=0.001)
+                    finished = mp.connection.wait(still_running, timeout=0.001)
                     if finished:
                         for sentinel in finished:
                             assert isinstance(sentinel, int)
                             still_running.remove(sentinel)
-                        num_finished = nprocs - len(still_running)
+                        num_finished = self.nprocs - len(still_running)
                         logger.debug(f'{num_finished} worker(s) finished, '
                                      f'{len(still_running)} running')
         with dictionary_lock:
@@ -476,9 +466,15 @@ class VirtualSubstitution:
         self.failure_nodes = list(failure_nodes)
 
     @staticmethod
-    def process_block_parallel_worker(working_nodes, success_nodes, failure_nodes,
-                                      dictionary, working_lock, success_lock,
-                                      failure_lock, dictionary_lock, ring_vars) -> None:
+    def process_block_parallel_worker(working_nodes: QeListProxy,
+                                      success_nodes: QeListProxy,
+                                      failure_nodes: QeListProxy,
+                                      dictionary: mp.managers.DictProxy,
+                                      working_lock: mp.managers.AcquirerProxy,  # type: ignore
+                                      success_lock: mp.managers.AcquirerProxy,  # type: ignore
+                                      failure_lock: mp.managers.AcquirerProxy,  # type: ignore
+                                      dictionary_lock: mp.managers.AcquirerProxy,  # type: ignore
+                                      ring_vars: list[str]) -> None:
         def work_left():
             with working_lock:
                 return list(working_nodes) or dictionary['busy'] > 0
@@ -522,7 +518,7 @@ class VirtualSubstitution:
                     dictionary['busy'] -= 1
 
     @staticmethod
-    def push_to(working_nodes, nodes: list[Node]) -> None:
+    def push_to(working_nodes: QeListProxy | list[Node], nodes: list[Node]) -> None:
         for node in nodes:
             match node.formula:
                 case _F():
@@ -535,36 +531,38 @@ class VirtualSubstitution:
                 case _:
                     assert False, node
 
-    def setup(self, f: Formula) -> None:
+    def setup(self, f: Formula, nprocs: int) -> None:
         logger.debug(f'entering {self.setup.__name__}')
+        self.nprocs = nprocs
         f = self.pnf(f)
         self.matrix, self.blocks = f.matrix()
 
     def simplify(self, *args, **kwargs) -> Formula:
         return _simplify(*args, **kwargs)
 
-    def virtual_substitution(self, f, nprocs):
-        """Virtual substitution main loop.
-        """
-        self.setup(f)
-        while self.blocks:
-            try:
-                self.pop_block()
-                self.process_block(nprocs)
-            except FoundT:
-                self.working_nodes = None
-                self.success_nodes = [Node(variables=[], formula=T, answer=[])]
-            self.collect_success_nodes()
-            if self.failure_nodes:
-                raise NotImplemented('failure_nodes = {self.failure_nodes}')
-        return self.simplify(self.matrix)
+    def statistics_parallel(self,
+                            working_nodes: QeListProxy,
+                            success_nodes: QeListProxy,
+                            failure_nodes: QeListProxy,
+                            working_lock: mp.managers.AcquirerProxy,  # type: ignore
+                            success_lock: mp.managers.AcquirerProxy,  # type: ignore
+                            failure_lock: mp.managers.AcquirerProxy,  # type: ignore
+                            ) -> str:
+        with working_lock:
+            wn = list(working_nodes)
+        with success_lock:
+            num_sn = len(success_nodes)
+        with failure_lock:
+            num_fn = len(failure_nodes)
+        return self._statistics(wn, num_sn, num_fn)
 
-    def statistics(self, working_nodes: Collection[Node], success_nodes: Collection[Node],
-                   failure_nodes: Collection[Node]) -> str:
-        return self.statistics_(working_nodes, len(success_nodes), len(failure_nodes))
+    def statistics_sequential(self) -> str:
+        num_sn = len(self.success_nodes)
+        num_fn = len(self.failure_nodes)
+        return self._statistics(self.working_nodes, num_sn, num_fn)
 
-    def statistics_(self, working_nodes: Collection[Node],
-                    num_success_nodes: int, num_failure_nodes: int) -> str:
+    def _statistics(self, working_nodes: list[Node], num_success_nodes: int,
+                    num_failure_nodes: int) -> str:
         counter = Counter(len(node.variables) for node in working_nodes)
         if counter.keys():
             m = max(counter.keys())
@@ -574,14 +572,30 @@ class VirtualSubstitution:
             string += ', '
         else:
             string = ''
-        if self.max_len > len(string):
-            string += (self.max_len - len(string)) * ' '
+        if self._statistics_max_len > len(string):
+            string += (self._statistics_max_len - len(string)) * ' '
         else:
-            self.max_len = len(string)
+            self._statistics_max_len = len(string)
         string += (f'W={len(working_nodes)}, '
                    f'S={num_success_nodes}, '
                    f'F={num_failure_nodes}')
         return string
+
+    def virtual_substitution(self, f: Formula, nprocs: int):
+        """Virtual substitution main loop.
+        """
+        self.setup(f, nprocs)
+        while self.blocks:
+            try:
+                self.pop_block()
+                self.process_block()
+            except FoundT:
+                self.working_nodes = None
+                self.success_nodes = [Node(variables=[], formula=T, answer=[])]
+            self.collect_success_nodes()
+            if self.failure_nodes:
+                raise NotImplementedError('failure_nodes = {self.failure_nodes}')
+        return self.simplify(self.matrix)
 
 
 qe = virtual_substitution = VirtualSubstitution()
