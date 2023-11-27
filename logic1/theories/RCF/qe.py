@@ -20,11 +20,11 @@ from ...firstorder import (
 from ...support.logging import DeltaTimeFormatter, TimePeriodFilter
 from ...support.tracing import trace  # noqa
 from . import rcf
-from .pnf import pnf as _pnf
+from .pnf import pnf
 from .rcf import (
     RcfAtomicFormula, RcfAtomicFormulas, ring, Term, Variable, Eq, Ne, Ge, Le,
     Gt, Lt)
-from .simplify import simplify as _simplify
+from .simplify import simplify
 
 Quantifier: TypeAlias = type[QuantifiedFormula]
 QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
@@ -158,9 +158,6 @@ class Node:
                     raise DegreeViolation(atom, x, atom.lhs.degree(x))
         return EliminationSet(variable=x, test_points=test_points, method='e')
 
-    def simplify(self, *args, **kwargs) -> Formula:
-        return _simplify(*args, **kwargs)
-
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
         x = eset.variable
@@ -169,7 +166,7 @@ class Node:
             new_formula = self.formula.transform_atoms(lambda atom: self.vsubs_atom(atom, x, tp))
             if tp.guard is not None:
                 new_formula = And(tp.guard, new_formula)
-            new_formula = self.simplify(new_formula)
+            new_formula = simplify(new_formula)
             if new_formula is T:
                 raise FoundT()
             new_nodes.append(Node(variables.copy(), new_formula, []))
@@ -253,23 +250,58 @@ class Node:
         return result
 
 
-class QeManager:
+class WorkingNodeList(list[Node]):
+
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self.memory: set[Formula] = set()
+        self.hits = 0
+        self.calls = 0
+
+    def append_if_unknown(self, node: Node) -> None:
+        if node.formula not in self.memory:
+            self.append(node)
+            self.memory.update({node.formula})
+        else:
+            self.hits += 1
+        self.calls += 1
+
+    def push(self, nodes: list[Node]) -> None:
+        for node in nodes:
+            match node.formula:
+                case _F():
+                    continue
+                case Or(args=args):
+                    for arg in args:
+                        subnode = Node(node.variables.copy(), arg, node.answer)
+                        self.append_if_unknown(subnode)
+                case And() | AtomicFormula():
+                    self.append_if_unknown(node)
+                case _:
+                    assert False, node
+
+
+class Manager:
 
     def __init__(self) -> None:
         self.manager = mp.Manager()
 
-    def dict(self, *args, **kwargs) -> mp.managers.DictProxy:
+    def dictProxy(self, *args, **kwargs) -> mp.managers.DictProxy:
         return self.manager.dict(*args, **kwargs)
 
-    def list(self, nodes: list[Node]) -> QeListProxy:
+    def listProxy(self, nodes: list[Node]) -> ListProxy:
         L = [pickle.dumps(node) for node in nodes]
-        return QeListProxy(self.manager.list(L))
+        return ListProxy(self.manager.list(L))
 
     def Lock(self) -> mp.managers.AcquirerProxy:  # type: ignore
         return self.manager.Lock()
 
+    def workingNodeProxy(self, nodes: list[Node]) -> WorkingNodeProxy:
+        L = [pickle.dumps(node) for node in nodes]
+        return WorkingNodeProxy(self.manager.list(L))
 
-class QeListProxy:
+
+class ListProxy:
 
     def __init__(self, list_proxy: mp.managers.ListProxy):
         self.list_proxy = list_proxy
@@ -281,14 +313,45 @@ class QeListProxy:
     def __len__(self):
         return len(self.list_proxy)
 
-    def append(self, node: Node):
+    def append(self, node: Node) -> None:
         self.list_proxy.append(pickle.dumps(node))
 
-    def extend(self, nodes: list[Node]):
+    def extend(self, nodes: list[Node]) -> None:
         self.list_proxy.extend([pickle.dumps(node) for node in nodes])
 
-    def pop(self):
+    def pop(self) -> Node:
         return pickle.loads(self.list_proxy.pop())
+
+
+class WorkingNodeProxy(ListProxy):
+
+    def __init__(self, *args):
+        # self.memory is local within the worker. This has two consequences:
+        # (1) equal formulas occurring in differnt worker processes are not
+        # recognized, (2) the success of the heuristics cannot be logeded by
+        # the master.
+        super().__init__(*args)
+        self.memory = set()
+
+    def append_if_unknown(self, node: Node) -> None:
+        if node.formula not in self.memory:
+            pickled_node = pickle.dumps(node)
+            self.list_proxy.append(pickled_node)
+            self.memory.update({node.formula})
+
+    def push(self, nodes: list[Node]) -> None:
+        for node in nodes:
+            match node.formula:
+                case _F():
+                    continue
+                case Or(args=args):
+                    for arg in args:
+                        subnode = Node(node.variables.copy(), arg, node.answer)
+                        self.append_if_unknown(subnode)
+                case And() | AtomicFormula():
+                    self.append_if_unknown(node)
+                case _:
+                    assert False, node
 
 
 @dataclass
@@ -300,7 +363,7 @@ class VirtualSubstitution:
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
-    working_nodes: Optional[list[Node]] = None
+    working_nodes: Optional[WorkingNodeList] = None
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
 
@@ -310,10 +373,10 @@ class VirtualSubstitution:
                  log: int = logging.NOTSET, log_rate: float = 0.5) -> Formula:
         """Virtual substitution entry point.
 
-        nprocs is the number of processors to use. Tge default nprocs=0 uses
-        the sequential implementation. In contrast, nprocs=1 uses the parallel
-        implementation with one worker process, which is interesting for
-        testing and debugging.
+        nprocs is the number of processors to use. The default value nprocs=0
+        uses the sequential implementation. In contrast, nprocs=1 uses the
+        parallel implementation with one worker process, which is interesting
+        for testing and debugging.
         """
         try:
             save_level = logger.getEffectiveLevel()
@@ -351,6 +414,12 @@ class VirtualSubstitution:
                 f'    failure_nodes = {self.nodes_as_str(self.failure_nodes)}\n'
                 f']')
 
+    def blocks_as_str(self) -> str:
+        if self.blocks is None:
+            return None
+        h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
+        return f'{h}'
+
     def collect_success_nodes(self) -> None:
         logger.debug(f'entering {self.collect_success_nodes.__name__}')
         self.matrix = Or(*(node.formula for node in self.success_nodes))
@@ -360,71 +429,18 @@ class VirtualSubstitution:
         self.working_nodes = None
         self.success_nodes = None
 
-    def blocks_as_str(self) -> str:
-        if self.blocks is None:
-            return None
-        h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
-        return f'{h}'
-
     def nodes_as_str(self, nodes: list[Node]) -> str:
         if nodes is None:
             return None
         h = ',\n                '.join(f'{node}' for node in nodes)
         return f'[{h}]'
 
-    def pnf(self, *args, **kwargs) -> Formula:
-        return _pnf(*args, **kwargs)
-
-    def pop_block(self) -> None:
-        logger.debug(f'entering {self.pop_block.__name__}')
-        assert self.matrix, self.matrix
-        logger.info(self.blocks_as_str())
-        if logger.isEnabledFor(logging.DEBUG):
-            s = str(self.matrix)
-            if len(s) > 80:
-                s = s[:76] + ' ...'
-            logger.debug(s)
-        quantifier, vars_ = self.blocks.pop()
-        matrix = self.matrix
-        self.matrix = None
-        if quantifier is All:
-            self.negated = True
-            matrix = Not(matrix)
-        else:
-            self.negated = False
-        self.working_nodes = []
-        self.push_to(self.working_nodes, [Node(vars_, self.simplify(matrix), [])])
-        self.success_nodes = []
-        self.failure_nodes = []
-
-    def process_block(self) -> None:
-        logger.debug(f'entering {self.process_block.__name__}')
-        if self.nprocs > 0:
-            return self.process_block_parallel()
-        return self.process_block_sequential()
-
-    def process_block_sequential(self) -> None:
-        while self.working_nodes:
-            if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.statistics_sequential())
-            node = self.working_nodes.pop()
-            try:
-                eset = node.eset()
-            except DegreeViolation:
-                self.failure_nodes.append(node)
-                continue
-            nodes = node.vsubs(eset)
-            if nodes[0].variables:
-                self.push_to(self.working_nodes, nodes)
-            else:
-                self.success_nodes.extend(nodes)
-
-    def process_block_parallel(self) -> None:
-        manager = QeManager()
-        working_nodes = manager.list(self.working_nodes)
-        success_nodes = manager.list(self.success_nodes)
-        failure_nodes = manager.list(self.failure_nodes)
-        dictionary = manager.dict({'busy': 0, 'found_t': 0})
+    def parallel_process_block(self) -> None:
+        manager = Manager()
+        working_nodes = manager.workingNodeProxy(self.working_nodes)
+        success_nodes = manager.listProxy(self.success_nodes)
+        failure_nodes = manager.listProxy(self.failure_nodes)
+        dictionary = manager.dictProxy({'busy': 0, 'found_t': 0})
         working_lock = manager.Lock()
         success_lock = manager.Lock()
         failure_lock = manager.Lock()
@@ -433,7 +449,7 @@ class VirtualSubstitution:
         s: list[Optional[int]] = [None] * self.nprocs
         for i in range(self.nprocs):
             p[i] = mp.Process(
-                target=self.process_block_parallel_worker,
+                target=self.parallel_process_block_worker,
                 args=(working_nodes, success_nodes, failure_nodes, dictionary,
                       working_lock, success_lock, failure_lock, dictionary_lock,
                       tuple(str(v) for v in ring.get_vars())))
@@ -442,13 +458,13 @@ class VirtualSubstitution:
         still_running = s.copy()
         while still_running:
             if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.statistics_parallel(
+                flogger.info(self.parallel_statistics(
                     working_nodes, success_nodes, failure_nodes,
                     working_lock, success_lock, failure_lock))
             if mp.connection.wait(still_running, timeout=0):
                 # All processes are going to finish now.
                 while still_running:
-                    finished = mp.connection.wait(still_running, timeout=0.001)
+                    finished = mp.connection.wait(still_running)
                     if finished:
                         for sentinel in finished:
                             assert isinstance(sentinel, int)
@@ -459,16 +475,16 @@ class VirtualSubstitution:
         with dictionary_lock:
             found_t = dictionary['found_t']
         if found_t > 0:
-            logger.debug(f'{found_t} worker found T')
+            logger.debug(f'{found_t} worker(s) found T')
             raise FoundT()
-        self.working_nodes = list(working_nodes)
+        self.working_nodes = WorkingNodeList(working_nodes)
         self.success_nodes = list(success_nodes)
         self.failure_nodes = list(failure_nodes)
 
     @staticmethod
-    def process_block_parallel_worker(working_nodes: QeListProxy,
-                                      success_nodes: QeListProxy,
-                                      failure_nodes: QeListProxy,
+    def parallel_process_block_worker(working_nodes: WorkingNodeProxy,
+                                      success_nodes: ListProxy,
+                                      failure_nodes: ListProxy,
                                       dictionary: mp.managers.DictProxy,
                                       working_lock: mp.managers.AcquirerProxy,  # type: ignore
                                       success_lock: mp.managers.AcquirerProxy,  # type: ignore
@@ -510,40 +526,17 @@ class VirtualSubstitution:
                 break
             if nodes[0].variables:
                 with working_lock, dictionary_lock:
-                    VirtualSubstitution.push_to(working_nodes, nodes)
+                    working_nodes.push(nodes)
                     dictionary['busy'] -= 1
             else:
                 with success_lock, dictionary_lock:
                     success_nodes.extend(nodes)
                     dictionary['busy'] -= 1
 
-    @staticmethod
-    def push_to(working_nodes: QeListProxy | list[Node], nodes: list[Node]) -> None:
-        for node in nodes:
-            match node.formula:
-                case _F():
-                    continue
-                case Or(args=args):
-                    for arg in args:
-                        working_nodes.append(Node(node.variables.copy(), arg, node.answer))
-                case And() | AtomicFormula():
-                    working_nodes.append(node)
-                case _:
-                    assert False, node
-
-    def setup(self, f: Formula, nprocs: int) -> None:
-        logger.debug(f'entering {self.setup.__name__}')
-        self.nprocs = nprocs
-        f = self.pnf(f)
-        self.matrix, self.blocks = f.matrix()
-
-    def simplify(self, *args, **kwargs) -> Formula:
-        return _simplify(*args, **kwargs)
-
-    def statistics_parallel(self,
-                            working_nodes: QeListProxy,
-                            success_nodes: QeListProxy,
-                            failure_nodes: QeListProxy,
+    def parallel_statistics(self,
+                            working_nodes: ListProxy,
+                            success_nodes: ListProxy,
+                            failure_nodes: ListProxy,
                             working_lock: mp.managers.AcquirerProxy,  # type: ignore
                             success_lock: mp.managers.AcquirerProxy,  # type: ignore
                             failure_lock: mp.managers.AcquirerProxy,  # type: ignore
@@ -554,15 +547,66 @@ class VirtualSubstitution:
             num_sn = len(success_nodes)
         with failure_lock:
             num_fn = len(failure_nodes)
-        return self._statistics(wn, num_sn, num_fn)
+        return self.statistics(wn, num_sn, num_fn, None, None)
 
-    def statistics_sequential(self) -> str:
+    def pop_block(self) -> None:
+        logger.debug(f'entering {self.pop_block.__name__}')
+        assert self.matrix, self.matrix
+        logger.info(self.blocks_as_str())
+        if logger.isEnabledFor(logging.DEBUG):
+            s = str(self.matrix)
+            logger.debug(s[:76] + '...' if len(s) > 80 else s)
+        quantifier, vars_ = self.blocks.pop()
+        matrix = self.matrix
+        self.matrix = None
+        if quantifier is All:
+            self.negated = True
+            matrix = Not(matrix)
+        else:
+            self.negated = False
+        self.working_nodes = WorkingNodeList()
+        self.working_nodes.push([Node(vars_, simplify(matrix), [])])
+        self.success_nodes = []
+        self.failure_nodes = []
+
+    def process_block(self) -> None:
+        logger.debug(f'entering {self.process_block.__name__}')
+        if self.nprocs > 0:
+            return self.parallel_process_block()
+        return self.sequential_process_block()
+
+    def sequential_process_block(self) -> None:
+        while self.working_nodes:
+            if flogger.isEnabledFor(logging.INFO):
+                flogger.info(self.sequential_statistics())
+            node = self.working_nodes.pop()
+            try:
+                eset = node.eset()
+            except DegreeViolation:
+                self.failure_nodes.append(node)
+                continue
+            nodes = node.vsubs(eset)
+            if nodes[0].variables:
+                self.working_nodes.push(nodes)
+            else:
+                self.success_nodes.extend(nodes)
+
+    def sequential_statistics(self) -> str:
         num_sn = len(self.success_nodes)
         num_fn = len(self.failure_nodes)
-        return self._statistics(self.working_nodes, num_sn, num_fn)
+        num_hits = self.working_nodes.hits
+        num_calls = self.working_nodes.calls
+        return self.statistics(self.working_nodes, num_sn, num_fn, num_hits, num_calls)
 
-    def _statistics(self, working_nodes: list[Node], num_success_nodes: int,
-                    num_failure_nodes: int) -> str:
+    def setup(self, f: Formula, nprocs: int) -> None:
+        logger.debug(f'entering {self.setup.__name__}')
+        self.nprocs = nprocs
+        f = pnf(f)
+        self.matrix, self.blocks = f.matrix()
+
+    def statistics(self, working_nodes: list[Node], num_success_nodes: int,
+                   num_failure_nodes: int, num_hits: Optional[int],
+                   num_calls: Optional[int]) -> str:
         counter = Counter(len(node.variables) for node in working_nodes)
         if counter.keys():
             m = max(counter.keys())
@@ -579,6 +623,8 @@ class VirtualSubstitution:
         string += (f'W={len(working_nodes)}, '
                    f'S={num_success_nodes}, '
                    f'F={num_failure_nodes}')
+        if num_hits and num_calls:
+            string += f', mem={num_hits}/{num_calls}'
         return string
 
     def virtual_substitution(self, f: Formula, nprocs: int):
@@ -595,7 +641,7 @@ class VirtualSubstitution:
             self.collect_success_nodes()
             if self.failure_nodes:
                 raise NotImplementedError('failure_nodes = {self.failure_nodes}')
-        return self.simplify(self.matrix)
+        return simplify(self.matrix)
 
 
 qe = virtual_substitution = VirtualSubstitution()
