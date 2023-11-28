@@ -12,6 +12,7 @@ import multiprocessing as mp
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
+import threading
 import time
 from typing import Optional, TypeAlias
 
@@ -293,12 +294,12 @@ class Manager:
         L = [pickle.dumps(node) for node in nodes]
         return ListProxy(self.manager.list(L))
 
-    def Lock(self) -> mp.managers.AcquirerProxy:  # type: ignore
+    def Lock(self) -> threading.Lock:
         return self.manager.Lock()
 
-    def workingNodeProxy(self, nodes: list[Node]) -> WorkingNodeProxy:
+    def workingNodeListProxy(self, nodes: list[Node]) -> WorkingNodeListProxy:
         L = [pickle.dumps(node) for node in nodes]
-        return WorkingNodeProxy(self.manager.list(L))
+        return WorkingNodeListProxy(self.manager.list(L))
 
 
 class ListProxy:
@@ -323,7 +324,7 @@ class ListProxy:
         return pickle.loads(self.list_proxy.pop())
 
 
-class WorkingNodeProxy(ListProxy):
+class WorkingNodeListProxy(ListProxy):
 
     def __init__(self, *args):
         # self.memory is local within the worker. This has two consequences:
@@ -369,8 +370,8 @@ class VirtualSubstitution:
 
     _statistics_max_len: int = 0
 
-    def __call__(self, f: Formula, nprocs: int = 0,
-                 log: int = logging.NOTSET, log_rate: float = 0.5) -> Formula:
+    def __call__(self, f: Formula, nprocs: int = 0, log: int = logging.NOTSET,
+                 log_rate: float = 0.5) -> Formula:
         """Virtual substitution entry point.
 
         nprocs is the number of processors to use. The default value nprocs=0
@@ -437,7 +438,7 @@ class VirtualSubstitution:
 
     def parallel_process_block(self) -> None:
         manager = Manager()
-        working_nodes = manager.workingNodeProxy(self.working_nodes)
+        working_nodes = manager.workingNodeListProxy(self.working_nodes)
         success_nodes = manager.listProxy(self.success_nodes)
         failure_nodes = manager.listProxy(self.failure_nodes)
         dictionary = manager.dictProxy({'busy': 0, 'found_t': 0})
@@ -482,14 +483,14 @@ class VirtualSubstitution:
         self.failure_nodes = list(failure_nodes)
 
     @staticmethod
-    def parallel_process_block_worker(working_nodes: WorkingNodeProxy,
+    def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
                                       success_nodes: ListProxy,
                                       failure_nodes: ListProxy,
                                       dictionary: mp.managers.DictProxy,
-                                      working_lock: mp.managers.AcquirerProxy,  # type: ignore
-                                      success_lock: mp.managers.AcquirerProxy,  # type: ignore
-                                      failure_lock: mp.managers.AcquirerProxy,  # type: ignore
-                                      dictionary_lock: mp.managers.AcquirerProxy,  # type: ignore
+                                      working_lock: threading.Lock,
+                                      success_lock: threading.Lock,
+                                      failure_lock: threading.Lock,
+                                      dictionary_lock: threading.Lock,
                                       ring_vars: list[str]) -> None:
         def work_left():
             with working_lock:
@@ -534,13 +535,12 @@ class VirtualSubstitution:
                     dictionary['busy'] -= 1
 
     def parallel_statistics(self,
-                            working_nodes: ListProxy,
+                            working_nodes: WorkingNodeListProxy,
                             success_nodes: ListProxy,
                             failure_nodes: ListProxy,
-                            working_lock: mp.managers.AcquirerProxy,  # type: ignore
-                            success_lock: mp.managers.AcquirerProxy,  # type: ignore
-                            failure_lock: mp.managers.AcquirerProxy,  # type: ignore
-                            ) -> str:
+                            working_lock: threading.Lock,
+                            success_lock: threading.Lock,
+                            failure_lock: threading.Lock) -> str:
         with working_lock:
             wn = list(working_nodes)
         with success_lock:
@@ -555,7 +555,7 @@ class VirtualSubstitution:
         logger.info(self.blocks_as_str())
         if logger.isEnabledFor(logging.DEBUG):
             s = str(self.matrix)
-            logger.debug(s[:76] + '...' if len(s) > 80 else s)
+            logger.debug(s[:37] + '...' if len(s) > 40 else s)
         quantifier, vars_ = self.blocks.pop()
         matrix = self.matrix
         self.matrix = None
