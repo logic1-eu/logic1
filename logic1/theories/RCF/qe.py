@@ -253,6 +253,10 @@ class Node:
 
 class WorkingNodeList(list[Node]):
 
+    @property
+    def computed(self):
+        return self.calls - self.hits
+
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.memory: set[Formula] = set()
@@ -379,6 +383,7 @@ class VirtualSubstitution:
         parallel implementation with one worker process, which is interesting
         for testing and debugging.
         """
+        self._statistics_max_len = 0
         try:
             save_level = logger.getEffectiveLevel()
             save_flevel = flogger.getEffectiveLevel()
@@ -590,6 +595,9 @@ class VirtualSubstitution:
                 self.working_nodes.push(nodes)
             else:
                 self.success_nodes.extend(nodes)
+        logger.info(f'total number of nodes computed: '
+                    f'{self.working_nodes.computed}, '
+                    f'deleted {self.working_nodes.hits}/{self.working_nodes.calls}')
 
     def sequential_statistics(self) -> str:
         num_sn = len(self.success_nodes)
@@ -610,7 +618,7 @@ class VirtualSubstitution:
         counter = Counter(len(node.variables) for node in working_nodes)
         if counter.keys():
             m = max(counter.keys())
-            string = f'V={m}, {counter[m]}'
+            string = f'V={m}, W={counter[m]}'
             for n in reversed(range(1, m)):
                 string += f'.{counter[n]}'
             string += ', '
@@ -620,11 +628,10 @@ class VirtualSubstitution:
             string += (self._statistics_max_len - len(string)) * ' '
         else:
             self._statistics_max_len = len(string)
-        string += (f'W={len(working_nodes)}, '
-                   f'S={num_success_nodes}, '
+        string += (f'S={num_success_nodes}, '
                    f'F={num_failure_nodes}')
-        if num_hits and num_calls:
-            string += f', mem={num_hits}/{num_calls}'
+        if num_hits is not None and num_calls is not None:
+            string += f', del={100.0 * num_hits / num_calls:.1f}%'
         return string
 
     def virtual_substitution(self, f: Formula, nprocs: int):
