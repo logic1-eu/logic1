@@ -9,15 +9,15 @@ class DeltaTimeFormatter(logging.Formatter):
 
     def format(self, record):
         timestamp = record.relativeCreated / 1000 - self.time_since_start_time
-        utc = datetime.datetime.utcfromtimestamp(timestamp)
-        record.delta = utc.strftime("%H:%M:%S,%f")
+        delta = datetime.timedelta(seconds=timestamp)
+        record.delta = str(delta)[:-3]
         return super().format(record)
 
     def reset_clock(self):
         self.time_since_start_time = time.time() - logging._startTime  # type: ignore
 
 
-class TimePeriodFilter(logging.Filter):
+class RateFilter(logging.Filter):
 
     def __init__(self):
         self.active = True
@@ -32,6 +32,9 @@ class TimePeriodFilter(logging.Filter):
             self.last_log = now
             return True
         return False
+
+    def is_due_soon(self, tolerance: float = 0) -> bool:
+        return time.time() - self.last_log >= self.rate - tolerance
 
     def off(self):
         self.active = False

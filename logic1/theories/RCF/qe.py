@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import auto, Enum
 import logging
 import multiprocessing as mp
+import multiprocessing.managers
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
@@ -16,39 +17,38 @@ import threading
 import time
 from typing import Optional, TypeAlias
 
-from ...firstorder import (
-    All, And, AtomicFormula, F, _F, Formula, Not, Or, QuantifiedFormula, T)
-from ...support.logging import DeltaTimeFormatter, TimePeriodFilter
-from ...support.tracing import trace  # noqa
-from . import rcf
-from .pnf import pnf
-from .rcf import (
-    RcfAtomicFormula, RcfAtomicFormulas, ring, Term, Variable, Eq, Ne, Ge, Le,
-    Gt, Lt)
-from .simplify import simplify
+from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
+                               Or, QuantifiedFormula, T)
+from logic1.support.logging import DeltaTimeFormatter, RateFilter
+from logic1.support.tracing import trace  # noqa
+from logic1.theories.RCF import rcf
+from logic1.theories.RCF.pnf import pnf
+from logic1.theories.RCF.simplify import simplify
+from logic1.theories.RCF.rcf import (Eq, Ne, Ge, Le, Gt, Lt, RcfAtomicFormula,
+                                     RcfAtomicFormulas, ring, Term, Variable)
 
 Quantifier: TypeAlias = type[QuantifiedFormula]
 QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
 
 
 # Create logger
-formatter = DeltaTimeFormatter(
+delta_time_formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s: %(message)s')
 
-handler = logging.StreamHandler()
-handler.setFormatter(formatter)
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(delta_time_formatter)
 
-logger = logging.getLogger(__name__)
-logger.addHandler(handler)
+logger = logging.getLogger(__name__ + '  ')
+logger.addHandler(stream_handler)
 logger.setLevel(logging.WARNING)
 
-# Create flogger
-filter_ = TimePeriodFilter()
+# Create rlogger (rate logger)
+rate_filter = RateFilter()
 
-flogger = logging.getLogger(__name__ + '/F')
-flogger.addHandler(handler)
-flogger.addFilter(filter_)
-flogger.setLevel(logging.WARNING)
+rlogger = logging.getLogger(__name__ + '/r')
+rlogger.addHandler(stream_handler)
+rlogger.addFilter(rate_filter)
+rlogger.setLevel(logging.WARNING)
 
 
 class DegreeViolation(Exception):
@@ -254,8 +254,15 @@ class Node:
 class WorkingNodeList(list[Node]):
 
     @property
-    def computed(self):
+    def computed(self) -> int:
         return self.calls - self.hits
+
+    @property
+    def percentage(self) -> str:
+        try:
+            return f'{100.0 * self.hits / self.calls:.1f}%'
+        except ZeroDivisionError:
+            return 'NaN'
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
@@ -270,6 +277,13 @@ class WorkingNodeList(list[Node]):
         else:
             self.hits += 1
         self.calls += 1
+
+    def final_statistics(self) -> str:
+        t = self.computed
+        h = self.hits
+        c = self.calls
+        p = self.percentage
+        return (f'computed {t} nodes, deleted {h}/{c} = {p}')
 
     def push(self, nodes: list[Node]) -> None:
         for node in nodes:
@@ -286,6 +300,23 @@ class WorkingNodeList(list[Node]):
                     assert False, node
 
 
+class SyncManager(mp.managers.SyncManager):
+
+    def dictProxy(self, *args, **kwargs) -> mp.managers.DictProxy:
+        return self.dict(*args, **kwargs)
+
+    def listProxy(self, nodes: list[Node]) -> NodeListProxy:
+        L = [pickle.dumps(node) for node in nodes]
+        return NodeListProxy(self.list(L))
+
+    def workingNodeListProxy(self, nodes: list[Node]) -> WorkingNodeListProxy:
+        proxy = WorkingNodeListProxy(self.list(),
+                                     self.list(),
+                                     self.dict({'hits': 0, 'calls': 0}))
+        proxy.push(nodes)
+        return proxy
+
+
 class Manager:
 
     def __init__(self) -> None:
@@ -294,19 +325,22 @@ class Manager:
     def dictProxy(self, *args, **kwargs) -> mp.managers.DictProxy:
         return self.manager.dict(*args, **kwargs)
 
-    def listProxy(self, nodes: list[Node]) -> ListProxy:
+    def listProxy(self, nodes: list[Node]) -> NodeListProxy:
         L = [pickle.dumps(node) for node in nodes]
-        return ListProxy(self.manager.list(L))
+        return NodeListProxy(self.manager.list(L))
 
     def Lock(self) -> threading.Lock:
         return self.manager.Lock()
 
     def workingNodeListProxy(self, nodes: list[Node]) -> WorkingNodeListProxy:
-        L = [pickle.dumps(node) for node in nodes]
-        return WorkingNodeListProxy(self.manager.list(L))
+        proxy = WorkingNodeListProxy(self.manager.list(),
+                                     self.manager.list(),
+                                     self.manager.dict({'hits': 0, 'calls': 0}))
+        proxy.push(nodes)
+        return proxy
 
 
-class ListProxy:
+class NodeListProxy:
 
     def __init__(self, list_proxy: mp.managers.ListProxy):
         self.list_proxy = list_proxy
@@ -328,23 +362,49 @@ class ListProxy:
         return pickle.loads(self.list_proxy.pop())
 
 
-class WorkingNodeListProxy(ListProxy):
+class WorkingNodeListProxy:
 
-    def __init__(self, *args):
-        # self.memory is local within the worker. This has two consequences:
-        # (1) equal formulas occurring in differnt worker processes are not
-        # recognized, (2) the success of the heuristics cannot be logeded by
-        # the master.
-        super().__init__(*args)
-        self.memory = set()
+    @property
+    def calls(self):
+        return self.statistics['calls']
 
-    def append_if_unknown(self, node: Node) -> None:
-        if node.formula not in self.memory:
-            pickled_node = pickle.dumps(node)
-            self.list_proxy.append(pickled_node)
-            self.memory.update({node.formula})
+    @property
+    def computed(self):
+        return self.statistics['calls'] - self.statistics['hits']
+
+    @property
+    def hits(self):
+        return self.statistics['hits']
+
+    def __init__(self, nodes: mp.managers.ListProxy, memory: mp.managers.ListProxy,
+                 statistics: mp.managers.DictProxy) -> None:
+        self.nodes = nodes
+        self.memory = memory
+        self.statistics = statistics
+
+    def __iter__(self):
+        for pickled_node in self.nodes:
+            yield pickle.loads(pickled_node)
+
+    def __len__(self):
+        return len(self.nodes)
+
+    def pop(self) -> Node:
+        return pickle.loads(self.nodes.pop())
 
     def push(self, nodes: list[Node]) -> None:
+
+        def append_if_unknown(node: Node) -> None:
+            if node.formula not in memory:
+                pickled_node = pickle.dumps(node)
+                self.nodes.append(pickled_node)
+                memory.update({node.formula})
+                self.memory.append(pickle.dumps(node.formula))
+            else:
+                self.statistics['hits'] += 1
+            self.statistics['calls'] += 1
+
+        memory = set(pickle.loads(pickled_formula) for pickled_formula in self.memory)
         for node in nodes:
             match node.formula:
                 case _F():
@@ -352,11 +412,14 @@ class WorkingNodeListProxy(ListProxy):
                 case Or(args=args):
                     for arg in args:
                         subnode = Node(node.variables.copy(), arg, node.answer)
-                        self.append_if_unknown(subnode)
+                        append_if_unknown(subnode)
                 case And() | AtomicFormula():
-                    self.append_if_unknown(node)
+                    append_if_unknown(node)
                 case _:
                     assert False, node
+
+
+# SyncManager.register('nodeListProxy', NodeListProxy)
 
 
 @dataclass
@@ -386,15 +449,15 @@ class VirtualSubstitution:
         self._statistics_max_len = 0
         try:
             save_level = logger.getEffectiveLevel()
-            save_flevel = flogger.getEffectiveLevel()
+            save_flevel = rlogger.getEffectiveLevel()
             logger.setLevel(log)
-            flogger.setLevel(log)
-            filter_.set_rate(log_rate)
-            formatter.reset_clock()
+            rlogger.setLevel(log)
+            rate_filter.set_rate(log_rate)
+            delta_time_formatter.reset_clock()
             result = self.virtual_substitution(f, nprocs)
         finally:
             logger.setLevel(save_level)
-            flogger.setLevel(save_flevel)
+            rlogger.setLevel(save_flevel)
         return result
 
     def __str__(self) -> str:
@@ -442,7 +505,8 @@ class VirtualSubstitution:
         return f'[{h}]'
 
     def parallel_process_block(self) -> None:
-        manager = Manager()
+        manager = SyncManager()
+        manager.start()
         working_nodes = manager.workingNodeListProxy(self.working_nodes)
         success_nodes = manager.listProxy(self.success_nodes)
         failure_nodes = manager.listProxy(self.failure_nodes)
@@ -461,36 +525,43 @@ class VirtualSubstitution:
                       tuple(str(v) for v in ring.get_vars())))
             p[i].start()
             s[i] = p[i].sentinel
+        logger.debug('all processes started')
         still_running = s.copy()
         while still_running:
-            if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.parallel_statistics(
+            if rlogger.isEnabledFor(logging.INFO) and rate_filter.is_due_soon(0.001):
+                rlogger.info(self.parallel_statistics(
                     working_nodes, success_nodes, failure_nodes,
                     working_lock, success_lock, failure_lock))
             if mp.connection.wait(still_running, timeout=0):
                 # All processes are going to finish now.
                 while still_running:
-                    finished = mp.connection.wait(still_running)
-                    if finished:
-                        for sentinel in finished:
-                            assert isinstance(sentinel, int)
-                            still_running.remove(sentinel)
-                        num_finished = self.nprocs - len(still_running)
-                        logger.debug(f'{num_finished} worker(s) finished, '
-                                     f'{len(still_running)} running')
+                    for sentinel in mp.connection.wait(still_running):
+                        assert isinstance(sentinel, int)
+                        still_running.remove(sentinel)
+                    num_finished = self.nprocs - len(still_running)
+                    logger.debug(f'{num_finished} worker(s) finished, '
+                                 f'{len(still_running)} running')
         with dictionary_lock:
             found_t = dictionary['found_t']
         if found_t > 0:
             logger.debug(f'{found_t} worker(s) found T')
+            # The exception handler for FoundT in virtual_substitution in will
+            # log final statistics. Therefore we copy over calls and hits. The
+            # nodes themselves have become meaningless.
+            self.working_nodes.calls = working_nodes.calls
+            self.working_nodes.hits = working_nodes.hits
             raise FoundT()
         self.working_nodes = WorkingNodeList(working_nodes)
+        self.working_nodes.calls = working_nodes.calls
+        self.working_nodes.hits = working_nodes.hits
+        logger.info(self.working_nodes.final_statistics())
         self.success_nodes = list(success_nodes)
         self.failure_nodes = list(failure_nodes)
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
-                                      success_nodes: ListProxy,
-                                      failure_nodes: ListProxy,
+                                      success_nodes: NodeListProxy,
+                                      failure_nodes: NodeListProxy,
                                       dictionary: mp.managers.DictProxy,
                                       working_lock: threading.Lock,
                                       success_lock: threading.Lock,
@@ -541,18 +612,20 @@ class VirtualSubstitution:
 
     def parallel_statistics(self,
                             working_nodes: WorkingNodeListProxy,
-                            success_nodes: ListProxy,
-                            failure_nodes: ListProxy,
+                            success_nodes: NodeListProxy,
+                            failure_nodes: NodeListProxy,
                             working_lock: threading.Lock,
                             success_lock: threading.Lock,
                             failure_lock: threading.Lock) -> str:
         with working_lock:
             wn = list(working_nodes)
+            num_hits = working_nodes.hits
+            num_calls = working_nodes.calls
         with success_lock:
             num_sn = len(success_nodes)
         with failure_lock:
             num_fn = len(failure_nodes)
-        return self.statistics(wn, num_sn, num_fn, None, None)
+        return self.statistics(wn, num_sn, num_fn, num_hits, num_calls)
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
@@ -582,8 +655,8 @@ class VirtualSubstitution:
 
     def sequential_process_block(self) -> None:
         while self.working_nodes:
-            if flogger.isEnabledFor(logging.INFO):
-                flogger.info(self.sequential_statistics())
+            if rlogger.isEnabledFor(logging.INFO):
+                rlogger.info(self.sequential_statistics())
             node = self.working_nodes.pop()
             try:
                 eset = node.eset()
@@ -595,9 +668,7 @@ class VirtualSubstitution:
                 self.working_nodes.push(nodes)
             else:
                 self.success_nodes.extend(nodes)
-        logger.info(f'total number of nodes computed: '
-                    f'{self.working_nodes.computed}, '
-                    f'deleted {self.working_nodes.hits}/{self.working_nodes.calls}')
+        logger.info(self.working_nodes.final_statistics())
 
     def sequential_statistics(self) -> str:
         num_sn = len(self.success_nodes)
@@ -630,8 +701,10 @@ class VirtualSubstitution:
             self._statistics_max_len = len(string)
         string += (f'S={num_success_nodes}, '
                    f'F={num_failure_nodes}')
-        if num_hits is not None and num_calls is not None:
+        try:
             string += f', del={100.0 * num_hits / num_calls:.1f}%'
+        except ZeroDivisionError:
+            string += ', del=NaN'
         return string
 
     def virtual_substitution(self, f: Formula, nprocs: int):
@@ -643,6 +716,8 @@ class VirtualSubstitution:
                 self.pop_block()
                 self.process_block()
             except FoundT:
+                logger.info('found T')
+                logger.info(self.working_nodes.final_statistics())
                 self.working_nodes = None
                 self.success_nodes = [Node(variables=[], formula=T, answer=[])]
             self.collect_success_nodes()
