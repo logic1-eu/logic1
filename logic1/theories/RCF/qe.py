@@ -13,6 +13,7 @@ import multiprocessing.managers
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
+import sys
 import threading
 import time
 from typing import Optional, TypeAlias
@@ -435,10 +436,11 @@ class VirtualSubstitution:
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
 
+    log_rate: float = 0.5
     _statistics_max_len: int = 0
 
     def __call__(self, f: Formula, nprocs: int = 0, log: int = logging.NOTSET,
-                 log_rate: float = 0.5) -> Formula:
+                 log_rate: float = 0.5) -> Optional[Formula]:
         """Virtual substitution entry point.
 
         nprocs is the number of processors to use. The default value nprocs=0
@@ -446,19 +448,24 @@ class VirtualSubstitution:
         parallel implementation with one worker process, which is interesting
         for testing and debugging.
         """
-        self._statistics_max_len = 0
         try:
-            save_level = logger.getEffectiveLevel()
-            save_flevel = rlogger.getEffectiveLevel()
-            logger.setLevel(log)
-            rlogger.setLevel(log)
-            rate_filter.set_rate(log_rate)
-            delta_time_formatter.reset_clock()
-            result = self.virtual_substitution(f, nprocs)
-        finally:
-            logger.setLevel(save_level)
-            rlogger.setLevel(save_flevel)
-        return result
+            self._statistics_max_len = 0
+            self.log_rate = log_rate
+            try:
+                save_level = logger.getEffectiveLevel()
+                save_flevel = rlogger.getEffectiveLevel()
+                logger.setLevel(log)
+                rlogger.setLevel(log)
+                rate_filter.set_rate(log_rate)
+                delta_time_formatter.reset_clock()
+                result = self.virtual_substitution(f, nprocs)
+            finally:
+                logger.setLevel(save_level)
+                rlogger.setLevel(save_flevel)
+            return result
+        except KeyboardInterrupt:
+            print('KeyboardInterrupt', file=sys.stderr)
+            return None
 
     def __str__(self) -> str:
 
@@ -505,6 +512,18 @@ class VirtualSubstitution:
         return f'[{h}]'
 
     def parallel_process_block(self) -> None:
+
+        def wait_for_processes_to_finish():
+            still_running = s.copy()
+            while still_running:
+                for sentinel in mp.connection.wait(still_running):
+                    assert isinstance(sentinel, int)
+                    still_running.remove(sentinel)
+                num_finished = self.nprocs - len(still_running)
+                pl = 's' if num_finished > 1 else ''
+                logger.debug(f'{num_finished} worker{pl} finished, '
+                             f'{len(still_running)} running')
+
         manager = SyncManager()
         manager.start()
         working_nodes = manager.workingNodeListProxy(self.working_nodes)
@@ -526,21 +545,19 @@ class VirtualSubstitution:
             p[i].start()
             s[i] = p[i].sentinel
         logger.debug('all processes started')
-        still_running = s.copy()
-        while still_running:
-            if rlogger.isEnabledFor(logging.INFO) and rate_filter.is_due_soon(0.001):
-                rlogger.info(self.parallel_statistics(
-                    working_nodes, success_nodes, failure_nodes,
-                    working_lock, success_lock, failure_lock))
-            if mp.connection.wait(still_running, timeout=0):
-                # All processes are going to finish now.
-                while still_running:
-                    for sentinel in mp.connection.wait(still_running):
-                        assert isinstance(sentinel, int)
-                        still_running.remove(sentinel)
-                    num_finished = self.nprocs - len(still_running)
-                    logger.debug(f'{num_finished} worker(s) finished, '
-                                 f'{len(still_running)} running')
+        try:
+            if logger.isEnabledFor(logging.INFO):
+                while not mp.connection.wait(s, timeout=self.log_rate):
+                    logger.info(self.parallel_statistics(
+                        working_nodes, success_nodes, failure_nodes,
+                        working_lock, success_lock, failure_lock))
+            else:
+                mp.connection.wait(s)
+        except KeyboardInterrupt:
+            logger.debug('KeyboardInterrupt, waiting for processes to finish')
+            wait_for_processes_to_finish()
+            raise
+        wait_for_processes_to_finish()
         with dictionary_lock:
             found_t = dictionary['found_t']
         if found_t > 0:
@@ -572,43 +589,46 @@ class VirtualSubstitution:
             with working_lock:
                 return list(working_nodes) or dictionary['busy'] > 0
 
-        ring.set_vars(*ring_vars)
-        while True:
-            with working_lock, dictionary_lock:
-                if dictionary['found_t'] > 0:
-                    break
-                if len(working_nodes) == 0 and dictionary['busy'] == 0:
-                    break
-                try:
-                    node = working_nodes.pop()
-                except IndexError:
-                    node = None
-                else:
-                    dictionary['busy'] += 1
-            if node is None:
-                time.sleep(0.001)
-                continue
-            try:
-                eset = node.eset()
-            except DegreeViolation:
-                with failure_lock, dictionary_lock:
-                    failure_nodes.append(node)
-                    dictionary['busy'] -= 1
-                continue
-            try:
-                nodes = node.vsubs(eset)
-            except FoundT:
-                with dictionary_lock:
-                    dictionary['found_t'] += 1
-                break
-            if nodes[0].variables:
+        try:
+            ring.set_vars(*ring_vars)
+            while True:
                 with working_lock, dictionary_lock:
-                    working_nodes.push(nodes)
-                    dictionary['busy'] -= 1
-            else:
-                with success_lock, dictionary_lock:
-                    success_nodes.extend(nodes)
-                    dictionary['busy'] -= 1
+                    if dictionary['found_t'] > 0:
+                        break
+                    if len(working_nodes) == 0 and dictionary['busy'] == 0:
+                        break
+                    try:
+                        node = working_nodes.pop()
+                    except IndexError:
+                        node = None
+                    else:
+                        dictionary['busy'] += 1
+                if node is None:
+                    time.sleep(0.001)
+                    continue
+                try:
+                    eset = node.eset()
+                except DegreeViolation:
+                    with failure_lock, dictionary_lock:
+                        failure_nodes.append(node)
+                        dictionary['busy'] -= 1
+                    continue
+                try:
+                    nodes = node.vsubs(eset)
+                except FoundT:
+                    with dictionary_lock:
+                        dictionary['found_t'] += 1
+                    break
+                if nodes[0].variables:
+                    with working_lock, dictionary_lock:
+                        working_nodes.push(nodes)
+                        dictionary['busy'] -= 1
+                else:
+                    with success_lock, dictionary_lock:
+                        success_nodes.extend(nodes)
+                        dictionary['busy'] -= 1
+        except KeyboardInterrupt:
+            return
 
     def parallel_statistics(self,
                             working_nodes: WorkingNodeListProxy,
