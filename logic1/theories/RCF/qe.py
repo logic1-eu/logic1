@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import auto, Enum
 import logging
 import multiprocessing as mp
@@ -16,7 +16,7 @@ from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
 import threading
 import time
-from typing import Optional, TypeAlias
+from typing import Optional, TypeAlias, TYPE_CHECKING
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
                                Or, QuantifiedFormula, T)
@@ -34,12 +34,12 @@ QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
 
 # Create logger
 delta_time_formatter = DeltaTimeFormatter(
-    f'%(asctime)s - %(name)s - %(levelname)s - %(delta)s: %(message)s')
+    f'%(asctime)s - %(name)s - %(levelname)-5s - %(delta)s: %(message)s')
 
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(delta_time_formatter)
 
-logger = logging.getLogger(__name__ + '  ')
+logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
 logger.setLevel(logging.WARNING)
 
@@ -50,6 +50,15 @@ rlogger = logging.getLogger(__name__ + '/r')
 rlogger.addHandler(stream_handler)
 rlogger.addFilter(rate_filter)
 rlogger.setLevel(logging.WARNING)
+
+# Create multiprocessing logger
+multiprocessing_formatter = DeltaTimeFormatter(
+    f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s -            : %(message)s')
+
+multiprocessing_handler = logging.StreamHandler()
+multiprocessing_handler.setFormatter(multiprocessing_formatter)
+multiprocessing_logger = logging.getLogger('multiprocessing')
+multiprocessing_logger.addHandler(multiprocessing_handler)
 
 
 class DegreeViolation(Exception):
@@ -301,126 +310,135 @@ class WorkingNodeList(list[Node]):
                     assert False, node
 
 
-class SyncManager(mp.managers.SyncManager):
-
-    def dictProxy(self, *args, **kwargs) -> mp.managers.DictProxy:
-        return self.dict(*args, **kwargs)
-
-    def listProxy(self, nodes: list[Node]) -> NodeListProxy:
-        L = [pickle.dumps(node) for node in nodes]
-        return NodeListProxy(self.list(L))
-
-    def workingNodeListProxy(self, nodes: list[Node]) -> WorkingNodeListProxy:
-        proxy = WorkingNodeListProxy(self.list(),
-                                     self.list(),
-                                     self.dict({'hits': 0, 'calls': 0}))
-        proxy.push(nodes)
-        return proxy
-
-
-class Manager:
-
-    def __init__(self) -> None:
-        self.manager = mp.Manager()
-
-    def dictProxy(self, *args, **kwargs) -> mp.managers.DictProxy:
-        return self.manager.dict(*args, **kwargs)
-
-    def listProxy(self, nodes: list[Node]) -> NodeListProxy:
-        L = [pickle.dumps(node) for node in nodes]
-        return NodeListProxy(self.manager.list(L))
-
-    def Lock(self) -> threading.Lock:
-        return self.manager.Lock()
-
-    def workingNodeListProxy(self, nodes: list[Node]) -> WorkingNodeListProxy:
-        proxy = WorkingNodeListProxy(self.manager.list(),
-                                     self.manager.list(),
-                                     self.manager.dict({'hits': 0, 'calls': 0}))
-        proxy.push(nodes)
-        return proxy
-
-
-class NodeListProxy:
-
-    def __init__(self, list_proxy: mp.managers.ListProxy):
-        self.list_proxy = list_proxy
+class NodeListProxy(mp.managers.BaseProxy):
 
     def __iter__(self):
-        for pickled_node in self.list_proxy:
+        pickled_nodes = self._callmethod('copy')
+        for pickled_node in pickled_nodes:
             yield pickle.loads(pickled_node)
 
     def __len__(self):
-        return len(self.list_proxy)
+        return self._callmethod('__len__')
 
     def append(self, node: Node) -> None:
-        self.list_proxy.append(pickle.dumps(node))
+        pickled_node = pickle.dumps(node)
+        self._callmethod('append', (pickled_node,))
 
     def extend(self, nodes: list[Node]) -> None:
-        self.list_proxy.extend([pickle.dumps(node) for node in nodes])
+        pickled_nodes = [pickle.dumps(node) for node in nodes]
+        self._callmethod('extend', (pickled_nodes,))
 
     def pop(self) -> Node:
-        return pickle.loads(self.list_proxy.pop())
+        pickled_node = self._callmethod('pop')  # type: ignore
+        if TYPE_CHECKING:
+            reveal_type(pickled_node)  # noqa
+        return pickle.loads(pickled_node)
 
 
-class WorkingNodeListProxy:
+def nodeList(nodes: list[Node]):
+    return [pickle.dumps(node) for node in nodes]
 
-    @property
-    def calls(self):
-        return self.statistics['calls']
 
-    @property
-    def computed(self):
-        return self.statistics['calls'] - self.statistics['hits']
+@dataclass
+class _WorkingNodeListPar:
 
-    @property
-    def hits(self):
-        return self.statistics['hits']
-
-    def __init__(self, nodes: mp.managers.ListProxy, memory: mp.managers.ListProxy,
-                 statistics: mp.managers.DictProxy) -> None:
-        self.nodes = nodes
-        self.memory = memory
-        self.statistics = statistics
-
-    def __iter__(self):
-        for pickled_node in self.nodes:
-            yield pickle.loads(pickled_node)
+    nodes: list[Node] = field(default_factory=list)
+    memory: set[Formula] = field(default_factory=set)
+    hits: int = 0
+    calls: int = 0
 
     def __len__(self):
         return len(self.nodes)
 
-    def pop(self) -> Node:
-        return pickle.loads(self.nodes.pop())
+    def append_if_unknown(self, node: Node) -> None:
+        if node.formula not in self.memory:
+            self.nodes.append(node)
+            self.memory.update({node.formula})
+        else:
+            self.hits += 1
+        self.calls += 1
 
-    def push(self, nodes: list[Node]) -> None:
+    def get_calls(self) -> int:
+        return self.calls
 
-        def append_if_unknown(node: Node) -> None:
-            if node.formula not in memory:
-                pickled_node = pickle.dumps(node)
-                self.nodes.append(pickled_node)
-                memory.update({node.formula})
-                self.memory.append(pickle.dumps(node.formula))
-            else:
-                self.statistics['hits'] += 1
-            self.statistics['calls'] += 1
+    def get_hits(self) -> int:
+        return self.hits
 
-        memory = set(pickle.loads(pickled_formula) for pickled_formula in self.memory)
-        for node in nodes:
+    def get_nodes(self) -> list[bytes]:
+        return [pickle.dumps(node) for node in self.nodes]
+
+    def pop(self) -> bytes:
+        return pickle.dumps(self.nodes.pop())
+
+    def push(self, pickled_nodes: list[bytes]) -> None:
+        for pickled_node in pickled_nodes:
+            node = pickle.loads(pickled_node)
             match node.formula:
                 case _F():
                     continue
                 case Or(args=args):
                     for arg in args:
                         subnode = Node(node.variables.copy(), arg, node.answer)
-                        append_if_unknown(subnode)
+                        self.append_if_unknown(subnode)
                 case And() | AtomicFormula():
-                    append_if_unknown(node)
+                    self.append_if_unknown(node)
                 case _:
                     assert False, node
 
 
-# SyncManager.register('nodeListProxy', NodeListProxy)
+class WorkingNodeListProxy(mp.managers.BaseProxy):
+
+    @property
+    def calls(self):
+        return self._callmethod('get_calls')
+
+    @property
+    def computed(self) -> int:
+        return self.calls - self.hits
+
+    @property
+    def hits(self):
+        return self._callmethod('get_hits')
+
+    @property
+    def percentage(self) -> str:
+        try:
+            return f'{100.0 * self.hits / self.calls:.1f}%'
+        except ZeroDivisionError:
+            return 'NaN'
+
+    def __iter__(self):
+        for pickled_node in self._callmethod('get_nodes'):
+            yield pickle.loads(pickled_node)
+
+    def __len__(self):
+        return self._callmethod('__len__')
+
+    def final_statistics(self) -> str:
+        t = self.computed
+        h = self.hits
+        c = self.calls
+        p = self.percentage
+        return (f'computed {t} nodes, deleted {h}/{c} = {p}')
+
+    def pop(self) -> Node:
+        return pickle.loads(self._callmethod('pop'))  # type: ignore
+
+    def push(self, nodes: list[Node]) -> None:
+        pickled_nodes = [pickle.dumps(node) for node in nodes]
+        self._callmethod('push', (pickled_nodes,))
+
+
+class SyncManager(mp.managers.SyncManager):
+    pass
+
+
+SyncManager.register("nodeList", nodeList, NodeListProxy,
+                     ['append', 'copy', 'extend', '__len__', 'pop'])
+
+SyncManager.register("workingNodeList", _WorkingNodeListPar,
+                     WorkingNodeListProxy,
+                     ['get_calls', 'get_hits', 'get_nodes', '__len__', 'pop', 'push'])
 
 
 @dataclass
@@ -464,7 +482,7 @@ class VirtualSubstitution:
                 rlogger.setLevel(save_flevel)
             return result
         except KeyboardInterrupt:
-            print('KeyboardInterrupt', file=sys.stderr)
+            print('KeyboardInterrupt', file=sys.stderr, flush=True)
             return None
 
     def __str__(self) -> str:
@@ -526,22 +544,25 @@ class VirtualSubstitution:
 
         manager = SyncManager()
         manager.start()
-        working_nodes = manager.workingNodeListProxy(self.working_nodes)
-        success_nodes = manager.listProxy(self.success_nodes)
-        failure_nodes = manager.listProxy(self.failure_nodes)
-        dictionary = manager.dictProxy({'busy': 0, 'found_t': 0})
+        working_nodes = manager.workingNodeList()  # type: ignore
+        working_nodes.push(self.working_nodes)
+        success_nodes = manager.nodeList(self.success_nodes)  # type: ignore
+        failure_nodes = manager.nodeList(self.failure_nodes)  # type: ignore
+        dictionary = manager.dict({'busy': 0, 'found_t': 0})
         working_lock = manager.Lock()
         success_lock = manager.Lock()
         failure_lock = manager.Lock()
         dictionary_lock = manager.Lock()
         p: list[Optional[mp.Process]] = [None] * self.nprocs
         s: list[Optional[int]] = [None] * self.nprocs
+        ring_vars = tuple(str(v) for v in ring.get_vars())
+        log_level = logger.getEffectiveLevel()
         for i in range(self.nprocs):
             p[i] = mp.Process(
                 target=self.parallel_process_block_worker,
                 args=(working_nodes, success_nodes, failure_nodes, dictionary,
                       working_lock, success_lock, failure_lock, dictionary_lock,
-                      tuple(str(v) for v in ring.get_vars())))
+                      ring_vars, i, log_level))
             p[i].start()
             s[i] = p[i].sentinel
         logger.debug('all processes started')
@@ -561,7 +582,8 @@ class VirtualSubstitution:
         with dictionary_lock:
             found_t = dictionary['found_t']
         if found_t > 0:
-            logger.debug(f'{found_t} worker(s) found T')
+            pl = 's' if found_t > 1 else ''
+            logger.debug(f'{found_t} worker{pl} found T')
             # The exception handler for FoundT in virtual_substitution in will
             # log final statistics. Therefore we copy over calls and hits. The
             # nodes themselves have become meaningless.
@@ -584,12 +606,16 @@ class VirtualSubstitution:
                                       success_lock: threading.Lock,
                                       failure_lock: threading.Lock,
                                       dictionary_lock: threading.Lock,
-                                      ring_vars: list[str]) -> None:
+                                      ring_vars: list[str],
+                                      i: int,
+                                      log_level: int) -> None:
         def work_left():
             with working_lock:
                 return list(working_nodes) or dictionary['busy'] > 0
 
         try:
+            multiprocessing_logger.setLevel(log_level)
+            multiprocessing_logger.debug(f'process {i} starting')
             ring.set_vars(*ring_vars)
             while True:
                 with working_lock, dictionary_lock:
@@ -628,7 +654,9 @@ class VirtualSubstitution:
                         success_nodes.extend(nodes)
                         dictionary['busy'] -= 1
         except KeyboardInterrupt:
+            multiprocessing_logger.debug(f'process {i} returning on KeyboardInterrupt')
             return
+        multiprocessing_logger.debug(f'process {i} finished')
 
     def parallel_statistics(self,
                             working_nodes: WorkingNodeListProxy,
@@ -653,7 +681,7 @@ class VirtualSubstitution:
         logger.info(self.blocks_as_str())
         if logger.isEnabledFor(logging.DEBUG):
             s = str(self.matrix)
-            logger.debug(s[:37] + '...' if len(s) > 40 else s)
+            logger.debug(s[:50] + '...' if len(s) > 53 else s)
         quantifier, vars_ = self.blocks.pop()
         matrix = self.matrix
         self.matrix = None
@@ -674,9 +702,14 @@ class VirtualSubstitution:
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
+        if logger.isEnabledFor(logging.INFO):
+            last_log = time.time()
         while self.working_nodes:
-            if rlogger.isEnabledFor(logging.INFO):
-                rlogger.info(self.sequential_statistics())
+            if logger.isEnabledFor(logging.INFO):
+                t = time.time()
+                if t - last_log >= self.log_rate:
+                    logger.info(self.sequential_statistics())
+                    last_log = t
             node = self.working_nodes.pop()
             try:
                 eset = node.eset()
