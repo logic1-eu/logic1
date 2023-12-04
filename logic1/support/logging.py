@@ -13,8 +13,11 @@ class DeltaTimeFormatter(logging.Formatter):
         record.delta = str(delta)[:-3]
         return super().format(record)
 
-    def reset_clock(self):
-        self.time_since_start_time = time.time() - logging._startTime  # type: ignore
+    def get_reference_time(self) -> float:
+        return self.time_since_start_time + logging._startTime  # type: ignore
+
+    def set_reference_time(self, t: float) -> None:
+        self.time_since_start_time = t - logging._startTime  # type: ignore
 
 
 class RateFilter(logging.Filter):

@@ -10,13 +10,14 @@ from enum import auto, Enum
 import logging
 import multiprocessing as mp
 import multiprocessing.managers
+import os
 import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
 import threading
 import time
-from typing import Optional, TypeAlias, TYPE_CHECKING
+from typing import Optional, TypeAlias
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
                                Or, QuantifiedFormula, T)
@@ -53,7 +54,7 @@ rlogger.setLevel(logging.WARNING)
 
 # Create multiprocessing logger
 multiprocessing_formatter = DeltaTimeFormatter(
-    f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s -            : %(message)s')
+    f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s - %(delta)s: %(message)s')
 
 multiprocessing_handler = logging.StreamHandler()
 multiprocessing_handler.setFormatter(multiprocessing_formatter)
@@ -261,39 +262,54 @@ class Node:
         return result
 
 
+@dataclass
 class WorkingNodeList(list[Node]):
+
+    memory: set[Formula]
+    node_counter: Counter[int]
+    hits: int
+    candidates: int
 
     @property
     def computed(self) -> int:
-        return self.calls - self.hits
+        return self.candidates - self.hits
 
     @property
-    def percentage(self) -> str:
+    def hit_ratio(self) -> float:
         try:
-            return f'{100.0 * self.hits / self.calls:.1f}%'
+            return float(self.hits) / self.candidates
         except ZeroDivisionError:
-            return 'NaN'
+            return float('nan')
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.memory: set[Formula] = set()
+        self.node_counter: Counter[int] = Counter()
         self.hits = 0
-        self.calls = 0
+        self.candidates = 0
 
     def append_if_unknown(self, node: Node) -> None:
         if node.formula not in self.memory:
             self.append(node)
             self.memory.update({node.formula})
+            n = len(node.variables)
+            self.node_counter[n] += 1
         else:
             self.hits += 1
-        self.calls += 1
+        self.candidates += 1
 
     def final_statistics(self) -> str:
         t = self.computed
         h = self.hits
-        c = self.calls
-        p = self.percentage
-        return (f'computed {t} nodes, deleted {h}/{c} = {p}')
+        c = self.candidates
+        p = self.hit_ratio
+        return (f'computed {t} nodes, skipped {h}/{c} = {p:.0%}')
+
+    def pop(self, *args, **kwargs) -> Node:
+        node = super().pop(*args, **kwargs)
+        n = len(node.variables)
+        self.node_counter[n] -= 1
+        return node
 
     def push(self, nodes: list[Node]) -> None:
         for node in nodes:
@@ -330,8 +346,6 @@ class NodeListProxy(mp.managers.BaseProxy):
 
     def pop(self) -> Node:
         pickled_node = self._callmethod('pop')  # type: ignore
-        if TYPE_CHECKING:
-            reveal_type(pickled_node)  # noqa
         return pickle.loads(pickled_node)
 
 
@@ -340,12 +354,13 @@ def nodeList(nodes: list[Node]):
 
 
 @dataclass
-class _WorkingNodeListPar:
+class WorkingNodeListParallel:
 
     nodes: list[Node] = field(default_factory=list)
     memory: set[Formula] = field(default_factory=set)
+    node_counter: Counter[int] = field(default_factory=Counter)
     hits: int = 0
-    calls: int = 0
+    candidates: int = 0
 
     def __len__(self):
         return len(self.nodes)
@@ -354,12 +369,14 @@ class _WorkingNodeListPar:
         if node.formula not in self.memory:
             self.nodes.append(node)
             self.memory.update({node.formula})
+            n = len(node.variables)
+            self.node_counter[n] += 1
         else:
             self.hits += 1
-        self.calls += 1
+        self.candidates += 1
 
-    def get_calls(self) -> int:
-        return self.calls
+    def get_candidates(self) -> int:
+        return self.candidates
 
     def get_hits(self) -> int:
         return self.hits
@@ -367,8 +384,14 @@ class _WorkingNodeListPar:
     def get_nodes(self) -> list[bytes]:
         return [pickle.dumps(node) for node in self.nodes]
 
+    def get_node_counter(self) -> dict[int, int]:
+        return self.node_counter
+
     def pop(self) -> bytes:
-        return pickle.dumps(self.nodes.pop())
+        node = self.nodes.pop()
+        n = len(node.variables)
+        self.node_counter[n] -= 1
+        return pickle.dumps(node)
 
     def push(self, pickled_nodes: list[bytes]) -> None:
         for pickled_node in pickled_nodes:
@@ -389,23 +412,27 @@ class _WorkingNodeListPar:
 class WorkingNodeListProxy(mp.managers.BaseProxy):
 
     @property
-    def calls(self):
-        return self._callmethod('get_calls')
+    def candidates(self):
+        return self._callmethod('get_candidates')
 
     @property
     def computed(self) -> int:
-        return self.calls - self.hits
+        return self.candidates - self.hits
 
     @property
     def hits(self):
         return self._callmethod('get_hits')
 
     @property
-    def percentage(self) -> str:
+    def node_counter(self):
+        return self._callmethod('get_node_counter')
+
+    @property
+    def hit_ratio(self) -> float:
         try:
-            return f'{100.0 * self.hits / self.calls:.1f}%'
+            return float(self.hits) / self.candidates
         except ZeroDivisionError:
-            return 'NaN'
+            return float('nan')
 
     def __iter__(self):
         for pickled_node in self._callmethod('get_nodes'):
@@ -413,13 +440,6 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
 
     def __len__(self):
         return self._callmethod('__len__')
-
-    def final_statistics(self) -> str:
-        t = self.computed
-        h = self.hits
-        c = self.calls
-        p = self.percentage
-        return (f'computed {t} nodes, deleted {h}/{c} = {p}')
 
     def pop(self) -> Node:
         return pickle.loads(self._callmethod('pop'))  # type: ignore
@@ -436,9 +456,10 @@ class SyncManager(mp.managers.SyncManager):
 SyncManager.register("nodeList", nodeList, NodeListProxy,
                      ['append', 'copy', 'extend', '__len__', 'pop'])
 
-SyncManager.register("workingNodeList", _WorkingNodeListPar,
+SyncManager.register("workingNodeList", WorkingNodeListParallel,
                      WorkingNodeListProxy,
-                     ['get_calls', 'get_hits', 'get_nodes', '__len__', 'pop', 'push'])
+                     ['get_candidates', 'get_hits', 'get_nodes',
+                      'get_node_counter', '__len__', 'pop', 'push'])
 
 
 @dataclass
@@ -446,7 +467,7 @@ class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
     """
 
-    nprocs: int = 0
+    workers: int = 0
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
@@ -454,36 +475,44 @@ class VirtualSubstitution:
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
 
+    log: int = logging.NOTSET
     log_rate: float = 0.5
-    _statistics_max_len: int = 0
 
-    def __call__(self, f: Formula, nprocs: int = 0, log: int = logging.NOTSET,
+    def __call__(self, f: Formula, workers: int = 0, log: int = logging.NOTSET,
                  log_rate: float = 0.5) -> Optional[Formula]:
         """Virtual substitution entry point.
 
-        nprocs is the number of processors to use. The default value nprocs=0
-        uses the sequential implementation. In contrast, nprocs=1 uses the
-        parallel implementation with one worker process, which is interesting
-        for testing and debugging.
+        workers is the number of processes used for virtual substitution. The
+        default value workers=0 uses a sequential implementation, avoiding
+        overhead when input problems are small. For all other values of
+        workers, there are additional processes started. In particular,
+        workers=1 uses the parallel implementation with one worker process,
+        which is interesting mostly for testing and debugging. A negative value
+        workers = z < 0 selects os.num_cpu() - abs(z) many workers. When there
+        are n > 0 many workers selected, then the overall number of processes
+        running will be n + 2, i.e., the workers plus the master process plus a
+        manager processes providing proxy objects for shared data. It follows
+        that workers=-2 matches the number of CPUs of the machine. For hard
+        computations, workers=-3 is an interesting choice, which leaves one CPU
+        free for smooth interaction with the machine.
         """
         try:
-            self._statistics_max_len = 0
+            self.log_level = log
             self.log_rate = log_rate
-            try:
-                save_level = logger.getEffectiveLevel()
-                save_flevel = rlogger.getEffectiveLevel()
-                logger.setLevel(log)
-                rlogger.setLevel(log)
-                rate_filter.set_rate(log_rate)
-                delta_time_formatter.reset_clock()
-                result = self.virtual_substitution(f, nprocs)
-            finally:
-                logger.setLevel(save_level)
-                rlogger.setLevel(save_flevel)
-            return result
+            save_level = logger.getEffectiveLevel()
+            save_rlevel = rlogger.getEffectiveLevel()
+            logger.setLevel(self.log_level)
+            rlogger.setLevel(self.log_level)
+            rate_filter.set_rate(self.log_rate)
+            delta_time_formatter.set_reference_time(time.time())
+            result = self.virtual_substitution(f, workers)
         except KeyboardInterrupt:
             print('KeyboardInterrupt', file=sys.stderr, flush=True)
             return None
+        finally:
+            logger.setLevel(save_level)
+            rlogger.setLevel(save_rlevel)
+        return result
 
     def __str__(self) -> str:
 
@@ -531,16 +560,40 @@ class VirtualSubstitution:
 
     def parallel_process_block(self) -> None:
 
+        statistics_max_len = 0
+
+        def periodic_statistics() -> str:
+            nonlocal statistics_max_len
+            with working_lock, dictionary_lock, success_lock, failure_lock:
+                nc = working_nodes.node_counter
+                r = working_nodes.hit_ratio
+                b = dictionary['busy']
+                s = len(success_nodes)
+                f = len(failure_nodes)
+            try:
+                m = max(k for k, v in nc.items() if v != 0)
+                v = f'V={m}'
+                tup = '.'.join(f'{nc[n]}' for n in reversed(range(1, m + 1)))
+                w = f'W={tup}'
+                vw = f'{v}, {w}'
+            except ValueError:
+                vw = 'V=0'
+            padding = (statistics_max_len - len(vw)) * ' '
+            statistics_max_len = max(statistics_max_len, len(vw))
+            return f'{vw}, {padding}B={b}, S={s}, F={f}, H={r:.0%}'
+
         def wait_for_processes_to_finish():
-            still_running = s.copy()
+            still_running = sentinels.copy()
             while still_running:
                 for sentinel in mp.connection.wait(still_running):
-                    assert isinstance(sentinel, int)
                     still_running.remove(sentinel)
-                num_finished = self.nprocs - len(still_running)
+                num_finished = self.workers - len(still_running)
                 pl = 's' if num_finished > 1 else ''
                 logger.debug(f'{num_finished} worker{pl} finished, '
                              f'{len(still_running)} running')
+            # The following call joins all finished processes as a side effect.
+            # Otherwise they would remain in the process table as zombies.
+            mp.active_children()
 
         manager = SyncManager()
         manager.start()
@@ -553,27 +606,26 @@ class VirtualSubstitution:
         success_lock = manager.Lock()
         failure_lock = manager.Lock()
         dictionary_lock = manager.Lock()
-        p: list[Optional[mp.Process]] = [None] * self.nprocs
-        s: list[Optional[int]] = [None] * self.nprocs
+        processes: list[Optional[mp.Process]] = [None] * self.workers
+        sentinels: list[Optional[int]] = [None] * self.workers
         ring_vars = tuple(str(v) for v in ring.get_vars())
         log_level = logger.getEffectiveLevel()
-        for i in range(self.nprocs):
-            p[i] = mp.Process(
+        reference_time = delta_time_formatter.get_reference_time()
+        for i in range(self.workers):
+            processes[i] = mp.Process(
                 target=self.parallel_process_block_worker,
                 args=(working_nodes, success_nodes, failure_nodes, dictionary,
                       working_lock, success_lock, failure_lock, dictionary_lock,
-                      ring_vars, i, log_level))
-            p[i].start()
-            s[i] = p[i].sentinel
-        logger.debug('all processes started')
+                      ring_vars, i, log_level, reference_time))
+            processes[i].start()
+            sentinels[i] = processes[i].sentinel
+        logger.debug(f'started processes in {range(self.workers)}')
         try:
             if logger.isEnabledFor(logging.INFO):
-                while not mp.connection.wait(s, timeout=self.log_rate):
-                    logger.info(self.parallel_statistics(
-                        working_nodes, success_nodes, failure_nodes,
-                        working_lock, success_lock, failure_lock))
+                while not mp.connection.wait(sentinels, timeout=self.log_rate):
+                    logger.info(periodic_statistics())
             else:
-                mp.connection.wait(s)
+                mp.connection.wait(sentinels)
         except KeyboardInterrupt:
             logger.debug('KeyboardInterrupt, waiting for processes to finish')
             wait_for_processes_to_finish()
@@ -585,13 +637,13 @@ class VirtualSubstitution:
             pl = 's' if found_t > 1 else ''
             logger.debug(f'{found_t} worker{pl} found T')
             # The exception handler for FoundT in virtual_substitution in will
-            # log final statistics. Therefore we copy over calls and hits. The
+            # log final statistics. Therefore we copy over candidates and hits. The
             # nodes themselves have become meaningless.
-            self.working_nodes.calls = working_nodes.calls
+            self.working_nodes.candidates = working_nodes.candidates
             self.working_nodes.hits = working_nodes.hits
             raise FoundT()
         self.working_nodes = WorkingNodeList(working_nodes)
-        self.working_nodes.calls = working_nodes.calls
+        self.working_nodes.candidates = working_nodes.candidates
         self.working_nodes.hits = working_nodes.hits
         logger.info(self.working_nodes.final_statistics())
         self.success_nodes = list(success_nodes)
@@ -608,13 +660,15 @@ class VirtualSubstitution:
                                       dictionary_lock: threading.Lock,
                                       ring_vars: list[str],
                                       i: int,
-                                      log_level: int) -> None:
+                                      log_level: int,
+                                      reference_time: float) -> None:
         def work_left():
             with working_lock:
                 return list(working_nodes) or dictionary['busy'] > 0
 
         try:
             multiprocessing_logger.setLevel(log_level)
+            multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'process {i} starting')
             ring.set_vars(*ring_vars)
             while True:
@@ -658,23 +712,6 @@ class VirtualSubstitution:
             return
         multiprocessing_logger.debug(f'process {i} finished')
 
-    def parallel_statistics(self,
-                            working_nodes: WorkingNodeListProxy,
-                            success_nodes: NodeListProxy,
-                            failure_nodes: NodeListProxy,
-                            working_lock: threading.Lock,
-                            success_lock: threading.Lock,
-                            failure_lock: threading.Lock) -> str:
-        with working_lock:
-            wn = list(working_nodes)
-            num_hits = working_nodes.hits
-            num_calls = working_nodes.calls
-        with success_lock:
-            num_sn = len(success_nodes)
-        with failure_lock:
-            num_fn = len(failure_nodes)
-        return self.statistics(wn, num_sn, num_fn, num_hits, num_calls)
-
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
         assert self.matrix, self.matrix
@@ -697,18 +734,39 @@ class VirtualSubstitution:
 
     def process_block(self) -> None:
         logger.debug(f'entering {self.process_block.__name__}')
-        if self.nprocs > 0:
+        if self.workers > 0:
             return self.parallel_process_block()
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
+
+        statistics_max_len = 0
+
+        def periodic_statistics() -> str:
+            nonlocal statistics_max_len
+            nc = self.working_nodes.node_counter
+            r = self.working_nodes.hit_ratio
+            s = len(self.success_nodes)
+            f = len(self.failure_nodes)
+            try:
+                m = max(k for k, v in nc.items() if v != 0)
+                v = f'V={m}'
+                tup = '.'.join(f'{nc[n]}' for n in reversed(range(1, m + 1)))
+                w = f'W={tup}'
+                vw = f'{v}, {w}'
+            except ValueError:
+                vw = 'V=0'
+            padding = (statistics_max_len - len(vw)) * ' '
+            statistics_max_len = max(statistics_max_len, len(vw))
+            return f'{vw}, {padding}S={s}, F={f}, H={r:.0%}'
+
         if logger.isEnabledFor(logging.INFO):
             last_log = time.time()
         while self.working_nodes:
             if logger.isEnabledFor(logging.INFO):
                 t = time.time()
                 if t - last_log >= self.log_rate:
-                    logger.info(self.sequential_statistics())
+                    logger.info(periodic_statistics())
                     last_log = t
             node = self.working_nodes.pop()
             try:
@@ -723,47 +781,19 @@ class VirtualSubstitution:
                 self.success_nodes.extend(nodes)
         logger.info(self.working_nodes.final_statistics())
 
-    def sequential_statistics(self) -> str:
-        num_sn = len(self.success_nodes)
-        num_fn = len(self.failure_nodes)
-        num_hits = self.working_nodes.hits
-        num_calls = self.working_nodes.calls
-        return self.statistics(self.working_nodes, num_sn, num_fn, num_hits, num_calls)
-
-    def setup(self, f: Formula, nprocs: int) -> None:
+    def setup(self, f: Formula, workers: int) -> None:
         logger.debug(f'entering {self.setup.__name__}')
-        self.nprocs = nprocs
+        if workers >= 0:
+            self.workers = workers
+        else:
+            self.workers = os.cpu_count() + workers
         f = pnf(f)
         self.matrix, self.blocks = f.matrix()
 
-    def statistics(self, working_nodes: list[Node], num_success_nodes: int,
-                   num_failure_nodes: int, num_hits: Optional[int],
-                   num_calls: Optional[int]) -> str:
-        counter = Counter(len(node.variables) for node in working_nodes)
-        if counter.keys():
-            m = max(counter.keys())
-            string = f'V={m}, W={counter[m]}'
-            for n in reversed(range(1, m)):
-                string += f'.{counter[n]}'
-            string += ', '
-        else:
-            string = ''
-        if self._statistics_max_len > len(string):
-            string += (self._statistics_max_len - len(string)) * ' '
-        else:
-            self._statistics_max_len = len(string)
-        string += (f'S={num_success_nodes}, '
-                   f'F={num_failure_nodes}')
-        try:
-            string += f', del={100.0 * num_hits / num_calls:.1f}%'
-        except ZeroDivisionError:
-            string += ', del=NaN'
-        return string
-
-    def virtual_substitution(self, f: Formula, nprocs: int):
+    def virtual_substitution(self, f: Formula, workers: int):
         """Virtual substitution main loop.
         """
-        self.setup(f, nprocs)
+        self.setup(f, workers)
         while self.blocks:
             try:
                 self.pop_block()
