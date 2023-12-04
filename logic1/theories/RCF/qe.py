@@ -588,8 +588,8 @@ class VirtualSubstitution:
                 for sentinel in mp.connection.wait(still_running):
                     still_running.remove(sentinel)
                 num_finished = self.workers - len(still_running)
-                pl = 's' if num_finished > 1 else ''
-                logger.debug(f'{num_finished} worker{pl} finished, '
+                pl = 'es' if num_finished > 1 else ''
+                logger.debug(f'{num_finished} worker process{pl} finished, '
                              f'{len(still_running)} running')
             # The following call joins all finished processes as a side effect.
             # Otherwise they would remain in the process table as zombies.
@@ -619,7 +619,7 @@ class VirtualSubstitution:
                       ring_vars, i, log_level, reference_time))
             processes[i].start()
             sentinels[i] = processes[i].sentinel
-        logger.debug(f'started processes in {range(self.workers)}')
+        logger.debug(f'starting worker processes in {range(self.workers)}')
         try:
             if logger.isEnabledFor(logging.INFO):
                 while not mp.connection.wait(sentinels, timeout=self.log_rate):
@@ -669,7 +669,7 @@ class VirtualSubstitution:
         try:
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
-            multiprocessing_logger.debug(f'process {i} starting')
+            multiprocessing_logger.debug(f'worker process {i} has started')
             ring.set_vars(*ring_vars)
             while True:
                 with working_lock, dictionary_lock:
@@ -708,9 +708,10 @@ class VirtualSubstitution:
                         success_nodes.extend(nodes)
                         dictionary['busy'] -= 1
         except KeyboardInterrupt:
-            multiprocessing_logger.debug(f'process {i} returning on KeyboardInterrupt')
+            multiprocessing_logger.debug(
+                f'worker process {i} returning on KeyboardInterrupt')
             return
-        multiprocessing_logger.debug(f'process {i} finished')
+        multiprocessing_logger.debug(f'worker process {i} finished')
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
