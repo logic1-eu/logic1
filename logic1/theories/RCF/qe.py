@@ -12,6 +12,7 @@ import multiprocessing as mp
 import multiprocessing.managers
 import os
 import pickle
+from queue import Queue
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
@@ -326,11 +327,35 @@ class WorkingNodeList(list[Node]):
                     assert False, node
 
 
+@dataclass
+class NodeListParallel:
+
+    nodes: list[bytes] = field(default_factory=list)
+    busy: mp.sharedctypes.Synchronized = None
+
+    def __init__(self, busy: mp.sharedctypes.Synchronized, nodes: list[Node]) -> None:
+        self.nodes = [pickle.dumps(node) for node in nodes]
+        self.busy = busy
+
+    def __len__(self):
+        return len(self.nodes)
+
+    def append(self, pickled_node: bytes) -> None:
+        self.nodes.append(pickled_node)
+        self.busy.value -= 1
+
+    def get_nodes(self) -> list[bytes]:
+        return self.nodes
+
+    def extend(self, pickled_nodes: list[bytes]) -> None:
+        self.nodes.extend(pickled_nodes)
+        self.busy.value -= 1
+
+
 class NodeListProxy(mp.managers.BaseProxy):
 
     def __iter__(self):
-        pickled_nodes = self._callmethod('copy')
-        for pickled_node in pickled_nodes:
+        for pickled_node in self._callmethod('get_nodes'):
             yield pickle.loads(pickled_node)
 
     def __len__(self):
@@ -344,23 +369,24 @@ class NodeListProxy(mp.managers.BaseProxy):
         pickled_nodes = [pickle.dumps(node) for node in nodes]
         self._callmethod('extend', (pickled_nodes,))
 
-    def pop(self) -> Node:
-        pickled_node = self._callmethod('pop')  # type: ignore
-        return pickle.loads(pickled_node)
-
-
-def nodeList(nodes: list[Node]):
-    return [pickle.dumps(node) for node in nodes]
-
 
 @dataclass
 class WorkingNodeListParallel:
 
     nodes: list[Node] = field(default_factory=list)
+    busy: mp.sharedctypes.Synchronized = None
     memory: set[Formula] = field(default_factory=set)
     node_counter: Counter[int] = field(default_factory=Counter)
     hits: int = 0
     candidates: int = 0
+
+    def __init__(self, busy) -> None:
+        self.nodes = []
+        self.busy = busy
+        self.memory = set()
+        self.node_counter = Counter()
+        self.hits = 0
+        self.candidates = 0
 
     def __len__(self):
         return len(self.nodes)
@@ -387,13 +413,17 @@ class WorkingNodeListParallel:
     def get_node_counter(self) -> dict[int, int]:
         return self.node_counter
 
+    def is_finished(self) -> bool:
+        return len(self.nodes) == 0 and self.busy.value == 0
+
     def pop(self) -> bytes:
         node = self.nodes.pop()
         n = len(node.variables)
         self.node_counter[n] -= 1
+        self.busy.value += 1
         return pickle.dumps(node)
 
-    def push(self, pickled_nodes: list[bytes]) -> None:
+    def push(self, pickled_nodes: list[bytes], track_busy: bool = True) -> None:
         for pickled_node in pickled_nodes:
             node = pickle.loads(pickled_node)
             match node.formula:
@@ -407,9 +437,15 @@ class WorkingNodeListParallel:
                     self.append_if_unknown(node)
                 case _:
                     assert False, node
+        if track_busy:
+            self.busy.value -= 1
 
 
 class WorkingNodeListProxy(mp.managers.BaseProxy):
+
+    @property
+    def busy(self):
+        return self._callmethod('get_busy')
 
     @property
     def candidates(self):
@@ -441,25 +477,32 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
     def __len__(self):
         return self._callmethod('__len__')
 
+    def decrement_busy(self) -> None:
+        self._callmethod('decrement_busy')
+
+    def is_finished(self):
+        return self._callmethod('is_finished')
+
     def pop(self) -> Node:
         return pickle.loads(self._callmethod('pop'))  # type: ignore
 
-    def push(self, nodes: list[Node]) -> None:
+    def push(self, nodes: list[Node], track_busy: bool = True) -> None:
         pickled_nodes = [pickle.dumps(node) for node in nodes]
-        self._callmethod('push', (pickled_nodes,))
+        self._callmethod('push', (pickled_nodes, track_busy))
 
 
 class SyncManager(mp.managers.SyncManager):
     pass
 
 
-SyncManager.register("nodeList", nodeList, NodeListProxy,
-                     ['append', 'copy', 'extend', '__len__', 'pop'])
+SyncManager.register("nodeList", NodeListParallel, NodeListProxy,
+                     ['append', 'get_nodes', 'extend', '__len__'])
 
 SyncManager.register("workingNodeList", WorkingNodeListParallel,
                      WorkingNodeListProxy,
-                     ['get_candidates', 'get_hits', 'get_nodes',
-                      'get_node_counter', '__len__', 'pop', 'push'])
+                     ['decrement_busy', 'get_busy', 'get_candidates',
+                      'get_hits', 'get_nodes', 'get_node_counter',
+                      'is_finished', '__len__', 'pop', 'push'])
 
 
 @dataclass
@@ -564,10 +607,10 @@ class VirtualSubstitution:
 
         def periodic_statistics() -> str:
             nonlocal statistics_max_len
-            with working_lock, dictionary_lock, success_lock, failure_lock:
+            with m_lock:
                 nc = working_nodes.node_counter
                 r = working_nodes.hit_ratio
-                b = dictionary['busy']
+                b = busy.value
                 s = len(success_nodes)
                 f = len(failure_nodes)
             try:
@@ -595,123 +638,123 @@ class VirtualSubstitution:
             # Otherwise they would remain in the process table as zombies.
             mp.active_children()
 
-        manager = SyncManager()
-        manager.start()
-        working_nodes = manager.workingNodeList()  # type: ignore
-        working_nodes.push(self.working_nodes)
-        success_nodes = manager.nodeList(self.success_nodes)  # type: ignore
-        failure_nodes = manager.nodeList(self.failure_nodes)  # type: ignore
-        dictionary = manager.dict({'busy': 0, 'found_t': 0})
-        working_lock = manager.Lock()
-        success_lock = manager.Lock()
-        failure_lock = manager.Lock()
-        dictionary_lock = manager.Lock()
-        processes: list[Optional[mp.Process]] = [None] * self.workers
-        sentinels: list[Optional[int]] = [None] * self.workers
-        ring_vars = tuple(str(v) for v in ring.get_vars())
-        log_level = logger.getEffectiveLevel()
-        reference_time = delta_time_formatter.get_reference_time()
-        for i in range(self.workers):
-            processes[i] = mp.Process(
-                target=self.parallel_process_block_worker,
-                args=(working_nodes, success_nodes, failure_nodes, dictionary,
-                      working_lock, success_lock, failure_lock, dictionary_lock,
-                      ring_vars, i, log_level, reference_time))
-            processes[i].start()
-            sentinels[i] = processes[i].sentinel
-        logger.debug(f'starting worker processes in {range(self.workers)}')
-        try:
-            if logger.isEnabledFor(logging.INFO):
-                while not mp.connection.wait(sentinels, timeout=self.log_rate):
-                    logger.info(periodic_statistics())
-            else:
-                mp.connection.wait(sentinels)
-        except KeyboardInterrupt:
-            logger.debug('KeyboardInterrupt, waiting for processes to finish')
+        with SyncManager() as manager:
+            busy = manager.Value('i', 0)
+            found_t = manager.Value('i', 0)
+            working_nodes = manager.workingNodeList(busy)  # type: ignore
+            working_nodes.push(self.working_nodes, track_busy=False)
+            success_nodes = manager.nodeList(busy, self.success_nodes)  # type: ignore
+            failure_nodes = manager.nodeList(busy, self.failure_nodes)  # type: ignore
+            m_lock = manager.Lock()
+            processes: list[Optional[mp.Process]] = [None] * self.workers
+            sentinels: list[Optional[int]] = [None] * self.workers
+            ring_vars = tuple(str(v) for v in ring.get_vars())
+            log_level = logger.getEffectiveLevel()
+            reference_time = delta_time_formatter.get_reference_time()
+            logger.debug(f'starting worker processes in {range(self.workers)}')
+            for i in range(self.workers):
+                processes[i] = mp.Process(
+                    target=self.parallel_process_block_worker,
+                    args=(working_nodes, success_nodes, failure_nodes, m_lock, busy,
+                          found_t, ring_vars, i, log_level, reference_time))
+                processes[i].start()
+                sentinels[i] = processes[i].sentinel
+            try:
+                if logger.isEnabledFor(logging.INFO):
+                    while not mp.connection.wait(sentinels, timeout=self.log_rate):
+                        logger.info(periodic_statistics())
+                else:
+                    mp.connection.wait(sentinels)
+            except KeyboardInterrupt:
+                logger.debug('KeyboardInterrupt, waiting for processes to finish')
+                wait_for_processes_to_finish()
+                raise
             wait_for_processes_to_finish()
-            raise
-        wait_for_processes_to_finish()
-        with dictionary_lock:
-            found_t = dictionary['found_t']
-        if found_t > 0:
-            pl = 's' if found_t > 1 else ''
-            logger.debug(f'{found_t} worker{pl} found T')
-            # The exception handler for FoundT in virtual_substitution in will
-            # log final statistics. Therefore we copy over candidates and hits. The
-            # nodes themselves have become meaningless.
+            if found_t.value > 0:
+                pl = 's' if found_t.value > 1 else ''
+                logger.debug(f'{found_t.value} worker{pl} found T')
+                # The exception handler for FoundT in virtual_substitution in will
+                # log final statistics. Therefore we copy over candidates and hits.
+                # The nodes themselves have become meaningless.
+                self.working_nodes.candidates = working_nodes.candidates
+                self.working_nodes.hits = working_nodes.hits
+                raise FoundT()
+            self.working_nodes = WorkingNodeList(working_nodes)
             self.working_nodes.candidates = working_nodes.candidates
             self.working_nodes.hits = working_nodes.hits
-            raise FoundT()
-        self.working_nodes = WorkingNodeList(working_nodes)
-        self.working_nodes.candidates = working_nodes.candidates
-        self.working_nodes.hits = working_nodes.hits
-        logger.info(self.working_nodes.final_statistics())
-        self.success_nodes = list(success_nodes)
-        self.failure_nodes = list(failure_nodes)
+            logger.info(self.working_nodes.final_statistics())
+            self.success_nodes = list(success_nodes)
+            self.failure_nodes = list(failure_nodes)
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
                                       success_nodes: NodeListProxy,
                                       failure_nodes: NodeListProxy,
-                                      dictionary: mp.managers.DictProxy,
-                                      working_lock: threading.Lock,
-                                      success_lock: threading.Lock,
-                                      failure_lock: threading.Lock,
-                                      dictionary_lock: threading.Lock,
+                                      m_lock: threading.Lock,
+                                      busy: mp.sharedctypes.Synchronized,
+                                      found_t: mp.sharedctypes.Synchronized,
                                       ring_vars: list[str],
                                       i: int,
                                       log_level: int,
                                       reference_time: float) -> None:
-        def work_left():
-            with working_lock:
-                return list(working_nodes) or dictionary['busy'] > 0
-
         try:
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
-            multiprocessing_logger.debug(f'worker process {i} has started')
+            multiprocessing_logger.debug(f'worker process {i} is running')
+            working_nodes_buffer: Queue[Optional[list[Node]]] = Queue()
+            t_lock = threading.Lock()
+            thread1 = threading.Thread(
+                target=VirtualSubstitution.parallel_process_block_worker1,
+                args=(working_nodes, working_nodes_buffer, m_lock, t_lock))
+            thread1.start()
             ring.set_vars(*ring_vars)
             while True:
-                with working_lock, dictionary_lock:
-                    if dictionary['found_t'] > 0:
-                        break
-                    if len(working_nodes) == 0 and dictionary['busy'] == 0:
+                with m_lock:
+                    if found_t.value > 0 or working_nodes.is_finished():
+                        working_nodes_buffer.put(None)
                         break
                     try:
                         node = working_nodes.pop()
                     except IndexError:
                         node = None
-                    else:
-                        dictionary['busy'] += 1
                 if node is None:
                     time.sleep(0.001)
                     continue
                 try:
                     eset = node.eset()
                 except DegreeViolation:
-                    with failure_lock, dictionary_lock:
+                    with m_lock:
                         failure_nodes.append(node)
-                        dictionary['busy'] -= 1
                     continue
                 try:
                     nodes = node.vsubs(eset)
                 except FoundT:
-                    with dictionary_lock:
-                        dictionary['found_t'] += 1
+                    with m_lock:
+                        found_t.value += 1
                     break
                 if nodes[0].variables:
-                    with working_lock, dictionary_lock:
+                    working_nodes_buffer.put(nodes)
+                    with m_lock:
                         working_nodes.push(nodes)
-                        dictionary['busy'] -= 1
                 else:
-                    with success_lock, dictionary_lock:
+                    with m_lock:
                         success_nodes.extend(nodes)
-                        dictionary['busy'] -= 1
         except KeyboardInterrupt:
-            multiprocessing_logger.debug(
-                f'worker process {i} returning on KeyboardInterrupt')
-            return
+            multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
+        thread1.join()
         multiprocessing_logger.debug(f'worker process {i} finished')
+
+    @staticmethod
+    def parallel_process_block_worker1(working_nodes: WorkingNodeListProxy,
+                                       working_nodes_buffer: Queue[Optional[list[Node]]],
+                                       m_lock: threading.Lock,
+                                       t_lock: threading.Lock):
+        while True:
+            nodes = working_nodes_buffer.get()
+            if nodes is None:
+                break
+            # with m_lock:
+            #     working_nodes.push(nodes)
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
