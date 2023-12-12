@@ -477,9 +477,6 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
     def __len__(self):
         return self._callmethod('__len__')
 
-    def decrement_busy(self) -> None:
-        self._callmethod('decrement_busy')
-
     def is_finished(self):
         return self._callmethod('is_finished')
 
@@ -500,9 +497,9 @@ SyncManager.register("nodeList", NodeListParallel, NodeListProxy,
 
 SyncManager.register("workingNodeList", WorkingNodeListParallel,
                      WorkingNodeListProxy,
-                     ['decrement_busy', 'get_busy', 'get_candidates',
-                      'get_hits', 'get_nodes', 'get_node_counter',
-                      'is_finished', '__len__', 'pop', 'push'])
+                     ['get_busy', 'get_candidates', 'get_hits', 'get_nodes',
+                      'get_node_counter', 'is_finished', '__len__', 'pop',
+                      'push'])
 
 
 @dataclass
