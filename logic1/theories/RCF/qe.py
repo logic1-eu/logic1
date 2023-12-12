@@ -701,18 +701,19 @@ class VirtualSubstitution:
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'worker process {i} is running')
-            working_nodes_buffer: Queue[Optional[list[Node]]] = Queue()
-            t_lock = threading.Lock()
+            working_nodes_buffer: Queue[list[Node]] = Queue()
             thread1 = threading.Thread(
                 target=VirtualSubstitution.parallel_process_block_worker1,
-                args=(working_nodes, working_nodes_buffer, m_lock, t_lock))
+                args=(working_nodes, working_nodes_buffer,
+                      m_lock, multiprocessing_logger, i),
+                daemon=True)
             thread1.start()
             ring.set_vars(*ring_vars)
             while True:
                 with m_lock:
                     if found_t.value > 0 or working_nodes.is_finished():
-                        working_nodes_buffer.put(None)
                         break
+                with m_lock:
                     try:
                         node = working_nodes.pop()
                     except IndexError:
@@ -741,20 +742,20 @@ class VirtualSubstitution:
                         success_nodes.extend(nodes)
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
-        thread1.join()
+        working_nodes_buffer.join()
         multiprocessing_logger.debug(f'worker process {i} finished')
 
     @staticmethod
     def parallel_process_block_worker1(working_nodes: WorkingNodeListProxy,
                                        working_nodes_buffer: Queue[Optional[list[Node]]],
                                        m_lock: threading.Lock,
-                                       t_lock: threading.Lock):
+                                       multiprocessing_logger,
+                                       i: int):
         while True:
-            nodes = working_nodes_buffer.get()
-            if nodes is None:
-                break
+            nodes = working_nodes_buffer.get()  # noqa
             # with m_lock:
             #     working_nodes.push(nodes)
+            working_nodes_buffer.task_done()
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
