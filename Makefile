@@ -23,3 +23,6 @@ clean:
 
 veryclean:
 	rm -rf htmlcov .coverage
+
+pygount:
+	pygount logic1 --names-to-skip=*.txt --format=summary
