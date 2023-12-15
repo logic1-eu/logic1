@@ -333,21 +333,27 @@ class WorkingNodeList(list[Node]):
 class NodeListParallel:
 
     nodes: list[bytes] = field(default_factory=list)
+    lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __init__(self, nodes: list[Node]) -> None:
         self.nodes = [pickle.dumps(node) for node in nodes]
+        self.lock = threading.Lock()
 
     def __len__(self):
-        return len(self.nodes)
+        with self.lock:
+            return len(self.nodes)
 
     def append(self, pickled_node: bytes) -> None:
-        self.nodes.append(pickled_node)
+        with self.lock:
+            self.nodes.append(pickled_node)
 
     def get_nodes(self) -> list[bytes]:
-        return self.nodes
+        with self.lock:
+            return self.nodes
 
     def extend(self, pickled_nodes: list[bytes]) -> None:
-        self.nodes.extend(pickled_nodes)
+        with self.lock:
+            self.nodes.extend(pickled_nodes)
 
 
 class NodeListProxy(mp.managers.BaseProxy):
@@ -377,19 +383,24 @@ class WorkingNodeListParallel:
     node_counter: Counter[int] = field(default_factory=Counter)
     hits: int = 0
     candidates: int = 0
+    lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __len__(self):
-        return len(self.nodes)
+        with self.lock:
+            return len(self.nodes)
 
     def append_if_unknown(self, node: Node) -> None:
         if node.formula not in self.memory:
-            self.nodes.append(node)
-            self.memory.update({node.formula})
-            n = len(node.variables)
-            self.node_counter[n] += 1
+            with self.lock:
+                self.nodes.append(node)
+                self.memory.add(node.formula)
+                n = len(node.variables)
+                self.node_counter[n] += 1
         else:
-            self.hits += 1
-        self.candidates += 1
+            with self.lock:
+                self.hits += 1
+        with self.lock:
+            self.candidates += 1
 
     def get_busy(self) -> int:
         return self.busy
@@ -401,20 +412,25 @@ class WorkingNodeListParallel:
         return self.hits
 
     def get_nodes(self) -> list[bytes]:
-        return [pickle.dumps(node) for node in self.nodes]
+        # Is not used by parallel code currently
+        with self.lock:
+            return [pickle.dumps(node) for node in self.nodes]
 
     def get_node_counter(self) -> dict[int, int]:
-        return self.node_counter
+        with self.lock:
+            return self.node_counter
 
     def is_finished(self) -> bool:
-        return len(self.nodes) == 0 and self.busy == 0
+        with self.lock:
+            return len(self.nodes) == 0 and self.busy == 0
 
     def pop(self) -> bytes:
-        node = self.nodes.pop()
-        n = len(node.variables)
-        self.node_counter[n] -= 1
-        self.busy += 1
-        return pickle.dumps(node)
+        with self.lock:
+            node = self.nodes.pop()
+            n = len(node.variables)
+            self.node_counter[n] -= 1
+            self.busy += 1
+            return pickle.dumps(node)
 
     def push(self, pickled_nodes: list[bytes]) -> None:
         for pickled_node in pickled_nodes:
@@ -422,7 +438,8 @@ class WorkingNodeListParallel:
             self.append_if_unknown(node)
 
     def task_done(self) -> None:
-        self.busy -= 1
+        with self.lock:
+            self.busy -= 1
 
 
 class WorkingNodeListProxy(mp.managers.BaseProxy):
@@ -699,23 +716,17 @@ class VirtualSubstitution:
             multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'worker process {i} is running')
             ring.set_vars(*ring_vars)
-            while True:
-                with m_lock:
-                    if found_t.value > 0 or working_nodes.is_finished():
-                        break
-                    try:
-                        node = working_nodes.pop()
-                    except IndexError:
-                        node = None
-                if node is None:
+            while found_t.value == 0 and not working_nodes.is_finished():
+                try:
+                    node = working_nodes.pop()
+                except IndexError:
                     time.sleep(0.001)
                     continue
                 try:
                     eset = node.eset()
                 except DegreeViolation:
-                    with m_lock:
-                        failure_nodes.append(node)
-                        working_nodes.task_done()
+                    failure_nodes.append(node)
+                    working_nodes.task_done()
                     continue
                 try:
                     nodes = node.vsubs(eset)
@@ -724,13 +735,10 @@ class VirtualSubstitution:
                         found_t.value += 1
                     break
                 if nodes[0].variables:
-                    with m_lock:
-                        working_nodes.push(nodes)
-                        working_nodes.task_done()
+                    working_nodes.push(nodes)
                 else:
-                    with m_lock:
-                        success_nodes.extend(nodes)
-                        working_nodes.task_done()
+                    success_nodes.extend(nodes)
+                working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
         multiprocessing_logger.debug(f'worker process {i} finished')
