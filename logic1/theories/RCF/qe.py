@@ -378,28 +378,37 @@ class NodeListProxy(mp.managers.BaseProxy):
 class WorkingNodeListParallel:
 
     nodes: list[Node] = field(default_factory=list)
+    nodes_lock: threading.Lock = field(default_factory=threading.Lock)
     busy: int = 0
+    busy_lock: threading.Lock = field(default_factory=threading.Lock)
     memory: set[Formula] = field(default_factory=set)
+    memory_lock: threading.Lock = field(default_factory=threading.Lock)
     node_counter: Counter[int] = field(default_factory=Counter)
+    node_counter_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
+    hits_lock: threading.Lock = field(default_factory=threading.Lock)
     candidates: int = 0
-    lock: threading.Lock = field(default_factory=threading.Lock)
+    candidates_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def __len__(self):
-        with self.lock:
+        with self.nodes_lock:
             return len(self.nodes)
 
     def append_if_unknown(self, node: Node) -> None:
-        if node.formula not in self.memory:
-            with self.lock:
+        with self.memory_lock:
+            in_memory = node.formula in self.memory
+        if not in_memory:
+            with self.nodes_lock:
                 self.nodes.append(node)
+            with self.memory_lock:
                 self.memory.add(node.formula)
-                n = len(node.variables)
+            n = len(node.variables)
+            with self.node_counter_lock:
                 self.node_counter[n] += 1
         else:
-            with self.lock:
+            with self.hits_lock:
                 self.hits += 1
-        with self.lock:
+        with self.candidates_lock:
             self.candidates += 1
 
     def get_busy(self) -> int:
@@ -413,24 +422,26 @@ class WorkingNodeListParallel:
 
     def get_nodes(self) -> list[bytes]:
         # Is not used by parallel code currently
-        with self.lock:
+        with self.nodes_lock:
             return [pickle.dumps(node) for node in self.nodes]
 
     def get_node_counter(self) -> dict[int, int]:
-        with self.lock:
+        with self.node_counter_lock:
             return self.node_counter
 
     def is_finished(self) -> bool:
-        with self.lock:
+        with self.nodes_lock, self.busy_lock:
             return len(self.nodes) == 0 and self.busy == 0
 
     def pop(self) -> bytes:
-        with self.lock:
+        with self.nodes_lock:
             node = self.nodes.pop()
-            n = len(node.variables)
+        n = len(node.variables)
+        with self.node_counter_lock:
             self.node_counter[n] -= 1
+        with self.busy_lock:
             self.busy += 1
-            return pickle.dumps(node)
+        return pickle.dumps(node)
 
     def push(self, pickled_nodes: list[bytes]) -> None:
         for pickled_node in pickled_nodes:
@@ -438,7 +449,7 @@ class WorkingNodeListParallel:
             self.append_if_unknown(node)
 
     def task_done(self) -> None:
-        with self.lock:
+        with self.busy_lock:
             self.busy -= 1
 
 
