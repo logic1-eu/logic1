@@ -616,6 +616,11 @@ class VirtualSubstitution:
     def collect_success_nodes(self) -> None:
         logger.debug(f'entering {self.collect_success_nodes.__name__}')
         self.matrix = Or(*(node.formula for node in self.success_nodes))
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f'{len(self.matrix.args)} node formulas, '
+                         f'{len(set(self.matrix.args))} different, '
+                         f'{len(list(self.matrix.atoms()))} atoms, '
+                         f'{len(set(self.matrix.atoms()))} different')
         if self.negated:
             self.matrix = Not(self.matrix)
         self.negated = None
@@ -705,12 +710,17 @@ class VirtualSubstitution:
                 self.working_nodes.candidates = working_nodes.candidates
                 self.working_nodes.hits = working_nodes.hits
                 raise FoundT()
+            logger.debug('importing working nodes from mananager')
             self.working_nodes = WorkingNodeList(working_nodes)
             self.working_nodes.candidates = working_nodes.candidates
             self.working_nodes.hits = working_nodes.hits
             logger.info(self.working_nodes.final_statistics())
+            logger.debug('importing success nodes from mananager')
             self.success_nodes = list(success_nodes)
+            logger.debug('importing failure nodes nodes from mananager')
             self.failure_nodes = list(failure_nodes)
+            logger.debug('leaving manager context')
+        logger.debug('manager context ended')
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
@@ -848,7 +858,10 @@ class VirtualSubstitution:
             self.collect_success_nodes()
             if self.failure_nodes:
                 raise NotImplementedError('failure_nodes = {self.failure_nodes}')
-        return simplify(self.matrix)
+        logger.debug('starting final simplification')
+        result = simplify(self.matrix)
+        logger.debug('final simplification finished')
+        return result
 
 
 qe = virtual_substitution = VirtualSubstitution()
