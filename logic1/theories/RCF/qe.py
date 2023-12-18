@@ -544,6 +544,7 @@ class VirtualSubstitution:
     working_nodes: Optional[WorkingNodeList] = None
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
+    time_multiprocessing: float = 0.0
 
     log: int = logging.NOTSET
     log_rate: float = 0.5
@@ -566,6 +567,7 @@ class VirtualSubstitution:
         computations, workers=-3 is an interesting choice, which leaves one CPU
         free for smooth interaction with the machine.
         """
+        VirtualSubstitution.__init__(self)
         try:
             self.log_level = log
             self.log_rate = log_rate
@@ -683,6 +685,7 @@ class VirtualSubstitution:
             log_level = logger.getEffectiveLevel()
             reference_time = delta_time_formatter.get_reference_time()
             logger.debug(f'starting worker processes in {range(self.workers)}')
+            time_ = time.time()
             for i in range(self.workers):
                 processes[i] = mp.Process(
                     target=self.parallel_process_block_worker,
@@ -701,6 +704,7 @@ class VirtualSubstitution:
                 wait_for_processes_to_finish()
                 raise
             wait_for_processes_to_finish()
+            self.time_multiprocessing += time.time() - time_
             if found_t.value > 0:
                 pl = 's' if found_t.value > 1 else ''
                 logger.debug(f'{found_t.value} worker{pl} found T')
