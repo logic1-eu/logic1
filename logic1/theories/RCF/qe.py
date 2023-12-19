@@ -672,7 +672,9 @@ class VirtualSubstitution:
             # Otherwise they would remain in the process table as zombies.
             mp.active_children()
 
+        logger.debug('entering sync manager context')
         with SyncManager() as manager:
+            logger.debug('sync manager context active')
             found_t = manager.Value('i', 0)
             working_nodes = manager.workingNodeList()  # type: ignore
             working_nodes.push(self.working_nodes)
@@ -723,8 +725,8 @@ class VirtualSubstitution:
             self.success_nodes = list(success_nodes)
             logger.debug('importing failure nodes nodes from mananager')
             self.failure_nodes = list(failure_nodes)
-            logger.debug('leaving manager context')
-        logger.debug('manager context ended')
+            logger.debug('leaving sync manager context')
+        logger.debug('sync manager context ended')
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
