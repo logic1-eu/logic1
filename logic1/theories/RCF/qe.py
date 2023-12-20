@@ -11,13 +11,12 @@ import logging
 import multiprocessing as mp
 import multiprocessing.managers
 import os
-import pickle
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
 import threading
 import time
-from typing import Optional, TypeAlias
+from typing import Iterable, Optional, TypeAlias
 from viztracer import log_sparse  # type: ignore
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
@@ -314,7 +313,7 @@ class WorkingNodeList(list[Node]):
         self.node_counter[n] -= 1
         return node
 
-    def push(self, nodes: list[Node]) -> None:
+    def extend(self, nodes: Iterable[Node]) -> None:
         for node in nodes:
             match node.formula:
                 case _F():
@@ -332,59 +331,10 @@ class WorkingNodeList(list[Node]):
 @dataclass
 class NodeListParallel:
 
-    nodes: list[bytes] = field(default_factory=list)
-    lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def __init__(self, nodes: list[Node]) -> None:
-        self.nodes = [pickle.dumps(node) for node in nodes]
-        self.lock = threading.Lock()
-
-    def __len__(self):
-        with self.lock:
-            return len(self.nodes)
-
-    def append(self, pickled_node: bytes) -> None:
-        with self.lock:
-            self.nodes.append(pickled_node)
-
-    def get_nodes(self) -> list[bytes]:
-        with self.lock:
-            return self.nodes
-
-    def extend(self, pickled_nodes: list[bytes]) -> None:
-        with self.lock:
-            self.nodes.extend(pickled_nodes)
-
-
-class NodeListProxy(mp.managers.BaseProxy):
-
-    def __iter__(self):
-        for pickled_node in self._callmethod('get_nodes'):
-            yield pickle.loads(pickled_node)
-
-    def __len__(self):
-        return self._callmethod('__len__')
-
-    def append(self, node: Node) -> None:
-        pickled_node = pickle.dumps(node)
-        self._callmethod('append', (pickled_node,))
-
-    def extend(self, nodes: list[Node]) -> None:
-        pickled_nodes = [pickle.dumps(node) for node in nodes]
-        self._callmethod('extend', (pickled_nodes,))
-
-
-@dataclass
-class WorkingNodeListParallel:
-
     nodes: list[Node] = field(default_factory=list)
     nodes_lock: threading.Lock = field(default_factory=threading.Lock)
-    busy: int = 0
-    busy_lock: threading.Lock = field(default_factory=threading.Lock)
     memory: set[Formula] = field(default_factory=set)
     memory_lock: threading.Lock = field(default_factory=threading.Lock)
-    node_counter: Counter[int] = field(default_factory=Counter)
-    node_counter_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
     hits_lock: threading.Lock = field(default_factory=threading.Lock)
     candidates: int = 0
@@ -394,25 +344,20 @@ class WorkingNodeListParallel:
         with self.nodes_lock:
             return len(self.nodes)
 
-    def append_if_unknown(self, node: Node) -> None:
+    def append(self, node: Node) -> bool:
         with self.memory_lock:
-            in_memory = node.formula in self.memory
-        if not in_memory:
+            is_new = node.formula not in self.memory
+        if is_new:
             with self.nodes_lock:
                 self.nodes.append(node)
             with self.memory_lock:
                 self.memory.add(node.formula)
-            n = len(node.variables)
-            with self.node_counter_lock:
-                self.node_counter[n] += 1
         else:
             with self.hits_lock:
                 self.hits += 1
         with self.candidates_lock:
             self.candidates += 1
-
-    def get_busy(self) -> int:
-        return self.busy
+        return is_new
 
     def get_candidates(self) -> int:
         return self.candidates
@@ -420,10 +365,47 @@ class WorkingNodeListParallel:
     def get_hits(self) -> int:
         return self.hits
 
-    def get_nodes(self) -> list[bytes]:
-        # Is not used by parallel code currently
-        with self.nodes_lock:
-            return [pickle.dumps(node) for node in self.nodes]
+    def get_nodes(self) -> list[Node]:
+        return self.nodes
+
+    def extend(self, nodes: list[Node]) -> None:
+        for node in nodes:
+            self.append(node)
+
+
+class NodeListProxy(mp.managers.BaseProxy):
+
+    def __iter__(self):
+        yield from self._callmethod('get_nodes')
+
+    def __len__(self):
+        return self._callmethod('__len__')
+
+    def append(self, node: Node) -> bool:
+        return self._callmethod('append', (node,))  # type: ignore
+
+    def extend(self, nodes: list[Node]) -> None:
+        self._callmethod('extend', (nodes,))
+
+
+@dataclass
+class WorkingNodeListParallel(NodeListParallel):
+
+    busy: int = 0
+    busy_lock: threading.Lock = field(default_factory=threading.Lock)
+    node_counter: Counter[int] = field(default_factory=Counter)
+    node_counter_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def append(self, node: Node) -> bool:
+        is_new = super().append(node)
+        if is_new:
+            n = len(node.variables)
+            with self.node_counter_lock:
+                self.node_counter[n] += 1
+        return is_new
+
+    def get_busy(self) -> int:
+        return self.busy
 
     def get_node_counter(self) -> dict[int, int]:
         with self.node_counter_lock:
@@ -433,7 +415,7 @@ class WorkingNodeListParallel:
         with self.nodes_lock, self.busy_lock:
             return len(self.nodes) == 0 and self.busy == 0
 
-    def pop(self) -> bytes:
+    def pop(self) -> Node:
         with self.nodes_lock:
             node = self.nodes.pop()
         n = len(node.variables)
@@ -441,12 +423,7 @@ class WorkingNodeListParallel:
             self.node_counter[n] -= 1
         with self.busy_lock:
             self.busy += 1
-        return pickle.dumps(node)
-
-    def push(self, pickled_nodes: list[bytes]) -> None:
-        for pickled_node in pickled_nodes:
-            node = pickle.loads(pickled_node)
-            self.append_if_unknown(node)
+        return node
 
     def task_done(self) -> None:
         with self.busy_lock:
@@ -483,8 +460,7 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
             return float('nan')
 
     def __iter__(self):
-        for pickled_node in self._callmethod('get_nodes'):
-            yield pickle.loads(pickled_node)
+        yield from self._callmethod('get_nodes')
 
     def __len__(self):
         return self._callmethod('__len__')
@@ -493,9 +469,9 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
         return self._callmethod('is_finished')
 
     def pop(self) -> Node:
-        return pickle.loads(self._callmethod('pop'))  # type: ignore
+        return self._callmethod('pop')  # type: ignore
 
-    def push(self, nodes: list[Node]) -> None:
+    def extend(self, nodes: list[Node]) -> None:
         newnodes = []
         for node in nodes:
             match node.formula:
@@ -511,8 +487,7 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
                         newnodes.append(node)
                 case _:
                     assert False, node
-        pickled_nodes = [pickle.dumps(n) for n in newnodes]
-        self._callmethod('push', (pickled_nodes,))
+        self._callmethod('extend', (newnodes,))
 
     def task_done(self) -> None:
         self._callmethod('task_done')
@@ -523,13 +498,14 @@ class SyncManager(mp.managers.SyncManager):
 
 
 SyncManager.register("nodeList", NodeListParallel, NodeListProxy,
-                     ['append', 'get_nodes', 'extend', '__len__'])
+                     ['get_candidates', 'get_hits', 'append', 'get_nodes',
+                      'extend', '__len__'])
 
 SyncManager.register("workingNodeList", WorkingNodeListParallel,
                      WorkingNodeListProxy,
                      ['get_busy', 'get_candidates', 'get_hits', 'get_nodes',
                       'get_node_counter', 'is_finished', '__len__', 'pop',
-                      'push', 'task_done'])
+                      'extend', 'task_done'])
 
 
 @dataclass
@@ -641,7 +617,7 @@ class VirtualSubstitution:
 
         def periodic_statistics() -> str:
             nonlocal statistics_max_len
-            with m_lock:
+            with m_lock1, m_lock2:
                 nc = working_nodes.node_counter
                 r = working_nodes.hit_ratio
                 b = working_nodes.busy
@@ -673,14 +649,15 @@ class VirtualSubstitution:
             mp.active_children()
 
         logger.debug('entering sync manager context')
-        with SyncManager() as manager:
+        with SyncManager() as manager1, SyncManager() as manager2:
+            m_lock1 = manager1.Lock()
+            m_lock2 = manager2.Lock()
             logger.debug('sync manager context active')
-            found_t = manager.Value('i', 0)
-            working_nodes = manager.workingNodeList()  # type: ignore
-            working_nodes.push(self.working_nodes)
-            success_nodes = manager.nodeList(self.success_nodes)  # type: ignore
-            failure_nodes = manager.nodeList(self.failure_nodes)  # type: ignore
-            m_lock = manager.Lock()
+            working_nodes = manager1.workingNodeList()  # type: ignore
+            working_nodes.extend(self.working_nodes)
+            success_nodes = manager2.nodeList(self.success_nodes)  # type: ignore
+            failure_nodes = manager2.nodeList(self.failure_nodes)  # type: ignore
+            found_t = manager2.Value('i', 0)
             processes: list[Optional[mp.Process]] = [None] * self.workers
             sentinels: list[Optional[int]] = [None] * self.workers
             ring_vars = tuple(str(v) for v in ring.get_vars())
@@ -691,7 +668,7 @@ class VirtualSubstitution:
             for i in range(self.workers):
                 processes[i] = mp.Process(
                     target=self.parallel_process_block_worker,
-                    args=(working_nodes, success_nodes, failure_nodes, m_lock,
+                    args=(working_nodes, success_nodes, failure_nodes, m_lock2,
                           found_t, ring_vars, i, log_level, reference_time))
                 processes[i].start()
                 sentinels[i] = processes[i].sentinel
@@ -732,7 +709,7 @@ class VirtualSubstitution:
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
                                       success_nodes: NodeListProxy,
                                       failure_nodes: NodeListProxy,
-                                      m_lock: threading.Lock,
+                                      m_lock2: threading.Lock,
                                       found_t: mp.sharedctypes.Synchronized,
                                       ring_vars: list[str],
                                       i: int,
@@ -758,11 +735,11 @@ class VirtualSubstitution:
                 try:
                     nodes = node.vsubs(eset)
                 except FoundT:
-                    with m_lock:
+                    with m_lock2:
                         found_t.value += 1
                     break
                 if nodes[0].variables:
-                    working_nodes.push(nodes)
+                    working_nodes.extend(nodes)
                 else:
                     success_nodes.extend(nodes)
                 working_nodes.task_done()
@@ -786,7 +763,7 @@ class VirtualSubstitution:
         else:
             self.negated = False
         self.working_nodes = WorkingNodeList()
-        self.working_nodes.push([Node(vars_, simplify(matrix), [])])
+        self.working_nodes.extend([Node(vars_, simplify(matrix), [])])
         self.success_nodes = []
         self.failure_nodes = []
 
@@ -834,7 +811,7 @@ class VirtualSubstitution:
                 continue
             nodes = node.vsubs(eset)
             if nodes[0].variables:
-                self.working_nodes.push(nodes)
+                self.working_nodes.extend(nodes)
             else:
                 self.success_nodes.extend(nodes)
         logger.info(self.working_nodes.final_statistics())
