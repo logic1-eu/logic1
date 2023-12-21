@@ -21,7 +21,7 @@ from viztracer import log_sparse  # type: ignore
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
                                Or, QuantifiedFormula, T)
-from logic1.support.logging import DeltaTimeFormatter, RateFilter
+from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF import rcf
 from logic1.theories.RCF.pnf import pnf
@@ -42,15 +42,8 @@ stream_handler.setFormatter(delta_time_formatter)
 
 logger = logging.getLogger(__name__)
 logger.addHandler(stream_handler)
+logger.addFilter(lambda record: record.msg.strip() != '')
 logger.setLevel(logging.WARNING)
-
-# Create rlogger (rate logger)
-rate_filter = RateFilter()
-
-rlogger = logging.getLogger(__name__ + '/r')
-rlogger.addHandler(stream_handler)
-rlogger.addFilter(rate_filter)
-rlogger.setLevel(logging.WARNING)
 
 # Create multiprocessing logger
 multiprocessing_formatter = DeltaTimeFormatter(
@@ -305,7 +298,7 @@ class WorkingNodeList(list[Node]):
         h = self.hits
         c = self.candidates
         p = self.hit_ratio
-        return (f'computed {t} nodes, skipped {h}/{c} = {p:.0%}')
+        return (f'performed {t} elimination steps, skipped {h}/{c} = {p:.0%}')
 
     def pop(self, *args, **kwargs) -> Node:
         node = super().pop(*args, **kwargs)
@@ -329,7 +322,7 @@ class WorkingNodeList(list[Node]):
 
 
 @dataclass
-class NodeListParallel:
+class NodeListManager:
 
     nodes: list[Node] = field(default_factory=list)
     nodes_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -339,6 +332,20 @@ class NodeListParallel:
     hits_lock: threading.Lock = field(default_factory=threading.Lock)
     candidates: int = 0
     candidates_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def get_nodes(self) -> list[Node]:
+        with self.nodes_lock:
+            return self.nodes
+
+    def get_memory(self) -> set[Formula]:
+        with self.memory_lock:
+            return self.memory
+
+    def get_candidates(self) -> int:
+        return self.candidates
+
+    def get_hits(self) -> int:
+        return self.hits
 
     def __len__(self):
         with self.nodes_lock:
@@ -359,21 +366,32 @@ class NodeListParallel:
             self.candidates += 1
         return is_new
 
-    def get_candidates(self) -> int:
-        return self.candidates
-
-    def get_hits(self) -> int:
-        return self.hits
-
-    def get_nodes(self) -> list[Node]:
-        return self.nodes
-
     def extend(self, nodes: list[Node]) -> None:
         for node in nodes:
             self.append(node)
 
+    def statistics(self) -> tuple:
+        with self.hits_lock, self.candidates_lock, self.nodes_lock:
+            return (self.hits, self.candidates)
+
 
 class NodeListProxy(mp.managers.BaseProxy):
+
+    @property
+    def nodes(self):
+        return self._callmethod('get_nodes')
+
+    @property
+    def memory(self):
+        return self._callmethod('get_memory')
+
+    @property
+    def candidates(self):
+        return self._callmethod('get_candidates')
+
+    @property
+    def hits(self):
+        return self._callmethod('get_hits')
 
     def __iter__(self):
         yield from self._callmethod('get_nodes')
@@ -387,14 +405,41 @@ class NodeListProxy(mp.managers.BaseProxy):
     def extend(self, nodes: list[Node]) -> None:
         self._callmethod('extend', (nodes,))
 
+    def final_statistics(self, key: str) -> str:
+        hits, candidates = self._callmethod('statistics')  # type: ignore
+        num_nodes = candidates - hits
+        if num_nodes == 0:
+            return ''
+        hit_ratio = self.hit_ratio(hits, candidates)
+        return (f'produced {num_nodes} {key} nodes, '
+                f'dropped {hits}/{candidates} = {hit_ratio:.0%}')
+
+    def hit_ratio(self, hits, candidates) -> float:
+        try:
+            return float(hits) / candidates
+        except ZeroDivisionError:
+            return float('nan')
+
+    def periodic_statistics(self, key: str) -> str:
+        hits, candidates = self._callmethod('statistics')  # type: ignore
+        num_nodes = candidates - hits
+        if num_nodes == 0:
+            return ''
+        hit_ratio = self.hit_ratio(hits, candidates)
+        return f'{key}={num_nodes}, H={hit_ratio:.0%}'
+
 
 @dataclass
-class WorkingNodeListParallel(NodeListParallel):
+class WorkingNodeListManager(NodeListManager):
 
     busy: int = 0
     busy_lock: threading.Lock = field(default_factory=threading.Lock)
     node_counter: Counter[int] = field(default_factory=Counter)
     node_counter_lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def get_node_counter(self):
+        with self.node_counter_lock:
+            return self.node_counter
 
     def append(self, node: Node) -> bool:
         is_new = super().append(node)
@@ -404,16 +449,13 @@ class WorkingNodeListParallel(NodeListParallel):
                 self.node_counter[n] += 1
         return is_new
 
-    def get_busy(self) -> int:
-        return self.busy
-
-    def get_node_counter(self) -> dict[int, int]:
-        with self.node_counter_lock:
-            return self.node_counter
-
     def is_finished(self) -> bool:
         with self.nodes_lock, self.busy_lock:
             return len(self.nodes) == 0 and self.busy == 0
+
+    def statistics(self) -> tuple:
+        with self.hits_lock, self.candidates_lock, self.busy_lock, self.node_counter_lock:
+            return (self.hits, self.candidates, self.busy, self.node_counter)
 
     def pop(self) -> Node:
         with self.nodes_lock:
@@ -430,46 +472,11 @@ class WorkingNodeListParallel(NodeListParallel):
             self.busy -= 1
 
 
-class WorkingNodeListProxy(mp.managers.BaseProxy):
-
-    @property
-    def busy(self):
-        return self._callmethod('get_busy')
-
-    @property
-    def candidates(self):
-        return self._callmethod('get_candidates')
-
-    @property
-    def computed(self) -> int:
-        return self.candidates - self.hits
-
-    @property
-    def hits(self):
-        return self._callmethod('get_hits')
+class WorkingNodeListProxy(NodeListProxy):
 
     @property
     def node_counter(self):
         return self._callmethod('get_node_counter')
-
-    @property
-    def hit_ratio(self) -> float:
-        try:
-            return float(self.hits) / self.candidates
-        except ZeroDivisionError:
-            return float('nan')
-
-    def __iter__(self):
-        yield from self._callmethod('get_nodes')
-
-    def __len__(self):
-        return self._callmethod('__len__')
-
-    def is_finished(self):
-        return self._callmethod('is_finished')
-
-    def pop(self) -> Node:
-        return self._callmethod('pop')  # type: ignore
 
     def extend(self, nodes: list[Node]) -> None:
         newnodes = []
@@ -489,6 +496,32 @@ class WorkingNodeListProxy(mp.managers.BaseProxy):
                     assert False, node
         self._callmethod('extend', (newnodes,))
 
+    def final_statistics(self, *args) -> str:
+        hits, candidates, _, _ = self._callmethod('statistics')  # type: ignore
+        computed = candidates - hits
+        hit_ratio = self.hit_ratio(hits, candidates)
+        return (f'performed {computed} elimination steps, '
+                f'skipped {hits}/{candidates} = {hit_ratio:.0%}')
+
+    def is_finished(self):
+        return self._callmethod('is_finished')
+
+    def periodic_statistics(self, *args) -> str:
+        hits, candidates, busy, node_counter = self._callmethod('statistics')  # type: ignore
+        hit_ratio = self.hit_ratio(hits, candidates)
+        try:
+            m = max(k for k, v in node_counter.items() if v != 0)
+            v = f'V={m}'
+            tup = '.'.join(f'{node_counter[n]}' for n in reversed(range(1, m + 1)))
+            w = f'W={tup}'
+            vw = f'{v}, {w}'
+        except ValueError:
+            vw = 'V=0'
+        return f'{vw}, B={busy}, H={hit_ratio:.0%}'
+
+    def pop(self) -> Node:
+        return self._callmethod('pop')  # type: ignore
+
     def task_done(self) -> None:
         self._callmethod('task_done')
 
@@ -497,15 +530,14 @@ class SyncManager(mp.managers.SyncManager):
     pass
 
 
-SyncManager.register("nodeList", NodeListParallel, NodeListProxy,
-                     ['get_candidates', 'get_hits', 'append', 'get_nodes',
-                      'extend', '__len__'])
+SyncManager.register("NodeList", NodeListManager, NodeListProxy,
+                     ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
+                      '__len__', 'append', 'extend', 'statistics'])
 
-SyncManager.register("workingNodeList", WorkingNodeListParallel,
-                     WorkingNodeListProxy,
-                     ['get_busy', 'get_candidates', 'get_hits', 'get_nodes',
-                      'get_node_counter', 'is_finished', '__len__', 'pop',
-                      'extend', 'task_done'])
+SyncManager.register("WorkingNodeList", WorkingNodeListManager, WorkingNodeListProxy,
+                     ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
+                      'get_node_counter', '__len__', 'append', 'extend',
+                      'is_finished', 'pop', 'statistics', 'task_done'])
 
 
 @dataclass
@@ -517,9 +549,12 @@ class VirtualSubstitution:
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
+    root_node: Optional[Node] = None
     working_nodes: Optional[WorkingNodeList] = None
     success_nodes: Optional[list[Node]] = None
     failure_nodes: Optional[list[Node]] = None
+    result: Optional[Formula] = None
+
     time_multiprocessing: float = 0.0
 
     log: int = logging.NOTSET
@@ -548,23 +583,20 @@ class VirtualSubstitution:
             self.log_level = log
             self.log_rate = log_rate
             save_level = logger.getEffectiveLevel()
-            save_rlevel = rlogger.getEffectiveLevel()
             logger.setLevel(self.log_level)
-            rlogger.setLevel(self.log_level)
-            rate_filter.set_rate(self.log_rate)
             delta_time_formatter.set_reference_time(time.time())
             result = self.virtual_substitution(f, workers)
         except KeyboardInterrupt:
             print('KeyboardInterrupt', file=sys.stderr, flush=True)
             return None
         finally:
+            logger.info('finished')
             logger.setLevel(save_level)
-            rlogger.setLevel(save_rlevel)
         return result
 
     def __str__(self) -> str:
 
-        def format_negated() -> str:
+        def negated_as_str() -> str:
             match self.negated:
                 case None:
                     read_as = ''
@@ -576,13 +608,20 @@ class VirtualSubstitution:
                     assert False, self.negated
             return f'{self.negated},{read_as}'
 
+        def nodes_as_str(nodes: list[Node]) -> str:
+            if nodes is None:
+                return None
+            h = ',\n                '.join(f'{node}' for node in nodes)
+            return f'[{h}]'
+
         return (f'{self.__class__.__qualname__} [\n'
                 f'    blocks        = {self.blocks_as_str()},\n'
                 f'    matrix        = {self.matrix},\n'
-                f'    negated       = {format_negated()}\n'
-                f'    working_nodes = {self.nodes_as_str(self.working_nodes)},\n'
-                f'    success_nodes = {self.nodes_as_str(self.success_nodes)}\n'
-                f'    failure_nodes = {self.nodes_as_str(self.failure_nodes)}\n'
+                f'    negated       = {negated_as_str()}\n'
+                f'    root_node     = {self.root_node}\n'
+                f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
+                f'    success_nodes = {nodes_as_str(self.success_nodes)}\n'
+                f'    failure_nodes = {nodes_as_str(self.failure_nodes)}\n'
                 f']')
 
     def blocks_as_str(self) -> str:
@@ -594,46 +633,27 @@ class VirtualSubstitution:
     def collect_success_nodes(self) -> None:
         logger.debug(f'entering {self.collect_success_nodes.__name__}')
         self.matrix = Or(*(node.formula for node in self.success_nodes))
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f'{len(self.matrix.args)} node formulas, '
-                         f'{len(set(self.matrix.args))} different, '
-                         f'{len(list(self.matrix.atoms()))} atoms, '
-                         f'{len(set(self.matrix.atoms()))} different')
         if self.negated:
             self.matrix = Not(self.matrix)
         self.negated = None
         self.working_nodes = None
         self.success_nodes = None
 
-    def nodes_as_str(self, nodes: list[Node]) -> str:
-        if nodes is None:
-            return None
-        h = ',\n                '.join(f'{node}' for node in nodes)
-        return f'[{h}]'
+    def final_simplification(self):
+        logger.debug(f'entering {self.final_simplification.__name__}')
+        if logger.isEnabledFor(logging.DEBUG):
+            num_atoms = sum(1 for _ in self.matrix.atoms())
+            logger.debug(f'found {num_atoms} atoms')
+        logger.info('final simplification')
+        t = time.time()
+        self.result = simplify(self.matrix)
+        t = time.time() - t
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f'simplification took {t:.3f} s')
+            num_atoms = sum(1 for _ in self.result.atoms())
+            logger.debug(f'produced {num_atoms} atoms')
 
     def parallel_process_block(self) -> None:
-
-        statistics_max_len = 0
-
-        def periodic_statistics() -> str:
-            nonlocal statistics_max_len
-            with m_lock1, m_lock2:
-                nc = working_nodes.node_counter
-                r = working_nodes.hit_ratio
-                b = working_nodes.busy
-                s = len(success_nodes)
-                f = len(failure_nodes)
-            try:
-                m = max(k for k, v in nc.items() if v != 0)
-                v = f'V={m}'
-                tup = '.'.join(f'{nc[n]}' for n in reversed(range(1, m + 1)))
-                w = f'W={tup}'
-                vw = f'{v}, {w}'
-            except ValueError:
-                vw = 'V=0'
-            padding = (statistics_max_len - len(vw)) * ' '
-            statistics_max_len = max(statistics_max_len, len(vw))
-            return f'{vw}, {padding}B={b}, S={s}, F={f}, H={r:.0%}'
 
         def wait_for_processes_to_finish():
             still_running = sentinels.copy()
@@ -649,15 +669,15 @@ class VirtualSubstitution:
             mp.active_children()
 
         logger.debug('entering sync manager context')
-        with SyncManager() as manager1, SyncManager() as manager2:
-            m_lock1 = manager1.Lock()
-            m_lock2 = manager2.Lock()
+        with SyncManager() as manager:
+            m_lock = manager.Lock()
             logger.debug('sync manager context active')
-            working_nodes = manager1.workingNodeList()  # type: ignore
-            working_nodes.extend(self.working_nodes)
-            success_nodes = manager2.nodeList(self.success_nodes)  # type: ignore
-            failure_nodes = manager2.nodeList(self.failure_nodes)  # type: ignore
-            found_t = manager2.Value('i', 0)
+            working_nodes = manager.WorkingNodeList()  # type: ignore
+            working_nodes.append(self.root_node)
+            self.root_node = None
+            success_nodes = manager.NodeList()  # type: ignore
+            failure_nodes = manager.NodeList()  # type: ignore
+            found_t = manager.Value('i', 0)
             processes: list[Optional[mp.Process]] = [None] * self.workers
             sentinels: list[Optional[int]] = [None] * self.workers
             ring_vars = tuple(str(v) for v in ring.get_vars())
@@ -668,14 +688,16 @@ class VirtualSubstitution:
             for i in range(self.workers):
                 processes[i] = mp.Process(
                     target=self.parallel_process_block_worker,
-                    args=(working_nodes, success_nodes, failure_nodes, m_lock2,
+                    args=(working_nodes, success_nodes, failure_nodes, m_lock,
                           found_t, ring_vars, i, log_level, reference_time))
                 processes[i].start()
                 sentinels[i] = processes[i].sentinel
             try:
                 if logger.isEnabledFor(logging.INFO):
                     while not mp.connection.wait(sentinels, timeout=self.log_rate):
-                        logger.info(periodic_statistics())
+                        logger.info(working_nodes.periodic_statistics())
+                        logger.info(success_nodes.periodic_statistics('S'))
+                        logger.info(failure_nodes.periodic_statistics('F'))
                 else:
                     mp.connection.wait(sentinels)
             except KeyboardInterrupt:
@@ -693,14 +715,17 @@ class VirtualSubstitution:
                 self.working_nodes.candidates = working_nodes.candidates
                 self.working_nodes.hits = working_nodes.hits
                 raise FoundT()
+            logger.info(working_nodes.final_statistics())
+            logger.info(success_nodes.final_statistics('success'))
+            logger.info(failure_nodes.final_statistics('failure'))
+            logger.info('importing results from mananager')
             logger.debug('importing working nodes from mananager')
             self.working_nodes = WorkingNodeList(working_nodes)
             self.working_nodes.candidates = working_nodes.candidates
             self.working_nodes.hits = working_nodes.hits
-            logger.info(self.working_nodes.final_statistics())
             logger.debug('importing success nodes from mananager')
             self.success_nodes = list(success_nodes)
-            logger.debug('importing failure nodes nodes from mananager')
+            logger.debug('importing failure nodes from mananager')
             self.failure_nodes = list(failure_nodes)
             logger.debug('leaving sync manager context')
         logger.debug('sync manager context ended')
@@ -709,7 +734,7 @@ class VirtualSubstitution:
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
                                       success_nodes: NodeListProxy,
                                       failure_nodes: NodeListProxy,
-                                      m_lock2: threading.Lock,
+                                      m_lock: threading.Lock,
                                       found_t: mp.sharedctypes.Synchronized,
                                       ring_vars: list[str],
                                       i: int,
@@ -735,7 +760,7 @@ class VirtualSubstitution:
                 try:
                     nodes = node.vsubs(eset)
                 except FoundT:
-                    with m_lock2:
+                    with m_lock:
                         found_t.value += 1
                     break
                 if nodes[0].variables:
@@ -745,7 +770,7 @@ class VirtualSubstitution:
                 working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
-        multiprocessing_logger.debug(f'worker process {i} finished')
+        multiprocessing_logger.debug(f'worker process {i} exiting')
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
@@ -762,10 +787,7 @@ class VirtualSubstitution:
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.working_nodes = WorkingNodeList()
-        self.working_nodes.extend([Node(vars_, simplify(matrix), [])])
-        self.success_nodes = []
-        self.failure_nodes = []
+        self.root_node = Node(vars_, simplify(matrix), [])
 
     def process_block(self) -> None:
         logger.debug(f'entering {self.process_block.__name__}')
@@ -795,6 +817,11 @@ class VirtualSubstitution:
             statistics_max_len = max(statistics_max_len, len(vw))
             return f'{vw}, {padding}S={s}, F={f}, H={r:.0%}'
 
+        self.working_nodes = WorkingNodeList()
+        self.working_nodes.extend([self.root_node])
+        self.root_node = None
+        self.success_nodes = []
+        self.failure_nodes = []
         if logger.isEnabledFor(logging.INFO):
             last_log = time.time()
         while self.working_nodes:
@@ -828,6 +855,7 @@ class VirtualSubstitution:
     def virtual_substitution(self, f: Formula, workers: int):
         """Virtual substitution main loop.
         """
+        logger.debug(f'entering {self.virtual_substitution.__name__}')
         self.setup(f, workers)
         while self.blocks:
             try:
@@ -841,10 +869,9 @@ class VirtualSubstitution:
             self.collect_success_nodes()
             if self.failure_nodes:
                 raise NotImplementedError('failure_nodes = {self.failure_nodes}')
-        logger.debug('starting final simplification')
-        result = simplify(self.matrix)
-        logger.debug('final simplification finished')
-        return result
+        self.final_simplification()
+        logger.debug(f'leaving {self.virtual_substitution.__name__}')
+        return self.result
 
 
 qe = virtual_substitution = VirtualSubstitution()
