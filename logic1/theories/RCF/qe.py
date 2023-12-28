@@ -258,12 +258,13 @@ class Node:
 
 
 @dataclass
-class WorkingNodeList(list[Node]):
+class WorkingNodeList:
 
-    memory: set[Formula]
-    node_counter: Counter[int]
-    hits: int
-    candidates: int
+    nodes: list[Node] = field(default_factory=list)
+    memory: set[Formula] = field(default_factory=set)
+    hits: int = 0
+    candidates: int = 0
+    node_counter: Counter[int] = field(default_factory=Counter)
 
     @property
     def computed(self) -> int:
@@ -276,16 +277,15 @@ class WorkingNodeList(list[Node]):
         except ZeroDivisionError:
             return float('nan')
 
-    def __init__(self, *args) -> None:
-        super().__init__(*args)
-        self.memory: set[Formula] = set()
-        self.node_counter: Counter[int] = Counter()
-        self.hits = 0
-        self.candidates = 0
+    def __iter__(self):
+        yield from self.nodes
 
-    def append_if_unknown(self, node: Node) -> None:
+    def __len__(self):
+        len(self.nodes)
+
+    def append(self, node: Node) -> None:
         if node.formula not in self.memory:
-            self.append(node)
+            self.nodes.append(node)
             self.memory.update({node.formula})
             n = len(node.variables)
             self.node_counter[n] += 1
@@ -300,8 +300,8 @@ class WorkingNodeList(list[Node]):
         p = self.hit_ratio
         return (f'performed {t} elimination steps, skipped {h}/{c} = {p:.0%}')
 
-    def pop(self, *args, **kwargs) -> Node:
-        node = super().pop(*args, **kwargs)
+    def pop(self) -> Node:
+        node = self.nodes.pop()
         n = len(node.variables)
         self.node_counter[n] -= 1
         return node
@@ -314,9 +314,9 @@ class WorkingNodeList(list[Node]):
                 case Or(args=args):
                     for arg in args:
                         subnode = Node(node.variables.copy(), arg, node.answer)
-                        self.append_if_unknown(subnode)
+                        self.append(subnode)
                 case And() | AtomicFormula():
-                    self.append_if_unknown(node)
+                    self.append(node)
                 case _:
                     assert False, node
 
@@ -478,7 +478,7 @@ class WorkingNodeListProxy(NodeListProxy):
     def node_counter(self):
         return self._callmethod('get_node_counter')
 
-    def extend(self, nodes: list[Node]) -> None:
+    def extend(self, nodes: Iterable[Node]) -> None:
         newnodes = []
         for node in nodes:
             match node.formula:
@@ -486,9 +486,9 @@ class WorkingNodeListProxy(NodeListProxy):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        newnode = Node(node.variables.copy(), arg, node.answer)
-                        if newnode not in newnodes:
-                            newnodes.append(newnode)
+                        subnode = Node(node.variables.copy(), arg, node.answer)
+                        if subnode not in newnodes:
+                            newnodes.append(subnode)
                 case And() | AtomicFormula():
                     if node not in newnodes:
                         newnodes.append(node)
@@ -608,7 +608,7 @@ class VirtualSubstitution:
                     assert False, self.negated
             return f'{self.negated},{read_as}'
 
-        def nodes_as_str(nodes: list[Node]) -> str:
+        def nodes_as_str(nodes: Iterable[Node]) -> str:
             if nodes is None:
                 return None
             h = ',\n                '.join(f'{node}' for node in nodes)
@@ -709,20 +709,29 @@ class VirtualSubstitution:
             if found_t.value > 0:
                 pl = 's' if found_t.value > 1 else ''
                 logger.debug(f'{found_t.value} worker{pl} found T')
-                # The exception handler for FoundT in virtual_substitution in will
-                # log final statistics. Therefore we copy over candidates and hits.
-                # The nodes themselves have become meaningless.
-                self.working_nodes.candidates = working_nodes.candidates
-                self.working_nodes.hits = working_nodes.hits
+                # The exception handler for FoundT in virtual_substitution will
+                # log final statistics. We do not retrieve nodes and memory,
+                # which would cost significant time and space. We also do not
+                # retreive the node_counter, which would be not consistent with
+                # our empty nodes.
+                self.working_nodes = WorkingNodeList(
+                    hits=working_nodes.hits,
+                    candidates=working_nodes.candidates)
                 raise FoundT()
             logger.info(working_nodes.final_statistics())
             logger.info(success_nodes.final_statistics('success'))
             logger.info(failure_nodes.final_statistics('failure'))
             logger.info('importing results from mananager')
             logger.debug('importing working nodes from mananager')
-            self.working_nodes = WorkingNodeList(working_nodes)
-            self.working_nodes.candidates = working_nodes.candidates
-            self.working_nodes.hits = working_nodes.hits
+            # We do not retrieve the memory, which would cost significant time
+            # and space.
+            self.working_nodes = WorkingNodeList(
+                nodes=working_nodes.nodes,
+                hits=working_nodes.hits,
+                candidates=working_nodes.candidates,
+                node_counter=working_nodes.node_counter)
+            assert self.working_nodes.nodes == []
+            assert self.working_nodes.node_counter.total() == 0
             logger.debug('importing success nodes from mananager')
             self.success_nodes = list(success_nodes)
             logger.debug('importing failure nodes from mananager')
@@ -818,13 +827,13 @@ class VirtualSubstitution:
             return f'{vw}, {padding}S={s}, F={f}, H={r:.0%}'
 
         self.working_nodes = WorkingNodeList()
-        self.working_nodes.extend([self.root_node])
+        self.working_nodes.append(self.root_node)
         self.root_node = None
         self.success_nodes = []
         self.failure_nodes = []
         if logger.isEnabledFor(logging.INFO):
             last_log = time.time()
-        while self.working_nodes:
+        while self.working_nodes.nodes:
             if logger.isEnabledFor(logging.INFO):
                 t = time.time()
                 if t - last_log >= self.log_rate:
