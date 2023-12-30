@@ -258,47 +258,92 @@ class Node:
 
 
 @dataclass
-class WorkingNodeList:
+class NodeList:
 
     nodes: list[Node] = field(default_factory=list)
     memory: set[Formula] = field(default_factory=set)
     hits: int = 0
     candidates: int = 0
-    node_counter: Counter[int] = field(default_factory=Counter)
 
-    @property
-    def computed(self) -> int:
-        return self.candidates - self.hits
+    def __iter__(self):
+        yield from self.nodes
 
-    @property
+    def __len__(self) -> int:
+        return len(self.nodes)
+
+    def append(self, node: Node) -> bool:
+        is_new = node.formula not in self.memory
+        if is_new:
+            self.nodes.append(node)
+            self.memory.add(node.formula)
+        else:
+            self.hits += 1
+        self.candidates += 1
+        return is_new
+
+    def extend(self, nodes: Iterable[Node]) -> None:
+        for node in nodes:
+            self.append(node)
+
+    def final_statistics(self, key: str) -> str:
+        hits = self.hits
+        candidates = self.candidates
+        num_nodes = candidates - hits
+        if num_nodes == 0:
+            return ''
+        ratio = self.hit_ratio()
+        return (f'produced {num_nodes} {key} nodes, '
+                f'dropped {hits}/{candidates} = {ratio:.0%}')
+
     def hit_ratio(self) -> float:
         try:
             return float(self.hits) / self.candidates
         except ZeroDivisionError:
             return float('nan')
 
-    def __iter__(self):
-        yield from self.nodes
+    def periodic_statistics(self, key: str) -> str:
+        num_nodes = self.candidates - self.hits
+        if num_nodes == 0:
+            return ''
+        ratio = self.hit_ratio()
+        return f'{key}={num_nodes}, H={ratio:.0%}'
 
-    def __len__(self):
-        len(self.nodes)
 
-    def append(self, node: Node) -> None:
-        if node.formula not in self.memory:
-            self.nodes.append(node)
-            self.memory.update({node.formula})
+@dataclass
+class WorkingNodeList(NodeList):
+
+    node_counter: Counter[int] = field(default_factory=Counter)
+
+    def append(self, node: Node) -> bool:
+        is_new = super().append(node)
+        if is_new:
             n = len(node.variables)
             self.node_counter[n] += 1
-        else:
-            self.hits += 1
-        self.candidates += 1
+        return is_new
 
-    def final_statistics(self) -> str:
-        t = self.computed
-        h = self.hits
-        c = self.candidates
-        p = self.hit_ratio
-        return (f'performed {t} elimination steps, skipped {h}/{c} = {p:.0%}')
+    def final_statistics(self, key: Optional[str] = None) -> str:
+        if key:
+            return super().final_statistics(key)
+        hits = self.hits
+        candidates = self.candidates
+        num_nodes = candidates - hits
+        ratio = self.hit_ratio()
+        return (f'performed {num_nodes} elimination steps, '
+                f'skipped {hits}/{candidates} = {ratio:.0%}')
+
+    def periodic_statistics(self, key: str = 'W') -> str:
+        node_counter = self.node_counter
+        ratio = self.hit_ratio()
+        try:
+            num_variables = max(k for k, v in node_counter.items() if v != 0)
+            v = f'V={num_variables}'
+            nc = '.'.join(f'{node_counter[n]}'
+                          for n in reversed(range(1, num_variables + 1)))
+            w = f'{key}={nc}'
+            vw = f'{v}, {w}'
+        except ValueError:
+            vw = 'V=0'
+        return f'{vw}, H={ratio:.0%}'
 
     def pop(self) -> Node:
         node = self.nodes.pop()
@@ -366,7 +411,7 @@ class NodeListManager:
             self.candidates += 1
         return is_new
 
-    def extend(self, nodes: list[Node]) -> None:
+    def extend(self, nodes: Iterable[Node]) -> None:
         for node in nodes:
             self.append(node)
 
@@ -410,9 +455,9 @@ class NodeListProxy(mp.managers.BaseProxy):
         num_nodes = candidates - hits
         if num_nodes == 0:
             return ''
-        hit_ratio = self.hit_ratio(hits, candidates)
+        ratio = self.hit_ratio(hits, candidates)
         return (f'produced {num_nodes} {key} nodes, '
-                f'dropped {hits}/{candidates} = {hit_ratio:.0%}')
+                f'dropped {hits}/{candidates} = {ratio:.0%}')
 
     def hit_ratio(self, hits, candidates) -> float:
         try:
@@ -425,8 +470,8 @@ class NodeListProxy(mp.managers.BaseProxy):
         num_nodes = candidates - hits
         if num_nodes == 0:
             return ''
-        hit_ratio = self.hit_ratio(hits, candidates)
-        return f'{key}={num_nodes}, H={hit_ratio:.0%}'
+        ratio = self.hit_ratio(hits, candidates)
+        return f'{key}={num_nodes}, H={ratio:.0%}'
 
 
 @dataclass
@@ -496,28 +541,31 @@ class WorkingNodeListProxy(NodeListProxy):
                     assert False, node
         self._callmethod('extend', (newnodes,))
 
-    def final_statistics(self, *args) -> str:
+    def final_statistics(self, key: Optional[str] = None) -> str:
+        if key:
+            return super().final_statistics(key)
         hits, candidates, _, _ = self._callmethod('statistics')  # type: ignore
-        computed = candidates - hits
-        hit_ratio = self.hit_ratio(hits, candidates)
-        return (f'performed {computed} elimination steps, '
-                f'skipped {hits}/{candidates} = {hit_ratio:.0%}')
+        num_nodes = candidates - hits
+        ratio = self.hit_ratio(hits, candidates)
+        return (f'performed {num_nodes} elimination steps, '
+                f'skipped {hits}/{candidates} = {ratio:.0%}')
 
     def is_finished(self):
         return self._callmethod('is_finished')
 
-    def periodic_statistics(self, *args) -> str:
+    def periodic_statistics(self, key: str = 'W') -> str:
         hits, candidates, busy, node_counter = self._callmethod('statistics')  # type: ignore
-        hit_ratio = self.hit_ratio(hits, candidates)
+        ratio = self.hit_ratio(hits, candidates)
         try:
-            m = max(k for k, v in node_counter.items() if v != 0)
-            v = f'V={m}'
-            tup = '.'.join(f'{node_counter[n]}' for n in reversed(range(1, m + 1)))
-            w = f'W={tup}'
+            num_variables = max(k for k, v in node_counter.items() if v != 0)
+            v = f'V={num_variables}'
+            nc = '.'.join(f'{node_counter[n]}'
+                          for n in reversed(range(1, num_variables + 1)))
+            w = f'{key}={nc}'
             vw = f'{v}, {w}'
         except ValueError:
             vw = 'V=0'
-        return f'{vw}, B={busy}, H={hit_ratio:.0%}'
+        return f'{vw}, B={busy}, H={ratio:.0%}'
 
     def pop(self) -> Node:
         return self._callmethod('pop')  # type: ignore
@@ -545,20 +593,20 @@ class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
     """
 
-    workers: int = 0
     blocks: Optional[list[QuantifierBlock]] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
     root_node: Optional[Node] = None
     working_nodes: Optional[WorkingNodeList] = None
-    success_nodes: Optional[list[Node]] = None
-    failure_nodes: Optional[list[Node]] = None
+    success_nodes: Optional[NodeList] = None
+    failure_nodes: Optional[NodeList] = None
     result: Optional[Formula] = None
 
-    time_multiprocessing: float = 0.0
-
+    workers: int = 0
     log: int = logging.NOTSET
     log_rate: float = 0.5
+
+    time_multiprocessing: float = 0.0
 
     def __call__(self, f: Formula, workers: int = 0, log: int = logging.NOTSET,
                  log_rate: float = 0.5) -> Optional[Formula]:
@@ -594,7 +642,7 @@ class VirtualSubstitution:
             logger.setLevel(save_level)
         return result
 
-    def __str__(self) -> str:
+    def status(self) -> str:
 
         def negated_as_str() -> str:
             match self.negated:
@@ -711,7 +759,7 @@ class VirtualSubstitution:
                 logger.debug(f'{found_t.value} worker{pl} found T')
                 # The exception handler for FoundT in virtual_substitution will
                 # log final statistics. We do not retrieve nodes and memory,
-                # which would cost significant time and space. We also do not
+                # which would cost significant time and space. We neither
                 # retreive the node_counter, which would be not consistent with
                 # our empty nodes.
                 self.working_nodes = WorkingNodeList(
@@ -724,7 +772,7 @@ class VirtualSubstitution:
             logger.info('importing results from mananager')
             logger.debug('importing working nodes from mananager')
             # We do not retrieve the memory, which would cost significant time
-            # and space.
+            # and space. Same for success nodes and failure nodes below.
             self.working_nodes = WorkingNodeList(
                 nodes=working_nodes.nodes,
                 hits=working_nodes.hits,
@@ -733,9 +781,13 @@ class VirtualSubstitution:
             assert self.working_nodes.nodes == []
             assert self.working_nodes.node_counter.total() == 0
             logger.debug('importing success nodes from mananager')
-            self.success_nodes = list(success_nodes)
+            self.success_nodes = NodeList(nodes=success_nodes.nodes,
+                                          hits=success_nodes.hits,
+                                          candidates=success_nodes.candidates)
             logger.debug('importing failure nodes from mananager')
-            self.failure_nodes = list(failure_nodes)
+            self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
+                                          hits=failure_nodes.hits,
+                                          candidates=failure_nodes.candidates)
             logger.debug('leaving sync manager context')
         logger.debug('sync manager context ended')
 
@@ -805,39 +857,20 @@ class VirtualSubstitution:
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
-
-        statistics_max_len = 0
-
-        def periodic_statistics() -> str:
-            nonlocal statistics_max_len
-            nc = self.working_nodes.node_counter
-            r = self.working_nodes.hit_ratio
-            s = len(self.success_nodes)
-            f = len(self.failure_nodes)
-            try:
-                m = max(k for k, v in nc.items() if v != 0)
-                v = f'V={m}'
-                tup = '.'.join(f'{nc[n]}' for n in reversed(range(1, m + 1)))
-                w = f'W={tup}'
-                vw = f'{v}, {w}'
-            except ValueError:
-                vw = 'V=0'
-            padding = (statistics_max_len - len(vw)) * ' '
-            statistics_max_len = max(statistics_max_len, len(vw))
-            return f'{vw}, {padding}S={s}, F={f}, H={r:.0%}'
-
         self.working_nodes = WorkingNodeList()
         self.working_nodes.append(self.root_node)
         self.root_node = None
-        self.success_nodes = []
-        self.failure_nodes = []
+        self.success_nodes = NodeList()
+        self.failure_nodes = NodeList()
         if logger.isEnabledFor(logging.INFO):
             last_log = time.time()
         while self.working_nodes.nodes:
             if logger.isEnabledFor(logging.INFO):
                 t = time.time()
                 if t - last_log >= self.log_rate:
-                    logger.info(periodic_statistics())
+                    logger.info(self.working_nodes.periodic_statistics())
+                    logger.info(self.success_nodes.periodic_statistics('S'))
+                    logger.info(self.success_nodes.periodic_statistics('F'))
                     last_log = t
             node = self.working_nodes.pop()
             try:
@@ -851,6 +884,8 @@ class VirtualSubstitution:
             else:
                 self.success_nodes.extend(nodes)
         logger.info(self.working_nodes.final_statistics())
+        logger.info(self.success_nodes.final_statistics('success'))
+        logger.info(self.success_nodes.final_statistics('failure'))
 
     def setup(self, f: Formula, workers: int) -> None:
         logger.debug(f'entering {self.setup.__name__}')
@@ -874,7 +909,7 @@ class VirtualSubstitution:
                 logger.info('found T')
                 logger.info(self.working_nodes.final_statistics())
                 self.working_nodes = None
-                self.success_nodes = [Node(variables=[], formula=T, answer=[])]
+                self.success_nodes = NodeList(nodes=[Node(variables=[], formula=T, answer=[])])
             self.collect_success_nodes()
             if self.failure_nodes:
                 raise NotImplementedError('failure_nodes = {self.failure_nodes}')
