@@ -16,7 +16,7 @@ from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
 import threading
 import time
-from typing import Iterable, Optional, TypeAlias
+from typing import Any, Collection, Iterable, Optional
 from viztracer import log_sparse  # type: ignore
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
@@ -28,10 +28,6 @@ from logic1.theories.RCF.pnf import pnf
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.rcf import (Eq, Ne, Ge, Le, Gt, Lt, RcfAtomicFormula,
                                      RcfAtomicFormulas, ring, Term, Variable)
-
-Quantifier: TypeAlias = type[QuantifiedFormula]
-QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
-
 
 # Create logger
 delta_time_formatter = DeltaTimeFormatter(
@@ -65,6 +61,12 @@ class Failed(Exception):
 
 class FoundT(Exception):
     pass
+
+
+class QuantifierBlocks(list[tuple[type[QuantifiedFormula], list[Variable]]]):
+
+    def __str__(self) -> str:
+        return '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self)
 
 
 class NSP(Enum):
@@ -258,12 +260,15 @@ class Node:
 
 
 @dataclass
-class NodeList:
+class NodeList(Collection):
 
     nodes: list[Node] = field(default_factory=list)
     memory: set[Formula] = field(default_factory=set)
     hits: int = 0
     candidates: int = 0
+
+    def __contains__(self, object: Any) -> bool:
+        return object in self.nodes
 
     def __iter__(self):
         yield from self.nodes
@@ -420,7 +425,7 @@ class NodeListManager:
             return (self.hits, self.candidates)
 
 
-class NodeListProxy(mp.managers.BaseProxy):
+class NodeListProxy(mp.managers.BaseProxy, Collection):
 
     @property
     def nodes(self):
@@ -437,6 +442,13 @@ class NodeListProxy(mp.managers.BaseProxy):
     @property
     def hits(self):
         return self._callmethod('get_hits')
+
+    def __contains__(self, object: Any) -> bool:
+        match object:
+            case Node():
+                return object in self._callmethod('get_nodes')  # type: ignore
+            case _:
+                return False
 
     def __iter__(self):
         yield from self._callmethod('get_nodes')
@@ -593,7 +605,7 @@ class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
     """
 
-    blocks: Optional[list[QuantifierBlock]] = None
+    blocks: Optional[QuantifierBlocks] = None
     matrix: Optional[Formula] = None
     negated: Optional[bool] = None
     root_node: Optional[Node] = None
@@ -641,42 +653,6 @@ class VirtualSubstitution:
             logger.info('finished')
             logger.setLevel(save_level)
         return result
-
-    def status(self) -> str:
-
-        def negated_as_str() -> str:
-            match self.negated:
-                case None:
-                    read_as = ''
-                case False:
-                    read_as = '  # read as Ex'
-                case True:
-                    read_as = '  # read as Not All'
-                case _:
-                    assert False, self.negated
-            return f'{self.negated},{read_as}'
-
-        def nodes_as_str(nodes: Iterable[Node]) -> str:
-            if nodes is None:
-                return None
-            h = ',\n                '.join(f'{node}' for node in nodes)
-            return f'[{h}]'
-
-        return (f'{self.__class__.__qualname__} [\n'
-                f'    blocks        = {self.blocks_as_str()},\n'
-                f'    matrix        = {self.matrix},\n'
-                f'    negated       = {negated_as_str()}\n'
-                f'    root_node     = {self.root_node}\n'
-                f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
-                f'    success_nodes = {nodes_as_str(self.success_nodes)}\n'
-                f'    failure_nodes = {nodes_as_str(self.failure_nodes)}\n'
-                f']')
-
-    def blocks_as_str(self) -> str:
-        if self.blocks is None:
-            return None
-        h = '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self.blocks)
-        return f'{h}'
 
     def collect_success_nodes(self) -> None:
         logger.debug(f'entering {self.collect_success_nodes.__name__}')
@@ -836,7 +812,7 @@ class VirtualSubstitution:
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
         assert self.matrix, self.matrix
-        logger.info(self.blocks_as_str())
+        logger.info(str(self.blocks))
         if logger.isEnabledFor(logging.DEBUG):
             s = str(self.matrix)
             logger.debug(s[:50] + '...' if len(s) > 53 else s)
@@ -894,7 +870,43 @@ class VirtualSubstitution:
         else:
             self.workers = os.cpu_count() + workers
         f = pnf(f)
-        self.matrix, self.blocks = f.matrix()
+        self.matrix, blocks = f.matrix()
+        self.blocks = QuantifierBlocks(blocks)
+
+    def status(self, dump_nodes: bool = False) -> str:
+
+        def negated_as_str() -> str:
+            match self.negated:
+                case None:
+                    read_as = ''
+                case False:
+                    read_as = '  # read as Ex'
+                case True:
+                    read_as = '  # read as Not All'
+                case _:
+                    assert False, self.negated
+            return f'{self.negated},{read_as}'
+
+        def nodes_as_str(nodes: Optional[Collection[Node]]) -> Optional[str]:
+            if nodes is None:
+                return None
+            match dump_nodes:
+                case True:
+                    h = ',\n                '.join(f'{node}' for node in nodes)
+                    return f'[{h}]'
+                case False:
+                    return f'{len(nodes)}'
+
+        return (f'{self.__class__.__qualname__}(\n'
+                f'    blocks        = {self.blocks},\n'
+                f'    matrix        = {self.matrix},\n'
+                f'    negated       = {negated_as_str()}\n'
+                f'    root_node     = {self.root_node}\n'
+                f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
+                f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
+                f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
+                f'    result        = {self.result}'
+                f')')
 
     def virtual_substitution(self, f: Formula, workers: int):
         """Virtual substitution main loop.
