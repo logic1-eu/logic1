@@ -16,7 +16,7 @@ from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
 import threading
 import time
-from typing import Any, Collection, Iterable, Optional
+from typing import Collection, Iterable, Optional
 from viztracer import log_sparse  # type: ignore
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
@@ -61,6 +61,18 @@ class Failed(Exception):
 
 class FoundT(Exception):
     pass
+
+
+class Timer:
+
+    def __init__(self):
+        self.reset()
+
+    def get(self) -> float:
+        return time.time() - self._reference_time
+
+    def reset(self) -> None:
+        self._reference_time = time.time()
 
 
 class QuantifierBlocks(list[tuple[type[QuantifiedFormula], list[Variable]]]):
@@ -267,8 +279,8 @@ class NodeList(Collection):
     hits: int = 0
     candidates: int = 0
 
-    def __contains__(self, object: Any) -> bool:
-        return object in self.nodes
+    def __contains__(self, obj: object) -> bool:
+        return obj in self.nodes
 
     def __iter__(self):
         yield from self.nodes
@@ -443,10 +455,10 @@ class NodeListProxy(mp.managers.BaseProxy, Collection):
     def hits(self):
         return self._callmethod('get_hits')
 
-    def __contains__(self, object: Any) -> bool:
-        match object:
+    def __contains__(self, obj: object) -> bool:
+        match obj:
             case Node():
-                return object in self._callmethod('get_nodes')  # type: ignore
+                return obj in self._callmethod('get_nodes')  # type: ignore
             case _:
                 return False
 
@@ -618,7 +630,16 @@ class VirtualSubstitution:
     log: int = logging.NOTSET
     log_rate: float = 0.5
 
-    time_multiprocessing: float = 0.0
+    time_final_simplification: Optional[float] = None
+    time_import_failure_nodes: Optional[float] = None
+    time_import_success_nodes: Optional[float] = None
+    time_import_working_nodes: Optional[float] = None
+    time_multiprocessing: Optional[float] = None
+    time_start_first_worker: Optional[float] = None
+    time_start_all_workers: Optional[float] = None
+    time_syncmanager_enter: Optional[float] = None
+    time_syncmanager_exit: Optional[float] = None
+    time_total: Optional[float] = None
 
     def __call__(self, f: Formula, workers: int = 0, log: int = logging.NOTSET,
                  log_rate: float = 0.5) -> Optional[Formula]:
@@ -638,6 +659,7 @@ class VirtualSubstitution:
         computations, workers=-3 is an interesting choice, which leaves one CPU
         free for smooth interaction with the machine.
         """
+        timer = Timer()
         VirtualSubstitution.__init__(self)
         try:
             self.log_level = log
@@ -652,6 +674,7 @@ class VirtualSubstitution:
         finally:
             logger.info('finished')
             logger.setLevel(save_level)
+        self.time_total = timer.get()
         return result
 
     def collect_success_nodes(self) -> None:
@@ -669,11 +692,11 @@ class VirtualSubstitution:
             num_atoms = sum(1 for _ in self.matrix.atoms())
             logger.debug(f'found {num_atoms} atoms')
         logger.info('final simplification')
-        t = time.time()
+        timer = Timer()
         self.result = simplify(self.matrix)
-        t = time.time() - t
+        self.time_final_simplification = timer.get()
         if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f'simplification took {t:.3f} s')
+            logger.debug(f'{self.time_final_simplification=:.3f}')
             num_atoms = sum(1 for _ in self.result.atoms())
             logger.debug(f'produced {num_atoms} atoms')
 
@@ -693,9 +716,11 @@ class VirtualSubstitution:
             mp.active_children()
 
         logger.debug('entering sync manager context')
+        timer = Timer()
         with SyncManager() as manager:
+            self.time_syncmanager_enter = timer.get()
+            logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            logger.debug('sync manager context active')
             working_nodes = manager.WorkingNodeList()  # type: ignore
             working_nodes.append(self.root_node)
             self.root_node = None
@@ -708,15 +733,33 @@ class VirtualSubstitution:
             log_level = logger.getEffectiveLevel()
             reference_time = delta_time_formatter.get_reference_time()
             logger.debug(f'starting worker processes in {range(self.workers)}')
-            time_ = time.time()
+            born_processes = manager.Value('i', 0)
+            timer.reset()
             for i in range(self.workers):
                 processes[i] = mp.Process(
                     target=self.parallel_process_block_worker,
                     args=(working_nodes, success_nodes, failure_nodes, m_lock,
-                          found_t, ring_vars, i, log_level, reference_time))
+                          found_t, ring_vars, i, log_level, reference_time,
+                          born_processes))
                 processes[i].start()
                 sentinels[i] = processes[i].sentinel
             try:
+                born = 0
+                while born < 1:
+                    time.sleep(0.0001)
+                    with m_lock:
+                        born = born_processes.value
+                self.time_start_first_worker = timer.get()
+                logger.debug(f'{self.time_start_first_worker=:.3f}')
+                if self.workers > 1:
+                    while born < self.workers:
+                        time.sleep(0.0001)
+                        with m_lock:
+                            born = born_processes.value
+                    self.time_start_all_workers = timer.get()
+                else:
+                    self.time_start_all_workers = self.time_start_first_worker
+                logger.debug(f'{self.time_start_all_workers=:.3f}')
                 if logger.isEnabledFor(logging.INFO):
                     while not mp.connection.wait(sentinels, timeout=self.log_rate):
                         logger.info(working_nodes.periodic_statistics())
@@ -729,7 +772,8 @@ class VirtualSubstitution:
                 wait_for_processes_to_finish()
                 raise
             wait_for_processes_to_finish()
-            self.time_multiprocessing += time.time() - time_
+            self.time_multiprocessing = timer.get() - self.time_start_first_worker
+            logger.debug(f'{self.time_multiprocessing=:.3f}')
             if found_t.value > 0:
                 pl = 's' if found_t.value > 1 else ''
                 logger.debug(f'{found_t.value} worker{pl} found T')
@@ -749,23 +793,34 @@ class VirtualSubstitution:
             logger.debug('importing working nodes from mananager')
             # We do not retrieve the memory, which would cost significant time
             # and space. Same for success nodes and failure nodes below.
+            timer.reset()
             self.working_nodes = WorkingNodeList(
                 nodes=working_nodes.nodes,
                 hits=working_nodes.hits,
                 candidates=working_nodes.candidates,
                 node_counter=working_nodes.node_counter)
+            self.time_import_working_nodes = timer.get()
+            logger.debug(f'{self.time_import_working_nodes=:.3f}')
             assert self.working_nodes.nodes == []
             assert self.working_nodes.node_counter.total() == 0
             logger.debug('importing success nodes from mananager')
+            timer.reset()
             self.success_nodes = NodeList(nodes=success_nodes.nodes,
                                           hits=success_nodes.hits,
                                           candidates=success_nodes.candidates)
+            self.time_import_success_nodes = timer.get()
+            logger.debug(f'{self.time_import_success_nodes=:.3f}')
             logger.debug('importing failure nodes from mananager')
+            timer.reset()
             self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
                                           hits=failure_nodes.hits,
                                           candidates=failure_nodes.candidates)
+            self.time_import_failure_nodes = timer.get()
+            logger.debug(f'{self.time_import_failure_nodes=:.3f}')
             logger.debug('leaving sync manager context')
-        logger.debug('sync manager context ended')
+            timer.reset()
+        self.time_syncmanager_exit = timer.get()
+        logger.debug(f'{self.time_syncmanager_exit=:.3f}')
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
@@ -776,8 +831,11 @@ class VirtualSubstitution:
                                       ring_vars: list[str],
                                       i: int,
                                       log_level: int,
-                                      reference_time: float) -> None:
+                                      reference_time: float,
+                                      born_processes: mp.sharedctypes.Synchronized) -> None:
         try:
+            with m_lock:
+                born_processes.value += 1
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'worker process {i} is running')
@@ -907,6 +965,25 @@ class VirtualSubstitution:
                 f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
                 f'    result        = {self.result}'
                 f')')
+
+    def timings(self) -> None:
+        match self.workers:
+            case 0:
+                print(f'{self.workers=}')
+                print(f'{self.time_final_simplification=:.1f}')
+                print(f'{self.time_total=:.1f}')
+            case _:
+                print(f'{self.workers=}')
+                print(f'{self.time_syncmanager_enter=:.1f}')
+                print(f'{self.time_start_first_worker=:.1f}')
+                print(f'{self.time_start_all_workers=:.1f}')
+                print(f'{self.time_multiprocessing=:.1f}')
+                print(f'{self.time_import_working_nodes=:.1f}')
+                print(f'{self.time_import_success_nodes=:.1f}')
+                print(f'{self.time_import_failure_nodes=:.1f}')
+                print(f'{self.time_final_simplification=:.1f}')
+                print(f'{self.time_syncmanager_exit=:.1f}')
+                print(f'{self.time_total=:.1f}')
 
     def virtual_substitution(self, f: Formula, workers: int):
         """Virtual substitution main loop.
