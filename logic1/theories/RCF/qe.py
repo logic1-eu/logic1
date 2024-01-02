@@ -10,7 +10,9 @@ from enum import auto, Enum
 import logging
 import multiprocessing as mp
 import multiprocessing.managers
+import multiprocessing.queues
 import os
+import queue
 from sage.rings.fraction_field import FractionField  # type: ignore
 from sage.rings.integer_ring import ZZ  # type: ignore
 import sys
@@ -724,7 +726,8 @@ class VirtualSubstitution:
             working_nodes = manager.WorkingNodeList()  # type: ignore
             working_nodes.append(self.root_node)
             self.root_node = None
-            success_nodes = manager.NodeList()  # type: ignore
+            success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
+            self.success_nodes = NodeList()
             failure_nodes = manager.NodeList()  # type: ignore
             found_t = manager.Value('i', 0)
             processes: list[Optional[mp.Process]] = [None] * self.workers
@@ -760,13 +763,24 @@ class VirtualSubstitution:
                 else:
                     self.time_start_all_workers = self.time_start_first_worker
                 logger.debug(f'{self.time_start_all_workers=:.3f}')
-                if logger.isEnabledFor(logging.INFO):
-                    while not mp.connection.wait(sentinels, timeout=self.log_rate):
-                        logger.info(working_nodes.periodic_statistics())
-                        logger.info(success_nodes.periodic_statistics('S'))
-                        logger.info(failure_nodes.periodic_statistics('F'))
-                else:
-                    mp.connection.wait(sentinels)
+                workers_running = self.workers
+                log_timer = Timer()
+                while workers_running > 0:
+                    if logger.isEnabledFor(logging.INFO):
+                        t = log_timer.get()
+                        if t >= self.log_rate:
+                            logger.info(working_nodes.periodic_statistics())
+                            logger.info(self.success_nodes.periodic_statistics('S'))
+                            logger.info(failure_nodes.periodic_statistics('F'))
+                            log_timer.reset()
+                    try:
+                        nodes = success_nodes.get(timeout=0.001)
+                    except queue.Empty:
+                        continue
+                    if nodes is not None:
+                        self.success_nodes.extend(nodes)
+                    else:
+                        workers_running -= 1
             except KeyboardInterrupt:
                 logger.debug('KeyboardInterrupt, waiting for processes to finish')
                 wait_for_processes_to_finish()
@@ -785,9 +799,10 @@ class VirtualSubstitution:
                 self.working_nodes = WorkingNodeList(
                     hits=working_nodes.hits,
                     candidates=working_nodes.candidates)
+                # TODO: wipe self.success_nodes and self.failure_nodes
                 raise FoundT()
             logger.info(working_nodes.final_statistics())
-            logger.info(success_nodes.final_statistics('success'))
+            logger.info(self.success_nodes.final_statistics('success'))
             logger.info(failure_nodes.final_statistics('failure'))
             logger.info('importing results from mananager')
             logger.debug('importing working nodes from mananager')
@@ -803,13 +818,6 @@ class VirtualSubstitution:
             logger.debug(f'{self.time_import_working_nodes=:.3f}')
             assert self.working_nodes.nodes == []
             assert self.working_nodes.node_counter.total() == 0
-            logger.debug('importing success nodes from mananager')
-            timer.reset()
-            self.success_nodes = NodeList(nodes=success_nodes.nodes,
-                                          hits=success_nodes.hits,
-                                          candidates=success_nodes.candidates)
-            self.time_import_success_nodes = timer.get()
-            logger.debug(f'{self.time_import_success_nodes=:.3f}')
             logger.debug('importing failure nodes from mananager')
             timer.reset()
             self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
@@ -824,7 +832,7 @@ class VirtualSubstitution:
 
     @staticmethod
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
-                                      success_nodes: NodeListProxy,
+                                      success_nodes: multiprocessing.Queue[Optional[list[Node]]],
                                       failure_nodes: NodeListProxy,
                                       m_lock: threading.Lock,
                                       found_t: mp.sharedctypes.Synchronized,
@@ -861,10 +869,11 @@ class VirtualSubstitution:
                 if nodes[0].variables:
                     working_nodes.extend(nodes)
                 else:
-                    success_nodes.extend(nodes)
+                    success_nodes.put(nodes)
                 working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
+        success_nodes.put(None)
         multiprocessing_logger.debug(f'worker process {i} exiting')
 
     def pop_block(self) -> None:
@@ -987,7 +996,6 @@ class VirtualSubstitution:
                 print(f'{self.time_start_all_workers=:.{precision}f}')
                 print(f'{self.time_multiprocessing=:.{precision}f}')
                 print(f'{self.time_import_working_nodes=:.{precision}f}')
-                print(f'{self.time_import_success_nodes=:.{precision}f}')
                 print(f'{self.time_import_failure_nodes=:.{precision}f}')
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=:.{precision}f}')
