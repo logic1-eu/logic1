@@ -966,24 +966,32 @@ class VirtualSubstitution:
                 f'    result        = {self.result}'
                 f')')
 
-    def timings(self) -> None:
+    def timings(self, precision: int = 7) -> None:
         match self.workers:
             case 0:
                 print(f'{self.workers=}')
-                print(f'{self.time_final_simplification=:.1f}')
-                print(f'{self.time_total=:.1f}')
+                print(f'{self.time_syncmanager_enter=}')
+                print(f'{self.time_start_first_worker=}')
+                print(f'{self.time_start_all_workers=}')
+                print(f'{self.time_multiprocessing=}')
+                print(f'{self.time_import_working_nodes=}')
+                print(f'{self.time_import_success_nodes=}')
+                print(f'{self.time_import_failure_nodes=}')
+                print(f'{self.time_final_simplification=:.{precision}f}')
+                print(f'{self.time_syncmanager_exit=}')
+                print(f'{self.time_total=:.{precision}}')
             case _:
                 print(f'{self.workers=}')
-                print(f'{self.time_syncmanager_enter=:.1f}')
-                print(f'{self.time_start_first_worker=:.1f}')
-                print(f'{self.time_start_all_workers=:.1f}')
-                print(f'{self.time_multiprocessing=:.1f}')
-                print(f'{self.time_import_working_nodes=:.1f}')
-                print(f'{self.time_import_success_nodes=:.1f}')
-                print(f'{self.time_import_failure_nodes=:.1f}')
-                print(f'{self.time_final_simplification=:.1f}')
-                print(f'{self.time_syncmanager_exit=:.1f}')
-                print(f'{self.time_total=:.1f}')
+                print(f'{self.time_syncmanager_enter=:.{precision}f}')
+                print(f'{self.time_start_first_worker=:.{precision}f}')
+                print(f'{self.time_start_all_workers=:.{precision}f}')
+                print(f'{self.time_multiprocessing=:.{precision}f}')
+                print(f'{self.time_import_working_nodes=:.{precision}f}')
+                print(f'{self.time_import_success_nodes=:.{precision}f}')
+                print(f'{self.time_import_failure_nodes=:.{precision}f}')
+                print(f'{self.time_final_simplification=:.{precision}f}')
+                print(f'{self.time_syncmanager_exit=:.{precision}f}')
+                print(f'{self.time_total=:.{precision}f}')
 
     def virtual_substitution(self, f: Formula, workers: int):
         """Virtual substitution main loop.
