@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import inspect
 import operator
-
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular)
+import sys
+from types import FrameType
 from typing import Optional, Self, TypeAlias
 
 from ... import firstorder
@@ -33,8 +35,7 @@ class _Ring:
         return cls._instance
 
     def __init__(self):
-        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable',
-                                        implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
         self.stack = []
 
     def __repr__(self):
@@ -48,22 +49,56 @@ class _Ring:
             # The code below is correct also for len(args) == 0, but I do now
             # want to recreate polynomial rings without a good reason.
             return ()
-        strings = list(args)
-        gens_as_str = [str(gen) for gen in self.sage_ring.gens()]
-        for arg in strings:
-            if not isinstance(arg, str):
-                raise ValueError(f'{arg} is not a string')
-            if arg in gens_as_str:
-                raise ValueError(f'{arg} is already a variable') from None
-        self.sage_ring = PolynomialRing(ZZ, gens_as_str + strings,
-                                        implementation='singular')
-        gens = self.sage_ring.gens()[len(gens_as_str):]
-        return gens
+        added_as_str = list(args)
+        old_as_str = [str(gen) for gen in self.sage_ring.gens()]
+        for v in added_as_str:
+            if not isinstance(v, str):
+                raise ValueError(f'{v} is not a string')
+            if v in old_as_str:
+                raise ValueError(f'{v} is already a variable') from None
+        new_as_str = sorted(old_as_str + added_as_str)
+        self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
+        added = (g for g in self.sage_ring.gens() if str(g) in added_as_str)
+        return tuple(added)
 
     def get_vars(self) -> tuple[Variable]:
         gens = self.sage_ring.gens()
-        gens = (v for v in gens if str(v) != 'one_unused_variable')
+        gens = (g for g in gens if str(g) != 'unused_')
         return tuple(gens)
+
+    def import_vars(self, force: bool = False):
+        critical = []
+        gens = self.sage_ring.gens()
+        frame = inspect.currentframe()
+        assert isinstance(frame, FrameType)
+        frame = frame.f_back
+        try:
+            assert isinstance(frame, FrameType)
+            name = frame.f_globals['__name__']
+            assert name == '__main__', f'import_vars called from {name}'
+            for gen in gens:
+                try:
+                    expr = frame.f_globals[str(gen)]
+                    if expr != gen:
+                        critical.append(str(gen))
+                except KeyError:
+                    pass
+            for gen in gens:
+                if force or str(gen) not in critical:
+                    frame.f_globals[str(gen)] = gen
+            if not force:
+                if len(critical) == 1:
+                    print(f'{critical[0]} has another value already, '
+                          f'use force=True to overwrite ',
+                          file=sys.stderr)
+                elif len(critical) > 1:
+                    print(f'{", ".join(critical)} have other values already, '
+                          f'use force=True to overwrite ',
+                          file=sys.stderr)
+        finally:
+            # Compare Note here:
+            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
+            del frame
 
     def pop(self) -> PolynomialRing:
         self.sage_ring = self.stack.pop()
@@ -74,8 +109,7 @@ class _Ring:
         return self.stack
 
     def set_vars(self, *args) -> tuple[Variable, ...]:
-        self.sage_ring = PolynomialRing(ZZ, 'one_unused_variable',
-                                        implementation='singular')
+        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
         gens = self.add_vars(*args)
         return gens
 
