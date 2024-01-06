@@ -59,8 +59,8 @@ class _Ring:
                 raise ValueError(f'{v} is already a variable') from None
         new_as_str = sorted(old_as_str + added_as_str)
         self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
-        added = (g for g in self.sage_ring.gens() if str(g) in added_as_str)
-        return tuple(added)
+        added_as_gen = (self.sage_ring(v) for v in added_as_str)
+        return tuple(added_as_gen)
 
     def get_vars(self) -> tuple[Variable]:
         gens = self.sage_ring.gens()
