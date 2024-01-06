@@ -3,17 +3,16 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Callable, final, Iterator, Optional, TYPE_CHECKING
+import functools
+from typing import Any, Callable, final, Iterator, Optional
 from typing_extensions import Self
 
 from ..support.containers import GetVars
 
-# from ..support.tracing import trace
-
-if TYPE_CHECKING:
-    from .atomic import AtomicFormula
+from ..support.tracing import trace  # noqa
 
 
+@functools.total_ordering
 class Formula(ABC):
     """An abstract base class for first-order formulas.
 
@@ -52,6 +51,17 @@ class Formula(ABC):
         Not(Eq(1, 0))
         """
         return Not(self)
+
+    def __le__(self, other: Formula) -> bool:
+        match other:
+            case AtomicFormula():
+                return False
+            case Formula():
+                L = [And, Or, Not, Implies, Equivalent, Ex, All, _T, _F]
+                if self.func != other.func:
+                    # print(func, L.index(func), other.func, L.index(other.func))
+                    return L.index(self.func) < L.index(other.func)
+                return self.args <= other.args
 
     @final
     def __lshift__(self, other: Formula) -> Formula:
@@ -393,4 +403,7 @@ class Formula(ABC):
 
 
 # The following imports are intentionally late to avoid circularity.
-from .boolean import Implies, And, Or, Not
+from .atomic import AtomicFormula
+from .boolean import And, Equivalent, Implies, Not, Or
+from .quantified import All, Ex
+from .truth import _F, _T

@@ -20,13 +20,14 @@ atomic formulas and terms. Of course, the abstract methods specified by
 
 from .formula import Formula  # noqa
 
-from .quantified import QuantifiedFormula, Ex, All  # noqa
+from .atomic import AtomicFormula  # noqa
 
 from .boolean import BooleanFormula, Equivalent, Implies, AndOr, And, Or, Not  # noqa
 
+from .quantified import QuantifiedFormula, Ex, All  # noqa
+
 from .truth import TruthValue, _T, T, _F, F  # noqa
 
-from .atomic import AtomicFormula  # noqa
 
 __all__ = [
     'Formula',

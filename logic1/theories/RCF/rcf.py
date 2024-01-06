@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import inspect
 import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
@@ -177,6 +178,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
         return self.func(*args)
 
 
+@functools.total_ordering
 class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
 
     def __init__(self, lhs, rhs, chk: bool = True):
@@ -188,6 +190,19 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
             super().__init__(*args_)
         else:
             super().__init__(lhs, rhs)
+
+    def __le__(self, other: Formula) -> bool:
+        match other:
+            case BinaryAtomicFormula():
+                if self.lhs != other.lhs:
+                    return not self.lhs <= other.lhs
+                if self.rhs != other.rhs:
+                    return not self.rhs <= other.rhs
+                L = [Eq, Ne, Le, Lt, Ge, Gt]
+                return L.index(self.func) <= L.index(other.func)
+            case _:
+                assert not isinstance(other, AtomicFormula)
+                return True
 
     def _sprint(self, mode: str) -> str:
         match mode:
