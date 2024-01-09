@@ -16,13 +16,13 @@ Eq(a, 0)
 Gt(a, 0)
 
 >>> dnf(Equivalent(Eq(a, 0), Eq(b, 0)))
-Or(And(Eq(b, 0), Eq(a, 0)), And(Ne(b, 0), Ne(a, 0)))
+Or(And(Eq(a, 0), Eq(b, 0)), And(Ne(a, 0), Ne(b, 0)))
 
 >>> dnf((Eq(a, 0) | Ne(b, 0)) & (Ne(a, 0) | Eq(b, 0)))
-Or(And(Eq(b, 0), Eq(a, 0)), And(Ne(b, 0), Ne(a, 0)))
+Or(And(Eq(a, 0), Eq(b, 0)), And(Ne(a, 0), Ne(b, 0)))
 
 >>> dnf((Gt(a, 0) | Ne(b, 0)) & (Le(c, 0) | Eq(b, 0)))
-Or(And(Eq(b, 0), Gt(a, 0)), And(Le(c, 0), Ne(b, 0)))
+Or(And(Gt(a, 0), Eq(b, 0)), And(Ne(b, 0), Le(c, 0)))
 
 >>> dnf((Gt(a, 0) | Eq(b, 0)) & (Le(a, 0) | Eq(b, 0)))
 Eq(b, 0)
@@ -40,10 +40,10 @@ Eq(a, 0)
 Gt(a, 0)
 
 >>> cnf(Equivalent(Eq(a, 0), Eq(b, 0)))
-And(Or(Eq(b, 0), Ne(a, 0)), Or(Eq(a, 0), Ne(b, 0)))
+And(Or(Eq(a, 0), Ne(b, 0)), Or(Ne(a, 0), Eq(b, 0)))
 
 >>> cnf((Eq(a, 0) & Ne(b, 0)) | (Ne(a, 0) & Eq(b, 0)))
-And(Or(Eq(b, 0), Eq(a, 0)), Or(Ne(b, 0), Ne(a, 0)))
+And(Or(Eq(a, 0), Eq(b, 0)), Or(Ne(a, 0), Ne(b, 0)))
 
 >>> cnf((Gt(a, 0) & Eq(b, 0)) | (Le(a, 0) & Eq(b, 0)))
 Eq(b, 0)

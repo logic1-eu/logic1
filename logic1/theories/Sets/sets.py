@@ -1,12 +1,10 @@
 from __future__ import annotations
 
+from abc import ABCMeta
 import logging
-import sympy
-
 from typing import ClassVar, TypeAlias
 
 from ... import atomlib
-
 from ...firstorder import T, F
 from ...support.decorators import classproperty
 
@@ -21,7 +19,13 @@ logging.basicConfig(
     level=logging.CRITICAL)
 
 
-class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
+class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
+
+    def relations(self) -> list[ABCMeta]:
+        return [C, C_, Eq, Ne]
+
+
+class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
     """Equations with only variables as terms.
 
     This implements that fact that the language of sets has no functions and,
@@ -72,7 +76,7 @@ class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
         return self
 
 
-class Ne(atomlib.generic.NeMixin, atomlib.sympy.BinaryAtomicFormula):
+class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
     """Inequations with only variables as terms.
 
     This implements that fact that the language of sets has no functions and,
@@ -118,7 +122,13 @@ class Ne(atomlib.generic.NeMixin, atomlib.sympy.BinaryAtomicFormula):
         return self
 
 
-class C(atomlib.sympy.IndexedConstantAtomicFormula):
+class IndexedConstantAtomicFormula(atomlib.sympy.IndexedConstantAtomicFormula):
+
+    def relations(self) -> list[ABCMeta]:
+        return [C, C_, Eq, Ne]
+
+
+class C(IndexedConstantAtomicFormula):
     r"""A class whose instances are cardinality constraints in the sense that
     their toplevel operator represents a constant relation symbol :math:`C_n`
     where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical interpretation in
@@ -155,22 +165,12 @@ class C(atomlib.sympy.IndexedConstantAtomicFormula):
     """
 
     # Instance variables
-    args: tuple[int]  #: :meta private:
+    args: tuple[atomlib.sympy.Index]  #: :meta private:
     """A type annotation for the property `func` inherited from
     :attr:`.firstorder.AtomicFormula.func`.
 
     :meta private:
     """
-
-    def __new__(cls, *args):
-        if len(args) != 1:
-            raise ValueError(f"bad number of arguments")
-        n = args[0]
-        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
-            raise ValueError(f"{n!r} is not an admissible cardinality")
-        if n not in cls._instances:
-            cls._instances[n] = super().__new__(cls)
-        return cls._instances[n]
 
     def __repr__(self):
         return f'C({self.index})'
@@ -183,7 +183,7 @@ class C(atomlib.sympy.IndexedConstantAtomicFormula):
         return f'C_{{{k}}}'
 
 
-class C_(atomlib.sympy.IndexedConstantAtomicFormula):
+class C_(IndexedConstantAtomicFormula):
     r"""A class whose instances are cardinality constraints in the sense that
     their toplevel operator represents a constant relation symbol
     :math:`\bar{C}_n` where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical
@@ -221,22 +221,12 @@ class C_(atomlib.sympy.IndexedConstantAtomicFormula):
     """
 
     # Instance variables
-    args: tuple[int]
+    args: tuple[atomlib.sympy.Index]
     """A type annotation for the property `func` inherited from
     :attr:`.firstorder.AtomicFormula.func`.
 
     :meta private:
     """
-
-    def __new__(cls, *args):
-        if len(args) != 1:
-            raise ValueError(f"bad number of arguments")
-        n = args[0]
-        if not isinstance(n, (int, sympy.core.numbers.Infinity)) or n < 0:
-            raise ValueError(f"{n!r} is not an admissible cardinality")
-        if n not in cls._instances:
-            cls._instances[n] = super().__new__(cls)
-        return cls._instances[n]
 
     def __repr__(self) -> str:
         return f'C_({self.index})'

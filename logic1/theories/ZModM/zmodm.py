@@ -1,7 +1,7 @@
+from abc import ABCMeta
 import logging
-from typing import Optional, TypeAlias
-
 import sympy
+from typing import Optional, TypeAlias
 
 from ... import atomlib
 from ...firstorder import T, F
@@ -31,7 +31,13 @@ def set_mod(modulus: Optional[int]) -> Optional[int]:
     return save_modulus
 
 
-class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
+class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
+
+    def relations(self) -> list[ABCMeta]:
+        return [Eq, Ne]
+
+
+class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
 
     @classproperty
     def complement_func(cls):
@@ -55,7 +61,7 @@ class Eq(atomlib.generic.EqMixin, atomlib.sympy.BinaryAtomicFormula):
         return Eq(lhs, 0)
 
 
-class Ne(atomlib.generic.NeMixin, atomlib.sympy.BinaryAtomicFormula):
+class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
 
     @classproperty
     def complement_func(cls):

@@ -139,22 +139,14 @@ class Simplify(ABC, Generic[TH]):
             else:
                 simplified_others = simplified_others.union(new_others)
         final_atoms = list(th.extract(gand))
-        self.sort_atoms(final_atoms)
+        final_atoms.sort()
         final_others = list(simplified_others)
-        self.sort_others(final_others)
+        final_others.sort()
         return gand(*final_atoms, *final_others)
 
     @abstractmethod
     def _simpl_at(self, f: AtomicFormula) -> Formula:
         # Does not receive the theory, by design.
-        ...
-
-    @abstractmethod
-    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
-        ...
-
-    @abstractmethod
-    def sort_others(self, others: list[Formula]) -> None:
         ...
 
     @abstractmethod

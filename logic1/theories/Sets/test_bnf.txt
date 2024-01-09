@@ -37,4 +37,4 @@ T
 Eq(a, o)
 
 >>> cnf(Equivalent(Eq(a, o), Eq(b, o)))
-And(Or(Eq(a, o), Ne(b, o)), Or(Eq(b, o), Ne(a, o)))
+And(Or(Eq(a, o), Ne(b, o)), Or(Ne(a, o), Eq(b, o)))

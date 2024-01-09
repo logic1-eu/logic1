@@ -7,22 +7,22 @@
 T
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x and a * x + b == 0)))')
-And(Eq(b, 0), Eq(a, 0))
+And(Eq(a, 0), Eq(b, 0))
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y + z == x)))')
 F
 
 >>> qe('ex(x, a * x + b == 0)')
-Or(Eq(b, 0), Ne(a, 0))
+Or(Ne(a, 0), Eq(b, 0))
 
 >>> qe('ex(x, a * x + b == 0)', workers=2)
-Or(Eq(b, 0), Ne(a, 0))
+Or(Ne(a, 0), Eq(b, 0))
 
 >>> qe('ex(x, a * x + b <= 0)')
-Or(Le(b, 0), Ne(a, 0))
+Or(Ne(a, 0), Le(b, 0))
 
 >>> qe('ex(x, a * x + b <= 0 and x <= b)')
-Or(Gt(a, 0), And(Eq(a, 0), Le(b, 0)), And(Ge(a^2*b + a*b, 0), Lt(a, 0)))
+Or(Gt(a, 0), And(Ge(a^2*b + a*b, 0), Lt(a, 0)), And(Eq(a, 0), Le(b, 0)))
 
 # Period 9
 >>> x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = ring.set_vars(
