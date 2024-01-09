@@ -390,17 +390,16 @@ class NodeListManager:
     memory: set[Formula] = field(default_factory=set)
     memory_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
-    hits_lock: threading.Lock = field(default_factory=threading.Lock)
+    hits_candidates_lock: threading.Lock = field(default_factory=threading.Lock)
     candidates: int = 0
-    candidates_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def get_nodes(self) -> list[Node]:
         with self.nodes_lock:
-            return self.nodes
+            return self.nodes.copy()
 
     def get_memory(self) -> set[Formula]:
         with self.memory_lock:
-            return self.memory
+            return self.memory.copy()
 
     def get_candidates(self) -> int:
         return self.candidates
@@ -415,15 +414,14 @@ class NodeListManager:
     def append(self, node: Node) -> bool:
         with self.memory_lock:
             is_new = node.formula not in self.memory
+            if is_new:
+                self.memory.add(node.formula)
         if is_new:
             with self.nodes_lock:
                 self.nodes.append(node)
-            with self.memory_lock:
-                self.memory.add(node.formula)
-        else:
-            with self.hits_lock:
+        with self.hits_candidates_lock:
+            if not is_new:
                 self.hits += 1
-        with self.candidates_lock:
             self.candidates += 1
         return is_new
 
@@ -432,7 +430,7 @@ class NodeListManager:
             self.append(node)
 
     def statistics(self) -> tuple:
-        with self.hits_lock, self.candidates_lock, self.nodes_lock:
+        with self.hits_candidates_lock:
             return (self.hits, self.candidates)
 
 
@@ -507,7 +505,7 @@ class WorkingNodeListManager(NodeListManager):
 
     def get_node_counter(self):
         with self.node_counter_lock:
-            return self.node_counter
+            return self.node_counter.copy()
 
     def append(self, node: Node) -> bool:
         is_new = super().append(node)
@@ -522,7 +520,10 @@ class WorkingNodeListManager(NodeListManager):
             return len(self.nodes) == 0 and self.busy == 0
 
     def statistics(self) -> tuple:
-        with self.hits_lock, self.candidates_lock, self.busy_lock, self.node_counter_lock:
+        # hits and candidates are always consistent. hits/candidates, busy,
+        # node_counter are three snapshots at different times, each of which is
+        # consistent.
+        with self.hits_candidates_lock, self.busy_lock, self.node_counter_lock:
             return (self.hits, self.candidates, self.busy, self.node_counter)
 
     def pop(self) -> Node:
