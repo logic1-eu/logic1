@@ -130,7 +130,7 @@ class Formula(ABC):
         return self.args
 
     def __hash__(self) -> int:
-        return hash((self.func, self.args))
+        return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
 
     @abstractmethod
     def __init__(self, *args) -> None:
