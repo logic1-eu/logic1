@@ -17,7 +17,6 @@ import sys
 import threading
 import time
 from typing import Collection, Iterable, Optional
-from viztracer import log_sparse  # type: ignore
 
 from logic1.firstorder import (All, And, AtomicFormula, F, _F, Formula, Not,
                                Or, QuantifiedFormula, T)
@@ -116,7 +115,6 @@ class Node:
     def __str__(self):
         return f'Node({self.variables}, {self.formula}, {self.answer})'
 
-    @log_sparse
     def eset(self) -> EliminationSet:
         return self.gauss_eset() or self.regular_eset()
 
@@ -178,7 +176,6 @@ class Node:
                     raise DegreeViolation(atom, x, atom.lhs.degree(x))
         return EliminationSet(variable=x, test_points=test_points, method='e')
 
-    @log_sparse
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
         x = eset.variable
