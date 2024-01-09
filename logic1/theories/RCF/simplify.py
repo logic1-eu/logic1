@@ -330,36 +330,6 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 assert False
         return func(lhs, ring(0), chk=False)
 
-    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
-        atoms.sort(key=Simplify._sort_key_at)
-
-    def sort_others(self, others: list[Formula]) -> None:
-        others.sort(key=Simplify._sort_key)
-
-    @staticmethod
-    def _sort_key(f: Formula) -> SortKey:
-        assert isinstance(f, (And, Or))
-        atom_sort_keys = tuple(Simplify._sort_key_at(a) for a in f.atoms())
-        return (f.depth(), len(f.args), len(atom_sort_keys), atom_sort_keys)
-
-    @staticmethod
-    def _sort_key_at(f: AtomicFormula) -> AtomicSortKey:
-        match f:
-            case Eq():
-                return (0, f.lhs)
-            case Ge():
-                return (1, f.lhs)
-            case Le():
-                return (2, f.lhs)
-            case Gt():
-                return (3, f.lhs)
-            case Lt():
-                return (4, f.lhs)
-            case Ne():
-                return (5, f.lhs)
-            case _:
-                assert False
-
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,
                       prefer_order=self.prefer_order)

@@ -5,7 +5,7 @@
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(Eq(a, 0) & (Ne(b, 0) | (Le(c, 0) & (Gt(d, 0) | Eq(a, 0)))))
-And(Eq(a, 0), Or(Le(c, 0), Ne(b, 0)))
+And(Eq(a, 0), Or(Ne(b, 0), Le(c, 0)))
 >>> simplify(Eq(a, 0) & (Eq(b, 0) | (Eq(c, 0) & Ge(d, 0))) & (Ne(d, 0) | Ne(a, 0)))
 And(Eq(a, 0), Ne(d, 0), Or(Eq(b, 0), And(Eq(c, 0), Gt(d, 0))))
 
@@ -24,64 +24,63 @@ Eq(a, 0)
 Ne(a, 0)
 
 >>> simplify(Gt(a, b) & Equivalent(Eq(a, 0), Gt(b, 0)))
-And(Gt(a - b, 0), Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0)))
+And(Gt(a - b, 0), Or(Eq(a, 0), Le(b, 0)), Or(Ne(a, 0), Gt(b, 0)))
 
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Gt(b, 0)))
-Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(b, 0)), Or(Gt(b, 0), Ne(a, 0))))
+Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(b, 0)), Or(Ne(a, 0), Gt(b, 0))))
 
 # Test quantifiers
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))))
-Ex(a_R1, All(a_R2, Or(Gt(a - b, 0), And(Or(Eq(a, 0), Ge(b - a_R2, 0)),
-    Or(Lt(b - a_R1, 0), Ne(a, 0))))))
+Ex(a_R1, All(a_R2, Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(a_R2 - b, 0)),
+    Or(Ne(a, 0), Gt(a_R1 - b, 0))))))
 
 # Test assumption
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))), assume=[Eq(a, 0)])
-Ex(a_R3, Or(Gt(a - b, 0), Lt(b - a_R3, 0)))
+Ex(a_R3, Or(Gt(a - b, 0), Gt(a_R3 - b, 0)))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\
 ...     == simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)
 
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)  # default
-And(Ne(a, 0), Or(Eq(b, 0), Gt(a, 0)))
+And(Ne(a, 0), Or(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak = False)  # default
-And(Ne(a, 0), Or(Eq(b, 0), Gt(a, 0)))
+And(Ne(a, 0), Or(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = True)
-And(Ne(a, 0), Or(Eq(b, 0), Ge(a, 0)))
+And(Ne(a, 0), Or(Ge(a, 0), Eq(b, 0)))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak = True)
-And(Ne(a, 0), Or(Eq(b, 0), Ge(a, 0)))
+And(Ne(a, 0), Or(Ge(a, 0), Eq(b, 0)))
 
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak = False)  # default
-Or(Eq(a, 0), And(Eq(b, 0), Gt(a, 0)))
+Or(Eq(a, 0), And(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak = False)  # default
-Or(Eq(a, 0), And(Eq(b, 0), Gt(a, 0)))
+Or(Eq(a, 0), And(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak = True)
-Or(Eq(a, 0), And(Eq(b, 0), Ge(a, 0)))
+Or(Eq(a, 0), And(Ge(a, 0), Eq(b, 0)))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak = True)
-Or(Eq(a, 0), And(Eq(b, 0), Ge(a, 0)))
-
+Or(Eq(a, 0), And(Ge(a, 0), Eq(b, 0)))
 
 # Test prefer_order
 >>> assert simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)))\
 ...     == simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)
 
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=True)  # default
-Or(Gt(a, 0), And(Eq(b, 0), Lt(a, 0)))
+Or(Gt(a, 0), And(Lt(a, 0), Eq(b, 0)))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)  # default
-Or(Gt(a, 0), And(Eq(b, 0), Lt(a, 0)))
+Or(Gt(a, 0), And(Lt(a, 0), Eq(b, 0)))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=False)
-Or(Gt(a, 0), And(Eq(b, 0), Ne(a, 0)))
+Or(Gt(a, 0), And(Ne(a, 0), Eq(b, 0)))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=False)
-Or(Gt(a, 0), And(Eq(b, 0), Ne(a, 0)))
+Or(Gt(a, 0), And(Ne(a, 0), Eq(b, 0)))
 
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=True)  # default
-And(Ge(a, 0), Or(Eq(b, 0), Gt(a, 0)))
+And(Ge(a, 0), Or(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=True)  # default
-And(Ge(a, 0), Or(Eq(b, 0), Gt(a, 0)))
+And(Ge(a, 0), Or(Gt(a, 0), Eq(b, 0)))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=False)
-And(Ge(a, 0), Or(Eq(b, 0), Ne(a, 0)))
+And(Ge(a, 0), Or(Ne(a, 0), Eq(b, 0)))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=False)
-And(Ge(a, 0), Or(Eq(b, 0), Ne(a, 0)))
+And(Ge(a, 0), Or(Ne(a, 0), Eq(b, 0)))
 
 # Do not prefer order over equality
 >>> simplify(Le(a, 0) & (Ne(b, 0) | Eq(a, 0)), prefer_order=True)

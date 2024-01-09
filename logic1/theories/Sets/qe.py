@@ -35,7 +35,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     >>> h = Ex(w, Ex(x, Ne(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z,
     ...     Ne(w, x) & Ne(w, y) & Ne(w, z) & Ne(x, y) & Ne(x, z) & Ne(y, z)))))
     >>> qe(h)
-    Or(C(4), C_(2))
+    Or(C_(2), C(4))
     """
 
     def __call__(self, f, sism: bool = True, show_progress: bool = False) -> Formula:

@@ -88,9 +88,9 @@ C(4)
 >>> phi2 = ALL(W, chi >> EX(V_minus_W, psi))
 >>> phi2_prime = qe(phi2)
 >>> phi2_prime
-And(Or(C(4), C_(2)), Or(C(5), C_(4)))
+And(Or(C_(2), C(4)), Or(C_(4), C(5)))
 >>> dnf(phi2_prime)
-Or(C(5), C_(2))
+Or(C_(2), C(5))
 
 # >>> phi2b = EX(W, chi) & phi2
 # >>> phi2b_prime = simplify(qe(phi2b))
@@ -100,15 +100,15 @@ Or(C(5), C_(2))
 >>> phi3 = EX(V_minus_W, psi)
 >>> phi3_prime = qe(phi3)
 >>> phi3_prime
-And(C(4), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6), Or(And(Eq(c13, c6), Eq(c24,
-    c25)), And(Eq(c13, c6), Eq(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Ne(c24,
-    c25), Ne(c25, c6)), And(Eq(c24, c25), Ne(c13, c6), Ne(c25, c6)), And(C(5),
-    Ne(c13, c6), Ne(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Or(Eq(c24, c25),
-    Eq(c25, c6))), And(Eq(c24, c25), Or(Eq(c13, c6), Eq(c25, c6))), And(Ne(c13,
-    c6), Or(Eq(c24, c25), Eq(c25, c6))), And(Ne(c24, c25), Or(Eq(c13, c6),
-    Eq(c25, c6)))))
+And(C(4), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6), Or(And(C(5), Ne(c13, c6),
+    Ne(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Eq(c24, c25)), And(Eq(c13, c6),
+    Eq(c24, c25), Ne(c25, c6)), And(Eq(c13, c6), Ne(c24, c25), Ne(c25, c6)),
+    And(Eq(c13, c6), Or(Eq(c24, c25), Eq(c25, c6))), And(Ne(c13, c6), Eq(c24,
+    c25), Ne(c25, c6)), And(Ne(c13, c6), Or(Eq(c24, c25), Eq(c25, c6))),
+    And(Eq(c24, c25), Or(Eq(c13, c6), Eq(c25, c6))), And(Ne(c24, c25),
+    Or(Eq(c13, c6), Eq(c25, c6)))))
 >>> dnf(phi3_prime)
-Or(And(C(5), Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c13, c6),
-    Ne(c13, c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c24, c25), Ne(c13,
-    c24), Ne(c13, c25), Ne(c24, c6)), And(C(4), Eq(c25, c6), Ne(c13, c24),
-    Ne(c13, c25), Ne(c24, c6)))
+Or(And(C(4), Ne(c13, c24), Ne(c13, c25), Eq(c13, c6), Ne(c24, c6)), And(C(4),
+   Ne(c13, c24), Ne(c13, c25), Eq(c24, c25), Ne(c24, c6)), And(C(4), Ne(c13,
+   c24), Ne(c13, c25), Ne(c24, c6), Eq(c25, c6)), And(C(5), Ne(c13, c24),
+   Ne(c13, c25), Ne(c24, c6)))

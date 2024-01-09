@@ -1,5 +1,5 @@
 from sympy import default_sort_key, oo
-from sympy.core.numbers import Infinity
+from sympy.core.numbers import Infinity, Integer
 from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
@@ -13,22 +13,22 @@ from ...support.tracing import trace  # noqa
 
 class Theory(abc.simplify.Theory):
 
-    _ref_min_card: int
-    _ref_max_card: int | Infinity
+    _ref_min_card: Integer
+    _ref_max_card: Integer | Infinity
     _ref_equations: list[set[Term]]
     _ref_inequations: set[Ne]
 
-    _cur_min_card: int
-    _cur_max_card: int | Infinity
+    _cur_min_card: Integer
+    _cur_max_card: Integer | Infinity
     _cur_equations: list[set[Term]]
     _cur_inequations: set[Ne]
 
     def __init__(self) -> None:
-        self._ref_min_card = 1
+        self._ref_min_card = Integer(1)
         self._ref_max_card = oo
         self._ref_equations = []
         self._ref_inequations = set()
-        self._cur_min_card = 1
+        self._cur_min_card = Integer(1)
         self._cur_max_card = oo
         self._cur_equations = []
         self._cur_inequations = set()
@@ -133,7 +133,7 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Term, Term]
+    AtomicSortKey: TypeAlias = tuple[int, Integer] | tuple[int, Term, Term]
     SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
@@ -144,32 +144,6 @@ class Simplify(abc.simplify.Simplify['Theory']):
 
     def _simpl_at(self, f: AtomicFormula) -> Formula:
         return f.simplify()
-
-    def sort_atoms(self, atoms: list[AtomicFormula]) -> None:
-        atoms.sort(key=Simplify._sort_key_at)
-
-    def sort_others(self, others: list[Formula]) -> None:
-        others.sort(key=Simplify._sort_key)
-
-    @staticmethod
-    def _sort_key(f: Formula) -> SortKey:
-        assert isinstance(f, (And, Or))
-        atom_sort_keys = tuple(Simplify._sort_key_at(a) for a in f.atoms())
-        return (f.depth(), len(f.args), len(atom_sort_keys), atom_sort_keys)
-
-    @staticmethod
-    def _sort_key_at(f: AtomicFormula) -> AtomicSortKey:
-        match f:
-            case C():
-                return (0, f.index)
-            case C_():
-                return (1, f.index)
-            case Eq():
-                return (2, default_sort_key(f.lhs), default_sort_key(f.rhs))
-            case Ne():
-                return (3, default_sort_key(f.lhs), default_sort_key(f.rhs))
-            case _:
-                assert False
 
     def _Theory(self) -> Theory:
         return Theory()

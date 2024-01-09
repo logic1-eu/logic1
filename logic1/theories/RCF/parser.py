@@ -1,4 +1,5 @@
 import ast
+import sys
 from typing import Any
 
 from ... import abc
@@ -10,17 +11,29 @@ from ...support.tracing import trace  # noqa
 
 class L1Parser(abc.parser.L1Parser):
 
-    def __call__(self, s: str):
+    def __call__(self, s: str) -> Formula:
         self.globals = {str(v): v for v in ring.get_vars()}
-        return self.process(s)
+        self.ring_extended = False
+        f = self.process(s)
+        if self.ring_extended:
+            print(f'ring is now {ring}', file=sys.stderr)
+        return f
 
-    def process_atom(self, a: Any):
+    def _declare_variable(self, v: str):
+        try:
+            self.globals[v] = ring.add_var(v)
+        except ValueError:
+            pass
+        else:
+            self.ring_extended = True
+
+    def process_atom(self, a: Any) -> Formula:
         try:
             return self._process_atom(a)
         except (TypeError, NameError) as exc:
             raise abc.parser.ParserError(f'{exc.__str__()}')
 
-    def _process_atom(self, a: Any):
+    def _process_atom(self, a: Any) -> Formula:
         match a:
             case ast.Compare(ops=ops, left=left, comparators=comparators):
                 eval_left = self.process_term(left)
@@ -49,20 +62,21 @@ class L1Parser(abc.parser.L1Parser):
             case _:
                 raise TypeError(f'cannot parse {ast.unparse(a)}')
 
-    def process_term(self, t: Any):
+    def process_term(self, t: Any) -> Term:
+        for node in ast.walk(t):
+            if isinstance(node, ast.Name):
+                self._declare_variable(node.id)
         try:
             return eval(ast.unparse(t), self.globals)
         except NameError as inst:
             raise abc.parser.ParserError(f'{inst.__str__()} in {ast.unparse(t)}') from None
 
-    def process_var(self, v: Any):
+    def process_var(self, v: Any) -> Variable:
         # v is the first argument of a quantifier.
         match v:
             case ast.Name():
-                try:
-                    return eval(ast.unparse(v), self.globals)
-                except NameError as inst:
-                    raise abc.parser.ParserError(f'{inst.__str__()} in quantifier') from None
+                self._declare_variable(v.id)
+                return eval(ast.unparse(v), self.globals)
             case _:
                 raise TypeError(f'{ast.unparse(v)} invalid as quantifed variable')
 
