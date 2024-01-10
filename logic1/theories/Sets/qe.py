@@ -102,7 +102,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return _simplify(f) if self.sism else f.simplify()
 
     @staticmethod
-    def _split_by_relation(f) -> tuple[list[type[Eq]], list[type[Ne]]]:
+    def _split_by_relation(f) -> tuple[list[Eq], list[Ne]]:
         eqs = []
         nes = []
         args = f.args if f.func is And else (f,)
