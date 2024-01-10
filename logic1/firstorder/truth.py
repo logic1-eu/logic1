@@ -108,13 +108,11 @@ class _T(TruthValue):
 
     _instance: Optional[_T] = None
 
-    # Class methods
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    # Instance methods
     def __init__(self) -> None:
         self.args = ()
 
@@ -170,13 +168,11 @@ class _F(TruthValue):
 
     _instance: Optional[_F] = None
 
-    # Class methods
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    # Instance methods
     def __init__(self) -> None:
         self.args = ()
 

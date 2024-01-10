@@ -94,39 +94,9 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
-    # Class methods
-    def __new__(cls, variable: Any, arg: Formula):
-        """A type-checking constructor.
+    def __init__(self, variable: Any, arg: Formula) -> None:
+        self.args = (variable, arg)
 
-        >>> from logic1 import Ex
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x
-        >>> Ex(x, Eq(x, x))
-        Ex(x, Eq(x, x))
-
-        >>> Ex('x', 'y')
-        Traceback (most recent call last):
-        ...
-        ValueError: 'y' is not a Formula
-
-        >>> Ex('x', Eq(x, x))
-        Traceback (most recent call last):
-        ...
-        ValueError: 'x' is not a Variable
-        """
-        if not isinstance(arg, Formula):
-            raise ValueError(f'{arg!r} is not a Formula')
-        atom = next(arg.atoms(), None)
-        # If atom is None, then arg does not contain any atomic formula.
-        # Therefore we cannot know what are valid variables, and we will accept
-        # anything. Otherwise atom has a static method providing the type of
-        # variables. This assumes that there is only one class of atomic
-        # formulas used within a formula.
-        if atom is not None and not isinstance(variable, atom.variable_type()):
-            raise ValueError(f'{variable!r} is not a Variable')
-        return super().__new__(cls)
-
-    # Instance methods
     def atoms(self) -> Iterator[AtomicFormula]:
         yield from self.arg.atoms()
 
@@ -282,10 +252,6 @@ class Ex(QuantifiedFormula):
         """
         return All
 
-    # Instance methods
-    def __init__(self, variable: Any, arg: Formula) -> None:
-        self.args = (variable, arg)
-
 
 class All(QuantifiedFormula):
     r"""A class whose instances are universally quanitfied formulas in the
@@ -326,10 +292,6 @@ class All(QuantifiedFormula):
         """A class property yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
-
-    # Instance methods
-    def __init__(self, variable: Any, arg: Formula) -> None:
-        self.args = (variable, arg)
 
 
 # The following import is intentionally late to avoid circularity.

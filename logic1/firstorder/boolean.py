@@ -191,16 +191,6 @@ class Equivalent(BooleanFormula):
         """The right-hand side of the equivalence."""
         return self.args[1]
 
-    # Class methods
-
-    def __new__(cls, lhs: Formula, rhs: Formula):
-        if not isinstance(lhs, Formula):
-            raise ValueError(f'{lhs!r} is not a Formula')
-        if not isinstance(rhs, Formula):
-            raise ValueError(f'{rhs!r} is not a Formula')
-        return super().__new__(cls)
-
-    # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
@@ -293,15 +283,6 @@ class Implies(BooleanFormula):
         """The right-hand side of the implication."""
         return self.args[1]
 
-    # Class methods
-    def __new__(cls, lhs: Formula, rhs: Formula):
-        if not isinstance(lhs, Formula):
-            raise ValueError(f'{lhs!r} is not a Formula')
-        if not isinstance(rhs, Formula):
-            raise ValueError(f'{rhs!r} is not a Formula')
-        return super().__new__(cls)
-
-    # Instance methods
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
@@ -484,29 +465,21 @@ class And(AndOr):
     # Instance variables
     args: tuple[Formula, ...]
 
-    # Class methods
-    def __new__(cls, *args, flatten: bool = True):
+    def __new__(cls, *args: Formula):
         if not args:
             return T
-        for arg in args:
-            if not isinstance(arg, Formula):
-                raise ValueError(f'{arg!r} is not a Formula')
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
-    # Instance methods
-    def __init__(self, *args, flatten: bool = True) -> None:
-        if flatten:
-            args_flat = []
-            for arg in args:
-                if isinstance(arg, And):
-                    args_flat.extend(list(arg.args))
-                else:
-                    args_flat.append(arg)
-            self.args = tuple(args_flat)
-        else:
-            self.args = args
+    def __init__(self, *args: Formula) -> None:
+        args_flat = []
+        for arg in args:
+            if isinstance(arg, And):
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        self.args = tuple(args_flat)
 
 
 class Or(AndOr):
@@ -578,29 +551,21 @@ class Or(AndOr):
     # Instance variables
     args: tuple[Formula, ...]
 
-    # Class methods
-    def __new__(cls, *args, flatten: bool = True):
+    def __new__(cls, *args):
         if not args:
             return F
-        for arg in args:
-            if not isinstance(arg, Formula):
-                raise ValueError(f'{arg!r} is not a Formula')
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
-    # Instance methods
-    def __init__(self, *args, flatten: bool = True) -> None:
-        if flatten:
-            args_flat = []
-            for arg in args:
-                if isinstance(arg, Or):
-                    args_flat.extend(list(arg.args))
-                else:
-                    args_flat.append(arg)
-            self.args = tuple(args_flat)
-        else:
-            self.args = args
+    def __init__(self, *args) -> None:
+        args_flat = []
+        for arg in args:
+            if isinstance(arg, Or):
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        self.args = tuple(args_flat)
 
 
 class Not(BooleanFormula):
@@ -653,13 +618,6 @@ class Not(BooleanFormula):
         """
         return self.args[0]
 
-    # Class methods
-    def __new__(cls, arg: Formula):
-        if not isinstance(arg, Formula):
-            raise ValueError(f'{arg!r} is not a Formula')
-        return super().__new__(cls)
-
-    # Instance methods
     def __init__(self, arg: Formula) -> None:
         self.args = (arg, )
 
