@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, final, Iterator, Optional
+from typing import Any, Callable, final, Iterable, Iterator, Optional
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -193,6 +193,18 @@ class Formula(ABC):
             as_latex += '{}\\dots'
         return f'$\\displaystyle {as_latex}$'
 
+    def all(self, skip: Iterable = set()) -> Formula:
+        """Universal closure.
+
+        Universally quantifiy all variables occurring free in self, except the
+        ones mentioned in skip.
+        """
+        variables = sorted(list(self.get_vars().free - set(skip)))
+        f = self
+        for v in reversed(variables):
+            f = All(v, f)
+        return f
+
     @abstractmethod
     def atoms(self) -> Iterator[AtomicFormula]:
         """
@@ -259,6 +271,18 @@ class Formula(ABC):
     @abstractmethod
     def depth(self) -> int:
         ...
+
+    def ex(self, skip: Iterable = set()) -> Formula:
+        """Existential closure.
+
+        Existentially quantifiy all variables occurring free in self, except
+        the ones mentioned in skip.
+        """
+        variables = sorted(list(self.get_vars().free - set(skip)))
+        f = self
+        for v in reversed(variables):
+            f = Ex(v, f)
+        return f
 
     @abstractmethod
     def get_qvars(self) -> set:
