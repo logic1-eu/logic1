@@ -130,6 +130,15 @@ class Formula(ABC):
         return self.args
 
     def __hash__(self) -> int:
+        """
+        Hash function.
+
+        hash() yields deterministic results for a fixed hash seed. Set the
+        environment variable PYTHONHASHSEED to a positive integer when
+        comparing hashes from various Python sessions, e.g. for debugging.
+        Recall from the Python documentation that PYTHONHASHSEED should not be
+        fixed in general.
+        """
         return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
 
     @abstractmethod
@@ -160,16 +169,8 @@ class Formula(ABC):
 
     @final
     def _repr_latex_(self) -> Optional[str]:
-        r"""A LaTeX representation of the :class:`Formula` `self` as it is used
-        within jupyter notebooks.
-
-        >>> from logic1 import F
-        >>>
-        >>> F._repr_latex_()
-        '$\\displaystyle \\bot$'
-
-        Subclasses have to_latex() methods yielding plain LaTeX without the
-        surrounding $\\displaystyle ... $.
+        """A LaTeX representation of the :class:`Formula` `self` for jupyter
+        notebooks. In general, use the method :meth:`to_latex` instead.
         """
         limit = 5000
         as_latex = self.to_latex()

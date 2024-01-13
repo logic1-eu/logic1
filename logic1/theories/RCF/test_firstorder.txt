@@ -1,0 +1,132 @@
+>>> from collections import Counter
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> a, b, x, y, z = ring.set_vars('a', 'b', 'x', 'y', 'z')
+
+__and__:
+>>> Eq(0, 0) & Eq(1 + 1, 2) & Eq(1 + 1 + 1, 3)
+And(Eq(0, 0), Eq(2, 2), Eq(3, 3))
+
+__invert__:
+>>> ~ Eq(1,0)
+Not(Eq(1, 0))
+
+__le__:
+...
+
+__lshift__:
+>>> Eq(x + z, y + z) << Eq(x, y)
+Implies(Eq(x, y), Eq(x + z, y + z))
+
+__or__:
+>>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
+Or(Eq(x, 0), Eq(x, y), Eq(x, z))
+
+__rshift__:
+>>> Eq(x, y) >> Eq(x + z, y + z)
+Implies(Eq(x, y), Eq(x + z, y + z))
+
+__eq__, __ne__, __hash__:
+>>> e1 = Ne(1, 0)
+>>> e2 = Ne(1, 0)
+>>> f = Ex(x, Eq(a * x + b, 0))
+>>> e1 == e2
+True
+>>> e1 != e2
+False
+>>> e1 is e2
+False
+>>> hash(e1) == hash(e2)
+True
+>>> e1 == f
+False
+>>> e1 != f
+True
+>>> hash(e1) == hash(f)
+False
+
+__init__:
+...
+
+__repr__, __str__, _repr_latex_:
+>>> f = Ex(x, Eq(a * x + b, 0))
+>>> repr(f)
+'Ex(x, Eq(a*x + b, 0))'
+>>> str(f)
+'Ex x (a*x + b == 0)'
+>>> f._repr_latex_()
+'$\\displaystyle \\exists x \\, (a x + b = 0)$'
+
+__all__, __ex__:
+>>> g = Eq(a * x + b, 0)
+>>> g.all()
+All(x, All(b, All(a, Eq(a*x + b, 0))))
+>>> g.all(skip=(x,))
+All(b, All(a, Eq(a*x + b, 0)))
+>>> g.ex()
+Ex(x, Ex(b, Ex(a, Eq(a*x + b, 0))))
+>>> g.ex(skip=(x,))
+Ex(b, Ex(a, Eq(a*x + b, 0)))
+
+atoms:
+>>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+>>> type(f.atoms())
+<class 'generator'>
+>>> list(f.atoms())
+[Eq(3*x, 0), Eq(3*x, 0), Eq(x, 0), Eq(x*y, 1)]
+>>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
+True
+>>> sum(1 for _ in f.atoms())
+4
+>>> Counter(f.atoms())
+Counter({Eq(3*x, 0): 2, Eq(x, 0): 1, Eq(x*y, 1): 1})
+>>> empty = (T & F).atoms()
+>>> next(empty)
+Traceback (most recent call last):
+...
+StopIteration
+>>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
+>>> isinstance(f.var, next(f.atoms()).variable_type())
+True
+
+count_alternations:
+>>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
+2
+
+depth:
+...
+
+get_qvars:
+>>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
+True
+
+get_vars:
+>>> f = Eq(3 * x, 0) >> All(z, All(x, ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+>>> f.get_vars().free == {x}
+True
+>>> f.get_vars().bound == {x, y}
+True
+>>> z not in f.get_vars().all
+True
+
+matrix:
+...
+
+simplify:
+...
+
+_sprint:
+...
+
+to_latex:
+...
+
+to_nnf:
+>>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
+>>> f.to_nnf()
+And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))), Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
+
+transform_atoms:
+>>> f = Eq(x, y) & Lt(y, z)
+>>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
+And(Eq(x - y, 0), Lt(y - z, 0))
