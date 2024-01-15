@@ -13,7 +13,7 @@ Quantifier: TypeAlias = type[quantified.Ex] | type[quantified.All]
 def All(variables: object, arg: Formula) -> Formula:
     """Build an All-quantified Formula, checking arguments.
     """
-    return _Q(quantified.Ex, variables, arg)
+    return _Q(quantified.All, variables, arg)
 
 
 def And(*args: Formula) -> Formula:
