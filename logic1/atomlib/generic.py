@@ -4,9 +4,6 @@ from ..support.decorators import classproperty
 
 class BinaryAtomicFormulaMixin:
 
-    latex_symbol: str  #: :meta private:
-    text_symbol: str  #: :meta private:
-
     @classproperty
     def dual_func(cls):
         """The dual class of :class:`cls`.
@@ -32,9 +29,6 @@ class BinaryAtomicFormulaMixin:
 
 class EqMixin:
 
-    latex_symbol = '='
-    text_symbol = '=='
-
     def simplify(self):
         if self.lhs == self.rhs:
             return T
@@ -42,9 +36,6 @@ class EqMixin:
 
 
 class NeMixin:
-
-    latex_symbol = '\\neq'
-    text_symbol = '!='
 
     def simplify(self):
         if self.lhs == self.rhs:
@@ -54,9 +45,6 @@ class NeMixin:
 
 class GeMixin:
 
-    latex_symbol = '\\geq'
-    text_symbol = '>='
-
     def simplify(self):
         if self.lhs == self.rhs:
             return T
@@ -64,9 +52,6 @@ class GeMixin:
 
 
 class LeMixin:
-
-    latex_symbol = '\\leq'
-    text_symbol = '<='
 
     def simplify(self):
         if self.lhs == self.rhs:
@@ -76,9 +61,6 @@ class LeMixin:
 
 class GtMixin:
 
-    latex_symbol = '>'
-    text_symbol = '>'
-
     def simplify(self):
         if self.lhs == self.rhs:
             return F
@@ -86,9 +68,6 @@ class GtMixin:
 
 
 class LtMixin:
-
-    latex_symbol = '<'
-    text_symbol = '<'
 
     def simplify(self):
         if self.lhs == self.rhs:

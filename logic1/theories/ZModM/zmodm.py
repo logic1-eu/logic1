@@ -1,7 +1,7 @@
 from abc import ABCMeta
 import logging
 import sympy
-from typing import Optional, TypeAlias
+from typing import Final, Optional, TypeAlias
 
 from ... import atomlib
 from ...firstorder import T, F
@@ -32,6 +32,18 @@ def set_mod(modulus: Optional[int]) -> Optional[int]:
 
 
 class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
+
+    def __str__(self) -> str:
+        SYMBOL: Final = {Eq: '==', Ne: '!='}
+        SPACING: Final = ' '
+        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+
+    def as_latex(self) -> str:
+        SYMBOL: Final = {Eq: '=', Ne: '\\neq'}
+        SPACING: Final = ' '
+        lhs = sympy.latex(self.lhs)
+        rhs = sympy.latex(self.rhs)
+        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
 
     def relations(self) -> list[ABCMeta]:
         return [Eq, Ne]

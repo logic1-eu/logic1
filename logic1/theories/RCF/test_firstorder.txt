@@ -53,7 +53,7 @@ __repr__, __str__, _repr_latex_:
 >>> repr(f)
 'Ex(x, Eq(a*x + b, 0))'
 >>> str(f)
-'Ex x (a*x + b == 0)'
+'Ex(x, a*x + b == 0)'
 >>> f._repr_latex_()
 '$\\displaystyle \\exists x \\, (a x + b = 0)$'
 

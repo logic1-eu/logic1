@@ -12,30 +12,6 @@ from ..support.tracing import trace  # noqa
 
 class AtomicFormula(Formula):
 
-    # Class variables
-    latex_symbol_spacing = ' '
-    """A class variable holding LaTeX spacing that goes around infix operators.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol_spacing = ' '
-    """A class variable holding spacing that goes around infix operators in
-    string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
-    print_precedence = 99
-    """A class variable holding the precedence of `latex_symbol` and
-    `text_symbol` with LaTeX and string conversions in subclasses.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding this class or the derived subclass itself.
@@ -50,7 +26,6 @@ class AtomicFormula(Formula):
     args: tuple
 
     # Static methods on terms
-
     @staticmethod
     @abstractmethod
     def term_get_vars(term: Any) -> set:
@@ -84,9 +59,17 @@ class AtomicFormula(Formula):
         """
         ...
 
-    # Instance methods
     def __init__(self, *args) -> None:
         self.args = args
+
+    def __str__(self) -> str:
+        # Overloading __str__ here breaks an infinite recursion in the
+        # inherited Formula.__str__. Nicer string representation are provided
+        # by various theory modules.
+        return repr(self)
+
+    def as_latex(self) -> str:
+        return f'\\verb!{repr(self)}!'
 
     def atoms(self) -> Iterator[AtomicFormula]:
         yield self

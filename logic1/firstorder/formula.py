@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, final, Iterable, Iterator, Optional
+from typing import Any, Callable, Final, final, Iterable, Iterator
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -59,7 +59,6 @@ class Formula(ABC):
             case Formula():
                 L = [And, Or, Not, Implies, Equivalent, Ex, All, _T, _F]
                 if self.func != other.func:
-                    # print(func, L.index(func), other.func, L.index(other.func))
                     return L.index(self.func) < L.index(other.func)
                 return self.args <= other.args
 
@@ -161,19 +160,52 @@ class Formula(ABC):
         r += ')'
         return r
 
-    @final
     def __str__(self) -> str:
         """Representation of the Formula used in printing.
         """
-        return self._sprint(mode='text')
+        SYMBOL: Final = {
+            All: 'All', Ex: 'Ex', And: '&', Or: 'or', Implies: '>>',
+            Equivalent: 'equivalent', Not: '~', _F: 'F', _T: 'T'}
+        PRECEDENCE: Final = {
+            All: 99, Ex: 99, And: 50, Or: 50, Implies: 10, Equivalent: 10,
+            Not: 99, _F: 99, _T: 99}
+        SPACING: Final = ' '
+        match self:
+            case All() | Ex():
+                L = []
+                arg: Formula = self
+                while isinstance(arg, (All, Ex)) and arg.func == self.func:
+                    L.append(arg.var)
+                    arg = arg.arg
+                variables = tuple(L) if len(L) > 1 else L[0]
+                return f'{SYMBOL[self.func]}({variables}, {arg})'
+            case And() | Or() | Equivalent() | Implies():
+                L = []
+                for arg in self.args:
+                    arg_as_str = str(arg)
+                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 0):
+                        arg_as_str = f'({arg_as_str})'
+                    L.append(arg_as_str)
+                return f'{SPACING}{SYMBOL[self.func]}{SPACING}'.join(L)
+            case Not():
+                arg_as_str = str(self.arg)
+                if self.arg.func not in (Ex, All, Not):
+                    arg_as_str = f'({arg_as_str})'
+                return f'{SYMBOL[Not]}{SPACING}{arg_as_str}'
+            case _F() | _T():
+                return SYMBOL[self.func]
+            case _:
+                # Atomic formulas must be caught by the implementation of the
+                # abstract method AtomicFormula.__str__.
+                assert False, repr(self)
 
     @final
-    def _repr_latex_(self) -> Optional[str]:
+    def _repr_latex_(self) -> str:
         """A LaTeX representation of the :class:`Formula` `self` for jupyter
         notebooks. In general, use the method :meth:`to_latex` instead.
         """
         limit = 5000
-        as_latex = self.to_latex()
+        as_latex = self.as_latex()
         if len(as_latex) > limit:
             as_latex = as_latex[:limit]
             opc = 0
@@ -205,6 +237,46 @@ class Formula(ABC):
         for v in reversed(variables):
             f = All(v, f)
         return f
+
+    def as_latex(self) -> str:
+        SYMBOL: Final = {
+            All: '\\forall', Ex: '\\exists', And: '\\wedge', Or: '\\vee',
+            Implies: '\\longrightarrow', Equivalent: '\\longleftrightarrow',
+            Not: '\\neg', _F: '\\bot', _T: '\\top'}
+        PRECEDENCE: Final = {
+            All: 99, Ex: 99, And: 50, Or: 50, Equivalent: 10, Implies: 10,
+            Not: 99, _F: 99, _T: 99}
+        SPACING: Final = ' \\, '
+        match self:
+            case All() | Ex():
+                try:  # requires discussion
+                    atom = next(self.atoms())
+                    var_as_latex = atom.term_to_latex(self.var)
+                except StopIteration:
+                    var_as_latex = str(self.var)
+                arg_as_latex = self.arg.as_latex()
+                if self.arg.func not in (Ex, All, Not):
+                    arg_as_latex = f'({arg_as_latex})'
+                return f'{SYMBOL[self.func]} {var_as_latex}{SPACING}{arg_as_latex}'
+            case And() | Or() | Equivalent() | Implies():
+                L = []
+                for arg in self.args:
+                    arg_as_latex = arg.as_latex()
+                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 99):
+                        arg_as_latex = f'({arg_as_latex})'
+                    L.append(arg_as_latex)
+                return f'{SPACING}{SYMBOL[self.func]}{SPACING}'.join(L)
+            case Not():
+                arg_as_latex = self.arg.as_latex()
+                if self.arg.func not in (Ex, All, Not):
+                    arg_as_latex = f'({arg_as_latex})'
+                return f'{SYMBOL[Not]}{SPACING}{arg_as_latex}'
+            case _F() | _T():
+                return SYMBOL[self.func]
+            case _:
+                # Atomic formulas must be caught by the implementation of the
+                # abstract method AtomicFormula.as_latex.
+                assert False
 
     @abstractmethod
     def atoms(self) -> Iterator[AtomicFormula]:
@@ -348,12 +420,6 @@ class Formula(ABC):
         return self
 
     @abstractmethod
-    def _sprint(self, mode: str) -> str:
-        """Print to string.
-        """
-        ...
-
-    @abstractmethod
     def subs(self, substitution: dict) -> Self:
         """Substitution of terms for variables.
 
@@ -373,12 +439,6 @@ class Formula(ABC):
         Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
         """
         ...
-
-    @final
-    def to_latex(self) -> str:
-        """Convert to a LaTeX representation.
-        """
-        return self._sprint(mode='latex')
 
     @abstractmethod
     def to_nnf(self, to_positive: bool = True,

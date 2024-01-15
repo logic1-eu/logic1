@@ -14,21 +14,6 @@ class TruthValue(BooleanFormula):
     r"""A class whose instances are formulas corresponding to :math:`\top` and
     :math:`\bot`.
     """
-
-    # Class variables
-    print_precedence = 99
-    """A class variable holding the precedence of the operators of instances of
-    :class:`TruthValue` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
-    print_style = 'constant'
-    """A class variable indicating the use of operators of instances of
-    :class:`TruthValue` as constants in LaTeX and string conversions.
-    """
-
     # The following would be abstract class variables, which are not available
     # at the moment.
     func: type[TruthValue]  #: :meta private:
@@ -37,7 +22,6 @@ class TruthValue(BooleanFormula):
     # Similarly the following would be an abstract instance variable:
     args: tuple[()]  #: :meta private:
 
-    # Instance methods
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})
 
@@ -76,23 +60,6 @@ class _T(TruthValue):
     >>> _T() is _T()
     True
     """
-
-    # Class variables
-    latex_symbol = '\\top'
-    """A class variable holding a LaTeX symbol for :class:`_T`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'T'
-    """A class variable holding a representation of :class:`_T` suitable for
-    string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`_T` itself.
@@ -136,23 +103,6 @@ class _F(TruthValue):
     >>> _F() is _F()
     True
     """
-
-    # Class variables
-    latex_symbol = '\\bot'
-    """A class variable holding a LaTeX symbol for :class:`_T`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'F'
-    """A class variable holding a representation of :class:`_F` suitable for
-    string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`_F` itself.

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import ABCMeta
 import logging
-from typing import ClassVar, TypeAlias
+import sympy
+from typing import ClassVar, Final, TypeAlias
 
 from ... import atomlib
 from ...firstorder import T, F
@@ -20,6 +21,18 @@ logging.basicConfig(
 
 
 class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
+
+    def __str__(self) -> str:
+        SYMBOL: Final = {Eq: '==', Ne: '!='}
+        SPACING: Final = ' '
+        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+
+    def as_latex(self) -> str:
+        SYMBOL: Final = {Eq: '=', Ne: '\\neq'}
+        SPACING: Final = ' '
+        lhs = sympy.latex(self.lhs)
+        rhs = sympy.latex(self.rhs)
+        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
 
     def relations(self) -> list[ABCMeta]:
         return [C, C_, Eq, Ne]
@@ -123,6 +136,27 @@ class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
 
 
 class IndexedConstantAtomicFormula(atomlib.sympy.IndexedConstantAtomicFormula):
+
+    def __str__(self) -> str:
+        # Normally __str__ defaults to __repr__. However, we have inherited
+        # Formula.__str__, which recursively calls exactly this method here.
+        return repr(self)
+
+    def as_latex(self) -> str:
+        match self.index:
+            case int() | sympy.Integer():  # no int admitted - discuss!
+                k = str(self.index)
+            case sympy.core.numbers.Infinity():
+                k = '\\infty'
+            case _:
+                assert False
+        match self.func:
+            case C():
+                return f'C_{{{k}}}'
+            case C_():
+                return f'\\overline{{C_{{{k}}}}}'
+            case _:
+                assert False
 
     def relations(self) -> list[ABCMeta]:
         return [C, C_, Eq, Ne]

@@ -22,37 +22,13 @@ class BooleanFormula(Formula):
     Note that members of :class:`BooleanFormula` may have subformulas with
     other logical operators deeper in the expression tree.
     """
-
-    # Class variables
-    latex_symbol_spacing = ' \\, '
-    """A class variable holding LaTeX spacing that comes after prefix operators
-    and around infix operators.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol_spacing = ' '
-    """A class variable holding spacing that comes after prefix operators
-    and around infix operators in string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     # The following would be abstract class variables, which are not available
     # at the moment.
-    latex_symbol: str  #: :meta private:
-    text_symbol: str  #: :meta private:
-    print_style: str  #: :meta private:
-
     func: type[BooleanFormula]  #: :meta private:
     dual_func: type[BooleanFormula]  #: :meta private:
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
-
-    # Instance methods
 
     def atoms(self) -> Iterator[AtomicFormula]:
         for arg in self.args:
@@ -93,38 +69,6 @@ class BooleanFormula(Formula):
     def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
         return self, []
 
-    def _sprint(self, mode: str) -> str:
-        def not_arg(outer, inner) -> str:
-            inner_sprint = inner._sprint(mode)
-            if inner.func not in (Ex, All, Not):
-                inner_sprint = '(' + inner_sprint + ')'
-            return inner_sprint
-
-        def infix_arg(outer, inner) -> str:
-            inner_sprint = inner._sprint(mode)
-            if (outer.__class__.print_precedence
-                    >= inner.__class__.print_precedence):
-                inner_sprint = '(' + inner_sprint + ')'
-            return inner_sprint
-
-        if mode == 'latex':
-            symbol = self.__class__.latex_symbol
-            spacing = self.__class__.latex_symbol_spacing
-        else:
-            assert mode == 'text'
-            symbol = self.__class__.text_symbol
-            spacing = self.__class__.text_symbol_spacing
-        if self.__class__.print_style == 'constant':
-            return symbol
-        if self.__class__.print_style == 'not':
-            return f'{symbol}{spacing}{not_arg(self, self.args[0])}'
-        if self.__class__.print_style == 'infix':
-            s = infix_arg(self, self.args[0])
-            for a in self.args[1:]:
-                s = f'{s}{spacing}{symbol}{spacing}{infix_arg(self, a)}'
-            return s
-        assert False
-
     def subs(self, substitution: dict) -> BooleanFormula:
         """Implements the abstract method :meth:`Formula.subs`.
         """
@@ -142,36 +86,6 @@ class Equivalent(BooleanFormula):
     toplevel operator represents the Boolean operator
     :math:`\longleftrightarrow`.
     """
-
-    # Class variables
-    latex_symbol = '\\longleftrightarrow'
-    """A class variable holding a LaTeX symbol for :class:`Equivalent`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = '<-->'
-    """A class variable holding a representation of :class:`Equivalent`
-    suitable for string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
-    print_precedence = 10
-    """A class variable holding the precedence of :data:`latex_symbol` and
-    :data:`text_symbol` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
-    print_style = 'infix'
-    """A class variable indicating the use of of :data:`latex_symbol` and
-    :data:`text_symbol` as an infix operators in LaTeX and string conversions.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Equivalent` itself.
@@ -234,36 +148,6 @@ class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator :math:`\longrightarrow`.
     """
-
-    # Class variables
-    latex_symbol = '\\longrightarrow'
-    """A class variable holding a LaTeX symbol for :class:`Implies`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = '-->'
-    """A class variable holding a representation of :class:`Implies` suitable
-    for string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
-    print_precedence = 10
-    """A class variable holding the precedence of :data:`latex_symbol` and
-    :data:`text_symbol` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
-    print_style = 'infix'
-    """A class variable indicating the use of of :data:`latex_symbol` and
-    :data:`text_symbol` as an infix operators in LaTeX and string conversions.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Equivalent` itself.
@@ -318,21 +202,6 @@ class Implies(BooleanFormula):
 
 
 class AndOr(BooleanFormula):
-
-    # Class variables
-    print_precedence = 50
-    """A class variable holding the precedence of the operators of instances of
-    :class:`AndOr` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
-    print_style = 'infix'
-    """A class variable indicating the use of operators of instances of
-    :class:`AndOr` as infix in LaTeX and string conversions.
-    """
-
     # The following would be abstract class variables, which are not available
     # at the moment.
     func: type[AndOr]  #: :meta private:
@@ -343,7 +212,6 @@ class AndOr(BooleanFormula):
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
 
-    # Instance methods
     def simplify(self):
         """Compare the parent method :meth:`Formula.simplify`.
 
@@ -411,23 +279,6 @@ class And(AndOr):
     >>> And(Eq(x, O), Eq(x, y), Eq(y, z))
     And(Eq(x, O), Eq(x, y), Eq(y, z))
     """
-
-    # Class variables
-    latex_symbol = '\\wedge'
-    """A class variable holding a LaTeX symbol for :class:`And`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'and'
-    """A class variable holding a representation of :class:`And`
-    suitable for string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`And` itself.
@@ -497,23 +348,6 @@ class Or(AndOr):
     >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
     """
-
-    # Class variables
-    latex_symbol = '\\vee'
-    """A class variable holding a LaTeX symbol for :class:`Or`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'or'
-    """A class variable holding a representation of :class:`Or`
-    suitable for string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Or` itself.
@@ -573,36 +407,6 @@ class Not(BooleanFormula):
     toplevel operator is the Boolean operator
     :math:`\neg`.
     """
-
-    # Class variables
-    latex_symbol = '\\neg'
-    """A class variable holding a LaTeX symbol for :class:`Not`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = '~'
-    """A class variable holding a representation of :class:`Not`
-    suitable for string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
-    print_precedence = 99
-    """A class variable holding the precedence of the operators of instances of
-    :class:`Not` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
-    print_style = 'not'
-    """A class variable indicating the use of operators of instances of
-    :class:`Not` as prefix in LaTeX and string conversions.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Not` itself.

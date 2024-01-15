@@ -8,7 +8,7 @@ from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular)
 import sys
 from types import FrameType
-from typing import Optional, Self, TypeAlias
+from typing import Final, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -204,21 +204,18 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
                 assert not isinstance(other, AtomicFormula)
                 return True
 
-    def _sprint(self, mode: str) -> str:
-        match mode:
-            case 'latex':
-                symbol = self.__class__.latex_symbol
-                lhs = str(latex(self.lhs))
-                rhs = str(latex(self.rhs))
-                spacing = self.__class__.latex_symbol_spacing
-            case 'text':
-                symbol = self.__class__.text_symbol
-                lhs = self.lhs.__str__()
-                rhs = self.rhs.__str__()
-                spacing = self.__class__.text_symbol_spacing
-            case _:
-                assert False
-        return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
+    def __str__(self) -> str:
+        SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
+        SPACING: Final = ' '
+        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+
+    def as_latex(self) -> str:
+        SYMBOL: Final = {
+            Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
+        SPACING: Final = ' '
+        lhs = str(latex(self.lhs))
+        rhs = str(latex(self.rhs))
+        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
 
 
 class Eq(generic.EqMixin, BinaryAtomicFormula):

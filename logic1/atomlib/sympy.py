@@ -100,20 +100,6 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
             args_.append(arg_)
         super().__init__(*args_)
 
-    def _sprint(self, mode: str) -> str:
-        if mode == 'latex':
-            symbol = self.__class__.latex_symbol
-            lhs = sympy.latex(self.lhs)
-            rhs = sympy.latex(self.rhs)
-            spacing = self.__class__.latex_symbol_spacing
-        else:
-            assert mode == 'text'
-            symbol = self.__class__.text_symbol
-            lhs = self.lhs.__str__()
-            rhs = self.rhs.__str__()
-            spacing = self.__class__.text_symbol_spacing
-        return f'{lhs}{spacing}{symbol}{spacing}{rhs}'
-
 
 class IndexedConstantAtomicFormula(AtomicFormula):
     r"""A class whose instances form a family of atomic formulas with m-arity

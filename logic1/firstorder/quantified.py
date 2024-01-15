@@ -10,7 +10,7 @@ from .formula import Formula
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
-# from ..support.tracing import trace
+from ..support.tracing import trace  # noqa
 
 if TYPE_CHECKING:
     from .atomic import AtomicFormula
@@ -28,36 +28,8 @@ class QuantifiedFormula(Formula):
     other logical operators deeper in the expression tree.
     """
 
-    # Class variables
-    latex_symbol_spacing = ' \\, '
-    """A class variable holding LaTeX spacing that comes after a quantifier
-    symbol and its quantified variable.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol_spacing = ' '
-    """A class variable holding spacing that comes after a quantifier
-    symbol and its quantified variable in string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
-    print_precedence = 99
-    """A class variable holding the precedence of the operators of instances of
-    :class:`QuantifiedFormula` in LaTeX and string conversions.
-
-    This is compared with the corresponding `print_precedence` of other classes
-    for placing parentheses.
-    """
-
     # The following would be abstract class variables, which are not available
     # at the moment.
-    latex_symbol: str  #: :meta private:
-    text_symbol: str  #: :meta private:
-
     func: type[QuantifiedFormula]  #: :meta private:
     dual_func: type[QuantifiedFormula]  #: :meta private:
 
@@ -144,25 +116,6 @@ class QuantifiedFormula(Formula):
         """
         return self.func(self.var, self.arg.simplify())
 
-    def _sprint(self, mode: str) -> str:
-        def arg_in_parens(inner):
-            inner_sprint = inner._sprint(mode)
-            if inner.func not in (Ex, All, Not):
-                inner_sprint = '(' + inner_sprint + ')'
-            return inner_sprint
-
-        if mode == 'latex':
-            atom = next(self.atoms(), None)
-            symbol = self.__class__.latex_symbol
-            var = atom.term_to_latex(self.var) if atom else self.var
-            spacing = self.__class__.latex_symbol_spacing
-        else:
-            assert mode == 'text'
-            symbol = self.__class__.text_symbol
-            var = self.var.__str__()
-            spacing = self.__class__.text_symbol_spacing
-        return f'{symbol} {var}{spacing}{arg_in_parens(self.arg)}'
-
     def subs(self, substitution: dict) -> QuantifiedFormula:
         """Implements the abstract method :meth:`Formula.subs`.
         """
@@ -223,23 +176,6 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, Eq(x, y))
     Ex(x, Eq(x, y))
     """
-
-    # Class variables
-    latex_symbol = '\\exists'
-    """A class variable holding a LaTeX symbol for :class:`Ex`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'Ex'
-    """A class variable holding a representation of :class:`Ex` suitable for
-    string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Ex` itself.
@@ -264,23 +200,6 @@ class All(QuantifiedFormula):
     >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
     All(x, All(y, Eq(x^2 + 2*x*y + y^2 + 1, x^2 + 2*x*y + y^2)))
     """
-
-    # Class variables
-    latex_symbol = '\\forall'
-    """A class variable holding a LaTeX symbol for :class:`All`.
-
-    This is used with :meth:`Formula.to_latex`, which is in turn used for the
-    output in Jupyter notebooks.
-    """
-
-    text_symbol = 'All'
-    """A class variable holding a representation of :class:`All` suitable for
-    string representation.
-
-    This is used for string conversions, e.g., explicitly with the constructor
-    of :class:`str` or implicitly with :func:`print`.
-    """
-
     @classproperty
     def func(cls):
         """A class property yielding the class :class:`Ex` itself.
@@ -292,7 +211,3 @@ class All(QuantifiedFormula):
         """A class property yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
-
-
-# The following import is intentionally late to avoid circularity.
-from .boolean import Not
