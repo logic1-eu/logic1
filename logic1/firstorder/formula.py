@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, Final, final, Iterable, Iterator
+from typing import Any, Callable, Final, Iterable, Iterator
 from typing_extensions import Self
 
 from ..support.containers import GetVars
@@ -27,7 +27,6 @@ class Formula(ABC):
     # Similarly the following would be an abstract instance variable:
     args: tuple  #: :meta private:
 
-    @final
     def __and__(self, other: Formula) -> Formula:
         """Override the :obj:`& <object.__and__>` operator to apply
         :class:`And`.
@@ -81,7 +80,6 @@ class Formula(ABC):
         """
         ...
 
-    @final
     def __invert__(self) -> Formula:
         """Override the :obj:`~ <object.__invert__>` operator to apply
         :class:`Not`.
@@ -103,7 +101,6 @@ class Formula(ABC):
                     return L.index(self.func) < L.index(other.func)
                 return self.args <= other.args
 
-    @final
     def __lshift__(self, other: Formula) -> Formula:
         r"""Override the :obj:`\<\< <object.__lshift__>` operator to apply
         :class:`Implies` with reversed sides.
@@ -121,7 +118,6 @@ class Formula(ABC):
         """
         return not self == other
 
-    @final
     def __or__(self, other: Formula) -> Formula:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
@@ -146,7 +142,6 @@ class Formula(ABC):
         r += ')'
         return r
 
-    @final
     def __rshift__(self, other: Formula) -> Formula:
         """Override the :obj:`>> <object.__rshift__>` operator to apply
         :class:`Implies`.
@@ -300,13 +295,13 @@ class Formula(ABC):
             case _:
                 assert False, type(self)
 
-    @final
     def count_alternations(self) -> int:
-        """Count number of quantifier alternations.
+        """Count the number of quantifier alternations.
 
-        Returns the maximal number of quantifier alternations along a path in
-        the expression tree. Occurrence of quantified variables is not checked,
-        so that quantifiers with unused variables are counted.
+        Returns the maximal number of quantifier alternations along a path from
+        the root to a leaf of the expression tree. Occurrence of quantified
+        variables is not checked, so that quantifiers with unused variables are
+        counted.
 
         >>> from logic1 import Ex, All, T
         >>> from logic1.theories.Sets import Eq
@@ -317,9 +312,28 @@ class Formula(ABC):
         """
         return self._count_alternations()[0]
 
-    @abstractmethod
-    def _count_alternations(self) -> tuple[int, set]:
-        ...
+    def _count_alternations(self) -> tuple[int, set[type[All] | type[Ex]]]:
+        match self:
+            case All() | Ex():
+                count, quantifiers = self.arg._count_alternations()
+                if self.dual_func in quantifiers:
+                    return (count + 1, {self.func})
+                return (count, quantifiers)
+            case And() | Or() | Not() | Implies() | Equivalent():
+                highest_count = -1
+                highest_count_quantifiers: set[type[All] | type[Ex]] = {All, Ex}
+                for arg in self.args:
+                    count, quantifiers = arg._count_alternations()
+                    if count > highest_count:
+                        highest_count = count
+                        highest_count_quantifiers = quantifiers
+                    elif count == highest_count:
+                        highest_count_quantifiers.update(quantifiers)
+                return (highest_count, highest_count_quantifiers)
+            case _F() | _T() | AtomicFormula():
+                return (-1, {All, Ex})
+            case _:
+                assert False, type(self)
 
     def depth(self) -> int:
         match self:
@@ -397,7 +411,6 @@ class Formula(ABC):
     def matrix(self) -> tuple[Formula, list[tuple[Any, list]]]:
         ...
 
-    @final
     def _repr_latex_(self) -> str:
         """A LaTeX representation of the :class:`Formula` `self` for jupyter
         notebooks. In general, use the method :meth:`to_latex` instead.

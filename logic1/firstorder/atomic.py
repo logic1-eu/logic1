@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Any, Callable, final, Iterator
-from typing_extensions import Self
+from typing import Any
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -71,21 +70,14 @@ class AtomicFormula(Formula):
     def as_latex(self) -> str:
         return f'\\verb!{repr(self)}!'
 
-    @final
-    def _count_alternations(self) -> tuple[int, set]:
-        return (-1, {Ex, All})
-
-    @final
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.
         """
         return set()
 
-    @final
     def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
         return self, []
 
-    @final
     def to_complement(self) -> AtomicFormula:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
@@ -99,4 +91,4 @@ class AtomicFormula(Formula):
 
 
 # The following imports are intentionally late to avoid circularity.
-from .quantified import Ex, All, QuantifierBlock
+from .quantified import QuantifierBlock

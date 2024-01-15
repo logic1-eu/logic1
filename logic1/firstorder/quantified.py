@@ -4,16 +4,13 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, Callable, Iterator, TypeAlias, TYPE_CHECKING
+from typing import Any, TypeAlias
 
 from .formula import Formula
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
-
-if TYPE_CHECKING:
-    from .atomic import AtomicFormula
 
 
 QuantifierBlock: TypeAlias = tuple[Any, list]
@@ -68,12 +65,6 @@ class QuantifiedFormula(Formula):
 
     def __init__(self, variable: Any, arg: Formula) -> None:
         self.args = (variable, arg)
-
-    def _count_alternations(self) -> tuple[int, set]:
-        count, quantifiers = self.arg._count_alternations()
-        if self.dual_func in quantifiers:
-            return (count + 1, {self.func})
-        return (count, quantifiers)
 
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.

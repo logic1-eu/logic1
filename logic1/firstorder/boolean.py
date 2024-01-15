@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Callable, final, Iterator, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 from .formula import Formula
 from ..support.containers import GetVars
@@ -30,18 +30,6 @@ class BooleanFormula(Formula):
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
 
-    def _count_alternations(self) -> tuple[int, set]:
-        best_count = -1
-        best_quantifiers = {Ex, All}
-        for arg in self.args:
-            count, quantifiers = arg._count_alternations()
-            if count > best_count:
-                best_count = count
-                best_quantifiers = quantifiers
-            elif count == best_count:
-                best_quantifiers |= quantifiers
-        return (best_count, best_quantifiers)
-
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.
         """
@@ -58,7 +46,6 @@ class BooleanFormula(Formula):
             vars |= arg.get_vars(assume_quantified=assume_quantified)
         return vars
 
-    @final
     def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
         return self, []
 
@@ -465,5 +452,4 @@ def involutive_not(arg: Formula) -> Formula:
 
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula  # noqa
-from .quantified import Ex, All
 from .truth import _T, _F, T, F

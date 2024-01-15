@@ -7,7 +7,6 @@ from ..support.decorators import classproperty
 
 from .boolean import BooleanFormula, Not
 from .formula import Formula
-from .quantified import Ex, All
 
 
 class TruthValue(BooleanFormula):
@@ -16,14 +15,11 @@ class TruthValue(BooleanFormula):
     """
     # The following would be abstract class variables, which are not available
     # at the moment.
-    func: type[TruthValue]  #: :meta private:
     dual_func: type[TruthValue]  #: :meta private:
+    func: type[TruthValue]  #: :meta private:
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[()]  #: :meta private:
-
-    def _count_alternations(self) -> tuple[int, set]:
-        return (-1, {Ex, All})
 
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars()`.
@@ -58,27 +54,27 @@ class _T(TruthValue):
     True
     """
     @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`_T` itself.
-        """
-        return cls
-
-    @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`_F`, which implements
         the dual operator :math:`\bot` or :math:`\top`.
         """
         return _F
 
+    @classproperty
+    def func(cls):
+        """A class property yielding the class :class:`_T` itself.
+        """
+        return cls
+
     _instance: Optional[_T] = None
+
+    def __init__(self) -> None:
+        self.args = ()
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-
-    def __init__(self) -> None:
-        self.args = ()
 
     def __repr__(self) -> str:
         return 'T'
@@ -101,27 +97,27 @@ class _F(TruthValue):
     True
     """
     @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`_F` itself.
-        """
-        return cls
-
-    @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`_T`, which implements
         the dual operator :math:`\top` or :math:`\bot`.
         """
         return (lambda: _T)()
 
+    @classproperty
+    def func(cls):
+        """A class property yielding the class :class:`_F` itself.
+        """
+        return cls
+
     _instance: Optional[_F] = None
+
+    def __init__(self) -> None:
+        self.args = ()
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-
-    def __init__(self) -> None:
-        self.args = ()
 
     def __repr__(self) -> str:
         return 'F'
