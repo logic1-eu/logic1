@@ -37,7 +37,7 @@ class PrenexNormalForm(ABC):
         f = self.with_distinct_vars(f, f.get_vars().free)
         return self._pnf(f)[All if prefer_universal else Ex]
 
-    def _pnf(self, f) -> dict[type[All] | type[Ex], Formula]:
+    def _pnf(self, f) -> dict[type[All | Ex], Formula]:
         """Private Prenex Normal Form.
 
         f must be in NNF. Both keys of the result dict are guaranteed to be
@@ -79,7 +79,7 @@ class PrenexNormalForm(ABC):
             case _:
                 assert False
 
-    def interchange(self, f: AndOr, q: type[Ex] | type[All]) -> Formula:
+    def interchange(self, f: AndOr, q: type[Ex | All]) -> Formula:
         quantifiers = []
         quantifier_positions = set()
         args = list(f.args)

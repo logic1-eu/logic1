@@ -39,7 +39,7 @@ class Theory(abc.simplify.Theory):
                 f'[{self._cur_min_card}..{self._cur_max_card}], '
                 f'{self._cur_equations}, {self._cur_inequations})')
 
-    def add(self, gand: type[And] | type[Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         for atom in atoms:
             if gand is Or:
                 atom = atom.to_complement()
@@ -94,7 +94,7 @@ class Theory(abc.simplify.Theory):
             #             inequations.update({ne_subs})
             # self._cur_inequations = inequations
 
-    def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
         if self._cur_min_card > self._ref_min_card:
             L.append(C(self._cur_min_card))

@@ -79,7 +79,7 @@ class Theory(abc.simplify.Theory):
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
 
-    def add(self, gand: type[And] | type[Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
@@ -178,7 +178,7 @@ class Theory(abc.simplify.Theory):
         q = q / c
         return f.func, p, q
 
-    def extract(self, gand: type[And] | type[Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:

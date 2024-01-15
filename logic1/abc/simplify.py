@@ -25,11 +25,11 @@ class Theory(ABC):
         ...
 
     @abstractmethod
-    def add(self, gand: type[And] | type[Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And] | type[Or]) -> Iterable[AtomicFormula]:
+    def extract(self, gand: type[And | Or]) -> Iterable[AtomicFormula]:
         ...
 
     @abstractmethod

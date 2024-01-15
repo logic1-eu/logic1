@@ -7,7 +7,7 @@ from .formula import Formula
 from .truth import F, T  # noqa
 
 
-Quantifier: TypeAlias = type[quantified.Ex] | type[quantified.All]
+Quantifier: TypeAlias = type[quantified.All | quantified.Ex]
 
 
 def All(variables: object, arg: Formula) -> Formula:

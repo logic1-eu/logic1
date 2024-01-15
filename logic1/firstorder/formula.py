@@ -312,7 +312,7 @@ class Formula(ABC):
         """
         return self._count_alternations()[0]
 
-    def _count_alternations(self) -> tuple[int, set[type[All] | type[Ex]]]:
+    def _count_alternations(self) -> tuple[int, set[type[All | Ex]]]:
         match self:
             case All() | Ex():
                 count, quantifiers = self.arg._count_alternations()
@@ -321,7 +321,7 @@ class Formula(ABC):
                 return (count, quantifiers)
             case And() | Or() | Not() | Implies() | Equivalent():
                 highest_count = -1
-                highest_count_quantifiers: set[type[All] | type[Ex]] = {All, Ex}
+                highest_count_quantifiers: set[type[All | Ex]] = {All, Ex}
                 for arg in self.args:
                     count, quantifiers = arg._count_alternations()
                     if count > highest_count:
