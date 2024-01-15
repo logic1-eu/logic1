@@ -40,6 +40,48 @@ class Formula(ABC):
         """
         return And(self, other)
 
+    def __eq__(self, other: object) -> bool:
+        """A recursive test for equality of the `self` and `other`.
+
+        Note that this is is not a logical operator for equality.
+
+        >>> from logic1.theories.RCF import Ne
+        >>>
+        >>> e1 = Ne(1, 0)
+        >>> e2 = Ne(1, 0)
+        >>> e1 == e2
+        True
+        >>> e1 is e2
+        False
+        """
+        if self is other:
+            return True
+        if not isinstance(other, Formula):
+            return NotImplemented
+        return self.func == other.func and self.args == other.args
+
+    def __getnewargs__(self):
+        return self.args
+
+    def __hash__(self) -> int:
+        """
+        Hash function.
+
+        hash() yields deterministic results for a fixed hash seed. Set the
+        environment variable PYTHONHASHSEED to a positive integer when
+        comparing hashes from various Python sessions, e.g. for debugging.
+        Recall from the Python documentation that PYTHONHASHSEED should not be
+        fixed in general.
+        """
+        return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
+
+    @abstractmethod
+    def __init__(self, *args: object) -> None:
+        """This abstract base class is not supposed to have instances
+        itself.
+        """
+        ...
+
     @final
     def __invert__(self) -> Formula:
         """Override the :obj:`~ <object.__invert__>` operator to apply
@@ -75,6 +117,11 @@ class Formula(ABC):
         """
         return Implies(other, self)
 
+    def __ne__(self, other: object) -> bool:
+        """A recursive test for unequality of the `self` and `other`.
+        """
+        return not self == other
+
     @final
     def __or__(self, other: Formula) -> Formula:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
@@ -86,66 +133,6 @@ class Formula(ABC):
         Or(Eq(x, 0), Eq(x, y), Eq(x, z))
         """
         return Or(self, other)
-
-    @final
-    def __rshift__(self, other: Formula) -> Formula:
-        """Override the :obj:`>> <object.__rshift__>` operator to apply
-        :class:`Implies`.
-
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
-        >>>
-        >>> Eq(x, y) >> Eq(x + z, y + z)
-        Implies(Eq(x, y), Eq(x + z, y + z))
-        """
-        return Implies(self, other)
-
-    def __eq__(self, other: object) -> bool:
-        """A recursive test for equality of the `self` and `other`.
-
-        Note that this is is not a logical operator for equality.
-
-        >>> from logic1.theories.RCF import Ne
-        >>>
-        >>> e1 = Ne(1, 0)
-        >>> e2 = Ne(1, 0)
-        >>> e1 == e2
-        True
-        >>> e1 is e2
-        False
-        """
-        if self is other:
-            return True
-        if not isinstance(other, Formula):
-            return NotImplemented
-        return self.func == other.func and self.args == other.args
-
-    def __ne__(self, other: object) -> bool:
-        """A recursive test for unequality of the `self` and `other`.
-        """
-        return not self == other
-
-    def __getnewargs__(self):
-        return self.args
-
-    def __hash__(self) -> int:
-        """
-        Hash function.
-
-        hash() yields deterministic results for a fixed hash seed. Set the
-        environment variable PYTHONHASHSEED to a positive integer when
-        comparing hashes from various Python sessions, e.g. for debugging.
-        Recall from the Python documentation that PYTHONHASHSEED should not be
-        fixed in general.
-        """
-        return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
-
-    @abstractmethod
-    def __init__(self, *args: object) -> None:
-        """This abstract base class is not supposed to have instances
-        itself.
-        """
-        ...
 
     def __repr__(self) -> str:
         """A Representation of the :class:`Formula` `self` that is suitable for
@@ -159,6 +146,19 @@ class Formula(ABC):
                 r += ', ' + a.__repr__()
         r += ')'
         return r
+
+    @final
+    def __rshift__(self, other: Formula) -> Formula:
+        """Override the :obj:`>> <object.__rshift__>` operator to apply
+        :class:`Implies`.
+
+        >>> from logic1.theories.RCF import Eq, ring
+        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>>
+        >>> Eq(x, y) >> Eq(x + z, y + z)
+        Implies(Eq(x, y), Eq(x + z, y + z))
+        """
+        return Implies(self, other)
 
     def __str__(self) -> str:
         """Representation of the Formula used in printing.
@@ -198,33 +198,6 @@ class Formula(ABC):
                 # Atomic formulas must be caught by the implementation of the
                 # abstract method AtomicFormula.__str__.
                 assert False, repr(self)
-
-    @final
-    def _repr_latex_(self) -> str:
-        """A LaTeX representation of the :class:`Formula` `self` for jupyter
-        notebooks. In general, use the method :meth:`to_latex` instead.
-        """
-        limit = 5000
-        as_latex = self.as_latex()
-        if len(as_latex) > limit:
-            as_latex = as_latex[:limit]
-            opc = 0
-            for pos in range(limit):
-                match as_latex[pos]:
-                    case '{':
-                        opc += 1
-                    case '}':
-                        opc -= 1
-            assert opc >= 0
-            while opc > 0:
-                match as_latex[-1]:
-                    case '{':
-                        opc -= 1
-                    case '}':
-                        opc += 1
-                as_latex = as_latex[:-1]
-            as_latex += '{}\\dots'
-        return f'$\\displaystyle {as_latex}$'
 
     def all(self, ignore: Iterable = set()) -> Formula:
         """Universal closure.
@@ -417,6 +390,33 @@ class Formula(ABC):
     @abstractmethod
     def matrix(self) -> tuple[Formula, list[tuple[Any, list]]]:
         ...
+
+    @final
+    def _repr_latex_(self) -> str:
+        """A LaTeX representation of the :class:`Formula` `self` for jupyter
+        notebooks. In general, use the method :meth:`to_latex` instead.
+        """
+        limit = 5000
+        as_latex = self.as_latex()
+        if len(as_latex) > limit:
+            as_latex = as_latex[:limit]
+            opc = 0
+            for pos in range(limit):
+                match as_latex[pos]:
+                    case '{':
+                        opc += 1
+                    case '}':
+                        opc -= 1
+            assert opc >= 0
+            while opc > 0:
+                match as_latex[-1]:
+                    case '{':
+                        opc -= 1
+                    case '}':
+                        opc += 1
+                as_latex = as_latex[:-1]
+            as_latex += '{}\\dots'
+        return f'$\\displaystyle {as_latex}$'
 
     def simplify(self) -> Formula:
         """Fast simplification. The result is equivalent to `self`.
