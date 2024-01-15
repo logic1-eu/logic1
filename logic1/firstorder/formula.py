@@ -141,7 +141,7 @@ class Formula(ABC):
         return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
 
     @abstractmethod
-    def __init__(self, *args) -> None:
+    def __init__(self, *args: object) -> None:
         """This abstract base class is not supposed to have instances
         itself.
         """
@@ -226,13 +226,13 @@ class Formula(ABC):
             as_latex += '{}\\dots'
         return f'$\\displaystyle {as_latex}$'
 
-    def all(self, skip: Iterable = set()) -> Formula:
+    def all(self, ignore: Iterable = set()) -> Formula:
         """Universal closure.
 
         Universally quantifiy all variables occurring free in self, except the
-        ones mentioned in skip.
+        ones mentioned in ignore.
         """
-        variables = sorted(list(self.get_vars().free - set(skip)))
+        variables = sorted(list(self.get_vars().free - set(ignore)))
         f = self
         for v in reversed(variables):
             f = All(v, f)
@@ -278,7 +278,6 @@ class Formula(ABC):
                 # abstract method AtomicFormula.as_latex.
                 assert False
 
-    @abstractmethod
     def atoms(self) -> Iterator[AtomicFormula]:
         """
         An iterator over all instances of AtomicFormula occurring in
@@ -318,7 +317,16 @@ class Formula(ABC):
         >>> isinstance(f.var, next(f.atoms()).variable_type())
         True
         """
-        ...
+        match self:
+            case All() | Ex():
+                yield from self.arg.atoms()
+            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
+                for arg in self.args:
+                    yield from arg.atoms()
+            case AtomicFormula():
+                yield self
+            case _:
+                assert False, type(self)
 
     @final
     def count_alternations(self) -> int:
@@ -345,13 +353,13 @@ class Formula(ABC):
     def depth(self) -> int:
         ...
 
-    def ex(self, skip: Iterable = set()) -> Formula:
+    def ex(self, ignore: Iterable = set()) -> Formula:
         """Existential closure.
 
         Existentially quantifiy all variables occurring free in self, except
-        the ones mentioned in skip.
+        the ones mentioned in ignore.
         """
-        variables = sorted(list(self.get_vars().free - set(skip)))
+        variables = sorted(list(self.get_vars().free - set(ignore)))
         f = self
         for v in reversed(variables):
             f = Ex(v, f)

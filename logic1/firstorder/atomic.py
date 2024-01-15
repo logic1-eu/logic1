@@ -71,9 +71,6 @@ class AtomicFormula(Formula):
     def as_latex(self) -> str:
         return f'\\verb!{repr(self)}!'
 
-    def atoms(self) -> Iterator[AtomicFormula]:
-        yield self
-
     @final
     def _count_alternations(self) -> tuple[int, set]:
         return (-1, {Ex, All})

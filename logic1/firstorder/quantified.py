@@ -69,9 +69,6 @@ class QuantifiedFormula(Formula):
     def __init__(self, variable: Any, arg: Formula) -> None:
         self.args = (variable, arg)
 
-    def atoms(self) -> Iterator[AtomicFormula]:
-        yield from self.arg.atoms()
-
     def _count_alternations(self) -> tuple[int, set]:
         count, quantifiers = self.arg._count_alternations()
         if self.dual_func in quantifiers:

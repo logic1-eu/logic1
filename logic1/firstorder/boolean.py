@@ -6,7 +6,7 @@ from .formula import Formula
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
-# from ..support.tracing import trace
+from ..support.tracing import trace  # noqa
 
 if TYPE_CHECKING:
     from .atomic import AtomicFormula
@@ -29,10 +29,6 @@ class BooleanFormula(Formula):
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
-
-    def atoms(self) -> Iterator[AtomicFormula]:
-        for arg in self.args:
-            yield from arg.atoms()
 
     def _count_alternations(self) -> tuple[int, set]:
         best_count = -1

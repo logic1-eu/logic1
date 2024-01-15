@@ -61,11 +61,11 @@ __all__, __ex__:
 >>> g = Eq(a * x + b, 0)
 >>> g.all()
 All(x, All(b, All(a, Eq(a*x + b, 0))))
->>> g.all(skip=(x,))
+>>> g.all(ignore=(x,))
 All(b, All(a, Eq(a*x + b, 0)))
 >>> g.ex()
 Ex(x, Ex(b, Ex(a, Eq(a*x + b, 0))))
->>> g.ex(skip=(x,))
+>>> g.ex(ignore=(x,))
 Ex(b, Ex(a, Eq(a*x + b, 0)))
 
 atoms:
