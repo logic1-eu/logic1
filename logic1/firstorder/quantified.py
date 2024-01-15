@@ -153,11 +153,6 @@ class QuantifiedFormula(Formula):
                                   _implicit_not=_implicit_not)
         return func_nnf(self.var, arg_nnf)
 
-    def transform_atoms(self, transformation: Callable) -> QuantifiedFormula:
-        """Implements the abstract method :meth:`Formula.transform_atoms`.
-        """
-        return self.func(self.var, self.arg.transform_atoms(transformation))
-
 
 class Ex(QuantifiedFormula):
     r"""A class whose instances are existentially quanitfied formulas in the

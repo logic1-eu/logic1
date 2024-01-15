@@ -97,12 +97,6 @@ class AtomicFormula(Formula):
         """
         return self.to_complement() if _implicit_not else self
 
-    @final
-    def transform_atoms(self, transformation: Callable) -> Self:
-        """Implements the abstract method :meth:`Formula.transform_atoms`.
-        """
-        return transformation(self)
-
 
 # The following imports are intentionally late to avoid circularity.
 from .quantified import Ex, All, QuantifierBlock

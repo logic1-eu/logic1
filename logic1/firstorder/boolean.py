@@ -67,12 +67,6 @@ class BooleanFormula(Formula):
         """
         return self.func(*(arg.subs(substitution) for arg in self.args))
 
-    def transform_atoms(self, transformation: Callable) -> BooleanFormula:
-        """Implements the abstract method :meth:`Formula.transform_atoms`.
-        """
-        return self.func(*(arg.transform_atoms(transformation)
-                           for arg in self.args))
-
 
 class Equivalent(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their

@@ -483,12 +483,11 @@ class Formula(ABC):
         """
         ...
 
-    @abstractmethod
-    def transform_atoms(self, transformation: Callable) -> Self:
-        """Apply `transformation` to all atomic formulas.
+    def transform_atoms(self, tr: Callable[[Any], Formula]) -> Formula:
+        """Apply `tr` to all atomic formulas.
 
         Replaces each atomic subformula of `self` with the :class:`Formula`
-        `transformation(self)`.
+        `tr(self)`.
 
         >>> from logic1 import And
         >>> from logic1.theories.RCF import Eq, Lt, ring
@@ -498,7 +497,17 @@ class Formula(ABC):
         >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
         And(Eq(x - y, 0), Lt(y - z, 0))
         """
-        ...
+        # type of tr requieres discussion
+        match self:
+            case All() | Ex():
+                return self.func(self.var, self.arg.transform_atoms(tr))
+            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
+                args = (arg.transform_atoms(tr) for arg in self.args)
+                return self.func(*args)
+            case AtomicFormula():
+                return tr(self)
+            case _:
+                assert False, type(self)
 
 
 # The following imports are intentionally late to avoid circularity.
