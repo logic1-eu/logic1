@@ -94,7 +94,9 @@ count_alternations:
 2
 
 depth:
-...
+>>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+>>> f.depth()
+6
 
 get_qvars:
 >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}

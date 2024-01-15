@@ -27,7 +27,6 @@ class Formula(ABC):
     # Similarly the following would be an abstract instance variable:
     args: tuple  #: :meta private:
 
-    # Instance methods
     @final
     def __and__(self, other: Formula) -> Formula:
         """Override the :obj:`& <object.__and__>` operator to apply
@@ -322,9 +321,16 @@ class Formula(ABC):
     def _count_alternations(self) -> tuple[int, set]:
         ...
 
-    @abstractmethod
     def depth(self) -> int:
-        ...
+        match self:
+            case All() | Ex():
+                return self.arg.depth() + 1
+            case And() | Or() | Not() | Implies() | Equivalent():
+                return max(arg.depth() for arg in self.args) + 1
+            case _F() | _T() | AtomicFormula():
+                return 0
+            case _:
+                assert False, type(self)
 
     def ex(self, ignore: Iterable = set()) -> Formula:
         """Existential closure.
