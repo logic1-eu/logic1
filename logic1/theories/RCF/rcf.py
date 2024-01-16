@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import functools
 import inspect
 import operator
@@ -19,8 +20,72 @@ from ...support.decorators import classproperty
 from ...support.tracing import trace  # noqa
 
 
-Term: TypeAlias = MPolynomial_libsingular
-Variable: TypeAlias = MPolynomial_libsingular
+@dataclass
+class Term(firstorder.Term):
+
+    poly: MPolynomial_libsingular
+
+    @classmethod
+    def fresh_variable(cls, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence _G0001,
+        _G0002, ..., G9999, G10000, ... This naming convention is inspired by
+        Lisp's gensym(). If the optional argument :data:`suffix` is specified,
+        the sequence _G0001_<suffix>, _G0002_<suffix>, ... is used instead.
+        """
+        if suffix != '':
+            suffix = f'_{suffix}'
+        vars_as_str = tuple(str(v) for v in ring.get_vars())
+        i = 1
+        v_as_str = f'_G{i:04d}{suffix}'
+        while v_as_str in vars_as_str:
+            i += 1
+            v_as_str = f'_G{i:04d}{suffix}'
+        v = ring.add_var(v_as_str)
+        return v
+
+    def __add__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly + other.poly)
+        return Term(self.poly + other)
+
+    def __radd__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__add__`.
+        return Term(other + self.poly)
+
+    def __mul__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly * other.poly)
+        return Term(self.poly * other)
+
+    def __rmul__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
+        return Term(other * self.poly)
+
+    def __neg__(self) -> Term:
+        return Term(- self.poly)
+
+    def __sub__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return self + (- other)
+        return Term(self.poly - other)
+
+    def __rsub__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
+        return Term(other - self.poly)
+
+    def __pow__(self, other: object) -> Term:
+        return Term(self.poly ** other)
+
+    def __xor__(self, other: object) -> Term:
+        return self ** other
+
+    def get_vars(self) -> set[Variable]:
+        """Extract the set of variables occurring in `self`.
+        """
+        print('getting_vars')
+
+
+Variable: TypeAlias = Term
 
 
 class _Ring:
@@ -60,16 +125,18 @@ class _Ring:
         new_as_str = sorted(old_as_str + added_as_str)
         self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
         added_as_gen = (self.sage_ring(v) for v in added_as_str)
-        return tuple(added_as_gen)
+        added_as_var = (Variable(g) for g in added_as_gen)
+        return tuple(added_as_var)
 
     def get_vars(self) -> tuple[Variable]:
         gens = self.sage_ring.gens()
         gens = (g for g in gens if str(g) != 'unused_')
-        return tuple(gens)
+        vars_ = (Variable(g) for g in gens)
+        return tuple(vars_)
 
     def import_vars(self, force: bool = False):
         critical = []
-        gens = self.sage_ring.gens()
+        gens = self.get_vars()
         frame = inspect.currentframe()
         assert isinstance(frame, FrameType)
         frame = frame.f_back

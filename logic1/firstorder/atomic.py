@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Any
+from abc import ABC, abstractmethod
+from typing import Any, Optional, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -79,3 +79,31 @@ class AtomicFormula(Formula):
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)
+
+
+class Term(ABC):
+
+    @classmethod
+    @abstractmethod
+    def fresh_variable(cls, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence _G0001,
+        _G0002, ..., G9999, G10000, ... This naming convention is inspired by
+        Lisp's gensym(). If the optional argument :data:`suffix` is specified,
+        the sequence _G0001_<suffix>, _G0002_<suffix>, ... is used instead.
+        """
+        ...
+
+    @abstractmethod
+    def get_vars(self) -> set[Variable]:
+        """Extract the set of variables occurring in `self`.
+        """
+        ...
+
+    @abstractmethod
+    def as_latex(self) -> str:
+        """Convert `self` to LaTeX.
+        """
+        ...
+
+
+Variable: TypeAlias = Term

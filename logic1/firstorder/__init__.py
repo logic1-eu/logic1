@@ -20,7 +20,7 @@ atomic formulas and terms. Of course, the abstract methods specified by
 
 from .formula import Formula  # noqa
 
-from .atomic import AtomicFormula  # noqa
+from .atomic import AtomicFormula, Term, Variable  # noqa
 
 from .boolean import BooleanFormula, Equivalent, Implies, AndOr, And, Or, Not  # noqa
 
