@@ -127,6 +127,8 @@ to_nnf:
 >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
 >>> f.to_nnf()
 And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))), Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
+>>> f.to_nnf(to_positive=False)
+And(Or(Not(Eq(a, 0)), Not(T), Ex(y, Not(Eq(y, a)))), Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
 
 transform_atoms:
 >>> f = Eq(x, y) & Lt(y, z)

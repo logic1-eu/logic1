@@ -5,8 +5,7 @@ from typing import final, Optional
 from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
-from .boolean import BooleanFormula, Not
-from .formula import Formula
+from .boolean import BooleanFormula
 
 
 class TruthValue(BooleanFormula):
@@ -30,16 +29,6 @@ class TruthValue(BooleanFormula):
         """Implements the abstract method :meth:`Formula.get_vars`.
         """
         return GetVars()
-
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        if to_positive:
-            return self.dual_func() if _implicit_not else self
-        if _implicit_not:
-            return Not(self)
-        return self
 
 
 @final

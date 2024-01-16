@@ -119,15 +119,6 @@ class QuantifiedFormula(Formula):
             return self.func(var, self.arg.subs(substitution))
         return self.func(self.var, self.arg.subs(substitution))
 
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        func_nnf = self.dual_func if _implicit_not else self.func
-        arg_nnf = self.arg.to_nnf(to_positive=to_positive,
-                                  _implicit_not=_implicit_not)
-        return func_nnf(self.var, arg_nnf)
-
 
 class Ex(QuantifiedFormula):
     r"""A class whose instances are existentially quanitfied formulas in the

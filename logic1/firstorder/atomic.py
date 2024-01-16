@@ -79,9 +79,3 @@ class AtomicFormula(Formula):
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)
-
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        return self.to_complement() if _implicit_not else self

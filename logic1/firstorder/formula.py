@@ -479,9 +479,7 @@ class Formula(ABC):
         """
         ...
 
-    @abstractmethod
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> Formula:
+    def to_nnf(self, to_positive: bool = True, _not: bool = False) -> Formula:
         """Convert to Negation Normal Form.
 
         A Negation Normal Form (NNF) is an equivalent formula within which the
@@ -506,7 +504,43 @@ class Formula(ABC):
         And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
             Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
         """
-        ...
+        rewrite: Formula
+        match self:
+            case All() | Ex():
+                nnf_func = self.dual_func if _not else self.func
+                nnf_arg = self.arg.to_nnf(to_positive=to_positive, _not=_not)
+                return nnf_func(self.var, nnf_arg)
+            case Equivalent():
+                rewrite = And(Implies(*self.args), Implies(self.rhs, self.lhs))
+                return rewrite.to_nnf(to_positive=to_positive, _not=_not)
+            case Implies():
+                if isinstance(self.rhs, Or):
+                    rewrite = Or(Not(self.lhs), *self.rhs.args)
+                else:
+                    rewrite = Or(Not(self.lhs), self.rhs)
+                return rewrite.to_nnf(to_positive=to_positive, _not=_not)
+            case And() | Or():
+                nnf_func = self.dual_func if _not else self.func
+                nnf_args: list[Formula] = []
+                for arg in self.args:
+                    nnf_arg = arg.to_nnf(to_positive=to_positive, _not=_not)
+                    if nnf_arg.func is nnf_func:
+                        nnf_args.extend(nnf_arg.args)
+                    else:
+                        nnf_args.append(nnf_arg)
+                return nnf_func(*nnf_args)
+            case Not():
+                return self.arg.to_nnf(to_positive=to_positive, _not=not _not)
+            case _F() | _T():
+                if _not:
+                    return self.dual_func() if to_positive else Not(self)
+                return self
+            case AtomicFormula():
+                if _not:
+                    return self.to_complement() if to_positive else Not(self)
+                return self
+            case _:
+                assert False, type(self)
 
     def transform_atoms(self, tr: Callable[[Any], Formula]) -> Formula:
         """Apply `tr` to all atomic formulas.

@@ -106,13 +106,6 @@ class Equivalent(BooleanFormula):
             return T
         return Equivalent(lhs, rhs)
 
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        tmp = And(Implies(self.lhs, self.rhs), Implies(self.rhs, self.lhs))
-        return tmp.to_nnf(to_positive=to_positive, _implicit_not=_implicit_not)
-
 
 class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
@@ -160,16 +153,6 @@ class Implies(BooleanFormula):
             return T
         return Implies(lhs_simplify, rhs_simplify)
 
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> BooleanFormula | AtomicFormula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        if isinstance(self.rhs, Or):
-            tmp = Or(Not(self.lhs), *self.rhs.args)
-        else:
-            tmp = Or(Not(self.lhs), self.rhs)
-        return tmp.to_nnf(to_positive=to_positive, _implicit_not=_implicit_not)
-
 
 class AndOr(BooleanFormula):
     # The following would be abstract class variables, which are not available
@@ -215,21 +198,6 @@ class AndOr(BooleanFormula):
         if not simplified_args:
             return gT
         return gAnd(*simplified_args)
-
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> AndOr:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-        """
-        func_nnf = self.dual_func if _implicit_not else self.func
-        args_nnf: list[Formula] = []
-        for arg in self.args:
-            arg_nnf = arg.to_nnf(to_positive=to_positive,
-                                 _implicit_not=_implicit_not)
-            if arg_nnf.func is func_nnf:
-                args_nnf += arg_nnf.args
-            else:
-                args_nnf += [arg_nnf]
-        return func_nnf(*args_nnf)
 
 
 class And(AndOr):
@@ -412,21 +380,6 @@ class Not(BooleanFormula):
         if arg_simplify is F:
             return T
         return involutive_not(arg_simplify)
-
-    def to_nnf(self, to_positive: bool = True,
-               _implicit_not: bool = False) -> Formula:
-        """Implements the abstract method :meth:`Formula.to_nnf`.
-
-        >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y, z
-        >>>
-        >>> f = All(x, Ex(y, And(Eq(x, y), T, Eq(x, y), Eq(x, z) & Eq(y, x))))
-        >>> (~f).to_nnf()
-        Ex(x, All(y, Or(Ne(x, y), F, Ne(x, y), Ne(x, z), Ne(y, x))))
-        """
-        return self.arg.to_nnf(to_positive=to_positive,
-                               _implicit_not=not _implicit_not)
 
 
 def involutive_not(arg: Formula) -> Formula:
