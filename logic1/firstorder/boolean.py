@@ -10,7 +10,6 @@ from ..support.tracing import trace  # noqa
 
 if TYPE_CHECKING:
     from .atomic import AtomicFormula
-    from .quantified import QuantifierBlock
 
 
 class BooleanFormula(Formula):
@@ -45,9 +44,6 @@ class BooleanFormula(Formula):
         for arg in self.args:
             vars |= arg.get_vars(assume_quantified=assume_quantified)
         return vars
-
-    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
-        return self, []
 
     def subs(self, substitution: dict) -> BooleanFormula:
         """Implements the abstract method :meth:`Formula.subs`.

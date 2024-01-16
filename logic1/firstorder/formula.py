@@ -4,12 +4,15 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, Final, Iterable, Iterator
+from typing import Any, Callable, Final, Iterable, Iterator, TypeAlias
 from typing_extensions import Self
 
 from ..support.containers import GetVars
 
 from ..support.tracing import trace  # noqa
+
+
+QuantifierBlock: TypeAlias = tuple[Any, list]
 
 
 @functools.total_ordering
@@ -407,9 +410,18 @@ class Formula(ABC):
         """
         ...
 
-    @abstractmethod
-    def matrix(self) -> tuple[Formula, list[tuple[Any, list]]]:
-        ...
+    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
+        blocks = []
+        block_vars = []
+        f: Formula = self
+        while isinstance(f, (QuantifiedFormula)):
+            block_quantifier = type(f)
+            while isinstance(f, block_quantifier):
+                block_vars.append(f.var)
+                f = f.arg
+            blocks.append((block_quantifier, block_vars))
+            block_vars = []
+        return f, blocks
 
     def _repr_latex_(self) -> str:
         """A LaTeX representation of the :class:`Formula` `self` for jupyter
@@ -526,5 +538,5 @@ class Formula(ABC):
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula
 from .boolean import And, Equivalent, Implies, Not, Or
-from .quantified import All, Ex
+from .quantified import All, Ex, QuantifiedFormula
 from .truth import _F, _T

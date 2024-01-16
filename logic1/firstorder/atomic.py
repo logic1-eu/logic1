@@ -75,9 +75,6 @@ class AtomicFormula(Formula):
         """
         return set()
 
-    def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
-        return self, []
-
     def to_complement(self) -> AtomicFormula:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
@@ -88,7 +85,3 @@ class AtomicFormula(Formula):
         """Implements the abstract method :meth:`Formula.to_nnf`.
         """
         return self.to_complement() if _implicit_not else self
-
-
-# The following imports are intentionally late to avoid circularity.
-from .quantified import QuantifierBlock
