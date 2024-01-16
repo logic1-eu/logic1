@@ -414,7 +414,7 @@ class Formula(ABC):
         blocks = []
         block_vars = []
         f: Formula = self
-        while isinstance(f, (QuantifiedFormula)):
+        while isinstance(f, QuantifiedFormula):
             block_quantifier = type(f)
             while isinstance(f, block_quantifier):
                 block_vars.append(f.var)
