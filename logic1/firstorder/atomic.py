@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional, TypeAlias
+from typing import Any, Self, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -25,38 +25,38 @@ class AtomicFormula(Formula):
     args: tuple
 
     # Static methods on terms
-    @staticmethod
-    @abstractmethod
-    def term_get_vars(term: Any) -> set:
-        """Extract the set of variables occurring in `term`.
-        """
-        ...
+    # @staticmethod
+    # @abstractmethod
+    # def term_get_vars(term: Any) -> set:
+    #     """Extract the set of variables occurring in `term`.
+    #     """
+    #     ...
 
-    @staticmethod
-    @abstractmethod
-    def term_to_latex(term: Any) -> str:
-        """Convert `term` to LaTeX.
-        """
-        ...
+    # @staticmethod
+    # @abstractmethod
+    # def term_to_latex(term: Any) -> str:
+    #     """Convert `term` to LaTeX.
+    #     """
+    #     ...
 
     # Static methods on variables
-    @staticmethod
-    @abstractmethod
-    def variable_type() -> Any:
-        """The Python type of variables in terms in subclasses of
-        :class:`AtomicFormula`.
-        """
-        ...
+    # @staticmethod
+    # @abstractmethod
+    # def variable_type() -> Any:
+    #     """The Python type of variables in terms in subclasses of
+    #     :class:`AtomicFormula`.
+    #     """
+    #     ...
 
-    @staticmethod
-    @abstractmethod
-    def rename_var(variable: Any) -> Any:
-        """Return a fresh variable for replacing `variable` in the course of
-        renaming.
+    # @staticmethod
+    # @abstractmethod
+    # def rename_var(variable: Any) -> Any:
+    #     """Return a fresh variable for replacing `variable` in the course of
+    #     renaming.
 
-        Compare :meth:`.Formula.to_distinct_vars`, :meth:`.Formula.to_pnf`.
-        """
-        ...
+    #     Compare :meth:`.Formula.to_distinct_vars`, :meth:`.Formula.to_pnf`.
+    #     """
+    #     ...
 
     def __init__(self, *args) -> None:
         self.args = args
@@ -86,22 +86,22 @@ class Term(ABC):
     @classmethod
     @abstractmethod
     def fresh_variable(cls, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence _G0001,
-        _G0002, ..., G9999, G10000, ... This naming convention is inspired by
-        Lisp's gensym(). If the optional argument :data:`suffix` is specified,
-        the sequence _G0001_<suffix>, _G0002_<suffix>, ... is used instead.
-        """
-        ...
-
-    @abstractmethod
-    def get_vars(self) -> set[Variable]:
-        """Extract the set of variables occurring in `self`.
+        """Return a fresh variable, by default from the sequence G0001, G0002,
+        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
+        gensym(). If the optional argument :data:`suffix` is specified, the
+        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
         ...
 
     @abstractmethod
     def as_latex(self) -> str:
         """Convert `self` to LaTeX.
+        """
+        ...
+
+    @abstractmethod
+    def get_vars(self) -> set[Self]:  # mypy complains about -> set[Variable]
+        """Extract the set of variables occurring in `self`.
         """
         ...
 

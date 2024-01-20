@@ -1,11 +1,11 @@
 from collections.abc import Sequence
-from typing import Any, TypeAlias
+from typing import TypeAlias
 
 from . import boolean
 from . import quantified
 from .formula import Formula
 from .truth import F, T  # noqa
-
+from .atomic import Variable
 
 Quantifier: TypeAlias = type[quantified.All | quantified.Ex]
 
@@ -72,13 +72,6 @@ def _Q(q: Quantifier, variables: object, arg: Formula) -> Formula:
                 raise ValueError(f'type of variable {v!r} must be {Variable}')
 
     _check_formulas(arg)
-    atom = next(arg.atoms(), None)
-    # If atom is None, then arg does not contain any atomic formula.
-    # Therefore we cannot know what are valid variables, and we will accept
-    # anything. Otherwise atom has a static method providing the type of
-    # variables. This assumes that there is only one class of atomic
-    # formulas used within a formula.
-    Variable = atom.variable_type() if atom is not None else Any
     match variables:
         case Sequence():
             check_variables(*variables)

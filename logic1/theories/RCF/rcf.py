@@ -6,7 +6,7 @@ import inspect
 import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
-    MPolynomial_libsingular)
+    MPolynomial_libsingular as Polynomial)
 import sys
 from types import FrameType
 from typing import Final, Optional, Self, TypeAlias
@@ -20,73 +20,8 @@ from ...support.decorators import classproperty
 from ...support.tracing import trace  # noqa
 
 
-@dataclass
-class Term(firstorder.Term):
-
-    poly: MPolynomial_libsingular
-
-    @classmethod
-    def fresh_variable(cls, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence _G0001,
-        _G0002, ..., G9999, G10000, ... This naming convention is inspired by
-        Lisp's gensym(). If the optional argument :data:`suffix` is specified,
-        the sequence _G0001_<suffix>, _G0002_<suffix>, ... is used instead.
-        """
-        if suffix != '':
-            suffix = f'_{suffix}'
-        vars_as_str = tuple(str(v) for v in ring.get_vars())
-        i = 1
-        v_as_str = f'_G{i:04d}{suffix}'
-        while v_as_str in vars_as_str:
-            i += 1
-            v_as_str = f'_G{i:04d}{suffix}'
-        v = ring.add_var(v_as_str)
-        return v
-
-    def __add__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly + other.poly)
-        return Term(self.poly + other)
-
-    def __radd__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__add__`.
-        return Term(other + self.poly)
-
-    def __mul__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly * other.poly)
-        return Term(self.poly * other)
-
-    def __rmul__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
-        return Term(other * self.poly)
-
-    def __neg__(self) -> Term:
-        return Term(- self.poly)
-
-    def __sub__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return self + (- other)
-        return Term(self.poly - other)
-
-    def __rsub__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
-        return Term(other - self.poly)
-
-    def __pow__(self, other: object) -> Term:
-        return Term(self.poly ** other)
-
-    def __xor__(self, other: object) -> Term:
-        return self ** other
-
-    def get_vars(self) -> set[Variable]:
-        """Extract the set of variables occurring in `self`.
-        """
-        print('getting_vars')
-
-
-Variable: TypeAlias = Term
-
+# discuss: from a mathematical viewpoint, class Term is a polynomial ring, and
+# _Ring is the set of its variables. Rename _Ring -> Variable, ring -> rcf.V?
 
 class _Ring:
 
@@ -128,7 +63,7 @@ class _Ring:
         added_as_var = (Variable(g) for g in added_as_gen)
         return tuple(added_as_var)
 
-    def get_vars(self) -> tuple[Variable]:
+    def get_vars(self) -> tuple[Variable, ...]:
         gens = self.sage_ring.gens()
         gens = (g for g in gens if str(g) != 'unused_')
         vars_ = (Variable(g) for g in gens)
@@ -185,86 +120,138 @@ class _Ring:
 ring = _Ring()
 
 
-class TermMixin():
+@dataclass
+class Term(firstorder.Term):
 
-    @staticmethod
-    def term_get_vars(term: Term) -> set[Variable]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_get_vars`.
-        """
-        return set(term.variables())
+    poly: Polynomial
 
-    @staticmethod
-    def term_to_latex(term: Term) -> str:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_to_latex`.
+    @classmethod
+    def fresh_variable(cls, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence G0001, G0002,
+        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
+        gensym(). If the optional argument :data:`suffix` is specified, the
+        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        return str(latex(term))
-
-    @staticmethod
-    def variable_type() -> type[Variable]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.variable_type`.
-        """
-        return Variable
-
-    @staticmethod
-    def rename_var(variable: Variable) -> Variable:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.rename_var`.
-        """
-        i = 0
         vars_as_str = tuple(str(v) for v in ring.get_vars())
-        v_as_str = str(variable)
+        i = 1
+        v_as_str = f'G{i:04d}{suffix}'
         while v_as_str in vars_as_str:
             i += 1
-            v_as_str = str(variable) + "_R" + str(i)
+            v_as_str = f'G{i:04d}{suffix}'
         v = ring.add_var(v_as_str)
         return v
 
+    def __add__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly + other.poly)
+        return Term(self.poly + other)
 
-class AtomicFormula(TermMixin, firstorder.AtomicFormula):
-    """Atomic Formula with Sage Terms. All terms are
-    :class:`sage.symbolic.expression.Expression`.
-    """
+    def __hash__(self) -> int:
+        # discuss: There was a doctest error that Term was not hashable.
+        return hash(('Term', self.poly))
 
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
+    def __init__(self, arg: Polynomial | Integer | int) -> None:
+        # discuss
+        if isinstance(arg, (Integer, int)):
+            # Sage Integers come into existence via vsubs.
+            arg = ring(arg)
+        assert isinstance(arg, Polynomial), f'{arg=}: {type(arg)}'
+        self.poly = arg
+
+    def __mul__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly * other.poly)
+        return Term(self.poly * other)
+
+    def __neg__(self) -> Term:
+        return Term(- self.poly)
+
+    def __pow__(self, other: object) -> Term:
+        return Term(self.poly ** other)
+
+    def __repr__(self) -> str:
+        # disucss: I added this to get the doctests working.
+        return str(self.poly)
+
+    def __radd__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__add__`.
+        return Term(other + self.poly)
+
+    def __rmul__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
+        return Term(other * self.poly)
+
+    def __rsub__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
+        return Term(other - self.poly)
+
+    def __sub__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return self + (- other)
+        return Term(self.poly - other)
+
+    def __xor__(self, other: object) -> Term:
+        return self ** other
+
+    def as_latex(self) -> str:
+        """Implements the abstract method
+        :meth:`.firstorder.AtomicFormula.term_to_latex`.
         """
-        all_vars = set()
-        for term in self.args:
-            all_vars.update(set(term.variables()))
-        return GetVars(free=all_vars - assume_quantified,
-                       bound=all_vars & assume_quantified)
+        return str(latex(self.poly))
 
-    def subs(self, d: dict) -> Self:
+    def get_vars(self) -> set[Term]:
+        """Extract the set of variables occurring in `self`.
+
+        This Implements the abstract method :meth:`.firstorder.Term.get_vars`.
+        """
+        return set(Term(g) for g in self.poly.variables())
+
+    @staticmethod
+    def sort_key(term: Term) -> Polynomial:
+        return term.poly
+
+    def subs(self, d: dict) -> Term:
         """Implements the abstract method :meth:`.firstorder.Formula.subs`.
         """
-        sage_keywords = {str(v): t for v, t in d.items()}
-        args = (arg.subs(**sage_keywords) for arg in self.args)
-        return self.func(*args)
+        sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
+        return Term(self.poly.subs(**sage_keywords))
+
+
+Variable: TypeAlias = Term
 
 
 @functools.total_ordering
-class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
+class AtomicFormula(generic.BinaryAtomicFormulaMixin, firstorder.AtomicFormula):
 
-    def __init__(self, lhs, rhs, chk: bool = True):
-        if chk:
-            args_ = []
-            for arg in (lhs, rhs):
-                assert isinstance(arg, (int, Integer, MPolynomial_libsingular)), arg
-                args_.append(ring(arg))
-            super().__init__(*args_)
-        else:
-            super().__init__(lhs, rhs)
+    @classproperty
+    def complement_func(cls):
+        # Should be an abstract class property
+        raise NotImplementedError
+
+    @classproperty
+    def converse_func(cls):
+        # Should be an abstract class property
+        raise NotImplementedError
+
+    def __init__(self, lhs: Term | int, rhs: Term | int):
+        # discuss: formally ensures 2 args? Does this do sth useful? Move to
+        # BinaryAtomicFormulaMixin?
+        if isinstance(lhs, int):
+            # There is no reason to accept sage Integers so far.
+            lhs = Term(ring(lhs))
+        if isinstance(rhs, int):
+            rhs = Term(ring(rhs))
+        assert isinstance(lhs, Term), f'{lhs=}: {type(lhs)}'
+        assert isinstance(rhs, Term), f'{rhs=}: {type(rhs)}'
+        super().__init__(lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         match other:
-            case BinaryAtomicFormula():
+            case AtomicFormula():
                 if self.lhs != other.lhs:
-                    return not self.lhs <= other.lhs
+                    return not self.lhs.poly <= other.lhs.poly  # discuss
                 if self.rhs != other.rhs:
-                    return not self.rhs <= other.rhs
+                    return not self.rhs.poly <= other.rhs.poly
                 L = [Eq, Ne, Le, Lt, Ge, Gt]
                 return L.index(self.func) <= L.index(other.func)
             case _:
@@ -274,18 +261,30 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
     def __str__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+        return f'{self.lhs.poly}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.poly}'
 
     def as_latex(self) -> str:
         SYMBOL: Final = {
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        lhs = str(latex(self.lhs))
-        rhs = str(latex(self.rhs))
-        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
+        return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
+
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
+        """
+        all_vars = set()
+        for term in self.args:
+            all_vars.update(set(term.get_vars()))
+        return GetVars(free=all_vars - assume_quantified,
+                       bound=all_vars & assume_quantified)
+
+    def subs(self, d: dict) -> Self:
+        """Implements the abstract method :meth:`.firstorder.Formula.subs`.
+        """
+        return self.func(*(arg.subs(d) for arg in self.args))  # discuss: lhs/rhs?
 
 
-class Eq(generic.EqMixin, BinaryAtomicFormula):
+class Eq(generic.EqMixin, AtomicFormula):
 
     sage_func = operator.eq
     func: type[Eq]
@@ -303,15 +302,15 @@ class Eq(generic.EqMixin, BinaryAtomicFormula):
         return Eq
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return T
         if lhs.is_constant():
             return F
-        return Eq(lhs, 0, chk=False)
+        return Eq(Term(lhs), Term(ring(0)))
 
 
-class Ne(generic.NeMixin, BinaryAtomicFormula):
+class Ne(generic.NeMixin, AtomicFormula):
 
     sage_func = operator.ne  #: :meta private:
     func: type[Ne]
@@ -329,15 +328,15 @@ class Ne(generic.NeMixin, BinaryAtomicFormula):
         return Ne
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return F
         if lhs.is_constant():
             return T
-        return Ne(lhs, 0, chk=False)
+        return Ne(Term(lhs), Term(ring(0)))
 
 
-class Ge(generic.GeMixin, BinaryAtomicFormula):
+class Ge(generic.GeMixin, AtomicFormula):
 
     sage_func = operator.ge  #: :meta private:
     func: type[Ge]
@@ -355,13 +354,13 @@ class Ge(generic.GeMixin, BinaryAtomicFormula):
         return Le
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs >= 0 else F
-        return Ge(lhs, 0, chk=False)
+        return Ge(Term(lhs), Term(ring(0)))
 
 
-class Le(generic.LeMixin, BinaryAtomicFormula):
+class Le(generic.LeMixin, AtomicFormula):
 
     sage_func = operator.le
     func: type[Le]
@@ -379,13 +378,13 @@ class Le(generic.LeMixin, BinaryAtomicFormula):
         return Ge
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs <= 0 else F
-        return Le(lhs, 0, chk=False)
+        return Le(Term(lhs), Term(ring(0)))
 
 
-class Gt(generic.GtMixin, BinaryAtomicFormula):
+class Gt(generic.GtMixin, AtomicFormula):
 
     sage_func = operator.gt
     func: type[Gt]
@@ -403,13 +402,13 @@ class Gt(generic.GtMixin, BinaryAtomicFormula):
         return Lt
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs > 0 else F
-        return Gt(lhs, 0, chk=False)
+        return Gt(Term(lhs), Term(ring(0)))
 
 
-class Lt(generic.LtMixin, BinaryAtomicFormula):
+class Lt(generic.LtMixin, AtomicFormula):
 
     sage_func = operator.lt
     func: type[Lt]
@@ -427,10 +426,10 @@ class Lt(generic.LtMixin, BinaryAtomicFormula):
         return Gt
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs < 0 else F
-        return Lt(lhs, 0, chk=False)
+        return Lt(Term(lhs), Term(ring(0)))
 
 
 # The type alias `RcfAtomicFormula` supports :code:`cast(RcfAtomicFormula,

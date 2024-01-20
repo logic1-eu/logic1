@@ -101,11 +101,11 @@ class QuantifiedFormula(Formula):
         # Collect all variables on the right hand sides of substitutions:
         substituted_vars = set()
         for term in substitution.values():
-            substituted_vars |= atom.term_get_vars(term)
+            substituted_vars |= term.get_vars()
         # (2) Make sure the quantified variable is not a key and does not occur
         # in a value of substitution:
         if self.var in substituted_vars or self.var in substitution:
-            var = atom.rename_var(self.var)
+            var = term.fresh_variable(suffix=f'_{str(self.var)}')
             # We now know the following:
             #   (i) var is not a key,
             #  (ii) var does not occur in the values,

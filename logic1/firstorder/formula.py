@@ -202,7 +202,9 @@ class Formula(ABC):
         Universally quantifiy all variables occurring free in self, except the
         ones mentioned in ignore.
         """
-        variables = sorted(list(self.get_vars().free - set(ignore)))
+        variables = list(self.get_vars().free - set(ignore))
+        if variables:
+            variables.sort(key=variables[0].sort_key)
         f = self
         for v in reversed(variables):
             f = All(v, f)
@@ -219,11 +221,7 @@ class Formula(ABC):
         SPACING: Final = ' \\, '
         match self:
             case All() | Ex():
-                try:  # requires discussion
-                    atom = next(self.atoms())
-                    var_as_latex = atom.term_to_latex(self.var)
-                except StopIteration:
-                    var_as_latex = str(self.var)
+                var_as_latex = self.var.as_latex()
                 arg_as_latex = self.arg.as_latex()
                 if self.arg.func not in (Ex, All, Not):
                     arg_as_latex = f'({arg_as_latex})'
@@ -279,13 +277,6 @@ class Formula(ABC):
         Traceback (most recent call last):
         ...
         StopIteration
-
-        One use case within firstorder is getting access to static methods of
-        classes derived from :class:`.atomic.AtomicFormula` elsewhere:
-
-        >>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
-        >>> isinstance(f.var, next(f.atoms()).variable_type())
-        True
         """
         match self:
             case All() | Ex():
@@ -355,7 +346,9 @@ class Formula(ABC):
         Existentially quantifiy all variables occurring free in self, except
         the ones mentioned in ignore.
         """
-        variables = sorted(list(self.get_vars().free - set(ignore)))
+        variables = list(self.get_vars().free - set(ignore))
+        if variables:
+            variables.sort(key=variables[0].sort_key)
         f = self
         for v in reversed(variables):
             f = Ex(v, f)
@@ -471,11 +464,11 @@ class Formula(ABC):
         Ex(x, Eq(x, a))
         >>>
         >>> f.subs({a: x})
-        Ex(x_R1, Eq(x_R1, x))
+        Ex(G0001_x, Eq(G0001_x, x))
         >>>
         >>> g = Ex(x, _ & Eq(b, 0))
         >>> g.subs({b: x})
-        Ex(x_R2, And(Ex(x_R1, Eq(x_R1, x_R2)), Eq(x, 0)))
+        Ex(G0002_x, And(Ex(G0001_x, Eq(G0001_x, G0002_x)), Eq(x, 0)))
         """
         ...
 

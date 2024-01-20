@@ -2,17 +2,25 @@ from functools import lru_cache
 from operator import xor
 from sage.all import oo, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import Iterable, Optional, Self, TypeAlias
+from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ...firstorder import And, AtomicFormula, F, Formula, Or, T
-from .rcf import (BinaryAtomicFormula, RcfAtomicFormula, RcfAtomicFormulas,
-                  Term, Variable, ring, Eq, Ne, Ge, Le, Gt, Lt)
+from ... import firstorder
+from ...firstorder import And, F, Formula, Or, T
+from .rcf import (
+    AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, RcfAtomicFormula,
+    RcfAtomicFormulas, ring, Term, Variable)
 from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
+
+# discuss: indirect import of Polynomial
+
+# discuss: firstorder.AtomicFormula vs. rcf.AtomicFormula. The problems existed
+# already before with AtomicFormula vs. BinaryAtomicFormula, resp. Also check
+# assert in l.306.
 
 
 class Theory(abc.simplify.Theory):
@@ -73,13 +81,13 @@ class Theory(abc.simplify.Theory):
             right = ')' if self.ropen else ']'
             return f'{left}{self.start}, {self.end}{right}'
 
-    _reference: dict[Term, tuple[_Interval, set]]
-    _current: dict[Term, tuple[_Interval, set]]
+    _reference: dict[Polynomial, tuple[_Interval, set]]
+    _current: dict[Polynomial, tuple[_Interval, set]]
 
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[firstorder.AtomicFormula]) -> None:
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
@@ -141,14 +149,16 @@ class Theory(abc.simplify.Theory):
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def _compose_atom(rel: type[BinaryAtomicFormula], p: Term, q: Rational) -> AtomicFormula:
+    def _compose_atom(rel: type[AtomicFormula], p: Polynomial, q: Rational)\
+            -> firstorder.AtomicFormula:
         num = q.numerator()
         den = q.denominator()
-        return rel(den * p - num, ring(0), chk=False)
+        return rel(Term(den * p - num), Term(ring(0)))
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def _decompose_atom(f: BinaryAtomicFormula) -> tuple[type[AtomicFormula], Term, Rational]:
+    def _decompose_atom(f: AtomicFormula)\
+            -> tuple[type[firstorder.AtomicFormula], Polynomial, Rational]:
         """Decompose into relation :math:`\rho`, term :math:`p` without
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
@@ -164,11 +174,12 @@ class Theory(abc.simplify.Theory):
         (<class 'logic1.theories.RCF.rcf.Le'>, a^2 + 2*a*b + b^2, -1/2)
         >>> g = Theory._compose_atom(rel, p, q); g
         Le(2*a^2 + 4*a*b + 2*b^2 + 1, 0)
-        >>> (f.lhs / g.lhs)
+        >>> (f.lhs.poly / g.lhs.poly)
         3
         """
-        q = - f.lhs.constant_coefficient()
-        p = f.lhs + q
+        lhs = f.lhs.poly
+        q = - lhs.constant_coefficient()
+        p = lhs + q
         c = p.content()
         p, _ = p.quo_rem(c)
         # Given that _simpl_at has procuces a monic polynomial, q != 0 will not
@@ -178,8 +189,8 @@ class Theory(abc.simplify.Theory):
         q = q / c
         return f.func, p, q
 
-    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
-        L: list[AtomicFormula] = []
+    def extract(self, gand: type[And | Or]) -> list[firstorder.AtomicFormula]:
+        L: list[firstorder.AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
                 ref_ivl, ref_exc = self._reference[p]
@@ -275,10 +286,7 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    AtomicSortKey: TypeAlias = tuple[int, Term]
-    SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
-
-    def __call__(self, f: Formula, assume: list[AtomicFormula] = [],
+    def __call__(self, f: Formula, assume: list[firstorder.AtomicFormula] = [],
                  prefer_weak: bool = False, prefer_order: bool = True) -> Formula:
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
@@ -289,7 +297,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
         return result
 
     @lru_cache(maxsize=None)
-    def _simpl_at(self, f: AtomicFormula) -> Formula:
+    def _simpl_at(self, f: firstorder.AtomicFormula) -> Formula:
         """
         >>> from .rcf import ring
         >>> a, b = ring.set_vars('a', 'b')
@@ -297,7 +305,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
          Ge(2*a^2 + 4*a*b + 2*b^2 - 1, 0)
         """
         assert isinstance(f, RcfAtomicFormulas)
-        lhs = f.lhs - f.rhs
+        lhs = f.lhs.poly - f.rhs.poly
         if lhs.is_constant():
             _python_operator = f.sage_func  # type: ignore
             eval_ = _python_operator(lhs, ring(0))  # type: ignore
@@ -328,7 +336,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 func = f.converse_func if unit < 0 else f.func
             case _:
                 assert False
-        return func(lhs, ring(0), chk=False)
+        return func(Term(lhs), Term(ring(0)))
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

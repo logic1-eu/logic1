@@ -31,12 +31,12 @@ Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(b, 0)), Or(Ne(a, 0), Gt(b, 0))))
 
 # Test quantifiers
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))))
-Ex(a_R1, All(a_R2, Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(a_R2 - b, 0)),
-    Or(Ne(a, 0), Gt(a_R1 - b, 0))))))
+Ex(G0001_a, All(G0002_a, Or(Gt(a - b, 0), And(Or(Gt(G0001_a - b, 0), Ne(a, 0)),
+    Or(Le(G0002_a - b, 0), Eq(a, 0))))))
 
 # Test assumption
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))), assume=[Eq(a, 0)])
-Ex(a_R3, Or(Gt(a - b, 0), Gt(a_R3 - b, 0)))
+Ex(G0003_a, Or(Gt(G0003_a - b, 0), Gt(a - b, 0)))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\

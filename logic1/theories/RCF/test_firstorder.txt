@@ -85,9 +85,6 @@ Counter({Eq(3*x, 0): 2, Eq(x, 0): 1, Eq(x*y, 1): 1})
 Traceback (most recent call last):
 ...
 StopIteration
->>> f = Ex(x, Eq(x, -y) & Eq(y, z ** 2))
->>> isinstance(f.var, next(f.atoms()).variable_type())
-True
 
 count_alternations:
 >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()

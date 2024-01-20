@@ -3,10 +3,8 @@ import sys
 from typing import Any
 
 from ... import abc
-from ...firstorder import *
-from .rcf import *
-
-from ...support.tracing import trace  # noqa
+from ...firstorder import And, Formula
+from .rcf import Eq, Ne, Le, Lt, Gt, Ge, ring, Term, RcfAtomicFormula, Variable
 
 
 class L1Parser(abc.parser.L1Parser):
