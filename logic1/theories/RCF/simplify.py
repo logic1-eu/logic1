@@ -9,9 +9,7 @@ from ... import abc
 
 from ... import firstorder
 from ...firstorder import And, F, Formula, Or, T
-from .rcf import (
-    AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, RcfAtomicFormula,
-    RcfAtomicFormulas, ring, Term, Variable)
+from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, ring, Term, Variable
 from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
@@ -153,7 +151,7 @@ class Theory(abc.simplify.Theory):
             -> firstorder.AtomicFormula:
         num = q.numerator()
         den = q.denominator()
-        return rel(Term(den * p - num), Term(ring(0)))
+        return rel(Term(den * p - num), Term(0))
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -304,18 +302,16 @@ class Simplify(abc.simplify.Simplify['Theory']):
         >>> simplify(Le(-6 * (a+b)**2 + 3, 0))
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
-        assert isinstance(f, RcfAtomicFormulas)
+        assert isinstance(f, AtomicFormula)
         lhp = f.lhs.poly - f.rhs.poly
         if lhp.is_constant():
             _python_operator = f.sage_func  # type: ignore
             eval_ = _python_operator(lhp, ring(0))  # type: ignore
             return T if eval_ else F
-        # Switch from Expressions to Polynomials
         lhp, _ = lhp.quo_rem(lhp.content())
-        # lhp = lhp / lhp.content()
         factor = lhp.factor()
         factor_list = list(factor)
-        func: type[RcfAtomicFormula]
+        func: type[AtomicFormula]
         match f.func:
             case rcf.Eq | rcf.Ne:
                 func = f.func
@@ -336,7 +332,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 func = f.converse_func if unit < 0 else f.func
             case _:
                 assert False
-        return func(Term(lhp), Term(ring(0)))
+        return func(Term(lhp), Term(0))
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

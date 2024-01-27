@@ -4,7 +4,7 @@ from typing import Any
 
 from ... import abc
 from ...firstorder import And, Formula
-from .rcf import Eq, Ne, Le, Lt, Gt, Ge, ring, Term, RcfAtomicFormula, Variable
+from .rcf import Eq, Ne, Le, Lt, Gt, Ge, ring, Term, AtomicFormula, Variable
 
 
 class L1Parser(abc.parser.L1Parser):
@@ -35,7 +35,7 @@ class L1Parser(abc.parser.L1Parser):
         match a:
             case ast.Compare(ops=ops, left=left, comparators=comparators):
                 eval_left = self.process_term(left)
-                L: list[RcfAtomicFormula] = []
+                L: list[AtomicFormula] = []
                 assert len(ops) == len(comparators)
                 for op, right in zip(ops, comparators):
                     eval_right = self.process_term(right)

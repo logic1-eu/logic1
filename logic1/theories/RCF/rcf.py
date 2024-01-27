@@ -358,7 +358,7 @@ class Eq(AtomicFormula):
             return T
         if lhs.is_constant():
             return F
-        return Eq(Term(lhs), Term(ring(0)))
+        return Eq(Term(lhs), Term(0))
 
 
 class Ne(AtomicFormula):
@@ -375,7 +375,7 @@ class Ne(AtomicFormula):
             return F
         if lhs.is_constant():
             return T
-        return Ne(Term(lhs), Term(ring(0)))
+        return Ne(Term(lhs), Term(0))
 
 
 class Ge(AtomicFormula):
@@ -387,7 +387,7 @@ class Ge(AtomicFormula):
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs >= 0 else F
-        return Ge(Term(lhs), Term(ring(0)))
+        return Ge(Term(lhs), Term(0))
 
 
 class Le(AtomicFormula):
@@ -399,7 +399,7 @@ class Le(AtomicFormula):
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs <= 0 else F
-        return Le(Term(lhs), Term(ring(0)))
+        return Le(Term(lhs), Term(0))
 
 
 class Gt(AtomicFormula):
@@ -411,7 +411,7 @@ class Gt(AtomicFormula):
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs > 0 else F
-        return Gt(Term(lhs), Term(ring(0)))
+        return Gt(Term(lhs), Term(0))
 
 
 class Lt(AtomicFormula):
@@ -423,13 +423,4 @@ class Lt(AtomicFormula):
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs < 0 else F
-        return Lt(Term(lhs), Term(ring(0)))
-
-
-# The type alias `RcfAtomicFormula` supports :code:`cast(RcfAtomicFormula,
-# ...)`. Furthermore, :code:`type[RcfAtomicFormula]` can be used for
-# annotating, e.g., :attr:`dual_func`. The tuple `RcfAtomicFormulas` supports
-# :code:`assert isinstance(..., RcfAtomicFormulas)`.
-RcfAtomicFormula: TypeAlias = Eq | Ne | Ge | Le | Gt | Lt
-
-RcfAtomicFormulas = (Eq, Ne, Ge, Le, Gt, Lt)
+        return Lt(Term(lhs), Term(0))
