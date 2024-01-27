@@ -143,6 +143,8 @@ class Term(firstorder.Term):
         return Term(self.poly + other)
 
     def __eq__(self, other: Term | Polynomial | Integer | int) -> Eq:  # type: ignore[override]
+        # discuss: we have Eq.__bool__ but this way we cannot compare Terms
+        # with arbitrary objects in a boolean context. Same for __ne__.
         if isinstance(other, Term):
             return Eq(self, other)
         return Eq(self, Term(other))
@@ -227,6 +229,16 @@ class Term(firstorder.Term):
         """
         return str(latex(self.poly))
 
+    def _coefficient(self, d: dict[Variable, int]) -> Term:
+        d_poly = {key.poly: value for key, value in d.items()}
+        return Term(self.poly.coefficient(d_poly))
+
+    def _degree(self, x: Variable) -> int:
+        return self.poly.degree(x.poly)
+
+    def _derivative(self, x: Variable, n: int = 1) -> Term:
+        return Term(self.poly.derivative(x.poly, n))
+
     def get_vars(self) -> set[Term]:
         """Extract the set of variables occurring in `self`.
 
@@ -234,6 +246,12 @@ class Term(firstorder.Term):
         :meth:`.firstorder.atomic.Term.get_vars`.
         """
         return set(Term(g) for g in self.poly.variables())
+
+    def _is_constant(self) -> bool:
+        return self.poly.is_constant()
+
+    def _is_zero(self) -> bool:
+        return self.poly.is_zero()
 
     @staticmethod
     def sort_key(term: Term) -> Polynomial:

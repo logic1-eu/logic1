@@ -94,8 +94,8 @@ class NSP(Enum):
 class TestPoint:
 
     guard: Optional[Formula] = None
-    num: Term = field(default_factory=lambda: Term(ring(0)))
-    den: Term = field(default_factory=lambda: Term(ring(1)))
+    num: Term = field(default_factory=lambda: Term(0))
+    den: Term = field(default_factory=lambda: Term(1))
     nsp: NSP = NSP.NONE
 
 
@@ -126,11 +126,11 @@ class Node:
                 for arg in self.formula.args:
                     if isinstance(arg, Eq):
                         lhs = arg.lhs
-                        if lhs.poly.degree(x.poly) == 1:
-                            a = Term(lhs.poly.coefficient({x.poly: 1}))
-                            if a.poly.is_constant():
+                        if lhs._degree(x) == 1:
+                            a = lhs._coefficient({x: 1})
+                            if a._is_constant():
                                 self.variables.remove(x)
-                                b = Term(lhs.poly.coefficient({x.poly: 0}))
+                                b = lhs._coefficient({x: 0})
                                 tp = TestPoint(num=-b, den=a)
                                 return EliminationSet(variable=x, test_points=[tp], method='g')
         return None
@@ -138,44 +138,44 @@ class Node:
     def regular_eset(self) -> EliminationSet:
 
         def guard():
-            return Ne(a, 0) if not a.poly.is_constant() else None
+            return Ne(a, 0) if not a._is_constant() else None
 
         x = self.variables.pop()
         test_points = [TestPoint(nsp=NSP.MINUS_INFINITY)]
         for atom in self.formula.atoms():
             assert isinstance(atom, AtomicFormula)
-            match atom.lhs.poly.degree(x.poly):
+            match atom.lhs._degree(x):
                 case -1 | 0:
                     continue
                 case 1:
-                    a = Term(atom.lhs.poly.coefficient({x.poly: 1}))
-                    b = Term(atom.lhs.poly.coefficient({x.poly: 0}))
+                    a = atom.lhs._coefficient({x: 1})
+                    b = atom.lhs._coefficient({x: 0})
                     match atom:
                         case Eq():
                             tp = TestPoint(guard=guard(), num=-b, den=a)
                         case Ne():
                             tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
                         case Le():
-                            if a.poly.is_constant() and a.poly > 0:
+                            if a._is_constant() and a.poly > 0:
                                 continue
                             tp = TestPoint(guard=guard(), num=-b, den=a)
                         case Ge():
-                            if a.poly.is_constant() and a.poly < 0:
+                            if a._is_constant() and a.poly < 0:
                                 continue
                             tp = TestPoint(guard=guard(), num=-b, den=a)
                         case Lt():
-                            if a.poly.is_constant() and a.poly > 0:
+                            if a._is_constant() and a.poly > 0:
                                 continue
                             tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
                         case Gt():
-                            if a.poly.is_constant() and a.poly < 0:
+                            if a._is_constant() and a.poly < 0:
                                 continue
                             tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
                         case _:
                             assert False, atom
                     test_points.append(tp)
                 case _:
-                    raise DegreeViolation(atom, x, atom.lhs.poly.degree(x.poly))
+                    raise DegreeViolation(atom, x, atom.lhs._degree(x))
         return EliminationSet(variable=x, test_points=test_points, method='e')
 
     def vsubs(self, eset: EliminationSet) -> list[Node]:
@@ -197,10 +197,10 @@ class Node:
         def mu() -> Formula:
             """Substitute ±oo into ordering constraint.
             """
-            c = Term(lhs.poly.coefficient({x.poly: 0}))
+            c = lhs._coefficient({x: 0})
             mu: Formula = func(c, 0)
-            for e in range(1, lhs.poly.degree(x.poly) + 1):
-                c = Term(lhs.poly.coefficient({x.poly: e}))
+            for e in range(1, lhs._degree(x) + 1):
+                c = lhs._coefficient({x: e})
                 if tp.nsp == NSP.MINUS_INFINITY and e % 2 == 1:
                     c = - c
                 mu = Or(Gt(c, 0), And(Eq(c, 0), mu))
@@ -209,9 +209,9 @@ class Node:
         def nu(lhs: Term) -> Formula:
             """Substitute ±ε into any constraint.
             """
-            if lhs.poly.degree(x.poly) <= 0:
+            if lhs._degree(x) <= 0:
                 return func(lhs, 0)
-            lhs_prime = Term(lhs.poly.derivative(x.poly))
+            lhs_prime = lhs._derivative(x)
             if tp.nsp == NSP.MINUS_EPSILON:
                 lhs_prime = - lhs_prime
             return Or(Gt(lhs, 0), And(Eq(lhs, 0), nu(lhs_prime)))
@@ -221,12 +221,12 @@ class Node:
             """
             func = atom.func
             FF = FractionField(ring.sage_ring)  # discuss
-            lhp = atom.lhs.poly.subs(**{str(x.poly): FF(tp.num.poly, tp.den.poly)})
+            lhq = atom.lhs.poly.subs(**{str(x.poly): FF(tp.num.poly, tp.den.poly)})
             match func:
                 case rcf.Eq | rcf.Ne:
-                    lhp = lhp.numerator()
+                    lhp = lhq.numerator()
                 case rcf.Ge | rcf.Le | rcf.Gt | rcf.Lt:
-                    lhp = (lhp * lhp.denominator() ** 2).numerator()
+                    lhp = (lhq * lhq.denominator() ** 2).numerator()
                 case _:
                     assert False, func
             assert lhp.parent() in (ring.sage_ring, ZZ), lhp.parent()
@@ -236,11 +236,11 @@ class Node:
             """Substitute transcendental element into equality.
             """
             args = []
-            for e in range(lhs.poly.degree(x.poly) + 1):
-                c = Term(lhs.poly.coefficient({x.poly: e}))
-                if c.poly.is_zero():
+            for e in range(lhs._degree(x) + 1):
+                c = lhs._coefficient({x: e})
+                if c._is_zero():
                     continue
-                if c.poly.is_constant():
+                if c._is_constant():
                     return F
                 args.append(func(c, 0))
             return And(*args) if func is Eq else Or(*args)
