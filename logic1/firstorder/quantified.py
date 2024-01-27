@@ -34,8 +34,8 @@ class QuantifiedFormula(Formula):
     def var(self) -> Any:
         """The variable of the quantifier.
 
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y = VV.set_vars('x', 'y')
         >>>
         >>> e1 = All(x, Ex(y, Eq(x, y)))
         >>> e1.var
@@ -51,12 +51,12 @@ class QuantifiedFormula(Formula):
     def arg(self) -> Formula:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
 
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y = VV.set_vars('x', 'y')
         >>>
-        >>> e1 = All(x, Ex(y, Eq(x, y)))
+        >>> e1 = All(x, Ex(y, x == y))
         >>> e1.arg
-        Ex(y, Eq(x, y))
+        Ex(y, x == y)
         """
         return self.args[1]
 
@@ -77,11 +77,11 @@ class QuantifiedFormula(Formula):
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y = VV.set_vars('x', 'y')
         >>>
         >>> All(x, Ex(y, Eq(x, y))).simplify()
-        All(x, Ex(y, Eq(x, y)))
+        All(x, Ex(y, x == y))
         """
         return self.func(self.var, self.arg.simplify())
 
@@ -125,11 +125,11 @@ class Ex(QuantifiedFormula):
     sense that their toplevel operator represents the quantifier symbol
     :math:`\exists`.
 
-    >>> from logic1.theories.Sets import Eq
-    >>> from sympy.abc import x, y
+    >>> from logic1.theories.Sets import Eq, VV
+    >>> x, y = VV.set_vars('x', 'y')
     >>>
     >>> Ex(x, Eq(x, y))
-    Ex(x, Eq(x, y))
+    Ex(x, x == y)
     """
     @classproperty
     def func(cls):
@@ -153,7 +153,7 @@ class All(QuantifiedFormula):
     >>> x, y = ring.set_vars('x', 'y')
     >>>
     >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
-    All(x, All(y, Eq(x^2 + 2*x*y + y^2 + 1, x^2 + 2*x*y + y^2)))
+    All(x, All(y, x^2 + 2*x*y + y^2 + 1 == x^2 + 2*x*y + y^2))
     """
     @classproperty
     def func(cls):

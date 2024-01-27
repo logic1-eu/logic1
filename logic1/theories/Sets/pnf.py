@@ -1,7 +1,7 @@
 from ... import abc
 
 from ...firstorder import Formula
-from .sets import Eq, Variable
+from .sets import Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -12,7 +12,7 @@ class PrenexNormalForm(abc.pnf.PrenexNormalForm):
         return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
     def rename(self, v: Variable) -> Variable:
-        return Eq.rename_var(v)
+        return v.fresh_variable(suffix=f'_{str(v)}')  # discuss
 
 
 pnf = PrenexNormalForm()

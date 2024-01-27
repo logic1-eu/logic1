@@ -21,10 +21,14 @@ class Pool(abc.qe.PoolOnePrimitive):
 class QuantifierElimination(abc.qe.QuantifierElimination):
     """Quantifier elimination for the theory of Sets.
 
-    >>> from logic1 import *
-    >>> from sympy.abc import a, u, v, w, x, y, z
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, u, v, w, x, y, z = VV.set_vars('a', 'u', 'v', 'w', 'x', 'y', 'z')
     >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, (Eq(u, v) | Ne(v, w))
     ...     & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
+    >>> f
+    All(u, Ex(w, All(x, Ex(y, Ex(v,
+        And(Or(u == v, v != w), Not(Equivalent(u == x, u != w)), y == a))))))
     >>> qe(f)
     C_(2)
 

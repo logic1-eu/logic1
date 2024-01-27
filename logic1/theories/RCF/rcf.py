@@ -4,24 +4,20 @@ from dataclasses import dataclass
 import functools
 import inspect
 import operator
-from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
-from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
+from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
+from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
 import sys
 from types import FrameType
-from typing import Final, Optional, Self, TypeAlias
+from typing import Any, Final, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
-from ...atomlib import generic
 from ...support.containers import GetVars
 from ...support.decorators import classproperty
 
 from ...support.tracing import trace  # noqa
 
-
-# discuss: from a mathematical viewpoint, class Term is a polynomial ring, and
-# _Ring is the set of its variables. Rename _Ring -> Variable, ring -> rcf.V?
 
 class _Ring:
 
@@ -56,7 +52,7 @@ class _Ring:
             if not isinstance(v, str):
                 raise ValueError(f'{v} is not a string')
             if v in old_as_str:
-                raise ValueError(f'{v} is already a variable') from None
+                raise ValueError(f'{v} is already a variable')
         new_as_str = sorted(old_as_str + added_as_str)
         self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
         added_as_gen = (self.sage_ring(v) for v in added_as_str)
@@ -146,22 +142,53 @@ class Term(firstorder.Term):
             return Term(self.poly + other.poly)
         return Term(self.poly + other)
 
+    def __eq__(self, other: Term | Polynomial | Integer | int) -> Eq:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Eq(self, other)
+        return Eq(self, Term(other))
+
+    def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
+        if isinstance(other, Term):
+            return Ge(self, other)
+        return Ge(self, Term(other))
+
+    def __gt__(self, other: Term | Polynomial | Integer | int) -> Gt:
+        if isinstance(other, Term):
+            return Gt(self, other)
+        return Gt(self, Term(other))
+
     def __hash__(self) -> int:
-        # discuss: There was a doctest error that Term was not hashable.
-        return hash(('Term', self.poly))
+        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
 
     def __init__(self, arg: Polynomial | Integer | int) -> None:
-        # discuss
-        if isinstance(arg, (Integer, int)):
-            # Sage Integers come into existence via vsubs.
-            arg = ring(arg)
-        assert isinstance(arg, Polynomial), f'{arg=}: {type(arg)}'
-        self.poly = arg
+        match arg:
+            case Polynomial():
+                self.poly = arg
+            case Integer() | int():
+                self.poly = ring(arg)
+            case _:
+                raise ValueError(
+                    f'arguments must be polylnomial or integer; {arg} is {type(arg)}')
+
+    def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
+        if isinstance(other, Term):
+            return Le(self, other)
+        return Le(self, Term(other))
+
+    def __lt__(self, other: Term | Polynomial | Integer | int) -> Lt:
+        if isinstance(other, Term):
+            return Lt(self, other)
+        return Lt(self, Term(other))
 
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly * other.poly)
         return Term(self.poly * other)
+
+    def __ne__(self, other: Term | Polynomial | Integer | int) -> Ne:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Ne(self, other)
+        return Ne(self, Term(other))
 
     def __neg__(self) -> Term:
         return Term(- self.poly)
@@ -170,7 +197,6 @@ class Term(firstorder.Term):
         return Term(self.poly ** other)
 
     def __repr__(self) -> str:
-        # disucss: I added this to get the doctests working.
         return str(self.poly)
 
     def __radd__(self, other: object) -> Term:
@@ -194,15 +220,18 @@ class Term(firstorder.Term):
         return self ** other
 
     def as_latex(self) -> str:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_to_latex`.
+        """Convert `self` to LaTeX.
+
+        Implements the abstract method
+        :meth:`.firstorder.atomic.Term.as_Latex`.
         """
         return str(latex(self.poly))
 
     def get_vars(self) -> set[Term]:
         """Extract the set of variables occurring in `self`.
 
-        This Implements the abstract method :meth:`.firstorder.Term.get_vars`.
+        Implements the abstract method
+        :meth:`.firstorder.atomic.Term.get_vars`.
         """
         return set(Term(g) for g in self.poly.variables())
 
@@ -210,9 +239,7 @@ class Term(firstorder.Term):
     def sort_key(term: Term) -> Polynomial:
         return term.poly
 
-    def subs(self, d: dict) -> Term:
-        """Implements the abstract method :meth:`.firstorder.Formula.subs`.
-        """
+    def subs(self, d: dict[Variable, Term]) -> Term:
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
         return Term(self.poly.subs(**sage_keywords))
 
@@ -221,42 +248,59 @@ Variable: TypeAlias = Term
 
 
 @functools.total_ordering
-class AtomicFormula(generic.BinaryAtomicFormulaMixin, firstorder.AtomicFormula):
+class AtomicFormula(firstorder.AtomicFormula):
 
     @classproperty
-    def complement_func(cls):
-        # Should be an abstract class property
-        raise NotImplementedError
+    def complement_func(cls) -> type[AtomicFormula]:
+        D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
+        return D[cls]
 
     @classproperty
-    def converse_func(cls):
-        # Should be an abstract class property
-        raise NotImplementedError
+    def converse_func(cls) -> type[AtomicFormula]:
+        D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
+        return D[cls]
 
-    def __init__(self, lhs: Term | int, rhs: Term | int):
-        # discuss: formally ensures 2 args? Does this do sth useful? Move to
-        # BinaryAtomicFormulaMixin?
-        if isinstance(lhs, int):
-            # There is no reason to accept sage Integers so far.
-            lhs = Term(ring(lhs))
-        if isinstance(rhs, int):
-            rhs = Term(ring(rhs))
-        assert isinstance(lhs, Term), f'{lhs=}: {type(lhs)}'
-        assert isinstance(rhs, Term), f'{rhs=}: {type(rhs)}'
+    @classproperty
+    def dual_func(cls) -> type[AtomicFormula]:
+        return cls.complement_func.converse_func
+
+    @property
+    def lhs(self):
+        return self.args[0]
+
+    @property
+    def rhs(self):
+        return self.args[1]
+
+    def __init__(self, lhs: Term | Polynomial | Integer | int,
+                 rhs: Term | Polynomial | Integer | int):
+        # Integer is a candidate for removal
+        assert not isinstance(lhs, Integer)
+        assert not isinstance(rhs, Integer)
+        if not isinstance(lhs, Term):
+            lhs = Term(lhs)
+        if not isinstance(rhs, Term):
+            rhs = Term(rhs)
         super().__init__(lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         match other:
             case AtomicFormula():
                 if self.lhs != other.lhs:
-                    return not self.lhs.poly <= other.lhs.poly  # discuss
+                    return not Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
                 if self.rhs != other.rhs:
-                    return not self.rhs.poly <= other.rhs.poly
+                    return not Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
                 L = [Eq, Ne, Le, Lt, Ge, Gt]
                 return L.index(self.func) <= L.index(other.func)
             case _:
-                assert not isinstance(other, AtomicFormula)
                 return True
+
+    def __repr__(self) -> str:
+        if self.lhs.poly.is_constant() and self.rhs.poly.is_constant():
+            # Return Eq(1, 2) instead of 1 == 2, because the latter is not
+            # suitable as input.
+            return super().__repr__()
+        return str(self)
 
     def __str__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
@@ -270,36 +314,25 @@ class AtomicFormula(generic.BinaryAtomicFormulaMixin, firstorder.AtomicFormula):
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
-        """
         all_vars = set()
         for term in self.args:
             all_vars.update(set(term.get_vars()))
         return GetVars(free=all_vars - assume_quantified,
                        bound=all_vars & assume_quantified)
 
-    def subs(self, d: dict) -> Self:
-        """Implements the abstract method :meth:`.firstorder.Formula.subs`.
+    def subs(self, d: dict[Variable, Term]) -> Self:
+        """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
-        return self.func(*(arg.subs(d) for arg in self.args))  # discuss: lhs/rhs?
+        return self.func(self.lhs.subs(d), self.rhs.subs(d))
 
 
-class Eq(generic.EqMixin, AtomicFormula):
+class Eq(AtomicFormula):
 
     sage_func = operator.eq
     func: type[Eq]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Ne of Eq.
-        """
-        return Ne
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Eq of Eq.
-        """
-        return Eq
+    def __bool__(self) -> bool:
+        return self.lhs.poly == self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -310,22 +343,13 @@ class Eq(generic.EqMixin, AtomicFormula):
         return Eq(Term(lhs), Term(ring(0)))
 
 
-class Ne(generic.NeMixin, AtomicFormula):
+class Ne(AtomicFormula):
 
     sage_func = operator.ne  #: :meta private:
     func: type[Ne]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Eq of Ne.
-        """
-        return Eq
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Ne of Ne.
-        """
-        return Ne
+    def __bool__(self) -> bool:
+        return self.lhs.poly != self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -336,22 +360,10 @@ class Ne(generic.NeMixin, AtomicFormula):
         return Ne(Term(lhs), Term(ring(0)))
 
 
-class Ge(generic.GeMixin, AtomicFormula):
+class Ge(AtomicFormula):
 
     sage_func = operator.ge  #: :meta private:
     func: type[Ge]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Lt` of :class:`Ge`.
-        """
-        return Lt
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Le of Ge.
-        """
-        return Le
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -360,22 +372,10 @@ class Ge(generic.GeMixin, AtomicFormula):
         return Ge(Term(lhs), Term(ring(0)))
 
 
-class Le(generic.LeMixin, AtomicFormula):
+class Le(AtomicFormula):
 
     sage_func = operator.le
     func: type[Le]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Lt` of :class:`Ge`.
-        """
-        return Gt
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Le of Ge.
-        """
-        return Ge
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -384,22 +384,10 @@ class Le(generic.LeMixin, AtomicFormula):
         return Le(Term(lhs), Term(ring(0)))
 
 
-class Gt(generic.GtMixin, AtomicFormula):
+class Gt(AtomicFormula):
 
     sage_func = operator.gt
     func: type[Gt]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Le` of :class:`Gt`.
-        """
-        return Le
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Lt of Gt.
-        """
-        return Lt
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -408,22 +396,10 @@ class Gt(generic.GtMixin, AtomicFormula):
         return Gt(Term(lhs), Term(ring(0)))
 
 
-class Lt(generic.LtMixin, AtomicFormula):
+class Lt(AtomicFormula):
 
     sage_func = operator.lt
     func: type[Lt]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Ge` of :class:`Lt`.
-        """
-        return Ge
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Gt of Lt.
-        """
-        return Gt
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly

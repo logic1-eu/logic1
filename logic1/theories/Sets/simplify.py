@@ -1,11 +1,9 @@
-from sympy import default_sort_key, oo
-from sympy.core.numbers import Infinity, Integer
 from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
 
 from ...firstorder import And, AtomicFormula, Formula, Or
-from .sets import C, C_, Eq, Ne, Term, Variable
+from .sets import C, C_, Eq, Index, Ne, oo, Term, Variable
 from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
@@ -13,22 +11,22 @@ from ...support.tracing import trace  # noqa
 
 class Theory(abc.simplify.Theory):
 
-    _ref_min_card: Integer
-    _ref_max_card: Integer | Infinity
+    _ref_min_card: Index
+    _ref_max_card: Index
     _ref_equations: list[set[Term]]
     _ref_inequations: set[Ne]
 
-    _cur_min_card: Integer
-    _cur_max_card: Integer | Infinity
+    _cur_min_card: Index
+    _cur_max_card: Index
     _cur_equations: list[set[Term]]
     _cur_inequations: set[Ne]
 
     def __init__(self) -> None:
-        self._ref_min_card = Integer(1)
+        self._ref_min_card = 1
         self._ref_max_card = oo
         self._ref_equations = []
         self._ref_inequations = set()
-        self._cur_min_card = Integer(1)
+        self._cur_min_card = 1
         self._cur_max_card = oo
         self._cur_equations = []
         self._cur_inequations = set()
@@ -77,7 +75,7 @@ class Theory(abc.simplify.Theory):
             # # Create substitution from the equations
             # sigma = dict()
             # for P in self._cur_equations:
-            #     x = max(P, key=default_sort_key)
+            #     x = max(P, key=Term.sort_key)
             #     for y in P:
             #         if y is not x:
             #             sigma[y] = x
@@ -101,7 +99,7 @@ class Theory(abc.simplify.Theory):
         if self._cur_max_card < self._ref_max_card:
             L.append(C_(self._cur_max_card + 1))
         for P in self._cur_equations:
-            x = min(P, key=default_sort_key)
+            x = min(P, key=Term.sort_key)
             for y in P:
                 if x != y:
                     for Q in self._ref_equations:
@@ -133,7 +131,7 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    AtomicSortKey: TypeAlias = tuple[int, Integer] | tuple[int, Term, Term]
+    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Term, Term]
     SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:

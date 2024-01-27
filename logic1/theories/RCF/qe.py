@@ -875,7 +875,7 @@ class VirtualSubstitution:
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
-        assert self.matrix, self.matrix
+        assert self.matrix is not None, self.matrix  # discuss
         logger.info(str(self.blocks))
         if logger.isEnabledFor(logging.DEBUG):
             s = str(self.matrix)

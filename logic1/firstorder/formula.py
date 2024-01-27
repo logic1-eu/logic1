@@ -74,7 +74,7 @@ class Formula(ABC):
         Recall from the Python documentation that PYTHONHASHSEED should not be
         fixed in general.
         """
-        return hash((tuple(str(cls) for cls in self.func.__mro__), self.args))
+        return hash((tuple(str(cls) for cls in self.func.mro()), self.args))
 
     @abstractmethod
     def __init__(self, *args: object) -> None:
@@ -87,10 +87,10 @@ class Formula(ABC):
         """Override the :obj:`~ <object.__invert__>` operator to apply
         :class:`Not`.
 
-        >>> from logic1.theories.RCF import Eq
-        >>>
-        >>> ~ Eq(1,0)
-        Not(Eq(1, 0))
+        >>> from logic1.theories.RCF import ring
+        >>> x, = ring.set_vars('x')
+        >>> ~ (x == 0)
+        Not(x == 0)
         """
         return Not(self)
 
@@ -112,7 +112,7 @@ class Formula(ABC):
         >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x + z, y + z) << Eq(x, y)
-        Implies(Eq(x, y), Eq(x + z, y + z))
+        Implies(x == y, x + z == y + z)
         """
         return Implies(other, self)
 
@@ -128,7 +128,7 @@ class Formula(ABC):
         >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
-        Or(Eq(x, 0), Eq(x, y), Eq(x, z))
+        Or(x == 0, x == y, x == z)
         """
         return Or(self, other)
 
@@ -153,7 +153,7 @@ class Formula(ABC):
         >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
         >>> Eq(x, y) >> Eq(x + z, y + z)
-        Implies(Eq(x, y), Eq(x + z, y + z))
+        Implies(x == y, x + z == y + z)
         """
         return Implies(self, other)
 
@@ -161,8 +161,8 @@ class Formula(ABC):
         """Representation of the Formula used in printing.
         """
         SYMBOL: Final = {
-            All: 'All', Ex: 'Ex', And: '&', Or: 'or', Implies: '>>',
-            Equivalent: 'equivalent', Not: '~', _F: 'F', _T: 'T'}
+            All: 'All', Ex: 'Ex', And: 'and', Or: 'or', Implies: '-->',
+            Equivalent: '<-->', Not: 'not', _F: 'F', _T: 'T'}
         PRECEDENCE: Final = {
             All: 99, Ex: 99, And: 50, Or: 50, Implies: 10, Equivalent: 10,
             Not: 99, _F: 99, _T: 99}
@@ -180,7 +180,7 @@ class Formula(ABC):
                 L = []
                 for arg in self.args:
                     arg_as_str = str(arg)
-                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 0):
+                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 100):
                         arg_as_str = f'({arg_as_str})'
                     L.append(arg_as_str)
                 return f'{SPACING}{SYMBOL[self.func]}{SPACING}'.join(L)
@@ -260,7 +260,7 @@ class Formula(ABC):
         >>> type(f.atoms())
         <class 'generator'>
         >>> list(f.atoms())
-        [Eq(3*x, 0), Eq(3*x, 0), Eq(x, 0), Eq(x*y, 1)]
+        [3*x == 0, 3*x == 0, x == 0, x*y == 1]
         >>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
         True
 
@@ -270,7 +270,7 @@ class Formula(ABC):
         4
         >>> from collections import Counter
         >>> Counter(f.atoms())
-        Counter({Eq(3*x, 0): 2, Eq(x, 0): 1, Eq(x*y, 1): 1})
+        Counter({3*x == 0: 2, x == 0: 1, x*y == 1: 1})
 
         >>> empty = (T & F).atoms()
         >>> next(empty)
@@ -298,10 +298,10 @@ class Formula(ABC):
         counted.
 
         >>> from logic1 import Ex, All, T
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y, z = VV.set_vars('x', 'y', 'z')
         >>>
-        >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
+        >>> Ex(x, (x == y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
         2
         """
         return self._count_alternations()[0]
@@ -359,8 +359,8 @@ class Formula(ABC):
         """The set of all variables that are quantified in self.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import a, b, c, x, y, z
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> a, b, c, x, y, z = VV.set_vars('a', 'b', 'c', 'x', 'y', 'z')
         >>>
         >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
         True
@@ -461,14 +461,14 @@ class Formula(ABC):
         >>>
         >>> f = Ex(x, Eq(x, a))
         >>> f.subs({x: a})
-        Ex(x, Eq(x, a))
+        Ex(x, x == a)
         >>>
         >>> f.subs({a: x})
-        Ex(G0001_x, Eq(G0001_x, x))
+        Ex(G0001_x, G0001_x == x)
         >>>
         >>> g = Ex(x, _ & Eq(b, 0))
         >>> g.subs({b: x})
-        Ex(G0002_x, And(Ex(G0001_x, Eq(G0001_x, G0002_x)), Eq(x, 0)))
+        Ex(G0002_x, And(Ex(G0001_x, G0001_x == G0002_x), x == 0))
         """
         ...
 
@@ -494,8 +494,7 @@ class Formula(ABC):
         >>>
         >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
         >>> f.to_nnf()
-        And(Or(Ne(a, 0), F, Ex(y, Ne(y, a))),
-            Or(All(y, Eq(y, a)), And(Eq(a, 0), T)))
+        And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
         """
         rewrite: Formula
         match self:
@@ -547,7 +546,7 @@ class Formula(ABC):
         >>>
         >>> f = Eq(x, y) & Lt(y, z)
         >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
-        And(Eq(x - y, 0), Lt(y - z, 0))
+        And(x - y == 0, y - z < 0)
         """
         # type of tr requieres discussion
         match self:

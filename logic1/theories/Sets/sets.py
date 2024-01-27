@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from abc import ABCMeta
+from dataclasses import dataclass
+import functools
+import inspect
 import logging
-import sympy
-from typing import ClassVar, Final, TypeAlias
+import string
+import sys
+from types import FrameType
+from typing import Any, ClassVar, Final, Optional, TypeAlias
 
-from ... import atomlib
-from ...firstorder import T, F
+from ... import firstorder
+from ...firstorder import F, Formula, T
+from ...support.containers import GetVars
 from ...support.decorators import classproperty
-
-
-oo: TypeAlias = atomlib.sympy.oo
-Term: TypeAlias = atomlib.sympy.Term
-Variable: TypeAlias = atomlib.sympy.Variable
 
 
 logging.basicConfig(
@@ -20,149 +20,323 @@ logging.basicConfig(
     level=logging.CRITICAL)
 
 
-class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
+oo = float('Inf')
 
-    def __str__(self) -> str:
-        SYMBOL: Final = {Eq: '==', Ne: '!='}
-        SPACING: Final = ' '
-        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+Index: TypeAlias = int | float
+
+
+class _VariableRegistry:
+    """Instances of the singleton VariableRegsitry register, store, and provide
+    variables, which are instances of Terms and suitable for building complex
+    insrtances of Terms using operators and methods defined in :class:`Term`.
+    """
+
+    _instance: ClassVar[Optional[_VariableRegistry]] = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __init__(self):
+        self.variables = []
+        self.stack = []
+
+    def __repr__(self):
+        return f'Term Algebra in {", ".join(self.variables)}'
+
+    def add_var(self, v: str) -> Variable:
+        return self.add_vars(v)[0]
+
+    def add_vars(self, *args) -> tuple[Variable, ...]:
+        added_as_str = list(args)
+        old_as_str = self.variables
+        for v in added_as_str:
+            if not isinstance(v, str):
+                raise ValueError(f'{v} is not a string')
+            if v in old_as_str:
+                raise ValueError(f'{v} is already a variable')
+        new_as_str = sorted(old_as_str + added_as_str)
+        self.variables = new_as_str
+        added_as_var = (Variable(v) for v in added_as_str)
+        return tuple(added_as_var)
+
+    def get_vars(self) -> tuple[Variable, ...]:
+        return tuple(Variable(v) for v in self.variables)
+
+    def import_vars(self, force: bool = False):
+        critical = []
+        variables = self.get_vars()
+        frame = inspect.currentframe()
+        assert isinstance(frame, FrameType)
+        frame = frame.f_back
+        try:
+            assert isinstance(frame, FrameType)
+            name = frame.f_globals['__name__']
+            assert name == '__main__', f'import_vars called from {name}'
+            for v in variables:
+                try:
+                    expr = frame.f_globals[str(v)]
+                    if expr != v:
+                        critical.append(str(v))
+                except KeyError:
+                    pass
+            for v in variables:
+                if force or str(v) not in critical:
+                    frame.f_globals[str(v)] = v
+            if not force:
+                if len(critical) == 1:
+                    print(f'{critical[0]} has another value already, '
+                          f'use force=True to overwrite ',
+                          file=sys.stderr)
+                elif len(critical) > 1:
+                    print(f'{", ".join(critical)} have other values already, '
+                          f'use force=True to overwrite ',
+                          file=sys.stderr)
+        finally:
+            # Compare Note here:
+            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
+            del frame
+
+    def pop(self) -> list[str]:
+        self.variables = self.stack.pop()
+        return self.variables
+
+    def push(self) -> list[list[str]]:
+        self.stack.append(self.variables)
+        return self.stack
+
+    def set_vars(self, *args) -> tuple[Variable, ...]:
+        self.variables = []
+        return self.add_vars(*args)
+
+
+VV = _VariableRegistry()
+
+
+@dataclass
+class Term(firstorder.Term):
+
+    var: str
+
+    @classmethod
+    def fresh_variable(cls, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence G0001, G0002,
+        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
+        gensym(). If the optional argument :data:`suffix` is specified, the
+        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
+        """
+        vars_as_str = tuple(str(v) for v in VV.get_vars())
+        i = 1
+        v_as_str = f'G{i:04d}{suffix}'
+        while v_as_str in vars_as_str:
+            i += 1
+            v_as_str = f'G{i:04d}{suffix}'
+        v = VV.add_var(v_as_str)
+        return v
+
+    def __eq__(self, other: Term) -> Eq:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Eq(self, other)
+        raise ValueError(f'arguments must be terms - {other} is {type(other)}')
+
+    def __hash__(self) -> int:
+        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.var))
+
+    def __init__(self, arg: str) -> None:
+        if not isinstance(arg, str):
+            raise ValueError(f'argument must be a string; {arg} is {type(arg)}')
+        self.var = arg
+
+    def __ne__(self, other: Term) -> Ne:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Ne(self, other)
+        raise ValueError(f'arguments must be terms; {other} is {type(other)}')
+
+    def __repr__(self) -> str:
+        return self.var
 
     def as_latex(self) -> str:
-        SYMBOL: Final = {Eq: '=', Ne: '\\neq'}
-        SPACING: Final = ' '
-        lhs = sympy.latex(self.lhs)
-        rhs = sympy.latex(self.rhs)
-        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
+        """Convert `self` to LaTeX.
 
-    def relations(self) -> list[ABCMeta]:
-        return [C, C_, Eq, Ne]
+        Implements the abstract method
+        :meth:`logic1.firstorder.atomic.Term.as_Latex`.
+        """
+        base = self.var.rstrip(string.digits)
+        index = self.var[len(base):]
+        if index:
+            return f'{base}_{{{index}}}'
+        return base
+
+    def get_vars(self) -> set[Term]:
+        """Extract the set of variables occurring in `self`.
+
+        Implements the abstract method
+        :meth:`logic1.firstorder.atomic.Term.get_vars`.
+        """
+        return {self}
+
+    @staticmethod
+    def sort_key(term: Term) -> str:
+        return term.var
+
+    def subs(self, d: dict[Variable, Term]) -> Term:
+        return d.get(self, self)
 
 
-class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
-    """Equations with only variables as terms.
+Variable: TypeAlias = Term
 
-    This implements that fact that the language of sets has no functions and,
-    in particular, no constants.
 
-    >>> from sympy.abc import x, y
-    >>> Eq(x, y)
-    Eq(x, y)
+@functools.total_ordering
+class AtomicFormula(firstorder.AtomicFormula):
 
-    >>> Eq(x, 0)
-    Traceback (most recent call last):
-    ...
-    ValueError: 0 is not a variable
+    @classproperty
+    def complement_func(cls) -> type[AtomicFormula]:
+        D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
+        return D[cls]
 
-    >>> Eq(x + x, y)
-    Traceback (most recent call last):
-    ...
-    ValueError: 2*x is not a variable
-    """
+    def __le__(self, other: Formula) -> bool:
+        L: Final = [C, C_, Eq, Ne]
+        match other:
+            case AtomicFormula():
+                if isinstance(self, (C, C_)) and isinstance(other, (Eq, Ne)):
+                    return True
+                if isinstance(self, (Eq, Ne)) and isinstance(other, (C, C_)):
+                    return False
+                match self:
+                    case C() | C_():
+                        assert isinstance(other, (C, C_))
+                        if self.index == other.index:
+                            return L.index(self.func) <= L.index(other.func)
+                        return self.index <= other.index
+                    case Eq() | Ne():
+                        assert isinstance(other, (Eq, Ne))
+                        if self.func != other.func:
+                            return L.index(self.func) <= L.index(other.func)
+                        if Term.sort_key(self.lhs) != Term.sort_key(other.lhs):
+                            return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
+                        return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
+                    case _:
+                        assert False, f'{self}: {type(self)}'
+            case _:
+                return True
+
+    def __repr__(self) -> str:
+        match self:
+            case C() | C_():
+                return super().__repr__()
+            case Eq() | Ne():
+                SYMBOL: Final = {Eq: '==', Ne: '!='}
+                SPACING: Final = ' '
+                return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+            case _:
+                assert False, f'{self}: {type(self)}'
+
+    def as_latex(self) -> str:
+        match self:
+            case C(index=index) if index == oo:
+                return f'C_\\infty'
+            case C(index=index):
+                return f'C_{{{index}}}'
+            case C_(index=index) if index == oo:
+                return f'\\overline{{C_\\infty}}'
+            case C_(index=index):
+                return f'\\overline{{C_{{{index}}}}}'
+            case Eq(lhs=lhs, rhs=rhs):
+                return f'{lhs.as_latex()} = {rhs.as_latex()}'
+            case Ne(lhs=lhs, rhs=rhs):
+                return f'{lhs.as_latex()} \\neq {rhs.as_latex()}'
+            case _:
+                assert False, f'{self}: {type(self)}'
+
+    def get_vars(self, assume_quantified: set = set()) -> GetVars:
+        match self:
+            case C() | C_():
+                return GetVars()
+            case Eq() | Ne():
+                all_vars = set()
+                for term in self.args:
+                    all_vars.update(set(term.get_vars()))
+                return GetVars(free=all_vars - assume_quantified,
+                               bound=all_vars & assume_quantified)
+            case _:
+                assert False, f'{self}: {type(self)}'
+
+    def subs(self, d: dict[Variable, Term]) -> AtomicFormula:
+        """Implements abstract :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        """
+        match self:
+            case C() | C_():
+                return self
+            case Eq() | Ne():
+                return self.func(self.lhs.subs(d), self.rhs.subs(d))
+            case _:
+                assert False, f'{self}: {type(self)}'
+
+
+class Eq(AtomicFormula):
 
     func: type[Eq]
+    args: tuple[Term, Term]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Ne of Eq.
-        """
-        return Ne
+    @property
+    def lhs(self):
+        return self.args[0]
 
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Eq of Eq.
-        """
-        return Eq
+    @property
+    def rhs(self):
+        return self.args[1]
 
-    def __init__(self, *args):
-        for arg in args:
-            if not isinstance(arg, Variable):
-                raise ValueError(f"{arg!r} is not a variable")
-        super().__init__(*args)
+    def __bool__(self) -> bool:
+        return self.lhs.var == self.rhs.var
 
-    def simplify(self):
-        c = self.lhs.compare(self.rhs)
-        if c == 0:
+    def __init__(self, lhs: Term, rhs: Term) -> None:
+        for arg in (lhs, rhs):
+            if not isinstance(arg, Term):
+                raise ValueError(
+                    f'arguments must be variables; {arg} is {type(arg)}')
+        super().__init__(lhs, rhs)
+
+    def simplify(self) -> Formula:
+        if self.lhs == self.rhs:
             return T
-        if c == 1:
+        if Term.sort_key(self.lhs) > Term.sort_key(self.rhs):
             return Eq(self.rhs, self.lhs)
-        assert c == -1
         return self
 
 
-class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
-    """Inequations with only variables as terms.
-
-    This implements that fact that the language of sets has no functions and,
-    in particular, no constants.
-
-    >>> from sympy.abc import x, y
-    >>> Ne(y, x)
-    Ne(y, x)
-
-    >>> Ne(x, y + 1)
-    Traceback (most recent call last):
-    ...
-    ValueError: y + 1 is not a variable
-    """
+class Ne(AtomicFormula):
 
     func: type[Ne]
+    args: tuple[Term, Term]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Eq of Ne.
-        """
-        return Eq
+    @property
+    def lhs(self):
+        return self.args[0]
 
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Me of Ne.
-        """
-        return Ne
+    @property
+    def rhs(self):
+        return self.args[1]
 
-    def __init__(self, *args):
-        for arg in args:
-            if not isinstance(arg, Variable):
-                raise ValueError(f"{arg!r} is not a variable")
-        super().__init__(*args)
+    def __bool__(self) -> bool:
+        return self.lhs.var != self.rhs.var
 
-    def simplify(self):
-        c = self.lhs.compare(self.rhs)
-        if c == 0:
+    def __init__(self, lhs: Term, rhs: Term) -> None:
+        for arg in (lhs, rhs):
+            if not isinstance(arg, Term):
+                raise ValueError(
+                    f'arguments must be variables - {arg} is {type(arg)}')
+        super().__init__(lhs, rhs)
+
+    def simplify(self) -> Formula:
+        if self.lhs == self.rhs:
             return F
-        if c == 1:
+        if Term.sort_key(self.lhs) > Term.sort_key(self.rhs):
             return Ne(self.rhs, self.lhs)
-        assert c == -1
         return self
 
 
-class IndexedConstantAtomicFormula(atomlib.sympy.IndexedConstantAtomicFormula):
-
-    def __str__(self) -> str:
-        # Normally __str__ defaults to __repr__. However, we have inherited
-        # Formula.__str__, which recursively calls exactly this method here.
-        return repr(self)
-
-    def as_latex(self) -> str:
-        match self.index:
-            case int() | sympy.Integer():  # no int admitted - discuss!
-                k = str(self.index)
-            case sympy.core.numbers.Infinity():
-                k = '\\infty'
-            case _:
-                assert False
-        match self.func:
-            case C():
-                return f'C_{{{k}}}'
-            case C_():
-                return f'\\overline{{C_{{{k}}}}}'
-            case _:
-                assert False
-
-    def relations(self) -> list[ABCMeta]:
-        return [C, C_, Eq, Ne]
-
-
-class C(IndexedConstantAtomicFormula):
+class C(AtomicFormula):
     r"""A class whose instances are cardinality constraints in the sense that
     their toplevel operator represents a constant relation symbol :math:`C_n`
     where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical interpretation in
@@ -171,53 +345,34 @@ class C(IndexedConstantAtomicFormula):
     The class constructor takes one argument, which is the index `n`. It takes
     care that instance with equal indices are identical.
 
-    >>> c_0_1 = C(0)
-    >>> c_0_2 = C(0)
+    >>> c_1_1 = C(1)
+    >>> c_1_2 = C(1)
     >>> c_oo = C(oo)
-    >>> c_0_1 is c_0_2
+    >>> c_1_1 is c_1_2
     True
-    >>> c_0_1 == c_oo
+    >>> c_1_1 == c_oo
     False
     """
 
-    # Class variables
-    func: type[C]  #: :meta private:
-    """A type annotation for the class property `func` inherited from
-    :attr:`.firstorder.AtomicFormula.func`.
-    """
+    _instances: ClassVar[dict[Index, C]] = dict()
 
-    @classproperty
-    def complement_func(cls):
-        """A class property yielding the complement class :class:`C_` of
-        :class:`C`.
-        """
-        return C_
+    func: type[C]
+    args: tuple[Index]
 
-    _instances: ClassVar[dict] = {}
-    """A private class variable, which is a dictionary holding unique instances
-    of `C(n)` with key `n`.
-    """
+    @property
+    def index(self) -> Index:
+        return self.args[0]
 
-    # Instance variables
-    args: tuple[atomlib.sympy.Index]  #: :meta private:
-    """A type annotation for the property `func` inherited from
-    :attr:`.firstorder.AtomicFormula.func`.
-
-    :meta private:
-    """
-
-    def __repr__(self):
-        return f'C({self.index})'
-
-    def _sprint(self, mode: str) -> str:
-        if mode == 'text':
-            return repr(self)
-        assert mode == 'latex', f'bad print mode {mode!r}'
-        k = str(self.index) if isinstance(self.index, int) else '\\infty'
-        return f'C_{{{k}}}'
+    def __new__(cls, index: Index):
+        if not (isinstance(index, int) and index > 0 or index == oo):
+            raise ValueError(f'argument must be positive int or oo; '
+                             f'{index} is {type(index)}')
+        if index not in cls._instances:
+            cls._instances[index] = super().__new__(cls)
+        return cls._instances[index]
 
 
-class C_(IndexedConstantAtomicFormula):
+class C_(AtomicFormula):
     r"""A class whose instances are cardinality constraints in the sense that
     their toplevel operator represents a constant relation symbol
     :math:`\bar{C}_n` where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical
@@ -227,47 +382,28 @@ class C_(IndexedConstantAtomicFormula):
     The class constructor takes one argument, which is the index `n`. It takes
     care that instance with equal indices are identical.
 
-    >>> c_0_1 = C_(0)
-    >>> c_0_2 = C_(0)
+    >>> c_1_1 = C_(1)
+    >>> c_1_2 = C_(1)
     >>> c_oo = C_(oo)
-    >>> c_0_1 is c_0_2
+    >>> c_1_1 is c_1_2
     True
-    >>> c_0_1 == c_oo
+    >>> c_1_1 == c_oo
     False
     """
 
-    # Class variables
-    func: type[C_]  #: :meta private:
-    """A type annotation for the class property `func` inherited from
-    :attr:`.firstorder.AtomicFormula.func`.
-    """
+    _instances: ClassVar[dict[Index, C_]] = dict()
 
-    @classproperty
-    def complement_func(cls):
-        """A class property yielding the complement class :class:`C` of
-        :class:'C_'.
-        """
-        return C
+    func: type[C_]
+    args: tuple[Index]
 
-    _instances: ClassVar[dict] = {}
-    """A private class variable, which is a dictionary holding unique instances
-    of `C_(n)` with key `n`.
-    """
+    @property
+    def index(self) -> Index:
+        return self.args[0]
 
-    # Instance variables
-    args: tuple[atomlib.sympy.Index]
-    """A type annotation for the property `func` inherited from
-    :attr:`.firstorder.AtomicFormula.func`.
-
-    :meta private:
-    """
-
-    def __repr__(self) -> str:
-        return f'C_({self.index})'
-
-    def _sprint(self, mode: str) -> str:
-        if mode == 'text':
-            return repr(self)
-        assert mode == 'latex', f'bad print mode {mode!r}'
-        k = str(self.index) if isinstance(self.index, int) else '\\infty'
-        return f'\\overline{{C_{{{k}}}}}'
+    def __new__(cls, index: Index):
+        if not (isinstance(index, int) and index > 0 or index == oo):
+            raise ValueError(f'argument must be positive int or oo; '
+                             f'{index} is {type(index)}')
+        if index not in cls._instances:
+            cls._instances[index] = super().__new__(cls)
+        return cls._instances[index]

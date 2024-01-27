@@ -5,6 +5,11 @@ from ..support.decorators import classproperty
 class BinaryAtomicFormulaMixin:
 
     @classproperty
+    def converse_func(cls):
+        # Should be an abstract class property
+        raise NotImplementedError
+
+    @classproperty
     def dual_func(cls):
         """The dual class of :class:`cls`.
 

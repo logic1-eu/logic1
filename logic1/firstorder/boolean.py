@@ -76,17 +76,18 @@ class Equivalent(BooleanFormula):
         return self.args[1]
 
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
+        # discuss: To what extent does this check for 2 args?
         self.args = (lhs, rhs)
 
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y = VV.set_vars('x', 'y')
         >>>
         >>> e1 = Equivalent(~ Eq(x, y), F)
         >>> e1.simplify()
-        Eq(x, y)
+        x == y
         """
         lhs = self.lhs.simplify()
         rhs = self.rhs.simplify()
@@ -171,13 +172,13 @@ class AndOr(BooleanFormula):
         >>> from logic1.theories.RCF import Eq, ring
         >>> x, y, z = ring.set_vars('x', 'y', 'z')
         >>>
-        >>> f1 = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z)))
+        >>> f1 = And(x == y, T, x == y, And(x == z, x == x + z))
         >>> f1.simplify()
-        And(Eq(x - y, 0), Eq(x - z, 0), Eq(-z, 0))
+        And(x - y == 0, x - z == 0, -z == 0)
         >>>
-        >>> f2 = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
+        >>> f2 = Or(x == 0, Or(x == 1, x == 2), And(x == y, x == z))
         >>> f2.simplify()
-        Or(Eq(x, 0), Eq(x - 1, 0), Eq(x - 2, 0), And(Eq(x - y, 0), Eq(x - z, 0)))
+        Or(x == 0, x - 1 == 0, x - 2 == 0, And(x - y == 0, x - z == 0))
         """
         gAnd = And if self.func is And else Or
         gT = T if self.func is And else F
@@ -205,17 +206,17 @@ class And(AndOr):
     toplevel operator represents the Boolean operator
     :math:`\wedge`.
 
-    >>> from logic1.theories.Sets import Eq
-    >>> from sympy.abc import x, y, z, O
+    >>> from logic1.theories.Sets import Eq, VV
+    >>> x, y, z, O = VV.set_vars('x', 'y', 'z', 'O')
     >>>
     >>> And()
     T
     >>>
     >>> And(Eq(O, O))
-    Eq(O, O)
+    O == O
     >>>
     >>> And(Eq(x, O), Eq(x, y), Eq(y, z))
-    And(Eq(x, O), Eq(x, y), Eq(y, z))
+    And(x == O, x == y, y == z)
     """
     @classproperty
     def func(cls):
@@ -276,15 +277,15 @@ class Or(AndOr):
     toplevel operator represents the Boolean operator
     :math:`\vee`.
 
-    >>> from logic1.theories.RCF import Eq
+    >>> from logic1.theories.RCF import ring
     >>> Or()
     F
+    >>> x, = ring.set_vars('x')
+    >>> Or(x == 0)
+    x == 0
     >>>
-    >>> Or(Eq(1, 0))
-    Eq(1, 0)
-    >>>
-    >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
-    Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
+    >>> Or(x == 1, x == 2, x == 3)
+    Or(x == 1, x == 2, x == 3)
     """
     @classproperty
     def func(cls):
@@ -367,12 +368,12 @@ class Not(BooleanFormula):
         """Compare the parent method :meth:`Formula.simplify`.
 
         >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y, z
+        >>> from logic1.theories.Sets import Eq, VV
+        >>> x, y, z = VV.set_vars('x', 'y', 'z')
         >>>
         >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
         >>> ~ All(x, Ex(y, f)).simplify()
-        Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z)))))
+        Not(All(x, Ex(y, And(x == y, x == z))))
         """
         arg_simplify = self.arg.simplify()
         if arg_simplify is T:
@@ -386,11 +387,12 @@ def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.theories.RCF import Eq
-    >>> involutive_not(Eq(0, 0))
-    Not(Eq(0, 0))
-    >>> involutive_not(~Eq(1, 0))
-    Eq(1, 0)
+    >>> from logic1.theories.RCF import ring
+    >>> x, = ring.set_vars('x')
+    >>> involutive_not(x == 0)
+    Not(x == 0)
+    >>> involutive_not(~ (x == 0))
+    x == 0
     >>> involutive_not(T)
     Not(T)
     """

@@ -35,10 +35,10 @@ def Equivalent(lhs: Formula, rhs: Formula) -> boolean.Equivalent:
 def Ex(variables: object, arg: Formula) -> Formula:
     """Build an Ex-quantified Formula, checking arguments.
 
-    >>> from logic1.theories.Sets import Eq
-    >>> from sympy.abc import x
-    >>> Ex(x, Eq(x, x))
-    Ex(x, Eq(x, x))
+    >>> from logic1.theories.Sets import Eq, VV
+    >>> x, = VV.set_vars('x')
+    >>> Ex(x, x == x)
+    Ex(x, x == x)
 
     >>> Ex('x', 'y')
     Traceback (most recent call last):
@@ -48,7 +48,7 @@ def Ex(variables: object, arg: Formula) -> Formula:
     >>> Ex('x', Eq(x, x))
     Traceback (most recent call last):
     ...
-    ValueError: type of variable 'x' must be <class 'sympy.core.symbol.Symbol'>
+    ValueError: type of variable 'x' must be <class 'logic1.firstorder.atomic.Term'>
     """
     return _Q(quantified.Ex, variables, arg)
 

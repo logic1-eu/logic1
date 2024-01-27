@@ -17,53 +17,19 @@ class AtomicFormula(Formula):
         """
         return cls
 
-    # The following would be an abstract class property, which is not available
-    # at the moment.
-    complement_func: type[AtomicFormula]  #: :meta private:
+    @classproperty
+    def complement_func(cls):
+        # Should be an abstract class property
+        raise NotImplementedError
 
-    # Instance variables
     args: tuple
-
-    # Static methods on terms
-    # @staticmethod
-    # @abstractmethod
-    # def term_get_vars(term: Any) -> set:
-    #     """Extract the set of variables occurring in `term`.
-    #     """
-    #     ...
-
-    # @staticmethod
-    # @abstractmethod
-    # def term_to_latex(term: Any) -> str:
-    #     """Convert `term` to LaTeX.
-    #     """
-    #     ...
-
-    # Static methods on variables
-    # @staticmethod
-    # @abstractmethod
-    # def variable_type() -> Any:
-    #     """The Python type of variables in terms in subclasses of
-    #     :class:`AtomicFormula`.
-    #     """
-    #     ...
-
-    # @staticmethod
-    # @abstractmethod
-    # def rename_var(variable: Any) -> Any:
-    #     """Return a fresh variable for replacing `variable` in the course of
-    #     renaming.
-
-    #     Compare :meth:`.Formula.to_distinct_vars`, :meth:`.Formula.to_pnf`.
-    #     """
-    #     ...
 
     def __init__(self, *args) -> None:
         self.args = args
 
     def __str__(self) -> str:
         # Overloading __str__ here breaks an infinite recursion in the
-        # inherited Formula.__str__. Nicer string representation are provided
+        # inherited Formula.__str__. Nicer string representations are provided
         # by various theory modules.
         return repr(self)
 
@@ -103,6 +69,11 @@ class Term(ABC):
     def get_vars(self) -> set[Self]:  # mypy complains about -> set[Variable]
         """Extract the set of variables occurring in `self`.
         """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def sort_key(term: Any) -> Any:
         ...
 
 

@@ -173,7 +173,7 @@ class Theory(abc.simplify.Theory):
         >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
         (<class 'logic1.theories.RCF.rcf.Le'>, a^2 + 2*a*b + b^2, -1/2)
         >>> g = Theory._compose_atom(rel, p, q); g
-        Le(2*a^2 + 4*a*b + 2*b^2 + 1, 0)
+        2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
         >>> (f.lhs.poly / g.lhs.poly)
         3
         """
@@ -302,41 +302,41 @@ class Simplify(abc.simplify.Simplify['Theory']):
         >>> from .rcf import ring
         >>> a, b = ring.set_vars('a', 'b')
         >>> simplify(Le(-6 * (a+b)**2 + 3, 0))
-         Ge(2*a^2 + 4*a*b + 2*b^2 - 1, 0)
+        2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
         assert isinstance(f, RcfAtomicFormulas)
-        lhs = f.lhs.poly - f.rhs.poly
-        if lhs.is_constant():
+        lhp = f.lhs.poly - f.rhs.poly
+        if lhp.is_constant():
             _python_operator = f.sage_func  # type: ignore
-            eval_ = _python_operator(lhs, ring(0))  # type: ignore
+            eval_ = _python_operator(lhp, ring(0))  # type: ignore
             return T if eval_ else F
         # Switch from Expressions to Polynomials
-        lhs, _ = lhs.quo_rem(lhs.content())
-        # lhs = lhs / lhs.content()
-        factor = lhs.factor()
+        lhp, _ = lhp.quo_rem(lhp.content())
+        # lhp = lhp / lhp.content()
+        factor = lhp.factor()
         factor_list = list(factor)
         func: type[RcfAtomicFormula]
         match f.func:
             case rcf.Eq | rcf.Ne:
                 func = f.func
                 # Compute squarefree part
-                lhs = ring(1)
+                lhp = ring(1)
                 for factor, _ in factor_list:
-                    lhs *= factor
-                if lhs.lc() < 0:
-                    lhs = - lhs
+                    lhp *= factor
+                if lhp.lc() < 0:
+                    lhp = - lhp
             case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
                 unit = factor.unit()
-                lhs = ring(1)
+                lhp = ring(1)
                 for factor, multiplicity in factor_list:
-                    lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
-                if lhs.lc() < 0:
-                    lhs = - lhs
+                    lhp *= factor ** 2 if multiplicity % 2 == 0 else factor
+                if lhp.lc() < 0:
+                    lhp = - lhp
                     unit = - unit
                 func = f.converse_func if unit < 0 else f.func
             case _:
                 assert False
-        return func(Term(lhs), Term(ring(0)))
+        return func(Term(lhp), Term(ring(0)))
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

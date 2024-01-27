@@ -7,49 +7,55 @@
 T
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x and a * x + b == 0)))')
-And(Eq(a, 0), Eq(b, 0))
+And(a == 0, b == 0)
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y + z == x)))')
 F
 
 >>> qe('ex(x, a * x + b == 0)')
-Or(Ne(a, 0), Eq(b, 0))
+Or(a != 0, b == 0)
 
 >>> qe('ex(x, a * x + b == 0)', workers=2)
-Or(Ne(a, 0), Eq(b, 0))
+Or(a != 0, b == 0)
 
 >>> qe('ex(x, a * x + b <= 0)')
-Or(Ne(a, 0), Le(b, 0))
+Or(a != 0, b <= 0)
 
 >>> qe('ex(x, a * x + b <= 0 and x <= b)')
-Or(Gt(a, 0), And(Ge(a^2*b + a*b, 0), Lt(a, 0)), And(Eq(a, 0), Le(b, 0)))
+Or(a > 0, And(a^2*b + a*b >= 0, a < 0), And(a == 0, b <= 0))
 
 # Period 9
->>> x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = ring.set_vars(
-...     'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9', 'x10', 'x11')
+>>> ring.set_vars(*(f'x{i}' for i in range(12)))
+(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11)
+>>> ring.import_vars()
 
->>> def _Q(q, X, phi):
-...     Q_X_phi = phi
-...     for x in X:
-...         Q_X_phi = q(x, Q_X_phi)
-...     return Q_X_phi
-
->>> def EX(X, phi):
-...     return _Q(Ex, X, phi)
-
->>> def ALL(X, phi):
-...     return _Q(All, X, phi)
-
->>> phi1 = l1('x2>=0 and x3 == x2-x1 or x2<0 and x3 == -x2-x1')
->>> phi2 = l1('x3>=0 and x4 == x3-x2 or x3<0 and x4 == -x3-x2')
->>> phi3 = l1('x4>=0 and x5 == x4-x3 or x4<0 and x5 == -x4-x3')
->>> phi4 = l1('x5>=0 and x6 == x5-x4 or x5<0 and x6 == -x5-x4')
->>> phi5 = l1('x6>=0 and x7 == x6-x5 or x6<0 and x7 == -x6-x5')
->>> phi6 = l1('x7>=0 and x8 == x7-x6 or x7<0 and x8 == -x7-x6')
->>> phi7 = l1('x8>=0 and x9 == x8-x7 or x8<0 and x9 == -x8-x7')
->>> phi8 = l1('x9>=0 and x10 == x9-x8 or x9<0 and x10 == -x9-x8')
->>> phi9 = l1('x10>=0 and x11 == x10-x9 or x10<0 and x11 == -x10-x9')
+>>> phi1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
+>>> phi2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)
+>>> phi3 = (x4 >= 0) & (x5 == x4 - x3) | (x4 < 0) & (x5 == -x4 - x3)
+>>> phi4 = (x5 >= 0) & (x6 == x5 - x4) | (x5 < 0) & (x6 == -x5 - x4)
+>>> phi5 = (x6 >= 0) & (x7 == x6 - x5) | (x6 < 0) & (x7 == -x6 - x5)
+>>> phi6 = (x7 >= 0) & (x8 == x7 - x6) | (x7 < 0) & (x8 == -x7 - x6)
+>>> phi7 = (x8 >= 0) & (x9 == x8 - x7) | (x8 < 0) & (x9 == -x8 - x7)
+>>> phi8 = (x9 >= 0) &  (x10 == x9 - x8) | (x9 < 0) & (x10 == -x9 - x8)
+>>> phi9 = (x10 >= 0) & (x11 == x10 - x9) | (x10 < 0) & (x11 == -x10 - x9)
 
 >>> phi = phi1 & phi2 & phi3 & phi4 & phi5 & phi6 & phi7 & phi8 & phi9
 
->>> p9 = ALL(phi.get_vars().free, Implies(phi, l1('x1 == x10 and x2 == x11')))
+>>> p9 = All(x1, phi >> ((x1 == x10) & (x2 == x11)))
+>>> qe(p9)
+And(Or(x2 < 0, And(x10 - x2 + x3 == 0, x11 - x2 == 0), And(Or(x10 + x11 + x9 !=
+0, x10 >= 0), Or(x10 - x11 - x9 != 0, x10 < 0)), And(Or(x10 + x8 + x9 != 0, x9
+>= 0), Or(x10 + x8 - x9 != 0, x9 < 0)), And(Or(x2 + x3 + x4 != 0, x3 >= 0),
+Or(x2 - x3 + x4 != 0, x3 < 0)), And(Or(x3 + x4 + x5 != 0, x4 >= 0), Or(x3 - x4 +
+x5 != 0, x4 < 0)), And(Or(x4 + x5 + x6 != 0, x5 >= 0), Or(x4 - x5 + x6 != 0, x5
+< 0)), And(Or(x5 + x6 + x7 != 0, x6 >= 0), Or(x5 - x6 + x7 != 0, x6 < 0)),
+And(Or(x6 + x7 + x8 != 0, x7 >= 0), Or(x6 - x7 + x8 != 0, x7 < 0)), And(Or(x7 +
+x8 + x9 != 0, x8 >= 0), Or(x7 - x8 + x9 != 0, x8 < 0))), Or(x2 > 0, And(x10 + x2
++ x3 == 0, x11 - x2 == 0), And(Or(x10 + x11 + x9 != 0, x10 >= 0), Or(x10 - x11 -
+x9 != 0, x10 < 0)), And(Or(x10 + x8 + x9 != 0, x9 >= 0), Or(x10 + x8 - x9 != 0,
+x9 < 0)), And(Or(x2 + x3 + x4 != 0, x3 >= 0), Or(x2 - x3 + x4 != 0, x3 < 0)),
+And(Or(x3 + x4 + x5 != 0, x4 >= 0), Or(x3 - x4 + x5 != 0, x4 < 0)), And(Or(x4 +
+x5 + x6 != 0, x5 >= 0), Or(x4 - x5 + x6 != 0, x5 < 0)), And(Or(x5 + x6 + x7 !=
+0, x6 >= 0), Or(x5 - x6 + x7 != 0, x6 < 0)), And(Or(x6 + x7 + x8 != 0, x7 >= 0),
+Or(x6 - x7 + x8 != 0, x7 < 0)), And(Or(x7 + x8 + x9 != 0, x8 >= 0), Or(x7 - x8 +
+x9 != 0, x8 < 0))))

@@ -5,9 +5,9 @@
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(Eq(a, 0) & (Ne(b, 0) | (Le(c, 0) & (Gt(d, 0) | Eq(a, 0)))))
-And(Eq(a, 0), Or(Ne(b, 0), Le(c, 0)))
+And(a == 0, Or(b != 0, c <= 0))
 >>> simplify(Eq(a, 0) & (Eq(b, 0) | (Eq(c, 0) & Ge(d, 0))) & (Ne(d, 0) | Ne(a, 0)))
-And(Eq(a, 0), Ne(d, 0), Or(Eq(b, 0), And(Eq(c, 0), Gt(d, 0))))
+And(a == 0, d != 0, Or(b == 0, And(c == 0, d > 0)))
 
 # Test implicit negation and extended Boolean operators
 >>> simplify(T)
@@ -19,74 +19,74 @@ F
 >>> simplify(Not(Eq(1, 0)))
 T
 >>> simplify(Eq(a, 0))
-Eq(a, 0)
+a == 0
 >>> simplify(Not(Eq(a, 0)))
-Ne(a, 0)
+a != 0
 
 >>> simplify(Gt(a, b) & Equivalent(Eq(a, 0), Gt(b, 0)))
-And(Gt(a - b, 0), Or(Eq(a, 0), Le(b, 0)), Or(Ne(a, 0), Gt(b, 0)))
+And(a - b > 0, Or(a == 0, b <= 0), Or(a != 0, b > 0))
 
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Gt(b, 0)))
-Or(Gt(a - b, 0), And(Or(Eq(a, 0), Le(b, 0)), Or(Ne(a, 0), Gt(b, 0))))
+Or(a - b > 0, And(Or(a == 0, b <= 0), Or(a != 0, b > 0)))
 
 # Test quantifiers
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))))
-Ex(G0001_a, All(G0002_a, Or(Gt(a - b, 0), And(Or(Gt(G0001_a - b, 0), Ne(a, 0)),
-    Or(Le(G0002_a - b, 0), Eq(a, 0))))))
+Ex(G0001_a, All(G0002_a, Or(a - b > 0, And(Or(G0001_a - b > 0, a != 0),
+    Or(G0002_a - b <= 0, a == 0)))))
 
 # Test assumption
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))), assume=[Eq(a, 0)])
-Ex(G0003_a, Or(Gt(G0003_a - b, 0), Gt(a - b, 0)))
+Ex(G0003_a, Or(G0003_a - b > 0, a - b > 0))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\
 ...     == simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)
 
->>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)  # default
-And(Ne(a, 0), Or(Gt(a, 0), Eq(b, 0)))
->>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak = False)  # default
-And(Ne(a, 0), Or(Gt(a, 0), Eq(b, 0)))
->>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = True)
-And(Ne(a, 0), Or(Ge(a, 0), Eq(b, 0)))
->>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak = True)
-And(Ne(a, 0), Or(Ge(a, 0), Eq(b, 0)))
+>>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak=False)  # default
+And(a != 0, Or(a > 0, b == 0))
+>>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak=False)  # default
+And(a != 0, Or(a > 0, b == 0))
+>>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak=True)
+And(a != 0, Or(a >= 0, b == 0))
+>>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak=True)
+And(a != 0, Or(a >= 0, b == 0))
 
->>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak = False)  # default
-Or(Eq(a, 0), And(Gt(a, 0), Eq(b, 0)))
->>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak = False)  # default
-Or(Eq(a, 0), And(Gt(a, 0), Eq(b, 0)))
->>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak = True)
-Or(Eq(a, 0), And(Ge(a, 0), Eq(b, 0)))
->>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak = True)
-Or(Eq(a, 0), And(Ge(a, 0), Eq(b, 0)))
+>>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak=False)  # default
+Or(a == 0, And(a > 0, b == 0))
+>>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak=False)  # default
+Or(a == 0, And(a > 0, b == 0))
+>>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak=True)
+Or(a == 0, And(a >= 0, b == 0))
+>>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak=True)
+Or(a == 0, And(a >= 0, b == 0))
 
 # Test prefer_order
 >>> assert simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)))\
 ...     == simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)
 
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=True)  # default
-Or(Gt(a, 0), And(Lt(a, 0), Eq(b, 0)))
+Or(a > 0, And(a < 0, b == 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)  # default
-Or(Gt(a, 0), And(Lt(a, 0), Eq(b, 0)))
+Or(a > 0, And(a < 0, b == 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=False)
-Or(Gt(a, 0), And(Ne(a, 0), Eq(b, 0)))
+Or(a > 0, And(a != 0, b == 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=False)
-Or(Gt(a, 0), And(Ne(a, 0), Eq(b, 0)))
+Or(a > 0, And(a != 0, b == 0))
 
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=True)  # default
-And(Ge(a, 0), Or(Gt(a, 0), Eq(b, 0)))
+ And(a >= 0, Or(a > 0, b == 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=True)  # default
-And(Ge(a, 0), Or(Gt(a, 0), Eq(b, 0)))
+ And(a >= 0, Or(a > 0, b == 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=False)
-And(Ge(a, 0), Or(Ne(a, 0), Eq(b, 0)))
+ And(a >= 0, Or(a != 0, b == 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=False)
-And(Ge(a, 0), Or(Ne(a, 0), Eq(b, 0)))
+ And(a >= 0, Or(a != 0, b == 0))
 
 # Do not prefer order over equality
 >>> simplify(Le(a, 0) & (Ne(b, 0) | Eq(a, 0)), prefer_order=True)
-And(Le(a, 0), Or(Eq(a, 0), Ne(b, 0)))
+And(a <= 0, Or(a == 0, b != 0))
 >>> simplify(Le(a, 0) & (Ne(b, 0) | Ge(a, 0)), prefer_order=True)
-And(Le(a, 0), Or(Eq(a, 0), Ne(b, 0)))
+And(a <= 0, Or(a == 0, b != 0))
 
 
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/benchmark/reals/service/rlgsn/testseries1/
@@ -945,15 +945,15 @@ And(Le(a, 0), Or(Eq(a, 0), Ne(b, 0)))
 >>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
 
 >>> simplify(Le(-5*(a-b)*(a+b), 0))
-Ge(a^2 - b^2, 0)
+a^2 - b^2 >= 0
 
 >>> i2, n, p1, q, td, z = ring.add_vars('i2', 'n', 'p1', 'q', 'td', 'z')
 
 >>> simplify(Le((-100*n + 10*td + 2500*z + 36519) * a, 0))
-Ge(100*a*n - 10*a*td - 2500*a*z - 36519*a, 0)
+100*a*n - 10*a*td - 2500*a*z - 36519*a >= 0
 
 >>> simplify(Eq((-100*n + 10*td + 2500*z + 36519) * a, 0))
-Eq(100*a*n - 10*a*td - 2500*a*z - 36519*a, 0)
+100*a*n - 10*a*td - 2500*a*z - 36519*a == 0
 
 >>> simplify(Le(-16 * (a-1)**2 * (a+1)**3, 0))
-Ge(a^3 - a^2 - a + 1, 0)
+a^3 - a^2 - a + 1 >= 0
