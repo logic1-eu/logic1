@@ -53,10 +53,11 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return result
 
     def select_and_pop(self, vars_: list, f: Formula) -> Variable:
+        # revise: use a counter
         d = {v: 0 for v in vars_}
         args = f.args if f.func is And else (f,)
         for atom in args:
-            for v in atom.get_vars().free:
+            for v in set(atom.fvars()):
                 if v in vars_:
                     d[v] += 1
         vals = list(d.values())
@@ -96,7 +97,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         if eqs:
             solution = eqs[0].rhs if eqs[0].rhs != v else eqs[0].lhs
             return f.subs({v: solution})
-        Z = And(*nes).get_vars().free - {v}
+        Z = set(And(*nes).fvars()) - {v}
         m = len(Z)
         phi_prime = Or(*(And(eta(Z, k), C(k + 1)) for k in range(1, m + 1)))
         logging.info(f'{self.qe1.__qualname__}: result is {phi_prime}')

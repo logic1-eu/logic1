@@ -7,7 +7,7 @@ import logging
 import string
 import sys
 from types import FrameType
-from typing import Any, ClassVar, Final, Optional, TypeAlias
+from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
 from ... import firstorder
 from ...firstorder import F, Formula, T
@@ -246,6 +246,15 @@ class AtomicFormula(firstorder.AtomicFormula):
                 return f'{lhs.as_latex()} = {rhs.as_latex()}'
             case Ne(lhs=lhs, rhs=rhs):
                 return f'{lhs.as_latex()} \\neq {rhs.as_latex()}'
+            case _:
+                assert False, f'{self}: {type(self)}'
+
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        match self:
+            case Eq() | Ne():
+                yield from (v for v in (self.lhs, self.rhs) if v not in quantified)
+            case C() | C_():
+                yield from ()
             case _:
                 assert False, f'{self}: {type(self)}'
 

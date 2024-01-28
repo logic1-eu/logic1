@@ -1,0 +1,8 @@
+>>> from logic1.firstorder import *
+>>> from logic1.theories.Sets import *
+>>> a, b, x, y, z = VV.set_vars('a', 'b', 'x', 'y', 'z')
+
+fvars:
+>>> f = C(2) & All(y, Ex(x, (x == y) & (y == a)) & Ex(z, x == a))
+>>> list(f.fvars())
+[a, x, a]

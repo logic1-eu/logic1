@@ -192,7 +192,7 @@ class Formula(ABC):
             case _F() | _T():
                 return SYMBOL[self.func]
             case _:
-                # Atomic formulas must be caught by the implementation of the
+                # Atomic formulas are caught by the implementation of the
                 # abstract method AtomicFormula.__str__.
                 assert False, repr(self)
 
@@ -202,7 +202,7 @@ class Formula(ABC):
         Universally quantifiy all variables occurring free in self, except the
         ones mentioned in ignore.
         """
-        variables = list(self.get_vars().free - set(ignore))
+        variables = list(set(self.fvars()) - set(ignore))
         if variables:
             variables.sort(key=variables[0].sort_key)
         f = self
@@ -242,7 +242,7 @@ class Formula(ABC):
             case _F() | _T():
                 return SYMBOL[self.func]
             case _:
-                # Atomic formulas must be caught by the implementation of the
+                # Atomic formulas are caught by the implementation of the
                 # abstract method AtomicFormula.as_latex.
                 assert False
 
@@ -346,13 +346,36 @@ class Formula(ABC):
         Existentially quantifiy all variables occurring free in self, except
         the ones mentioned in ignore.
         """
-        variables = list(self.get_vars().free - set(ignore))
+        variables = list(set(self.fvars()) - set(ignore))
         if variables:
             variables.sort(key=variables[0].sort_key)
         f = self
         for v in reversed(variables):
             f = Ex(v, f)
         return f
+
+    def fvars(self) -> Iterator[Variable]:
+        """An iterator over all variables with free ocurrences in self.
+
+        >>> from logic1.theories.RCF import ring
+        >>> a, x, y, z = ring.set_vars('a', 'x', 'y', 'z')
+        >>>
+        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a)).fvars())
+        [a, x, a]
+        """
+        return self._fvars(set())
+
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        match self:
+            case All() | Ex():
+                yield from self.arg._fvars(quantified.union({self.var}))
+            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
+                for arg in self.args:
+                    yield from arg._fvars(quantified)
+            case AtomicFormula():
+                yield from self._fvars(quantified)
+            case _:
+                assert False, type(self)
 
     @abstractmethod
     def get_qvars(self) -> set:
@@ -562,7 +585,7 @@ class Formula(ABC):
 
 
 # The following imports are intentionally late to avoid circularity.
-from .atomic import AtomicFormula
+from .atomic import AtomicFormula, Variable
 from .boolean import And, Equivalent, Implies, Not, Or
 from .quantified import All, Ex, QuantifiedFormula
 from .truth import _F, _T

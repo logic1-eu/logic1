@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Self, TypeAlias
+from typing import Any, Iterator, Self, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -35,6 +35,10 @@ class AtomicFormula(Formula):
 
     def as_latex(self) -> str:
         return f'\\verb!{repr(self)}!'
+
+    @abstractmethod
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        ...
 
     def get_qvars(self) -> set:
         """Implements the abstract method :meth:`Formula.get_qvars`.

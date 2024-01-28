@@ -65,7 +65,7 @@ class Simplify(ABC, Generic[TH]):
         match f:
             case QuantifiedFormula(func=Q, var=var, arg=arg):
                 simplified_arg = self._simpl_pnf(arg, th.next_(remove=var))
-                if var not in simplified_arg.get_vars().free:
+                if var not in simplified_arg.fvars():
                     return simplified_arg
                 return Q(var, simplified_arg)
             case _:

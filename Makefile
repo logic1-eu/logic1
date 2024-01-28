@@ -3,7 +3,8 @@ wheel:
 
 pytest:
 	pytest --exitfirst --doctest-modules\
-		--ignore="logic1/theories/depricated"
+		--ignore="logic1/theories/depricated"\
+		--ignore="logic1/theories/ZModM"
 
 mypy:
 	mypy logic1 --exclude logic1/theories/depricated

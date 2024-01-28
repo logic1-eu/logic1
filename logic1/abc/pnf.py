@@ -34,7 +34,7 @@ class PrenexNormalForm(ABC):
         """
         if not is_nnf:
             f = f.to_nnf()
-        f = self.with_distinct_vars(f, f.get_vars().free)
+        f = self.with_distinct_vars(f, set(f.fvars()))
         return self._pnf(f)[All if prefer_universal else Ex]
 
     def _pnf(self, f) -> dict[type[All | Ex], Formula]:

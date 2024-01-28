@@ -160,13 +160,13 @@ class QuantifierElimination(ABC, Generic[P]):
             v = self.select_and_pop(vars_, f)
             match f:
                 case AtomicFormula():
-                    if v in f.get_vars().free:
+                    if v in f.fvars():
                         result = self.simplify(self.qe1(v, f))
                     else:
                         result = f
                 case And(args=args):
                     other_args, v_args = more_itertools.partition(
-                        lambda arg: v in arg.get_vars().free, args)
+                        lambda arg: v in arg.fvars(), args)
                     f_v: Formula = And(*v_args)
                     if f_v is not T:
                         f_v = self.qe1(v, f_v)

@@ -68,6 +68,10 @@ Ex(x, Ex(b, Ex(a, a*x + b == 0)))
 >>> g.ex(ignore=(x,))
 Ex(b, Ex(a, a*x + b == 0))
 
+all:
+>>> (a*x + b != 0).all(ignore={x})
+All(b, All(a, a*x + b != 0))
+
 atoms:
 >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
 >>> type(f.atoms())
@@ -94,6 +98,14 @@ depth:
 >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
 >>> f.depth()
 6
+
+ex:
+>>> (a*x + b > 0).ex(ignore={x})
+Ex(b, Ex(a, a*x + b > 0))
+
+fvars:
+>>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a)).fvars())
+[a, x, a]
 
 get_qvars:
 >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}

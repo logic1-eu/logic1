@@ -9,7 +9,7 @@ from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular as Polynomial)
 import sys
 from types import FrameType
-from typing import Any, Final, Optional, Self, TypeAlias
+from typing import Any, Final, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -239,6 +239,10 @@ class Term(firstorder.Term):
     def _derivative(self, x: Variable, n: int = 1) -> Term:
         return Term(self.poly.derivative(x.poly, n))
 
+    def vars(self) -> Iterator[Variable]:
+        # discuss "from" vs. "for"
+        yield from (Term(g) for g in self.poly.variables())
+
     def get_vars(self) -> set[Term]:
         """Extract the set of variables occurring in `self`.
 
@@ -330,6 +334,10 @@ class AtomicFormula(firstorder.AtomicFormula):
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
+
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        yield from (v for v in self.lhs.vars() if v not in quantified)
+        yield from (v for v in self.rhs.vars() if v not in quantified)
 
     def get_vars(self, assume_quantified: set = set()) -> GetVars:
         all_vars = set()
