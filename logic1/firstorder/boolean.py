@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from .formula import Formula
-from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
@@ -28,22 +27,6 @@ class BooleanFormula(Formula):
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
-
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars`.
-        """
-        qvars = set()
-        for arg in self.args:
-            qvars |= arg.get_qvars()
-        return qvars
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars`.
-        """
-        vars = GetVars()
-        for arg in self.args:
-            vars |= arg.get_vars(assume_quantified=assume_quantified)
-        return vars
 
     def subs(self, substitution: dict) -> BooleanFormula:
         """Implements the abstract method :meth:`Formula.subs`.

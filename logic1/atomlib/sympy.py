@@ -5,7 +5,6 @@ import sympy
 from typing import Final, TypeAlias
 
 from .. import firstorder
-from ..support.containers import GetVars
 from ..support.renaming import rename
 from . import generic
 
@@ -17,13 +16,6 @@ oo: Final = sympy.oo
 
 
 class TermMixin:
-
-    @staticmethod
-    def term_get_vars(term: Term) -> set[Variable]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_get_vars`.
-        """
-        return sympy.S(term).atoms(Variable)
 
     @staticmethod
     def term_to_latex(term: Term) -> str:
@@ -63,15 +55,6 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
                 return L.index(self.func) <= L.index(other.func)
             case _:
                 return True
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
-        """
-        all_vars = set()
-        for term in self.args:
-            all_vars |= term.atoms(sympy.Symbol)
-        return GetVars(free=all_vars - assume_quantified,
-                       bound=all_vars & assume_quantified)
 
     @abstractmethod
     def relations(self) -> list[ABCMeta]:
@@ -133,8 +116,3 @@ class IndexedConstantAtomicFormula(AtomicFormula):
         """The index of the :class:`IndexedConstantAtomicFormula`.
         """
         return self.args[0]
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
-        """
-        return GetVars()

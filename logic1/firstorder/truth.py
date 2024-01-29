@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import final, Optional
 
-from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 from .boolean import BooleanFormula
@@ -19,16 +18,6 @@ class TruthValue(BooleanFormula):
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[()]  #: :meta private:
-
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars()`.
-        """
-        return set()
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars`.
-        """
-        return GetVars()
 
 
 @final

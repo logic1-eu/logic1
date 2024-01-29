@@ -13,7 +13,6 @@ from typing import Any, Final, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
-from ...support.containers import GetVars
 from ...support.decorators import classproperty
 
 from ...support.tracing import trace  # noqa
@@ -243,14 +242,6 @@ class Term(firstorder.Term):
         # discuss "from" vs. "for"
         yield from (Term(g) for g in self.poly.variables())
 
-    def get_vars(self) -> set[Term]:
-        """Extract the set of variables occurring in `self`.
-
-        Implements the abstract method
-        :meth:`.firstorder.atomic.Term.get_vars`.
-        """
-        return set(Term(g) for g in self.poly.variables())
-
     def _is_constant(self) -> bool:
         return self.poly.is_constant()
 
@@ -335,16 +326,13 @@ class AtomicFormula(firstorder.AtomicFormula):
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
 
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
+        yield from (v for v in self.lhs.vars() if v in quantified)
+        yield from (v for v in self.rhs.vars() if v in quantified)
+
     def _fvars(self, quantified: set) -> Iterator[Variable]:
         yield from (v for v in self.lhs.vars() if v not in quantified)
         yield from (v for v in self.rhs.vars() if v not in quantified)
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        all_vars = set()
-        for term in self.args:
-            all_vars.update(set(term.get_vars()))
-        return GetVars(free=all_vars - assume_quantified,
-                       bound=all_vars & assume_quantified)
 
     def subs(self, d: dict[Variable, Term]) -> Self:
         """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.

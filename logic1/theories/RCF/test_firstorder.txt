@@ -90,6 +90,10 @@ Traceback (most recent call last):
 ...
 StopIteration
 
+bvars:
+>>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).bvars())
+[x, y, y]
+
 count_alternations:
 >>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
 2
@@ -104,24 +108,15 @@ ex:
 Ex(b, Ex(a, a*x + b > 0))
 
 fvars:
->>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a)).fvars())
-[a, x, a]
-
-get_qvars:
->>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
-True
-
-get_vars:
->>> f = Eq(3 * x, 0) >> All(z, All(x, ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
->>> f.get_vars().free == {x}
-True
->>> f.get_vars().bound == {x, y}
-True
->>> z not in f.get_vars().all
-True
+>>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).fvars())
+[a, x, a, x]
 
 matrix:
 ...
+
+qvars:
+>>> list(All(y, Ex(x, a == y) & Ex(z, a == y)).qvars())
+[y, x, z]
 
 simplify:
 ...

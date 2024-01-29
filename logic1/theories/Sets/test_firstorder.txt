@@ -2,7 +2,16 @@
 >>> from logic1.theories.Sets import *
 >>> a, b, x, y, z = VV.set_vars('a', 'b', 'x', 'y', 'z')
 
+bvars:
+>>> f = C(2) & All(y, Ex(x, (x == y) & (y == a)) & Ex(z, x == a))
+>>> list(f.bvars())
+[x, y, y]
+
 fvars:
 >>> f = C(2) & All(y, Ex(x, (x == y) & (y == a)) & Ex(z, x == a))
 >>> list(f.fvars())
 [a, x, a]
+
+qvars:
+>>> list(All(y, Ex(x, a == y) & Ex(z, a == y)).qvars())
+[y, x, z]

@@ -7,8 +7,6 @@ import functools
 from typing import Any, Callable, Final, Iterable, Iterator, TypeAlias
 from typing_extensions import Self
 
-from ..support.containers import GetVars
-
 from ..support.tracing import trace  # noqa
 
 
@@ -289,6 +287,35 @@ class Formula(ABC):
             case _:
                 assert False, type(self)
 
+    def bvars(self) -> Iterator[Variable]:
+        """An iterator over all variables with bound ocurrences in self. Each
+        variable is reported once for each term that it occurs ib.
+
+        >>> from logic1.theories.RCF import ring
+        >>> a, x, y, z = ring.set_vars('a', 'x', 'y', 'z')
+        >>>
+        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).bvars())
+        [x, y, y]
+
+        Note that following the common definition in logic, *occurrence* refers
+        to the occurrence in a term. Appearances of variables as a quantified
+        variables without use in any term are not considered. Compare
+        :meth:`qvars`.
+        """
+        return self._bvars(set())
+
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
+        match self:
+            case All() | Ex():
+                yield from self.arg._bvars(quantified.union({self.var}))
+            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
+                for arg in self.args:
+                    yield from arg._bvars(quantified)
+            case AtomicFormula():
+                yield from self._bvars(quantified)
+            case _:
+                assert False, type(self)
+
     def count_alternations(self) -> int:
         """Count the number of quantifier alternations.
 
@@ -355,13 +382,14 @@ class Formula(ABC):
         return f
 
     def fvars(self) -> Iterator[Variable]:
-        """An iterator over all variables with free ocurrences in self.
+        """An iterator over all variables with free ocurrences in self. Each
+        variable is reported once for each term that it occurs in.
 
         >>> from logic1.theories.RCF import ring
         >>> a, x, y, z = ring.set_vars('a', 'x', 'y', 'z')
         >>>
-        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a)).fvars())
-        [a, x, a]
+        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).fvars())
+        [a, x, a, x]
         """
         return self._fvars(set())
 
@@ -377,55 +405,6 @@ class Formula(ABC):
             case _:
                 assert False, type(self)
 
-    @abstractmethod
-    def get_qvars(self) -> set:
-        """The set of all variables that are quantified in self.
-
-        >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> a, b, c, x, y, z = VV.set_vars('a', 'b', 'c', 'x', 'y', 'z')
-        >>>
-        >>> All(y, Ex(x, Eq(a, y)) & Ex(z, Eq(a, y))).get_qvars() == {x, y, z}
-        True
-
-        Note that the mere quantification of a variable does not establish a
-        bound ocurrence of that variable. Compare :meth:`get_vars`.
-        """
-        ...
-
-    @abstractmethod
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Extract all variables occurring in *self*.
-
-        The result is an instance of :class:`GetVars
-        <logic1.support.containers.GetVars>`, which extract certain subsects of
-        variables as a :class:`set`.
-
-        >>> from logic1 import Ex, All
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
-        >>>
-        >>> # Variables with free occurrences:
-        >>> f = Eq(3 * x, 0) >> All(z, All(x,
-        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
-        >>> f.get_vars().free == {x}
-        True
-        >>>
-        >>> # Variables with bound occurrences:
-        >>> f.get_vars().bound == {x, y}
-        True
-        >>>
-        >>> # All occurring variables:
-        >>> z not in f.get_vars().all
-        True
-
-        Note that following the common definition in logic, *occurrence* refers
-        to the occurrence in a term. Appearances of variables as a quantified
-        variables without use in any term are not considered. Compare
-        :meth:`get_qvars`.
-        """
-        ...
-
     def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
         blocks = []
         block_vars = []
@@ -438,6 +417,30 @@ class Formula(ABC):
             blocks.append((block_quantifier, block_vars))
             block_vars = []
         return f, blocks
+
+    def qvars(self) -> Iterator[Variable]:
+        """An iterator over all variables that are quantified in self.
+
+        >>> from logic1.theories.Sets import VV
+        >>> a, b, c, x, y, z = VV.set_vars('a', 'b', 'c', 'x', 'y', 'z')
+        >>>
+        >>> list(All(y, Ex(x, a == y) & Ex(z, a == y)).qvars())
+        [y, x, z]
+
+        Note that the mere quantification of a variable does not establish a
+        bound ocurrence of that variable. Compare :meth:`bvars`, :meth:`fvars`.
+        """
+        match self:
+            case All() | Ex():
+                yield self.var
+                yield from self.arg.qvars()
+            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
+                for arg in self.args:
+                    yield from arg.qvars()
+            case AtomicFormula():
+                yield from ()
+            case _:
+                assert False, type(self)
 
     def _repr_latex_(self) -> str:
         """A LaTeX representation of the :class:`Formula` `self` for jupyter

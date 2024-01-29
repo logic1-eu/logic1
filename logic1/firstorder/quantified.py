@@ -4,13 +4,16 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TYPE_CHECKING
 
 from .formula import Formula
-from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
+
+
+if TYPE_CHECKING:
+    from .atomic import Variable
 
 
 class QuantifiedFormula(Formula):
@@ -63,17 +66,6 @@ class QuantifiedFormula(Formula):
     def __init__(self, variable: Any, arg: Formula) -> None:
         self.args = (variable, arg)
 
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars`.
-        """
-        return self.arg.get_qvars() | {self.var}
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars`.
-        """
-        quantified = assume_quantified | {self.var}
-        return self.arg.get_vars(assume_quantified=quantified)
-
     def simplify(self) -> Formula:
         """Compare the parent method :meth:`Formula.simplify`.
 
@@ -99,9 +91,9 @@ class QuantifiedFormula(Formula):
         if self.var in substitution:
             del substitution[self.var]
         # Collect all variables on the right hand sides of substitutions:
-        substituted_vars = set()
+        substituted_vars: set[Variable] = set()
         for term in substitution.values():
-            substituted_vars |= term.get_vars()
+            substituted_vars.update(tuple(term.vars()))
         # (2) Make sure the quantified variable is not a key and does not occur
         # in a value of substitution:
         if self.var in substituted_vars or self.var in substitution:

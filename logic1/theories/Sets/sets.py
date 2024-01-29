@@ -11,7 +11,6 @@ from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
 from ... import firstorder
 from ...firstorder import F, Formula, T
-from ...support.containers import GetVars
 from ...support.decorators import classproperty
 
 
@@ -168,20 +167,20 @@ class Term(firstorder.Term):
             return f'{base}_{{{index}}}'
         return base
 
-    def get_vars(self) -> set[Term]:
-        """Extract the set of variables occurring in `self`.
-
-        Implements the abstract method
-        :meth:`logic1.firstorder.atomic.Term.get_vars`.
-        """
-        return {self}
-
     @staticmethod
     def sort_key(term: Term) -> str:
         return term.var
 
     def subs(self, d: dict[Variable, Term]) -> Term:
         return d.get(self, self)
+
+    def vars(self) -> Iterator[Variable]:
+        """Extract the set of variables occurring in `self`.
+
+        Implements the abstract method
+        :meth:`logic1.firstorder.atomic.Term.vars`.
+        """
+        yield self
 
 
 Variable: TypeAlias = Term
@@ -249,25 +248,21 @@ class AtomicFormula(firstorder.AtomicFormula):
             case _:
                 assert False, f'{self}: {type(self)}'
 
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
+        match self:
+            case Eq() | Ne():
+                yield from (v for v in (self.lhs, self.rhs) if v in quantified)
+            case C() | C_():
+                yield from ()
+            case _:
+                assert False, f'{self}: {type(self)}'
+
     def _fvars(self, quantified: set) -> Iterator[Variable]:
         match self:
             case Eq() | Ne():
                 yield from (v for v in (self.lhs, self.rhs) if v not in quantified)
             case C() | C_():
                 yield from ()
-            case _:
-                assert False, f'{self}: {type(self)}'
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        match self:
-            case C() | C_():
-                return GetVars()
-            case Eq() | Ne():
-                all_vars = set()
-                for term in self.args:
-                    all_vars.update(set(term.get_vars()))
-                return GetVars(free=all_vars - assume_quantified,
-                               bound=all_vars & assume_quantified)
             case _:
                 assert False, f'{self}: {type(self)}'
 

@@ -11,9 +11,13 @@ mypy:
 
 test: mypy pytest
 
+pygount:
+	pygount -f summary logic1
+
 coverage:
 	coverage run -m pytest --doctest-modules\
-		--ignore="logic1/theories/depricated"
+		--ignore="logic1/theories/depricated"\
+		--ignore="logic1/theories/ZModM"
 
 coverage_html: coverage
 	coverage html

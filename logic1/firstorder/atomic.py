@@ -37,13 +37,12 @@ class AtomicFormula(Formula):
         return f'\\verb!{repr(self)}!'
 
     @abstractmethod
-    def _fvars(self, quantified: set) -> Iterator[Variable]:
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
         ...
 
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars`.
-        """
-        return set()
+    @abstractmethod
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        ...
 
     def to_complement(self) -> AtomicFormula:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
@@ -69,15 +68,13 @@ class Term(ABC):
         """
         ...
 
-    @abstractmethod
-    def get_vars(self) -> set[Self]:  # mypy complains about -> set[Variable]
-        """Extract the set of variables occurring in `self`.
-        """
-        ...
-
     @staticmethod
     @abstractmethod
     def sort_key(term: Any) -> Any:
+        ...
+
+    @abstractmethod
+    def vars(self) -> Iterator[Variable]:
         ...
 
 
