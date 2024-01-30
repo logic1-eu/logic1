@@ -7,7 +7,8 @@ pytest:
 		--ignore="logic1/theories/ZModM"
 
 mypy:
-	mypy logic1 --exclude logic1/theories/depricated
+	mypy logic1 --exclude logic1/theories/depricated\
+		--exclude logic1/theories/ZModM
 
 test: mypy pytest
 

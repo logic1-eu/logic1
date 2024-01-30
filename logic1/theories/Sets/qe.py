@@ -3,10 +3,9 @@ import logging
 from itertools import combinations
 
 from ... import abc
-from ...firstorder import And, Formula, Or
+from ...firstorder import And, Formula, pnf as _pnf, Or
 from .sets import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
-from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
 
 from ...support.tracing import trace  # noqa

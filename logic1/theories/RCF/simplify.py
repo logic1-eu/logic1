@@ -8,9 +8,8 @@ from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
 from ... import firstorder
-from ...firstorder import And, F, Formula, Or, T
+from ...firstorder import And, F, Formula, Or, pnf, T
 from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, ring, Term, Variable
-from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
 

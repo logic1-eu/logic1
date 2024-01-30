@@ -1,7 +1,6 @@
 from .bnf import cnf as _cnf
 from .bnf import dnf as _dnf
 from .parser import l1
-from .pnf import pnf as _pnf
 from .qe import VirtualSubstitution as _VirtualSubstitution
 from .rcf import AtomicFormula, Polynomial, Variable, ring, VV  # noqa
 from .simplify import simplify as _simplify
@@ -17,12 +16,6 @@ def dnf(x, *args, **kwargs):
     if isinstance(x, str):
         x = l1(x)
     return _dnf(x, *args, **kwargs)
-
-
-def pnf(x, *args, **kwargs):
-    if isinstance(x, str):
-        x = l1(x)
-    return _pnf(x, *args, **kwargs)
 
 
 class VirtualSubstitution(_VirtualSubstitution):

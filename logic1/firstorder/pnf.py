@@ -13,8 +13,8 @@ alternations in the prenex block [Burhenne90]_.
 
 from typing import Any, TypeAlias
 
-from ..firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex,
-                          Formula, QuantifiedFormula, TruthValue)
+from . import (All, AndOr, AtomicFormula, BooleanFormula, Ex, Formula,
+               QuantifiedFormula, TruthValue)
 
 Variable: TypeAlias = Any
 
@@ -143,3 +143,6 @@ class PrenexNormalForm:
                 return f
             case _:
                 assert False
+
+
+pnf = PrenexNormalForm()

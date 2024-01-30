@@ -28,6 +28,8 @@ from .quantified import QuantifiedFormula, Ex, All  # noqa
 
 from .truth import TruthValue, _T, T, _F, F  # noqa
 
+from .pnf import pnf  # noqa
+
 
 __all__ = [
     'Formula',
@@ -38,5 +40,7 @@ __all__ = [
 
     'TruthValue', '_T', 'T', '_F', 'F',
 
-    'AtomicFormula'
+    'AtomicFormula',
+
+    'pnf'
 ]

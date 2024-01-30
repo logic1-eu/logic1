@@ -21,11 +21,10 @@ import time
 from typing import Collection, Iterable, Optional
 
 from logic1.firstorder import (
-    All, And, F, _F, Formula, Not, Or, QuantifiedFormula, T)
+    All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF import rcf
-from logic1.theories.RCF.pnf import pnf
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.rcf import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable)

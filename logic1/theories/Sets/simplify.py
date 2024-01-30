@@ -2,9 +2,8 @@ from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
 
-from ...firstorder import And, AtomicFormula, Formula, Or
+from ...firstorder import And, AtomicFormula, Formula, Or, pnf
 from .sets import C, C_, Eq, Index, Ne, oo, Term, Variable
-from .pnf import pnf
 
 from ...support.tracing import trace  # noqa
 
