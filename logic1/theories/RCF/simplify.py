@@ -157,7 +157,7 @@ class Theory(abc.simplify.Theory):
     @lru_cache(maxsize=None)
     def _decompose_atom(f: AtomicFormula)\
             -> tuple[type[firstorder.AtomicFormula], Polynomial, Rational]:
-        """Decompose into relation :math:`\rho`, term :math:`p` without
+        r"""Decompose into relation :math:`\rho`, term :math:`p` without
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
 
@@ -165,9 +165,9 @@ class Theory(abc.simplify.Theory):
         right hand side is zero and its left hand side polynomial has gone
         through SymPy's :meth:`expand`.
 
-        >>> from .rcf import ring
-        >>> a, b = ring.set_vars('a', 'b')
-        >>> f = Le(6*a**2 + 12*a*b + 6*b**2 + 3, 0)
+        >>> from .rcf import VV
+        >>> a, b = VV.get('a', 'b')
+        >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
         >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
         (<class 'logic1.theories.RCF.rcf.Le'>, a^2 + 2*a*b + b^2, -1/2)
         >>> g = Theory._compose_atom(rel, p, q); g
@@ -297,9 +297,9 @@ class Simplify(abc.simplify.Simplify['Theory']):
     @lru_cache(maxsize=None)
     def _simpl_at(self, f: firstorder.AtomicFormula) -> Formula:
         """
-        >>> from .rcf import ring
-        >>> a, b = ring.set_vars('a', 'b')
-        >>> simplify(Le(-6 * (a+b)**2 + 3, 0))
+        >>> from .rcf import VV
+        >>> a, b = VV.get('a', 'b')
+        >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
         assert isinstance(f, AtomicFormula)

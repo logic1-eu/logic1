@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import functools
 import inspect
 import operator
@@ -9,7 +8,7 @@ from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
     MPolynomial_libsingular as Polynomial)
 import sys
 from types import FrameType
-from typing import Any, Final, Iterator, Optional, Self, TypeAlias
+from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -37,32 +36,28 @@ class _Ring:
     def __repr__(self):
         return str(self.sage_ring)
 
-    def add_var(self, v: str) -> Variable:
-        return self.add_vars(v)[0]
+    def add_var(self, var: str) -> None:
+        new_vars = [str(g) for g in self.sage_ring.gens()]
+        assert var not in new_vars
+        new_vars.append(var)
+        new_vars.sort()
+        self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
 
-    def add_vars(self, *args) -> tuple[Variable, ...]:
-        if len(args) == 0:
-            # The code below is correct also for len(args) == 0, but I do now
-            # want to recreate polynomial rings without a good reason.
-            return ()
-        added_as_str = list(args)
-        old_as_str = [str(gen) for gen in self.sage_ring.gens()]
-        for v in added_as_str:
-            if not isinstance(v, str):
-                raise ValueError(f'{v} is not a string')
-            if v in old_as_str:
-                raise ValueError(f'{v} is already a variable')
-        new_as_str = sorted(old_as_str + added_as_str)
-        self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
-        added_as_gen = (self.sage_ring(v) for v in added_as_str)
-        added_as_var = (Variable(g) for g in added_as_gen)
-        return tuple(added_as_var)
+    def ensure_vars(self, vars_: Iterable[str]) -> None:
+        new_vars = [str(g) for g in self.sage_ring.gens()]
+        have_appended = False
+        for v in vars_:
+            if v not in new_vars:
+                have_appended = True
+                new_vars.append(v)
+        if have_appended:
+            new_vars.sort()
+            self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
 
-    def get_vars(self) -> tuple[Variable, ...]:
+    def get_vars(self) -> tuple[Polynomial, ...]:
         gens = self.sage_ring.gens()
         gens = (g for g in gens if str(g) != 'unused_')
-        vars_ = (Variable(g) for g in gens)
-        return tuple(vars_)
+        return tuple(gens)
 
     def import_vars(self, force: bool = False):
         critical = []
@@ -98,43 +93,84 @@ class _Ring:
             # https://docs.python.org/3/library/inspect.html#inspect.Traceback
             del frame
 
-    def pop(self) -> PolynomialRing:
+    def pop(self) -> None:
         self.sage_ring = self.stack.pop()
-        return self.sage_ring
 
-    def push(self) -> list[PolynomialRing]:
+    def push(self) -> None:
         self.stack.append(self.sage_ring)
-        return self.stack
-
-    def set_vars(self, *args) -> tuple[Variable, ...]:
         self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
-        gens = self.add_vars(*args)
-        return gens
 
 
 ring = _Ring()
 
 
-@dataclass
-class Term(firstorder.Term):
+class _VariableSet:
 
-    poly: Polynomial
+    _instance: ClassVar[Optional[_VariableSet]] = None
 
-    @classmethod
-    def fresh_variable(cls, suffix: str = '') -> Variable:
+    wrapped_ring: PolynomialRing
+
+    def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
         ..., G9999, G10000, ... This naming convention is inspired by Lisp's
         gensym(). If the optional argument :data:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        vars_as_str = tuple(str(v) for v in ring.get_vars())
+        vars_ = set(str(g) for g in self.wrapped_ring.get_vars())
         i = 1
-        v_as_str = f'G{i:04d}{suffix}'
-        while v_as_str in vars_as_str:
+        v = f'G{i:04d}{suffix}'
+        while v in vars_:
             i += 1
-            v_as_str = f'G{i:04d}{suffix}'
-        v = ring.add_var(v_as_str)
-        return v
+            v = f'G{i:04d}{suffix}'
+        self.wrapped_ring.add_var(v)
+        return Term(self.wrapped_ring(v))
+
+    def get(self, *args) -> tuple[Variable, ...]:
+        return tuple(self[name] for name in args)
+
+    def __getitem__(self, index: str) -> Variable:
+        match index:
+            case str():
+                self.wrapped_ring.ensure_vars((index,))
+                return Term(self.wrapped_ring(index))
+            case _:
+                raise ValueError(f'expecting string as index; {index} is {type(index)}')
+
+    def imp(self, arg: object, safe=False) -> None:
+        ...
+
+    def __init__(self, ring_: PolynomialRing) -> None:
+        self.wrapped_ring = ring_
+
+    def __new__(cls, ring_: PolynomialRing):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def pop(self) -> None:
+        self.wrapped_ring.pop()
+
+    def push(self) -> None:
+        self.wrapped_ring.push()
+
+    def _stack(self) -> list[PolynomialRing]:
+        return self.wrapped_ring.stack
+
+    def __repr__(self):
+        vars_ = self.wrapped_ring.get_vars()
+        s = ', '.join(str(g) for g in (*vars_, '...'))
+        return f'{{{s}}}'
+
+
+VV = _VariableSet(ring)
+
+
+class Term(firstorder.Term):
+
+    wrapped_ring: _Ring = ring
+    wrapped_variable_set: _VariableSet = VV
+
+    poly: Polynomial
 
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
@@ -147,6 +183,10 @@ class Term(firstorder.Term):
         if isinstance(other, Term):
             return Eq(self, other)
         return Eq(self, Term(other))
+
+    def fresh(self) -> Variable:
+        assert self._is_variable()
+        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
         if isinstance(other, Term):
@@ -166,7 +206,7 @@ class Term(firstorder.Term):
             case Polynomial():
                 self.poly = arg
             case Integer() | int():
-                self.poly = ring(arg)
+                self.poly = self.wrapped_ring(arg)
             case _:
                 raise ValueError(
                     f'arguments must be polylnomial or integer; {arg} is {type(arg)}')
@@ -236,7 +276,7 @@ class Term(firstorder.Term):
         return self.poly.degree(x.poly)
 
     def _derivative(self, x: Variable, n: int = 1) -> Term:
-        return Term(self.poly.derivative(x.poly, n))
+        return Term(self.wrapped_ring(self.poly).derivative(self.wrapped_ring(x.poly), n))
 
     def vars(self) -> Iterator[Variable]:
         # discuss "from" vs. "for"
@@ -244,6 +284,9 @@ class Term(firstorder.Term):
 
     def _is_constant(self) -> bool:
         return self.poly.is_constant()
+
+    def _is_variable(self) -> bool:
+        return self.poly in self.poly.parent().gens()
 
     def _is_zero(self) -> bool:
         return self.poly.is_zero()
@@ -254,7 +297,7 @@ class Term(firstorder.Term):
 
     def subs(self, d: dict[Variable, Term]) -> Term:
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
-        return Term(self.poly.subs(**sage_keywords))
+        return Term(self.wrapped_ring(self.poly).subs(**sage_keywords))
 
 
 Variable: TypeAlias = Term

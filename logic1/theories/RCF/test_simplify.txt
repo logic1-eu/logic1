@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(Eq(a, 0) & (Ne(b, 0) | (Le(c, 0) & (Gt(d, 0) | Eq(a, 0)))))
@@ -92,7 +92,7 @@ And(a <= 0, Or(a == 0, b != 0))
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/benchmark/reals/service/rlgsn/testseries1/
 # 710 atoms, Redlog reduces to 674 atoms (2 ms)
 
->>> i2, n, p1, q, td, z = ring.set_vars('i2', 'n', 'p1', 'q', 'td', 'z')
+>>> i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
 
 >>> testseries1 = Or(And(Ge(q, 0), Le(q - 40, 0), Ge(n, 0), Eq(n - td, 0), Eq(i2,
 ... 0), Or(And(Le(400*q + 9*td - 20050, 0), Eq(q, 0)), And(Gt(400*q + 9*td - 20050,
@@ -942,12 +942,12 @@ And(a <= 0, Or(a == 0, b != 0))
 
 #  Regressions of problems during development
 
->>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> simplify(Le(-5*(a-b)*(a+b), 0))
 a^2 - b^2 >= 0
 
->>> i2, n, p1, q, td, z = ring.add_vars('i2', 'n', 'p1', 'q', 'td', 'z')
+>>> i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
 
 >>> simplify(Le((-100*n + 10*td + 2500*z + 36519) * a, 0))
 100*a*n - 10*a*td - 2500*a*z - 36519*a >= 0

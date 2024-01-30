@@ -2,36 +2,45 @@
 >>> from logic1.theories.RCF import *
 
 # Test renaming to distinct variables:
->>> x, y, z = ring.set_vars('x', 'y', 'z')
+>>> VV
+{G0001_x, G0002_x, a, b, c, d, x, y, z, ...}
+>>> VV.push()
+>>> x, y, z = VV.get('x', 'y', 'z')
 >>> f = Eq(x, y) & Ex(x, Eq(x, y) & All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T))))
 >>> pnf(f)
 Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
     And(x == y, G0002_x == y, G0002_x == G0001_y, G0001_y == z, T)))))
+>>> VV.pop()
 
 # Example from p.88 in "K. Burhenne. Implementierung eines Algorithmus zur
 # Quantorenelimination für lineare reelle Probleme. Diploma Thesis, University
 # of Passau, Germany, 1990":
 #
->>> x = ring.set_vars(*('x' + str(i) for i in range(8)))
+>>> VV.push()
+>>> x = VV.get(*('x' + str(i) for i in range(8)))
 >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
 >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
 >>> f3 = Ex(x[7], Eq(x[0], 0))
 >>> pnf(f1 & f2 & f3)
 All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
+>>> VV.pop()
 
 # Derived from the rlpnf test in redlog.tst at
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/rl/redlog.tst
 #
->>> a, b, y = ring.set_vars('a', 'b', 'y')
+>>> VV.push()
+>>> a, b, y = VV.get('a', 'b', 'y')
 >>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
 >>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
->>> _ = ring.push()
 >>> pnf(Equivalent(f1, f2))
 Ex(G0001_y, All(G0002_y,
     And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
         Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
->>> _ = ring.pop()
+>>> VV.pop()
+>>> VV.push()
+>>> a, b, y = VV.get('a', 'b', 'y')
 >>> pnf(Equivalent(f1, f2), prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
     And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
         Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
+>>> VV.pop()

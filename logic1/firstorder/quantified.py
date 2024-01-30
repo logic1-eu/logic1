@@ -97,7 +97,7 @@ class QuantifiedFormula(Formula):
         # (2) Make sure the quantified variable is not a key and does not occur
         # in a value of substitution:
         if self.var in substituted_vars or self.var in substitution:
-            var = term.fresh_variable(suffix=f'_{str(self.var)}')
+            var = self.var.fresh()
             # We now know the following:
             #   (i) var is not a key,
             #  (ii) var does not occur in the values,
@@ -141,10 +141,10 @@ class All(QuantifiedFormula):
     sense that their toplevel operator represents the quantifier symbol
     :math:`\forall`.
 
-    >>> from logic1.theories.RCF import Eq, ring
-    >>> x, y = ring.set_vars('x', 'y')
+    >>> from logic1.theories.RCF import VV
+    >>> x, y = VV.get('x', 'y')
     >>>
-    >>> All(x, All(y, Eq((x + y)**2 + 1, x**2 + 2*x*y + y**2)))
+    >>> All(x, All(y, (x + y)**2 + 1 == x**2 + 2*x*y + y**2))
     All(x, All(y, x^2 + 2*x*y + y^2 + 1 == x^2 + 2*x*y + y^2))
     """
     @classproperty

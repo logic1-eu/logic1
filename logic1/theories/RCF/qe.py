@@ -221,7 +221,7 @@ class Node:
             """
             func = atom.func
             FF = FractionField(ring.sage_ring)  # discuss
-            lhq = atom.lhs.poly.subs(**{str(x.poly): FF(tp.num.poly, tp.den.poly)})
+            lhq = ring(atom.lhs.poly).subs(**{str(x.poly): FF(tp.num.poly, tp.den.poly)})
             match func:
                 case rcf.Eq | rcf.Ne:
                     lhp = lhq.numerator()
@@ -844,7 +844,7 @@ class VirtualSubstitution:
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'worker process {i} is running')
-            ring.set_vars(*ring_vars)
+            ring.ensure_vars(ring_vars)
             while found_t.value == 0 and not working_nodes.is_finished():
                 try:
                     node = working_nodes.pop()

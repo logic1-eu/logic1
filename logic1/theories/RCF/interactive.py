@@ -3,7 +3,7 @@ from .bnf import dnf as _dnf
 from .parser import l1
 from .pnf import pnf as _pnf
 from .qe import VirtualSubstitution as _VirtualSubstitution
-from .rcf import AtomicFormula, Polynomial, Variable, ring  # noqa
+from .rcf import AtomicFormula, Polynomial, Variable, ring, VV  # noqa
 from .simplify import simplify as _simplify
 
 

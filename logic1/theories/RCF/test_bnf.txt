@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> dnf(T)
 T

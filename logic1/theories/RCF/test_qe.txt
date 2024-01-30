@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF.interactive import *
 
->>> a, b, x, y, z = ring.set_vars('a', 'b', 'x', 'y', 'z')
+>>> a, b, x, y, z = VV.get('a', 'b', 'x', 'y', 'z')
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x)))')
 T
@@ -25,9 +25,7 @@ Or(a != 0, b <= 0)
 Or(a > 0, And(a^2*b + a*b >= 0, a < 0), And(a == 0, b <= 0))
 
 # Period 9
->>> ring.set_vars(*(f'x{i}' for i in range(12)))
-(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11)
->>> ring.import_vars()
+>>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
 >>> phi1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
 >>> phi2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)

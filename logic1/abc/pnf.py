@@ -11,7 +11,6 @@ alternations in the prenex block [Burhenne90]_.
        Diploma Thesis, University of Passau, Germany, 1990
 """
 
-from abc import ABC, abstractmethod
 from typing import Any, TypeAlias
 
 from ..firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex,
@@ -20,7 +19,10 @@ from ..firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex,
 Variable: TypeAlias = Any
 
 
-class PrenexNormalForm(ABC):
+class PrenexNormalForm:
+
+    def __call__(self, f: Formula, prefer_universal: bool = False, is_nnf: bool = False):
+        return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
     def pnf(self, f: Formula, prefer_universal: bool, is_nnf: bool) -> Formula:
         """If the minimal number of alternations in the result can be achieved
@@ -129,7 +131,7 @@ class PrenexNormalForm(ABC):
             case QuantifiedFormula(func=Q, var=var, arg=arg):
                 new_arg = self.with_distinct_vars(arg, badlist)
                 if var in badlist:
-                    new_var = self.rename(var)
+                    new_var = var.fresh()
                     new_arg = new_arg.subs({var: new_var})
                     badlist.update({new_var})  # mutable
                     return Q(new_var, new_arg)
@@ -141,7 +143,3 @@ class PrenexNormalForm(ABC):
                 return f
             case _:
                 assert False
-
-    @abstractmethod
-    def rename(self, var: Variable) -> Variable:
-        ...

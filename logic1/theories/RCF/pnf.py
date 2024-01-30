@@ -12,7 +12,7 @@ class PrenexNormalForm(abc.pnf.PrenexNormalForm):
         return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
     def rename(self, v: Variable) -> Variable:
-        return v.fresh_variable(suffix=f'_{str(v)}')  # discuss
+        return v.fresh()  # discuss
 
 
 pnf = PrenexNormalForm()

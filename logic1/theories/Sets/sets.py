@@ -118,6 +118,9 @@ class Term(firstorder.Term):
 
     var: str
 
+    def fresh(self) -> Variable:
+        return self.fresh_variable(suffix=f'_{str(self)}')
+
     @classmethod
     def fresh_variable(cls, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,

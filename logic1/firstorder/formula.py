@@ -85,8 +85,8 @@ class Formula(ABC):
         """Override the :obj:`~ <object.__invert__>` operator to apply
         :class:`Not`.
 
-        >>> from logic1.theories.RCF import ring
-        >>> x, = ring.set_vars('x')
+        >>> from logic1.theories.RCF import VV
+        >>> x, = VV.get('x')
         >>> ~ (x == 0)
         Not(x == 0)
         """
@@ -106,8 +106,8 @@ class Formula(ABC):
         r"""Override the :obj:`\<\< <object.__lshift__>` operator to apply
         :class:`Implies` with reversed sides.
 
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> Eq(x + z, y + z) << Eq(x, y)
         Implies(x == y, x + z == y + z)
@@ -122,8 +122,8 @@ class Formula(ABC):
     def __or__(self, other: Formula) -> Formula:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
         Or(x == 0, x == y, x == z)
@@ -147,8 +147,8 @@ class Formula(ABC):
         """Override the :obj:`>> <object.__rshift__>` operator to apply
         :class:`Implies`.
 
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> Eq(x, y) >> Eq(x + z, y + z)
         Implies(x == y, x + z == y + z)
@@ -250,8 +250,8 @@ class Formula(ABC):
         :data:`self`.
 
         >>> from logic1 import Ex, All, T, F
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x,
         ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
@@ -289,10 +289,10 @@ class Formula(ABC):
 
     def bvars(self) -> Iterator[Variable]:
         """An iterator over all variables with bound ocurrences in self. Each
-        variable is reported once for each term that it occurs ib.
+        variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories.RCF import ring
-        >>> a, x, y, z = ring.set_vars('a', 'x', 'y', 'z')
+        >>> from logic1.theories.RCF import VV
+        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
         >>>
         >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).bvars())
         [x, y, y]
@@ -385,8 +385,8 @@ class Formula(ABC):
         """An iterator over all variables with free ocurrences in self. Each
         variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories.RCF import ring
-        >>> a, x, y, z = ring.set_vars('a', 'x', 'y', 'z')
+        >>> from logic1.theories.RCF import VV
+        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
         >>>
         >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).fvars())
         [a, x, a, x]
@@ -482,8 +482,8 @@ class Formula(ABC):
         """Substitution of terms for variables.
 
         >>> from logic1 import Ex
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> a, b, x = ring.set_vars('a', 'b', 'x')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> a, b, x = VV.get('a', 'b', 'x')
         >>>
         >>> f = Ex(x, Eq(x, a))
         >>> f.subs({x: a})
@@ -515,8 +515,8 @@ class Formula(ABC):
         Positive Normal Form.
 
         >>> from logic1 import Ex, Equivalent, T
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> a, y = ring.set_vars('a', 'y')
+        >>> from logic1.theories.RCF import Eq, VV
+        >>> a, y = VV.get('a', 'y')
         >>>
         >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
         >>> f.to_nnf()
@@ -567,8 +567,8 @@ class Formula(ABC):
         `tr(self)`.
 
         >>> from logic1 import And
-        >>> from logic1.theories.RCF import Eq, Lt, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import Eq, Lt, VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> f = Eq(x, y) & Lt(y, z)
         >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))

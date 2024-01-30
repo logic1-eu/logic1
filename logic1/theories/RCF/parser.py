@@ -1,29 +1,20 @@
 import ast
-import sys
 from typing import Any
 
 from ... import abc
 from ...firstorder import And, Formula
-from .rcf import Eq, Ne, Le, Lt, Gt, Ge, ring, Term, AtomicFormula, Variable
+from .rcf import Eq, Ne, Le, Lt, Gt, Ge, Term, AtomicFormula, Variable, VV
 
 
 class L1Parser(abc.parser.L1Parser):
 
     def __call__(self, s: str) -> Formula:
-        self.globals = {str(v): v for v in ring.get_vars()}
-        self.ring_extended = False
+        self.globals: dict[str, Variable] = dict()
         f = self.process(s)
-        if self.ring_extended:
-            print(f'ring is now {ring}', file=sys.stderr)
         return f
 
     def _declare_variable(self, v: str):
-        try:
-            self.globals[v] = ring.add_var(v)
-        except ValueError:
-            pass
-        else:
-            self.ring_extended = True
+        self.globals[v] = VV[v]
 
     def process_atom(self, a: Any) -> Formula:
         try:

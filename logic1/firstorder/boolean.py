@@ -152,8 +152,8 @@ class AndOr(BooleanFormula):
     def simplify(self):
         """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
+        >>> from logic1.theories.RCF import VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> f1 = And(x == y, T, x == y, And(x == z, x == x + z))
         >>> f1.simplify()
@@ -260,10 +260,10 @@ class Or(AndOr):
     toplevel operator represents the Boolean operator
     :math:`\vee`.
 
-    >>> from logic1.theories.RCF import ring
+    >>> from logic1.theories.RCF import VV
     >>> Or()
     F
-    >>> x, = ring.set_vars('x')
+    >>> x, = VV.get('x')
     >>> Or(x == 0)
     x == 0
     >>>
@@ -370,8 +370,8 @@ def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.theories.RCF import ring
-    >>> x, = ring.set_vars('x')
+    >>> from logic1.theories.RCF import VV
+    >>> x, = VV.get('x')
     >>> involutive_not(x == 0)
     Not(x == 0)
     >>> involutive_not(~ (x == 0))

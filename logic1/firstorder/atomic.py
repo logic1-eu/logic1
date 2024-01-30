@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, Self, TypeAlias
+from typing import Any, Iterator, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -52,14 +52,8 @@ class AtomicFormula(Formula):
 
 class Term(ABC):
 
-    @classmethod
     @abstractmethod
-    def fresh_variable(cls, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence G0001, G0002,
-        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
-        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
-        """
+    def fresh(self) -> Variable:
         ...
 
     @abstractmethod
