@@ -728,6 +728,11 @@ class VirtualSubstitution:
             found_t = manager.Value('i', 0)
             processes: list[Optional[mp.Process]] = [None] * self.workers
             sentinels: list[Optional[int]] = [None] * self.workers
+            # We pass the ring variables to the workers. The workers
+            # reconstruct the ring. This is not really necessary at the moment.
+            # However, future introduction of variables by workers will cause
+            # problems, and expect  reconstruction of the ring to be part of
+            # the solution.
             ring_vars = tuple(str(v) for v in ring.get_vars())
             log_level = logger.getEffectiveLevel()
             reference_time = delta_time_formatter.get_reference_time()

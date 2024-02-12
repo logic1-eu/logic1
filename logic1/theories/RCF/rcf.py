@@ -170,7 +170,18 @@ class Term(firstorder.Term):
     wrapped_ring: _Ring = ring
     wrapped_variable_set: _VariableSet = VV
 
-    poly: Polynomial
+    _poly: Polynomial
+
+    @property
+    def poly(self):
+        if self.wrapped_ring.sage_ring is not self._poly.parent():
+            self.wrapped_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
+            self._poly = self.wrapped_ring(self._poly)
+        return self._poly
+
+    @poly.setter
+    def poly(self, value):
+        self._poly = value
 
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
@@ -276,7 +287,7 @@ class Term(firstorder.Term):
         return self.poly.degree(x.poly)
 
     def _derivative(self, x: Variable, n: int = 1) -> Term:
-        return Term(self.wrapped_ring(self.poly).derivative(self.wrapped_ring(x.poly), n))
+        return Term(self.poly.derivative(x.poly, n))
 
     def vars(self) -> Iterator[Variable]:
         # discuss "from" vs. "for"
@@ -297,7 +308,7 @@ class Term(firstorder.Term):
 
     def subs(self, d: dict[Variable, Term]) -> Term:
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
-        return Term(self.wrapped_ring(self.poly).subs(**sage_keywords))
+        return Term(self.poly.subs(**sage_keywords))
 
 
 Variable: TypeAlias = Term

@@ -39,6 +39,8 @@ Ex(G0001_y, All(G0002_y,
 >>> VV.pop()
 >>> VV.push()
 >>> a, b, y = VV.get('a', 'b', 'y')
+>>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
+>>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
 >>> pnf(Equivalent(f1, f2), prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
     And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
