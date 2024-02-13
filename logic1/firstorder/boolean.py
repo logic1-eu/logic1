@@ -28,11 +28,6 @@ class BooleanFormula(Formula):
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
 
-    def subs(self, substitution: dict) -> BooleanFormula:
-        """Implements the abstract method :meth:`Formula.subs`.
-        """
-        return self.func(*(arg.subs(substitution) for arg in self.args))
-
 
 class Equivalent(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their

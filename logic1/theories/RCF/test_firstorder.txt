@@ -121,6 +121,19 @@ qvars:
 simplify:
 ...
 
+subs:
+>>> VV.push()
+>>> a, b, x = VV.get('a', 'b', 'x')
+>>> f = Ex(x, x == a)
+>>> f.subs({x: a})
+Ex(x, x == a)
+>>> f.subs({a: x})
+Ex(G0001_x, G0001_x == x)
+>>> g = Ex(x, _ & (b == 0))
+>>> g.subs({b: x})
+Ex(G0002_x, And(Ex(G0001_x, G0001_x == G0002_x), x == 0))
+>>> VV.pop()
+
 _sprint:
 ...
 

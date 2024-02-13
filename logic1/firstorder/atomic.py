@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Iterator, TypeAlias
+from typing import Any, Iterator, Self, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -48,6 +48,10 @@ class AtomicFormula(Formula):
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)
+
+    @abstractmethod
+    def subs(self, substitution: dict) -> Self:
+        ...
 
 
 class Term(ABC):
