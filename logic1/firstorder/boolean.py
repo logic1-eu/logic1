@@ -80,19 +80,7 @@ class Implies(BooleanFormula):
         self.args = (lhs, rhs)
 
 
-class AndOr(BooleanFormula):
-    # The following would be abstract class variables, which are not available
-    # at the moment.
-    func: type[AndOr]  #: :meta private:
-    dual_func: type[AndOr]  #: :meta private:
-    definite_func: type[BooleanFormula]  #: :meta private:
-    neutral_func: type[BooleanFormula]  #: :meta private:
-
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[Formula, ...]  #: :meta private:
-
-
-class And(AndOr):
+class And(BooleanFormula):
     r"""A class whose instances are conjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\wedge`.
@@ -163,7 +151,7 @@ class And(AndOr):
         self.args = tuple(args_flat)
 
 
-class Or(AndOr):
+class Or(BooleanFormula):
     r"""A class whose instances are disjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\vee`.

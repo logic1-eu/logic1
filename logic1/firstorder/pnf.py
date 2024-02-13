@@ -13,7 +13,7 @@ alternations in the prenex block [Burhenne90]_.
 
 from typing import Any, TypeAlias
 
-from . import (All, AndOr, AtomicFormula, BooleanFormula, Ex, Formula,
+from . import (All, And, AtomicFormula, BooleanFormula, Ex, Formula, Or,
                QuantifiedFormula, TruthValue)
 
 Variable: TypeAlias = Any
@@ -51,7 +51,7 @@ class PrenexNormalForm:
         match f:
             case AtomicFormula() | TruthValue():
                 return {Ex: f, All: f}
-            case AndOr(func=op, args=args):
+            case And(func=op, args=args) | Or(func=op, args=args):
                 L1 = []
                 L2 = []
                 for arg in args:
@@ -81,7 +81,7 @@ class PrenexNormalForm:
             case _:
                 assert False
 
-    def interchange(self, f: AndOr, q: type[Ex | All]) -> Formula:
+    def interchange(self, f: And | Or, q: type[Ex | All]) -> Formula:
         quantifiers = []
         quantifier_positions = set()
         args = list(f.args)

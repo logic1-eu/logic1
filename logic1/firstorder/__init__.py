@@ -22,7 +22,7 @@ from .formula import Formula  # noqa
 
 from .atomic import AtomicFormula, Term, Variable  # noqa
 
-from .boolean import BooleanFormula, Equivalent, Implies, AndOr, And, Or, Not  # noqa
+from .boolean import BooleanFormula, Equivalent, Implies, And, Or, Not  # noqa
 
 from .quantified import QuantifiedFormula, Ex, All  # noqa
 
@@ -36,7 +36,7 @@ __all__ = [
 
     'QuantifiedFormula', 'Ex', 'All',
 
-    'BooleanFormula', 'AndOr', 'Equivalent', 'Implies', 'And', 'Or', 'Not',
+    'BooleanFormula', 'Equivalent', 'Implies', 'And', 'Or', 'Not',
 
     'TruthValue', '_T', 'T', '_F', 'F',
 
