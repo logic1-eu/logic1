@@ -4,16 +4,12 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, TYPE_CHECKING
+from typing import Any, final
 
 from .formula import Formula
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
-
-
-if TYPE_CHECKING:
-    from .atomic import Variable
 
 
 class QuantifiedFormula(Formula):
@@ -67,6 +63,7 @@ class QuantifiedFormula(Formula):
         self.args = (variable, arg)
 
 
+@final
 class Ex(QuantifiedFormula):
     r"""A class whose instances are existentially quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
@@ -91,6 +88,7 @@ class Ex(QuantifiedFormula):
         return All
 
 
+@final
 class All(QuantifiedFormula):
     r"""A class whose instances are universally quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
