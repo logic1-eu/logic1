@@ -1,6 +1,5 @@
 # Logic1
 
-Author: Thomas Sturm, Germany
+Author: Nicolas Faroß, Thomas Sturm, Germany
 
-License: BSD 2-Clause license covers all files in the logic1 repository
-unless stated otherwise. See the [LICENSE](LICENSE) file for details.
+License: GNU GENERAL PUBLIC LICENSE Version 3. See the [LICENSE](LICENSE) file for details.
