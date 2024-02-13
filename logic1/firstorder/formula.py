@@ -689,6 +689,5 @@ class Formula(ABC):
 
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula, Variable
-from .boolean import And, Equivalent, Implies, involutive_not, Not, Or
+from .boolean import And, Equivalent, Implies, involutive_not, Not, Or, _F, F, _T, T
 from .quantified import All, Ex, QuantifiedFormula
-from .truth import _F, F, _T, T

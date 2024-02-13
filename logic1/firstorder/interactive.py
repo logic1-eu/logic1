@@ -4,7 +4,7 @@ from typing import TypeAlias
 from . import boolean
 from . import quantified
 from .formula import Formula
-from .truth import F, T  # noqa
+from .boolean import F, T  # noqa
 from .atomic import Variable
 
 Quantifier: TypeAlias = type[quantified.All | quantified.Ex]
