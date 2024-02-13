@@ -13,8 +13,8 @@ alternations in the prenex block [Burhenne90]_.
 
 from typing import Any, TypeAlias
 
-from . import (All, And, AtomicFormula, BooleanFormula, Ex, Formula, Or,
-               QuantifiedFormula, TruthValue)
+from . import (All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
+               QuantifiedFormula, _T)
 
 Variable: TypeAlias = Any
 
@@ -49,7 +49,7 @@ class PrenexNormalForm:
         or d[Ex] is d[All], i.e., identity is guaranteed.
         """
         match f:
-            case AtomicFormula() | TruthValue():
+            case AtomicFormula() | _F() | _T():
                 return {Ex: f, All: f}
             case And(func=op, args=args) | Or(func=op, args=args):
                 L1 = []

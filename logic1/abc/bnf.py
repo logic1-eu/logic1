@@ -3,7 +3,7 @@ from pyeda.boolalg import expr, minimization  # type: ignore
 
 from ..firstorder import (
     All, And, AtomicFormula, BooleanFormula, Equivalent, Ex, _F, F, Formula,
-    Implies, Not, Or, _T, T, TruthValue)
+    Implies, Not, Or, _T, T)
 
 from ..support.tracing import trace  # noqa
 
@@ -37,7 +37,7 @@ class DisjunctiveNormalForm(ABC):
         match mtx:
             case And() | Or():
                 dnf: Formula = self.dnf_and_or(mtx)
-            case AtomicFormula() | TruthValue():
+            case AtomicFormula() | _F() | _T():
                 return f
             case Not(arg=arg):
                 assert isinstance(arg, AtomicFormula)

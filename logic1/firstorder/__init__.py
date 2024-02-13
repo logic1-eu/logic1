@@ -26,7 +26,7 @@ from .boolean import BooleanFormula, Equivalent, Implies, And, Or, Not  # noqa
 
 from .quantified import QuantifiedFormula, Ex, All  # noqa
 
-from .truth import TruthValue, _T, T, _F, F  # noqa
+from .truth import _T, T, _F, F  # noqa
 
 from .pnf import pnf  # noqa
 
@@ -38,7 +38,7 @@ __all__ = [
 
     'BooleanFormula', 'Equivalent', 'Implies', 'And', 'Or', 'Not',
 
-    'TruthValue', '_T', 'T', '_F', 'F',
+    '_T', 'T', '_F', 'F',
 
     'AtomicFormula',
 

@@ -3,8 +3,8 @@ import more_itertools
 from abc import ABC, abstractmethod
 from typing import Any, Generic, Iterable, Iterator, Optional, Self, TypeVar
 
-from ..firstorder import (And, AtomicFormula, Equivalent, Formula, Implies,
-                          Not, Or, QuantifiedFormula, T, TruthValue)
+from ..firstorder import (And, AtomicFormula, Equivalent, _F, Formula, Implies,
+                          Not, Or, QuantifiedFormula, _T)
 
 from ..support.tracing import trace  # noqa
 
@@ -54,7 +54,7 @@ class Simplify(ABC, Generic[TH]):
         try:
             th.add(And, assume)
         except th.Inconsistent:
-            return T
+            return _T()
         match f:
             case AtomicFormula():
                 return self._simpl_nnf(And(f), th)
@@ -77,7 +77,7 @@ class Simplify(ABC, Generic[TH]):
                 return self._simpl_at(f)
             case And() | Or():
                 return self._simpl_and_or(f, th)
-            case TruthValue():
+            case _F() | _T():
                 return f
             case Not() | Implies() | Equivalent() | QuantifiedFormula():
                 raise Simplify.NotInPnf

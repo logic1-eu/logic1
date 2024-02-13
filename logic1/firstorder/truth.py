@@ -7,21 +7,8 @@ from ..support.decorators import classproperty
 from .boolean import BooleanFormula
 
 
-class TruthValue(BooleanFormula):
-    r"""A class whose instances are formulas corresponding to :math:`\top` and
-    :math:`\bot`.
-    """
-    # The following would be abstract class variables, which are not available
-    # at the moment.
-    dual_func: type[TruthValue]  #: :meta private:
-    func: type[TruthValue]  #: :meta private:
-
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[()]  #: :meta private:
-
-
 @final
-class _T(TruthValue):
+class _T(BooleanFormula):
     """The constant Formula that is always true.
 
     This is a quite basic implementation of a singleton class. It does not
@@ -64,7 +51,7 @@ T = _T()
 
 
 @final
-class _F(TruthValue):
+class _F(BooleanFormula):
     """The constant Formula that is always false.
 
     This is a quite basic implementation of a singleton class. It does not
