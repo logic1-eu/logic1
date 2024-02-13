@@ -30,15 +30,9 @@ from .pnf import pnf  # noqa
 
 
 __all__ = [
-    'Formula',
+    'Ex', 'All',
 
-    'QuantifiedFormula', 'Ex', 'All',
-
-    'BooleanFormula', 'Equivalent', 'Implies', 'And', 'Or', 'Not',
-
-    '_T', 'T', '_F', 'F',
-
-    'AtomicFormula',
+    'Equivalent', 'Implies', 'And', 'Or', 'Not', 'T', 'F',
 
     'pnf'
 ]
