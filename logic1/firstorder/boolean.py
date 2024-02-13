@@ -1,14 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 from .formula import Formula
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
-
-if TYPE_CHECKING:
-    from .atomic import AtomicFormula
 
 
 class BooleanFormula(Formula):
@@ -57,34 +52,6 @@ class Equivalent(BooleanFormula):
         # discuss: To what extent does this check for 2 args?
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y = VV.set_vars('x', 'y')
-        >>>
-        >>> e1 = Equivalent(~ Eq(x, y), F)
-        >>> e1.simplify()
-        x == y
-        """
-        lhs = self.lhs.simplify()
-        rhs = self.rhs.simplify()
-        if lhs is T:
-            return rhs
-        if rhs is T:
-            return lhs
-        if lhs is F:
-            if isinstance(rhs, Not):
-                return rhs.arg
-            return Not(rhs)
-        if rhs is F:
-            if isinstance(lhs, Not):
-                return lhs.arg
-            return Not(lhs)
-        if lhs == rhs:
-            return T
-        return Equivalent(lhs, rhs)
-
 
 class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
@@ -112,26 +79,6 @@ class Implies(BooleanFormula):
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-        """
-        if self.rhs is T:
-            return self.lhs
-        lhs_simplify = self.lhs.simplify()
-        if lhs_simplify is F:
-            return T
-        rhs_simplify = self.rhs.simplify()
-        if rhs_simplify is T:
-            return T
-        if lhs_simplify is T:
-            return rhs_simplify
-        if rhs_simplify is F:
-            return involutive_not(lhs_simplify)
-        assert {lhs_simplify, rhs_simplify}.isdisjoint({T, F})
-        if lhs_simplify == rhs_simplify:
-            return T
-        return Implies(lhs_simplify, rhs_simplify)
-
 
 class AndOr(BooleanFormula):
     # The following would be abstract class variables, which are not available
@@ -143,40 +90,6 @@ class AndOr(BooleanFormula):
 
     # Similarly the following would be an abstract instance variable:
     args: tuple[Formula, ...]  #: :meta private:
-
-    def simplify(self):
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x, y, z = VV.get('x', 'y', 'z')
-        >>>
-        >>> f1 = And(x == y, T, x == y, And(x == z, x == x + z))
-        >>> f1.simplify()
-        And(x - y == 0, x - z == 0, -z == 0)
-        >>>
-        >>> f2 = Or(x == 0, Or(x == 1, x == 2), And(x == y, x == z))
-        >>> f2.simplify()
-        Or(x == 0, x - 1 == 0, x - 2 == 0, And(x - y == 0, x - z == 0))
-        """
-        gAnd = And if self.func is And else Or
-        gT = T if self.func is And else F
-        gF = F if self.func is And else T
-        simplified_args = []
-        for arg in self.args:
-            arg_simplify = arg.simplify()
-            if arg_simplify is gF:
-                return gF
-            if arg_simplify is gT:
-                continue
-            if arg_simplify in simplified_args:
-                continue
-            if arg_simplify.func is gAnd:
-                simplified_args.extend(arg_simplify.args)
-            else:
-                simplified_args.append(arg_simplify)
-        if not simplified_args:
-            return gT
-        return gAnd(*simplified_args)
 
 
 class And(AndOr):
@@ -342,24 +255,6 @@ class Not(BooleanFormula):
     def __init__(self, arg: Formula) -> None:
         self.args = (arg, )
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y, z = VV.set_vars('x', 'y', 'z')
-        >>>
-        >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
-        >>> ~ All(x, Ex(y, f)).simplify()
-        Not(All(x, Ex(y, And(x == y, x == z))))
-        """
-        arg_simplify = self.arg.simplify()
-        if arg_simplify is T:
-            return F
-        if arg_simplify is F:
-            return T
-        return involutive_not(arg_simplify)
-
 
 def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
@@ -380,5 +275,4 @@ def involutive_not(arg: Formula) -> Formula:
 
 
 # The following imports are intentionally late to avoid circularity.
-from .atomic import AtomicFormula  # noqa
 from .truth import _T, _F, T, F

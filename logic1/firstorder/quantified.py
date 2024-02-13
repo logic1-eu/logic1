@@ -66,17 +66,6 @@ class QuantifiedFormula(Formula):
     def __init__(self, variable: Any, arg: Formula) -> None:
         self.args = (variable, arg)
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y = VV.set_vars('x', 'y')
-        >>>
-        >>> All(x, Ex(y, Eq(x, y))).simplify()
-        All(x, Ex(y, x == y))
-        """
-        return self.func(self.var, self.arg.simplify())
-
 
 class Ex(QuantifiedFormula):
     r"""A class whose instances are existentially quanitfied formulas in the

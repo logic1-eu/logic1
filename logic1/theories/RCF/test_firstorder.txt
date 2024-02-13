@@ -119,7 +119,13 @@ qvars:
 [y, x, z]
 
 simplify:
-...
+>>> f1 = And(x == y, T, x == y, And(x == z, x == x + z))
+>>> f1.simplify()
+And(x - y == 0, x - z == 0, -z == 0)
+>>>
+>>> f2 = Or(x == 0, Or(x == 1, x == 2), And(x == y, x == z))
+>>> f2.simplify()
+Or(x == 0, x - 1 == 0, x - 2 == 0, And(x - y == 0, x - z == 0))
 
 subs:
 >>> VV.push()

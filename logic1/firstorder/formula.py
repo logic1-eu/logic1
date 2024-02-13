@@ -472,10 +472,75 @@ class Formula(ABC):
         """Fast simplification. The result is equivalent to `self`.
 
         Primary simplification goals are the elimination of occurrences of
-        :data:`T` and :data:`F` and of occurrences of equal subformulas as
-        siblings in the expression tree.
+        :data:`T` and :data:`F` and of duplicate siblings in the expression
+        tree.
         """
-        return self
+        match self:
+            case _F() | _T():
+                return self
+            case Not():
+                arg_simplify = self.arg.simplify()
+                if arg_simplify is T:
+                    return F
+                if arg_simplify is F:
+                    return T
+                return involutive_not(arg_simplify)
+            case And() | Or():
+                simplified_args: list[Formula] = []
+                for arg in self.args:
+                    arg_simplify = arg.simplify()
+                    if arg_simplify is self.definite_func():
+                        return self.definite_func()
+                    if arg_simplify is self.neutral_func():
+                        continue
+                    if arg_simplify in simplified_args:
+                        continue
+                    if arg_simplify.func is self.func:
+                        simplified_args.extend(arg_simplify.args)
+                    else:
+                        simplified_args.append(arg_simplify)
+                return self.func(*simplified_args)
+            case Implies():
+                if self.rhs is T:
+                    return self.lhs
+                lhs_simplify = self.lhs.simplify()
+                if lhs_simplify is F:
+                    return T
+                rhs_simplify = self.rhs.simplify()
+                if rhs_simplify is T:
+                    return T
+                if lhs_simplify is T:
+                    return rhs_simplify
+                if rhs_simplify is F:
+                    return involutive_not(lhs_simplify)
+                assert {lhs_simplify, rhs_simplify}.isdisjoint({T, F})
+                if lhs_simplify == rhs_simplify:
+                    return T
+                return Implies(lhs_simplify, rhs_simplify)
+            case Equivalent():
+                lhs_simplify = self.lhs.simplify()
+                rhs_simplify = self.rhs.simplify()
+                if lhs_simplify is T:
+                    return rhs_simplify
+                if rhs_simplify is T:
+                    return lhs_simplify
+                if lhs_simplify is F:
+                    if isinstance(rhs_simplify, Not):
+                        return rhs_simplify.arg
+                    return Not(rhs_simplify)
+                if rhs_simplify is F:
+                    if isinstance(lhs_simplify, Not):
+                        return lhs_simplify.arg
+                    return Not(lhs_simplify)
+                if lhs_simplify == rhs_simplify:
+                    return T
+                return Equivalent(lhs_simplify, rhs_simplify)
+            case All() | Ex():
+                return self.func(self.var, self.arg.simplify())
+            case _:
+                # Atomic formulas are caught by the implementation of simplify
+                # in AtomicFormula or its subclasses.
+                assert False, type(self)
 
     def subs(self, substitution: dict) -> Self:
         """Substitution of terms for variables.
@@ -624,6 +689,6 @@ class Formula(ABC):
 
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula, Variable
-from .boolean import And, Equivalent, Implies, Not, Or
+from .boolean import And, Equivalent, Implies, involutive_not, Not, Or
 from .quantified import All, Ex, QuantifiedFormula
-from .truth import _F, _T
+from .truth import _F, F, _T, T

@@ -44,14 +44,17 @@ class AtomicFormula(Formula):
     def _fvars(self, quantified: set) -> Iterator[Variable]:
         ...
 
-    def to_complement(self) -> AtomicFormula:
-        """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
-        """
-        return self.complement_func(*self.args)
+    def simplify(self) -> Formula:
+        return self
 
     @abstractmethod
     def subs(self, substitution: dict) -> Self:
         ...
+
+    def to_complement(self) -> AtomicFormula:
+        """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
+        """
+        return self.complement_func(*self.args)
 
 
 class Term(ABC):

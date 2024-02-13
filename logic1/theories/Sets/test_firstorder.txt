@@ -15,3 +15,13 @@ fvars:
 qvars:
 >>> list(All(y, Ex(x, a == y) & Ex(z, a == y)).qvars())
 [y, x, z]
+
+simplify:
+>>> All(x, Ex(y, x == y)).simplify()
+All(x, Ex(y, x == y))
+>>> e1 = Equivalent(~ (x == y), F)
+>>> e1.simplify()
+x == y
+>>> f = And(x == y, T, x == y, And(x == z, y == x))
+>>> ~ All(x, Ex(y, f)).simplify()
+Not(All(x, Ex(y, And(x == y, x == z))))
