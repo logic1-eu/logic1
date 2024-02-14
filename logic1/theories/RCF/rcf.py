@@ -6,7 +6,6 @@ import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
-import sys
 from types import FrameType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
@@ -59,40 +58,6 @@ class _Ring:
         gens = (g for g in gens if str(g) != 'unused_')
         return tuple(gens)
 
-    def import_vars(self, force: bool = False):
-        critical = []
-        gens = self.get_vars()
-        frame = inspect.currentframe()
-        assert isinstance(frame, FrameType)
-        frame = frame.f_back
-        try:
-            assert isinstance(frame, FrameType)
-            name = frame.f_globals['__name__']
-            assert name == '__main__', f'import_vars called from {name}'
-            for gen in gens:
-                try:
-                    expr = frame.f_globals[str(gen)]
-                    if expr != gen:
-                        critical.append(str(gen))
-                except KeyError:
-                    pass
-            for gen in gens:
-                if force or str(gen) not in critical:
-                    frame.f_globals[str(gen)] = gen
-            if not force:
-                if len(critical) == 1:
-                    print(f'{critical[0]} has another value already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-                elif len(critical) > 1:
-                    print(f'{", ".join(critical)} have other values already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-        finally:
-            # Compare Note here:
-            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
-            del frame
-
     def pop(self) -> None:
         self.sage_ring = self.stack.pop()
 
@@ -136,8 +101,29 @@ class _VariableSet:
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
-    def imp(self, arg: object, safe=False) -> None:
-        ...
+    def imp(self, *args) -> None:
+        """Import variables into global namespace.
+        """
+        vars_ = self.get(*args)
+        frame = inspect.currentframe()
+        assert isinstance(frame, FrameType)
+        frame = frame.f_back
+        try:
+            assert isinstance(frame, FrameType)
+            module = frame.f_globals['__name__']
+            assert module == '__main__', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is module {module}'
+            function = frame.f_code.co_name
+            assert function == '<module>', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is function {function} in module {module}'
+            for v in vars_:
+                frame.f_globals[str(v)] = v
+        finally:
+            # Compare Note here:
+            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
+            del frame
 
     def __init__(self, ring_: PolynomialRing) -> None:
         self.wrapped_ring = ring_
