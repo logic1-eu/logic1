@@ -43,6 +43,13 @@ class _Ring:
         self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
 
     def ensure_vars(self, vars_: Iterable[str]) -> None:
+
+        def sort_key(s: str) -> tuple[str, int]:
+            base = s.rstrip('0123456789')
+            index = s[len(base):]
+            n = int(index) if index else -1
+            return base, n
+
         new_vars = [str(g) for g in self.sage_ring.gens()]
         have_appended = False
         for v in vars_:
@@ -50,7 +57,7 @@ class _Ring:
                 have_appended = True
                 new_vars.append(v)
         if have_appended:
-            new_vars.sort()
+            new_vars.sort(key=sort_key)
             self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
 
     def get_vars(self) -> tuple[Polynomial, ...]:
