@@ -4,11 +4,11 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, final
+from typing import Any, final, Sequence
 
 from .formula import Formula
+from .atomic import Variable
 from ..support.decorators import classproperty
-
 from ..support.tracing import trace  # noqa
 
 
@@ -59,8 +59,28 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
-    def __init__(self, variable: Any, arg: Formula) -> None:
-        self.args = (variable, arg)
+    def __init__(self, vars_: Variable | Sequence[Variable], arg: Formula) -> None:
+        """Construct an quantified formula.
+
+        >>> from logic1.theories.RCF import VV
+        >>> a, b, x = VV.get('a', 'b', 'x')
+        >>> All((a, b), Ex(x, a*x + b >= 0))
+        All(a, All(b, Ex(x, a*x + b >= 0)))
+        """
+        assert self.func in (Ex, All)  # in lack of abstract class properties
+        if not isinstance(arg, Formula):
+            raise ValueError(f'{arg!r} is not a Formula')
+        match vars_:
+            case Variable():
+                assert not isinstance(vars_, Sequence)
+                self.args = (vars_, arg)
+            case (Variable(), *_):
+                f = arg
+                for v in reversed(vars_[1:]):
+                    f = self.func(v, f)
+                self.args = (vars_[0], f)
+            case _:
+                raise ValueError(f'{vars_!r} is not a Variable')
 
 
 @final

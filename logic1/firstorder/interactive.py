@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TypeAlias
+from typing import Any, TypeAlias
 
 from . import boolean
 from . import quantified
@@ -63,7 +63,7 @@ def Or(*args: Formula) -> Formula:
     return boolean.Or(*args)
 
 
-def _Q(q: Quantifier, variables: object, arg: Formula) -> Formula:
+def _Q(q: Quantifier, variables: Any, arg: Formula) -> Formula:
     """Build a q-quantified Formula, checking arguments.
     """
     def check_variables(*args: object) -> None:
