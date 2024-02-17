@@ -22,11 +22,11 @@ extensions = [
     'sphinx.ext.doctest',
     # 'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
-    'sphinx_togglebutton'
+    # 'sphinx_togglebutton'
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = ['**/atomlib.rst', 'manual/*.rst']
 
 language = 'en'
 

@@ -1,21 +1,27 @@
 .. _api-support:
 
-Package :mod:`logic1.support`
-==============================
-
-.. automodule:: logic1.support
-
-Module :mod:`containers <logic1.support.containers>`
-----------------------------------------------------
-
-.. automodule:: logic1.support.containers
-  :members:
-  :undoc-members:
+***************
+Support Modules
+***************
 
 Module :mod:`decorators <logic1.support.decorators>`
 ----------------------------------------------------
 
 .. automodule:: logic1.support.decorators
+  :members:
+  :undoc-members:
+
+Module :mod:`containers <logic1.support.excepthook>`
+----------------------------------------------------
+
+.. automodule:: logic1.support.excepthook
+  :members:
+  :undoc-members:
+
+Module :mod:`logging <logic1.support.logging>`
+------------------------------------------------
+
+.. automodule:: logic1.support.logging
   :members:
   :undoc-members:
 

@@ -19,7 +19,10 @@ class AtomicFormula(Formula):
 
     @classproperty
     def complement_func(cls):
-        # Should be an abstract class property
+        """The complement func of an atomic formula.
+
+        Should be an abstract class property
+        """
         raise NotImplementedError
 
     args: tuple

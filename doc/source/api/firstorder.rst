@@ -17,7 +17,7 @@ First-order Formulas
   :undoc-members:
 
 .. autoclass:: Ex
-  :members: latex_symbol, text_symbol
+  :members:
 
   .. property:: func
     :classmethod:
@@ -30,7 +30,7 @@ First-order Formulas
     A class property yielding the dual class :class:`All` of :class:`Ex`.
 
 .. autoclass:: All
-  :members: latex_symbol, text_symbol
+  :members:
 
   .. property:: func
     :classmethod:
@@ -64,10 +64,6 @@ First-order Formulas
     :classmethod:
 
     A class property yielding the class :class:`Implies` itself.
-
-.. autoclass:: AndOr
-  :members:
-  :undoc-members:
 
 .. autoclass:: And
   :members:
@@ -107,11 +103,6 @@ First-order Formulas
     :classmethod:
 
     A class property yielding the class :class:`Not` itself.
-
-
-.. autoclass:: TruthValue
-  :members:
-  :undoc-members:
 
 .. autoclass:: _T
   :members:
@@ -153,8 +144,27 @@ First-order Formulas
 .. autoclass:: AtomicFormula
   :members:
   :undoc-members:
+  :exclude-members: complement_func
 
   .. property:: func
     :classmethod:
+    :abstractmethod:
 
     A class property yielding this class or the derived subclass itself.
+
+  .. property:: complement_func
+    :classmethod:
+
+    The complement func of an atomic formula. Let :code:`A` be a
+    subclass of :class:`AtomicFormula`. Then
+    :code:`A.complement_func(*args)` is equivalent to
+    :code:`Not(A.func(*args))`.
+
+    The implementation in here raises :exc:`NotImplementedError`, which is
+    a workaround for missing abstract class properties. Relevant subclasses
+    are implemented in various theories, e.g.,
+    :class:`logic1.theories.RCF.rcf.AtomicFormula`
+
+.. autoclass:: Term
+  :members:
+  :undoc-members:

@@ -312,16 +312,22 @@ class AtomicFormula(firstorder.AtomicFormula):
 
     @classproperty
     def complement_func(cls) -> type[AtomicFormula]:
+        """Complement relation.
+        """
         D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
         return D[cls]
 
     @classproperty
     def converse_func(cls) -> type[AtomicFormula]:
+        """Converse relation.
+        """
         D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
         return D[cls]
 
     @classproperty
     def dual_func(cls) -> type[AtomicFormula]:
+        """Dual relation.
+        """
         return cls.complement_func.converse_func
 
     @property
