@@ -283,16 +283,18 @@ class AtomicFormula(firstorder.AtomicFormula):
 
 class Eq(AtomicFormula):
 
-    func: type[Eq]
-    args: tuple[Term, Term]
+    @property
+    def lhs(self) -> Term:
+        _lhs = self.args[0]
+        assert isinstance(_lhs, Term)
+        return _lhs
 
     @property
-    def lhs(self):
-        return self.args[0]
-
-    @property
-    def rhs(self):
-        return self.args[1]
+    def rhs(self) -> Term:
+        assert len(self.args) == 2
+        _rhs = self.args[1]
+        assert isinstance(_rhs, Term)
+        return _rhs
 
     def __bool__(self) -> bool:
         return self.lhs.var == self.rhs.var
@@ -314,16 +316,18 @@ class Eq(AtomicFormula):
 
 class Ne(AtomicFormula):
 
-    func: type[Ne]
-    args: tuple[Term, Term]
+    @property
+    def lhs(self) -> Term:
+        _lhs = self.args[0]
+        assert isinstance(_lhs, Term)
+        return _lhs
 
     @property
-    def lhs(self):
-        return self.args[0]
-
-    @property
-    def rhs(self):
-        return self.args[1]
+    def rhs(self) -> Term:
+        assert len(self.args) == 2
+        args = self.args[1]
+        assert isinstance(args, Term)
+        return args
 
     def __bool__(self) -> bool:
         return self.lhs.var != self.rhs.var
@@ -363,12 +367,11 @@ class C(AtomicFormula):
 
     _instances: ClassVar[dict[Index, C]] = dict()
 
-    func: type[C]
-    args: tuple[Index]
-
     @property
     def index(self) -> Index:
-        return self.args[0]
+        _index = self.args[0]
+        assert isinstance(_index, (int, float))
+        return _index
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
@@ -400,12 +403,11 @@ class C_(AtomicFormula):
 
     _instances: ClassVar[dict[Index, C_]] = dict()
 
-    func: type[C_]
-    args: tuple[Index]
-
     @property
     def index(self) -> Index:
-        return self.args[0]
+        _index = self.args[0]
+        assert isinstance(_index, (int, float))
+        return _index
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):

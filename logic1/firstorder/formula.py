@@ -1,36 +1,60 @@
-"""Provides an abstract base class for first-order formulas."""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, Final, Iterable, Iterator, TypeAlias
+from typing import Any, Callable, Final, Iterable, Iterator
 from typing_extensions import Self
 
+from ..support.decorators import classproperty  # noqa
 from ..support.tracing import trace  # noqa
-
-
-QuantifierBlock: TypeAlias = tuple[Any, list]
 
 
 @functools.total_ordering
 class Formula(ABC):
-    """An abstract base class for first-order formulas.
+    r"""This abstract base class implements representations of and methods on
+    first-order formulas recursively built using first-order operators:
 
-    All other classes in the :mod:`.firstorder` package are derived from
-    :class:`Formula`.
+    1. Boolean operators:
+
+       a. Truth values :math:`\top` and :math:`\bot`
+
+       b. Negation :math:`\lnot`
+
+       c. Conjunction :math:`\land` and discjunction :math:`\lor`
+
+       d. Implication :math:`\longrightarrow`
+
+       e. Bi-implication (syntactic equivalence) :math:`\longleftrightarrow`
+
+    2. Quantifiers :math:`\exists x` and :math:`\forall x`, where :math:`x` is
+       a variable.
+
+    As an abstract base class, :class:`Formula` cannot be instantiated.
+    Nevertheless, it implements a number of methods on first-order formulas.
+    The methods implemented here  are typically syntactic in the sense that
+    they do not need to know the semantics of the underlying theories.
     """
 
-    # The following would be an abstract class variables, which are not
-    # available at the moment.
-    func: type[Formula]  #: :meta private:
+    @classproperty
+    def func(cls) -> Self:
+        """This class property is supposed to be used with instances of
+        subclasses of :class:`Formula`. It yields the respective subclass.
+        """
+        return cls
 
-    # Similarly the following would be an abstract instance variable:
-    args: tuple  #: :meta private:
+    @property
+    def args(self) -> tuple[Any, ...]:
+        """The argument tuple of the formula.
+        """
+        return self._args
+
+    @args.setter
+    def args(self, args: tuple[Any, ...]) -> None:
+        self._args = args
 
     def __and__(self, other: Formula) -> Formula:
         """Override the :obj:`& <object.__and__>` operator to apply
-        :class:`And`.
+        :class:`.boolean.And`.
 
         >>> from logic1.theories.RCF import Eq
         >>>
@@ -76,8 +100,8 @@ class Formula(ABC):
 
     @abstractmethod
     def __init__(self, *args: object) -> None:
-        """This abstract base class is not supposed to have instances
-        itself.
+        """This abstract base class is not supposed to have instances itself.
+        Technically this is enforced via this abstract inializer.
         """
         ...
 
@@ -409,11 +433,11 @@ class Formula(ABC):
         blocks = []
         block_vars = []
         f: Formula = self
-        while isinstance(f, QuantifiedFormula):
+        while isinstance(f, (Ex, All)):
             block_quantifier = type(f)
             while isinstance(f, block_quantifier):
-                block_vars.append(f.var)
-                f = f.arg
+                block_vars.append(f.args[0])
+                f = f.args[1]
             blocks.append((block_quantifier, block_vars))
             block_vars = []
         return f, blocks
@@ -690,4 +714,4 @@ class Formula(ABC):
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula, Variable
 from .boolean import And, Equivalent, Implies, involutive_not, Not, Or, _F, F, _T, T
-from .quantified import All, Ex, QuantifiedFormula
+from .quantified import All, Ex, QuantifierBlock

@@ -4,7 +4,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, final, Sequence
+from typing import Any, final, Sequence, TypeAlias
 
 from .formula import Formula
 from .atomic import Variable
@@ -23,11 +23,7 @@ class QuantifiedFormula(Formula):
 
     # The following would be abstract class variables, which are not available
     # at the moment.
-    func: type[QuantifiedFormula]  #: :meta private:
     dual_func: type[QuantifiedFormula]  #: :meta private:
-
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[Any, Formula]  #: :meta private:
 
     @property
     def var(self) -> Any:
@@ -95,11 +91,6 @@ class Ex(QuantifiedFormula):
     >>> Ex(x, Eq(x, y))
     Ex(x, x == y)
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Ex` itself.
-        """
-        return cls
 
     @classproperty
     def dual_func(cls):
@@ -121,13 +112,10 @@ class All(QuantifiedFormula):
     All(x, All(y, x^2 + 2*x*y + y^2 + 1 == x^2 + 2*x*y + y^2))
     """
     @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Ex` itself.
-        """
-        return cls
-
-    @classproperty
     def dual_func(cls):
         """A class property yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
+
+
+QuantifierBlock: TypeAlias = tuple[type[All | Ex], list]

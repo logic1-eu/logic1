@@ -331,12 +331,17 @@ class AtomicFormula(firstorder.AtomicFormula):
         return cls.complement_func.converse_func
 
     @property
-    def lhs(self):
-        return self.args[0]
+    def lhs(self) -> Term:
+        _lhs = self.args[0]
+        assert isinstance(_lhs, Term)
+        return _lhs
 
     @property
-    def rhs(self):
-        return self.args[1]
+    def rhs(self) -> Term:
+        assert len(self.args) == 2
+        _rhs = self.args[1]
+        assert isinstance(_rhs, Term)
+        return _rhs
 
     def __init__(self, lhs: Term | Polynomial | Integer | int,
                  rhs: Term | Polynomial | Integer | int):
@@ -396,7 +401,6 @@ class AtomicFormula(firstorder.AtomicFormula):
 class Eq(AtomicFormula):
 
     sage_func = operator.eq
-    func: type[Eq]
 
     def __bool__(self) -> bool:
         return self.lhs.poly == self.rhs.poly
@@ -413,7 +417,6 @@ class Eq(AtomicFormula):
 class Ne(AtomicFormula):
 
     sage_func = operator.ne  #: :meta private:
-    func: type[Ne]
 
     def __bool__(self) -> bool:
         return self.lhs.poly != self.rhs.poly
@@ -430,7 +433,6 @@ class Ne(AtomicFormula):
 class Ge(AtomicFormula):
 
     sage_func = operator.ge  #: :meta private:
-    func: type[Ge]
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -442,7 +444,6 @@ class Ge(AtomicFormula):
 class Le(AtomicFormula):
 
     sage_func = operator.le
-    func: type[Le]
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -454,7 +455,6 @@ class Le(AtomicFormula):
 class Gt(AtomicFormula):
 
     sage_func = operator.gt
-    func: type[Gt]
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -466,7 +466,6 @@ class Gt(AtomicFormula):
 class Lt(AtomicFormula):
 
     sage_func = operator.lt
-    func: type[Lt]
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly

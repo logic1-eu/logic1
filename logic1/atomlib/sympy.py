@@ -50,7 +50,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
                     return len(self.args) < len(other.args)
                 for i in range(len(self.args)):
                     if self.args[i] != other.args[i]:
-                        return self.args[i].sort_key() <= other.args[i].sort_key()
+                        return self.args[i].sort_key() <= other.args[i].sort_key()  # type: ignore
                 L = self.relations()
                 return L.index(self.func) <= L.index(other.func)
             case _:
@@ -63,7 +63,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
     def subs(self, substitution: dict) -> AtomicFormula:
         """Implements the abstract method :meth:`.firstorder.Formula.subs`.
         """
-        args = (arg.subs(substitution, simultaneous=True) for arg in self.args)
+        args = (arg.subs(substitution, simultaneous=True) for arg in self.args)  # type: ignore
         return self.func(*args)
 
 
@@ -82,37 +82,3 @@ class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
                 raise ValueError(f"{arg!r} is not a Term")
             args_.append(arg_)
         super().__init__(*args_)
-
-
-class IndexedConstantAtomicFormula(AtomicFormula):
-    r"""A class whose instances form a family of atomic formulas with m-arity
-    0. Their p-arity is 1, where the one argument of the constructor is the
-    index.
-    """
-    def __new__(cls, *args):
-        if len(args) != 1:
-            raise ValueError(f"bad number of arguments")
-        n = args[0]
-        if not isinstance(n, (int, sympy.Integer, sympy.core.numbers.Infinity)) or n < 0:
-            raise ValueError(f"{n!r} is not an admissible cardinality")
-        if n not in cls._instances:
-            cls._instances[n] = super().__new__(cls)
-        return cls._instances[n]
-
-    def __init__(self, index: object, chk: bool = True):
-        if chk:
-            match index:
-                case sympy.Integer() | sympy.core.numbers.Infinity():
-                    super().__init__(index)
-                case int():
-                    super().__init__(sympy.Integer(index))
-                case _:
-                    raise ValueError(f'{index} invalid as index')
-        else:
-            super().__init__(index)
-
-    @property
-    def index(self) -> sympy.Integer:
-        """The index of the :class:`IndexedConstantAtomicFormula`.
-        """
-        return self.args[0]

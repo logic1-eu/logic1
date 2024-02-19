@@ -12,20 +12,12 @@ from ..support.tracing import trace  # noqa
 class AtomicFormula(Formula):
 
     @classproperty
-    def func(cls):
-        """A class property yielding this class or the derived subclass itself.
-        """
-        return cls
-
-    @classproperty
     def complement_func(cls):
         """The complement func of an atomic formula.
 
         Should be an abstract class property
         """
         raise NotImplementedError
-
-    args: tuple
 
     def __init__(self, *args) -> None:
         self.args = args

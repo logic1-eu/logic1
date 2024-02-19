@@ -10,20 +10,14 @@ from ..support.tracing import trace  # noqa
 
 class BooleanFormula(Formula):
     r"""A class whose instances are Boolean formulas in the sense that their
-    toplevel operator is one of the Boolean operators :math:`\lnot`,
-    :math:`\wedge`, :math:`\vee`, :math:`\longrightarrow`,
-    :math:`\longleftrightarrow`.
-
-    Note that members of :class:`BooleanFormula` may have subformulas with
-    other logical operators deeper in the expression tree.
+    toplevel operator is one of the Boolean operators :math:`\top`,
+    :math:`\bot`, :math:`\lnot`, :math:`\wedge`, :math:`\vee`,
+    :math:`\longrightarrow`, :math:`\longleftrightarrow`.
     """
+
     # The following would be abstract class variables, which are not available
     # at the moment.
-    func: type[BooleanFormula]  #: :meta private:
     dual_func: type[BooleanFormula]  #: :meta private:
-
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[Formula, ...]  #: :meta private:
 
 
 @final
@@ -32,15 +26,6 @@ class Equivalent(BooleanFormula):
     toplevel operator represents the Boolean operator
     :math:`\longleftrightarrow`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Equivalent` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula, Formula]
-
     @property
     def lhs(self) -> Formula:
         """The left-hand side of the equivalence."""
@@ -61,15 +46,6 @@ class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator :math:`\longrightarrow`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Equivalent` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula, Formula]
-
     @property
     def lhs(self) -> Formula:
         """The left-hand side of the implication."""
@@ -103,12 +79,6 @@ class And(BooleanFormula):
     And(x == O, x == y, y == z)
     """
     @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`And` itself.
-        """
-        return cls
-
-    @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`Or`, which implements
         the dual operator :math:`\vee` of :math:`\wedge`.
@@ -135,9 +105,6 @@ class And(BooleanFormula):
         contrast to the formula :data:`T`.
         """
         return _T
-
-    # Instance variables
-    args: tuple[Formula, ...]
 
     def __new__(cls, *args: Formula):
         if not args:
@@ -173,12 +140,6 @@ class Or(BooleanFormula):
     Or(x == 1, x == 2, x == 3)
     """
     @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Or` itself.
-        """
-        return cls
-
-    @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`And`, which implements
         the dual operator :math:`\wedge` of :math:`\vee`.
@@ -206,9 +167,6 @@ class Or(BooleanFormula):
         """
         return _F
 
-    # Instance variables
-    args: tuple[Formula, ...]
-
     def __new__(cls, *args):
         if not args:
             return F
@@ -232,15 +190,6 @@ class Not(BooleanFormula):
     toplevel operator is the Boolean operator
     :math:`\neg`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Not` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula]
-
     @property
     def arg(self) -> Formula:
         r"""The one argument of the operator :math:`\neg`.
@@ -287,12 +236,6 @@ class _T(BooleanFormula):
         """
         return _F
 
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`_T` itself.
-        """
-        return cls
-
     _instance: Optional[_T] = None
 
     def __init__(self) -> None:
@@ -329,12 +272,6 @@ class _F(BooleanFormula):
         the dual operator :math:`\top` or :math:`\bot`.
         """
         return (lambda: _T)()
-
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`_F` itself.
-        """
-        return cls
 
     _instance: Optional[_F] = None
 
