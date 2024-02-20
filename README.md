@@ -2,4 +2,4 @@
 
 Author: Nicolas Faroß, Thomas Sturm, Germany
 
-License: GNU GENERAL PUBLIC LICENSE Version 3. See the [LICENSE](LICENSE) file for details.
+License: GPL-2.0-or-later. See the [LICENSE](LICENSE) file for details.
