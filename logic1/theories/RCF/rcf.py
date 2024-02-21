@@ -262,7 +262,9 @@ class Term(firstorder.Term):
         return Term(self.poly - other)
 
     def __xor__(self, other: object) -> Term:
-        return self ** other
+        raise NotImplementedError(
+            "Use ** for exponentiation, not '^', which means xor "
+            "in Python, and has the wrong precedence")
 
     def as_latex(self) -> str:
         """Convert `self` to LaTeX.
