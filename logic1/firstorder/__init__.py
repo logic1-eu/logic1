@@ -98,7 +98,7 @@ functions on first-order formulas. For instance, quantifier elimination (QE)
 computes equivalent formulas that do not contain quantifiers anymore:
 
 >>> RCF.qe(f)
-Or(b == 0, And(a*b <= 0, a != 0))
+Or(b == 0, And(a != 0, a*b <= 0))
 """  # noqa
 
 from .formula import Formula  # noqa

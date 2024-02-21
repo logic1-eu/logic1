@@ -20,7 +20,6 @@ Formula Base Class
     .. automethod:: __init__
 
     .. property:: func
-      :type: Self
       :classmethod:
 
       This class property is supposed to be used read-only on instances of
@@ -35,28 +34,20 @@ Formula Base Class
 
     .. doctest::
 
-       >>> from logic1.firstorder import *
-       >>> f = And(Implies(F, T), Or(T, Not(T)))
-       >>> # The class of f:
-       >>> f.func
-       <class 'logic1.firstorder.boolean.And'>
-       >>> # The argument tuple of f:
-       >>> f.args
-       (Implies(F, T), Or(T, Not(T)))
-       >>> # The invariant:
-       >>> f == f.func(*f.args)
-       True
-       >>> # Construction of a new formula using components of f:
-       >>> f.func(Equivalent(T, T), *f.args)
-       And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
-
-    The subclass constructors
-    :class:`Not <logic1.firstorder.boolean.Not>`,
-    :class:`And <logic1.firstorder.boolean.And>`,
-    :class:`Or <logic1.firstorder.boolean.Or>`,
-    :class:`Implies <logic1.firstorder.boolean.Implies>` are alternatively
-    available as overloaded operators :code:`~`, :code:`&`, :code:`|`,
-    :code:`>>`, respectively:
+      >>> from logic1.firstorder import *
+      >>> f = And(Implies(F, T), Or(T, Not(T)))
+      >>> # The class of f:
+      >>> f.func
+      <class 'logic1.firstorder.boolean.And'>
+      >>> # The argument tuple of f:
+      >>> f.args
+      (Implies(F, T), Or(T, Not(T)))
+      >>> # The invariant:
+      >>> f == f.func(*f.args)
+      True
+      >>> # Construction of a new formula using components of f:
+      >>> f.func(Equivalent(T, T), *f.args)
+      And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
 
     .. method:: ~, &, |, >>, <<
                 __invert__(other: Formula) -> Formula
@@ -64,6 +55,30 @@ Formula Base Class
                 __or__(other: Formula) -> Formula
                 __rshift__(other: Formula) -> Formula
                 __lshift__(other: Formula) -> Formula
+
+      The subclass constructors
+      :class:`Not <logic1.firstorder.boolean.Not>`,
+      :class:`And <logic1.firstorder.boolean.And>`,
+      :class:`Or <logic1.firstorder.boolean.Or>`,
+      :class:`Implies <logic1.firstorder.boolean.Implies>` are alternatively
+      available as overloaded operators :code:`~`, :code:`&`, :code:`|`,
+      :code:`>>`, respectively:
+
+      >>> from logic1.firstorder import *
+      >>> (F >> T) &  (T |  ~ T)
+      And(Implies(F, T), Or(T, Not(T)))
+
+      Furthermore, :code:`f1 << f2` constructs :code:`Implies(f2, f1)`. Note
+      that the :external+python:ref:`Operator Precedence <operator-summary>` of
+      Python applies and cannot be changed. In particular, the originally
+      bitwise logical operators bind stronger than the comparison operators so
+      that, unfortunately, equations and inequalities must be parenthesized:
+
+      >>> from logic1.theories import RCF
+      >>> a, b, x = RCF.VV.get('a', 'b', 'x')
+      >>> f = Ex(x, (x >= 0) & (a*x + b == 0))
+      >>> f
+      Ex(x, And(x >= 0, a*x + b == 0))
 
 
 Boolean Formulas

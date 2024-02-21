@@ -5,9 +5,9 @@
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(Eq(a, 0) & (Ne(b, 0) | (Le(c, 0) & (Gt(d, 0) | Eq(a, 0)))))
-And(a == 0, Or(b != 0, c <= 0))
+And(a == 0, Or(c <= 0, b != 0))
 >>> simplify(Eq(a, 0) & (Eq(b, 0) | (Eq(c, 0) & Ge(d, 0))) & (Ne(d, 0) | Ne(a, 0)))
-And(a == 0, d != 0, Or(b == 0, And(c == 0, d > 0)))
+And(d != 0, a == 0, Or(b == 0, And(d > 0, c == 0)))
 
 # Test implicit negation and extended Boolean operators
 >>> simplify(T)
@@ -24,69 +24,69 @@ a == 0
 a != 0
 
 >>> simplify(Gt(a, b) & Equivalent(Eq(a, 0), Gt(b, 0)))
-And(a - b > 0, Or(a == 0, b <= 0), Or(a != 0, b > 0))
+And(a - b > 0, Or(b <= 0, a == 0), Or(b > 0, a != 0))
 
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Gt(b, 0)))
-Or(a - b > 0, And(Or(a == 0, b <= 0), Or(a != 0, b > 0)))
+Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a != 0)))
 
 # Test quantifiers
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))))
-Ex(G0001_a, All(G0002_a, Or(a - b > 0, And(Or(G0001_a - b > 0, a != 0),
-    Or(G0002_a - b <= 0, a == 0)))))
+Ex(G0001_a, All(G0002_a, Or(a - b > 0, And(Or(a == 0, G0002_a - b <= 0),
+    Or(a != 0, G0001_a - b > 0)))))
 
 # Test assumption
 >>> simplify(Gt(a, b) | Equivalent(Eq(a, 0), Ex(a, Gt(a, b))), assume=[Eq(a, 0)])
-Ex(G0003_a, Or(G0003_a - b > 0, a - b > 0))
+Ex(G0003_a, Or(a - b > 0, G0003_a - b > 0))
 
 # Test prefer_weak
 >>> assert simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)))\
 ...     == simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak = False)
 
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak=False)  # default
-And(a != 0, Or(a > 0, b == 0))
+And(a != 0, Or(b == 0, a > 0))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak=False)  # default
-And(a != 0, Or(a > 0, b == 0))
+And(a != 0, Or(b == 0, a > 0))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Ge(a, 0)), prefer_weak=True)
-And(a != 0, Or(a >= 0, b == 0))
+And(a != 0, Or(b == 0, a >= 0))
 >>> simplify(Ne(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_weak=True)
-And(a != 0, Or(a >= 0, b == 0))
+And(a != 0, Or(b == 0, a >= 0))
 
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak=False)  # default
-Or(a == 0, And(a > 0, b == 0))
+Or(a == 0, And(b == 0, a > 0))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak=False)  # default
-Or(a == 0, And(a > 0, b == 0))
+Or(a == 0, And(b == 0, a > 0))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Ge(a, 0)), prefer_weak=True)
-Or(a == 0, And(a >= 0, b == 0))
+Or(a == 0, And(b == 0, a >= 0))
 >>> simplify(Eq(a, 0) | (Eq(b, 0) & Gt(a, 0)), prefer_weak=True)
-Or(a == 0, And(a >= 0, b == 0))
+Or(a == 0, And(b == 0, a >= 0))
 
 # Test prefer_order
 >>> assert simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)))\
 ...     == simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)
 
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=True)  # default
-Or(a > 0, And(a < 0, b == 0))
+Or(a > 0, And(b == 0, a < 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=True)  # default
-Or(a > 0, And(a < 0, b == 0))
+Or(a > 0, And(b == 0, a < 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Lt(a, 0)), prefer_order=False)
-Or(a > 0, And(a != 0, b == 0))
+Or(a > 0, And(b == 0, a != 0))
 >>> simplify(Gt(a, 0) | (Eq(b, 0) & Ne(a, 0)), prefer_order=False)
-Or(a > 0, And(a != 0, b == 0))
+Or(a > 0, And(b == 0, a != 0))
 
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=True)  # default
- And(a >= 0, Or(a > 0, b == 0))
+ And(a >= 0, Or(b == 0, a > 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=True)  # default
- And(a >= 0, Or(a > 0, b == 0))
+ And(a >= 0, Or(b == 0, a > 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Gt(a, 0)), prefer_order=False)
- And(a >= 0, Or(a != 0, b == 0))
+ And(a >= 0, Or(b == 0, a != 0))
 >>> simplify(Ge(a, 0) & (Eq(b, 0) | Ne(a, 0)), prefer_order=False)
- And(a >= 0, Or(a != 0, b == 0))
+ And(a >= 0, Or(b == 0, a != 0))
 
 # Do not prefer order over equality
 >>> simplify(Le(a, 0) & (Ne(b, 0) | Eq(a, 0)), prefer_order=True)
-And(a <= 0, Or(a == 0, b != 0))
+And(a <= 0, Or(b != 0, a == 0))
 >>> simplify(Le(a, 0) & (Ne(b, 0) | Ge(a, 0)), prefer_order=True)
-And(a <= 0, Or(a == 0, b != 0))
+And(a <= 0, Or(b != 0, a == 0))
 
 
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/benchmark/reals/service/rlgsn/testseries1/

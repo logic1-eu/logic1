@@ -16,6 +16,9 @@ from ...support.decorators import classproperty
 from ...support.tracing import trace  # noqa
 
 
+TERMORDER: Final = 'deglex'
+
+
 class _Ring:
 
     _instance: Optional[_Ring] = None
@@ -29,7 +32,8 @@ class _Ring:
         return cls._instance
 
     def __init__(self):
-        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
+        self.sage_ring = PolynomialRing(
+            ZZ, 'unused_', implementation='singular', order=TERMORDER)
         self.stack = []
 
     def __repr__(self):
@@ -40,7 +44,8 @@ class _Ring:
         assert var not in new_vars
         new_vars.append(var)
         new_vars.sort()
-        self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
+        self.sage_ring = PolynomialRing(
+            ZZ, new_vars, implementation='singular', order=TERMORDER)
 
     def ensure_vars(self, vars_: Iterable[str]) -> None:
 
@@ -58,7 +63,8 @@ class _Ring:
                 new_vars.append(v)
         if have_appended:
             new_vars.sort(key=sort_key)
-            self.sage_ring = PolynomialRing(ZZ, new_vars, implementation='singular')
+            self.sage_ring = PolynomialRing(
+                ZZ, new_vars, implementation='singular', order=TERMORDER)
 
     def get_vars(self) -> tuple[Polynomial, ...]:
         gens = self.sage_ring.gens()
@@ -70,7 +76,8 @@ class _Ring:
 
     def push(self) -> None:
         self.stack.append(self.sage_ring)
-        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
+        self.sage_ring = PolynomialRing(
+            ZZ, 'unused_', implementation='singular', order=TERMORDER)
 
 
 ring = _Ring()
@@ -355,9 +362,9 @@ class AtomicFormula(firstorder.AtomicFormula):
         match other:
             case AtomicFormula():
                 if self.lhs != other.lhs:
-                    return not Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
+                    return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
                 if self.rhs != other.rhs:
-                    return not Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
+                    return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
                 L = [Eq, Ne, Le, Lt, Ge, Gt]
                 return L.index(self.func) <= L.index(other.func)
             case _:

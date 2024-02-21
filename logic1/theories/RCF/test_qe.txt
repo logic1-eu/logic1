@@ -7,22 +7,22 @@
 T
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x and a * x + b == 0)))')
-And(a == 0, b == 0)
+And(b == 0, a == 0)
 
 >>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y + z == x)))')
 F
 
 >>> qe('ex(x, a * x + b == 0)')
-Or(a != 0, b == 0)
+Or(b == 0, a != 0)
 
 >>> qe('ex(x, a * x + b == 0)', workers=2)
-Or(a != 0, b == 0)
+Or(b == 0, a != 0)
 
 >>> qe('ex(x, a * x + b <= 0)')
-Or(a != 0, b <= 0)
+Or(b <= 0, a != 0)
 
 >>> qe('ex(x, a * x + b <= 0 and x <= b)')
-Or(a > 0, And(a^2*b + a*b >= 0, a < 0), And(a == 0, b <= 0))
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
 
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
@@ -41,19 +41,19 @@ Or(a > 0, And(a^2*b + a*b >= 0, a < 0), And(a == 0, b <= 0))
 
 >>> p9 = All(x1, phi >> ((x1 == x10) & (x2 == x11)))
 >>> qe(p9)
-And(Or(x2 < 0, And(x2 - x3 - x10 == 0, x2 - x11 == 0), And(Or(x2 + x3 + x4 != 0,
-x3 >= 0), Or(x2 - x3 + x4 != 0, x3 < 0)), And(Or(x3 + x4 + x5 != 0, x4 >= 0),
-Or(x3 - x4 + x5 != 0, x4 < 0)), And(Or(x4 + x5 + x6 != 0, x5 >= 0), Or(x4 - x5 +
-x6 != 0, x5 < 0)), And(Or(x5 + x6 + x7 != 0, x6 >= 0), Or(x5 - x6 + x7 != 0, x6
-< 0)), And(Or(x6 + x7 + x8 != 0, x7 >= 0), Or(x6 - x7 + x8 != 0, x7 < 0)),
-And(Or(x7 + x8 + x9 != 0, x8 >= 0), Or(x7 - x8 + x9 != 0, x8 < 0)), And(Or(x8 +
-x9 + x10 != 0, x9 >= 0), Or(x8 - x9 + x10 != 0, x9 < 0)), And(Or(x9 + x10 + x11
-!= 0, x10 >= 0), Or(x9 - x10 + x11 != 0, x10 < 0))), Or(x2 > 0, And(x2 + x3 +
-x10 == 0, x2 - x11 == 0), And(Or(x2 + x3 + x4 != 0, x3 >= 0), Or(x2 - x3 + x4 !=
-0, x3 < 0)), And(Or(x3 + x4 + x5 != 0, x4 >= 0), Or(x3 - x4 + x5 != 0, x4 < 0)),
-And(Or(x4 + x5 + x6 != 0, x5 >= 0), Or(x4 - x5 + x6 != 0, x5 < 0)), And(Or(x5 +
-x6 + x7 != 0, x6 >= 0), Or(x5 - x6 + x7 != 0, x6 < 0)), And(Or(x6 + x7 + x8 !=
-0, x7 >= 0), Or(x6 - x7 + x8 != 0, x7 < 0)), And(Or(x7 + x8 + x9 != 0, x8 >= 0),
-Or(x7 - x8 + x9 != 0, x8 < 0)), And(Or(x8 + x9 + x10 != 0, x9 >= 0), Or(x8 - x9
-+ x10 != 0, x9 < 0)), And(Or(x9 + x10 + x11 != 0, x10 >= 0), Or(x9 - x10 + x11
-!= 0, x10 < 0))))
+And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x10 < 0, x9 - x10
++ x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
+0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
+>= 0, x7 + x8 + x9 != 0)), And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 +
+x7 + x8 != 0)), And(Or(x6 < 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 !=
+0)), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x2 - x11
+== 0, x2 + x3 + x10 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0, x9
++ x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
+x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8 >= 0, x7 + x8 + x9 != 0)),
+And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
+0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 != 0)), And(Or(x5 < 0, x4 - x5 +
+x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0))))
