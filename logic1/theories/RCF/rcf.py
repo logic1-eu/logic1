@@ -332,16 +332,11 @@ class AtomicFormula(firstorder.AtomicFormula):
 
     @property
     def lhs(self) -> Term:
-        _lhs = self.args[0]
-        assert isinstance(_lhs, Term)
-        return _lhs
+        return self.args[0]
 
     @property
     def rhs(self) -> Term:
-        assert len(self.args) == 2
-        _rhs = self.args[1]
-        assert isinstance(_rhs, Term)
-        return _rhs
+        return self.args[1]
 
     def __init__(self, lhs: Term | Polynomial | Integer | int,
                  rhs: Term | Polynomial | Integer | int):

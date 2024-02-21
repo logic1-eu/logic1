@@ -35,8 +35,12 @@ class Formula(ABC):
     they do not need to know the semantics of the underlying theories.
     """
 
+    # The return type of func is type[Self]. However, @classproperty makes
+    # Python think that it is Self. Therefore, we do not annotate at all and
+    # hope for the return of @property + @classmethod in the Standard Python
+    # Library.
     @classproperty
-    def func(cls) -> Self:
+    def func(cls):
         """This class property is supposed to be used with instances of
         subclasses of :class:`Formula`. It yields the respective subclass.
         """
@@ -101,7 +105,7 @@ class Formula(ABC):
     @abstractmethod
     def __init__(self, *args: object) -> None:
         """This abstract base class is not supposed to have instances itself.
-        Technically this is enforced via this abstract inializer.
+        Technically this is enforced via this abstract initializer.
         """
         ...
 

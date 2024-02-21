@@ -285,16 +285,11 @@ class Eq(AtomicFormula):
 
     @property
     def lhs(self) -> Term:
-        _lhs = self.args[0]
-        assert isinstance(_lhs, Term)
-        return _lhs
+        return self.args[0]
 
     @property
     def rhs(self) -> Term:
-        assert len(self.args) == 2
-        _rhs = self.args[1]
-        assert isinstance(_rhs, Term)
-        return _rhs
+        return self.args[1]
 
     def __bool__(self) -> bool:
         return self.lhs.var == self.rhs.var
@@ -318,16 +313,11 @@ class Ne(AtomicFormula):
 
     @property
     def lhs(self) -> Term:
-        _lhs = self.args[0]
-        assert isinstance(_lhs, Term)
-        return _lhs
+        return self.args[0]
 
     @property
     def rhs(self) -> Term:
-        assert len(self.args) == 2
-        args = self.args[1]
-        assert isinstance(args, Term)
-        return args
+        return self.args[1]
 
     def __bool__(self) -> bool:
         return self.lhs.var != self.rhs.var
@@ -369,9 +359,7 @@ class C(AtomicFormula):
 
     @property
     def index(self) -> Index:
-        _index = self.args[0]
-        assert isinstance(_index, (int, float))
-        return _index
+        return self.args[0]
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
@@ -405,9 +393,7 @@ class C_(AtomicFormula):
 
     @property
     def index(self) -> Index:
-        _index = self.args[0]
-        assert isinstance(_index, (int, float))
-        return _index
+        return self.args[0]
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
