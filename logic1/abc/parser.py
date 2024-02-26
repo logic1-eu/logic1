@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 import ast
-import sys
 
 from ..firstorder import All, And, Equivalent, Ex, F, Implies, Not, Or, T
+from ..support.excepthook import NoTraceException
 
 from ..support.tracing import trace  # noqa
 
@@ -20,8 +20,7 @@ class L1Parser(ABC):
             assert isinstance(a, ast.Expression)
             return self._process(a.body)
         except (NameError, ParserError, SyntaxError, TypeError) as exc:
-            print(f'{exc.args[0]}', file=sys.stderr, flush=True)
-            return None
+            raise NoTraceException(*exc.args)
 
     def _process(self, a: ast.expr):
         match a:

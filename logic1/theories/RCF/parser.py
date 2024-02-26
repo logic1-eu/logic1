@@ -1,31 +1,20 @@
 import ast
-import sys
 from typing import Any
 
 from ... import abc
-from ...firstorder import *
-from .rcf import *
-
-from ...support.tracing import trace  # noqa
+from ...firstorder import And, Formula
+from .rcf import Eq, Ne, Le, Lt, Gt, Ge, Term, AtomicFormula, Variable, VV
 
 
 class L1Parser(abc.parser.L1Parser):
 
     def __call__(self, s: str) -> Formula:
-        self.globals = {str(v): v for v in ring.get_vars()}
-        self.ring_extended = False
+        self.globals: dict[str, Variable] = dict()
         f = self.process(s)
-        if self.ring_extended:
-            print(f'ring is now {ring}', file=sys.stderr)
         return f
 
     def _declare_variable(self, v: str):
-        try:
-            self.globals[v] = ring.add_var(v)
-        except ValueError:
-            pass
-        else:
-            self.ring_extended = True
+        self.globals[v] = VV[v]
 
     def process_atom(self, a: Any) -> Formula:
         try:
@@ -37,7 +26,7 @@ class L1Parser(abc.parser.L1Parser):
         match a:
             case ast.Compare(ops=ops, left=left, comparators=comparators):
                 eval_left = self.process_term(left)
-                L: list[RcfAtomicFormula] = []
+                L: list[AtomicFormula] = []
                 assert len(ops) == len(comparators)
                 for op, right in zip(ops, comparators):
                     eval_right = self.process_term(right)

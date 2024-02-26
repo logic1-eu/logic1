@@ -4,8 +4,8 @@ from typing import Any, TypeAlias
 from . import boolean
 from . import quantified
 from .formula import Formula
-from .truth import F, T  # noqa
-
+from .boolean import F, T  # noqa
+from .atomic import Variable
 
 Quantifier: TypeAlias = type[quantified.All | quantified.Ex]
 
@@ -35,10 +35,10 @@ def Equivalent(lhs: Formula, rhs: Formula) -> boolean.Equivalent:
 def Ex(variables: object, arg: Formula) -> Formula:
     """Build an Ex-quantified Formula, checking arguments.
 
-    >>> from logic1.theories.Sets import Eq
-    >>> from sympy.abc import x
-    >>> Ex(x, Eq(x, x))
-    Ex(x, Eq(x, x))
+    >>> from logic1.theories.Sets import Eq, VV
+    >>> x, = VV.set_vars('x')
+    >>> Ex(x, x == x)
+    Ex(x, x == x)
 
     >>> Ex('x', 'y')
     Traceback (most recent call last):
@@ -48,7 +48,7 @@ def Ex(variables: object, arg: Formula) -> Formula:
     >>> Ex('x', Eq(x, x))
     Traceback (most recent call last):
     ...
-    ValueError: type of variable 'x' must be <class 'sympy.core.symbol.Symbol'>
+    ValueError: type of variable 'x' must be <class 'logic1.firstorder.atomic.Term'>
     """
     return _Q(quantified.Ex, variables, arg)
 
@@ -63,7 +63,7 @@ def Or(*args: Formula) -> Formula:
     return boolean.Or(*args)
 
 
-def _Q(q: Quantifier, variables: object, arg: Formula) -> Formula:
+def _Q(q: Quantifier, variables: Any, arg: Formula) -> Formula:
     """Build a q-quantified Formula, checking arguments.
     """
     def check_variables(*args: object) -> None:
@@ -72,13 +72,6 @@ def _Q(q: Quantifier, variables: object, arg: Formula) -> Formula:
                 raise ValueError(f'type of variable {v!r} must be {Variable}')
 
     _check_formulas(arg)
-    atom = next(arg.atoms(), None)
-    # If atom is None, then arg does not contain any atomic formula.
-    # Therefore we cannot know what are valid variables, and we will accept
-    # anything. Otherwise atom has a static method providing the type of
-    # variables. This assumes that there is only one class of atomic
-    # formulas used within a formula.
-    Variable = atom.variable_type() if atom is not None else Any
     match variables:
         case Sequence():
             check_variables(*variables)

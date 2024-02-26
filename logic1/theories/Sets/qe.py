@@ -3,10 +3,9 @@ import logging
 from itertools import combinations
 
 from ... import abc
-from ...firstorder import And, Formula, Or
+from ...firstorder import And, Formula, pnf as _pnf, Or
 from .sets import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
-from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
 
 from ...support.tracing import trace  # noqa
@@ -21,10 +20,14 @@ class Pool(abc.qe.PoolOnePrimitive):
 class QuantifierElimination(abc.qe.QuantifierElimination):
     """Quantifier elimination for the theory of Sets.
 
-    >>> from logic1 import *
-    >>> from sympy.abc import a, u, v, w, x, y, z
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, u, v, w, x, y, z = VV.set_vars('a', 'u', 'v', 'w', 'x', 'y', 'z')
     >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, (Eq(u, v) | Ne(v, w))
     ...     & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
+    >>> f
+    All(u, Ex(w, All(x, Ex(y, Ex(v,
+        And(Or(u == v, v != w), Not(Equivalent(u == x, u != w)), y == a))))))
     >>> qe(f)
     C_(2)
 
@@ -49,10 +52,11 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return result
 
     def select_and_pop(self, vars_: list, f: Formula) -> Variable:
+        # revise: use a counter
         d = {v: 0 for v in vars_}
         args = f.args if f.func is And else (f,)
         for atom in args:
-            for v in atom.get_vars().free:
+            for v in set(atom.fvars()):
                 if v in vars_:
                     d[v] += 1
         vals = list(d.values())
@@ -92,7 +96,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         if eqs:
             solution = eqs[0].rhs if eqs[0].rhs != v else eqs[0].lhs
             return f.subs({v: solution})
-        Z = And(*nes).get_vars().free - {v}
+        Z = set(And(*nes).fvars()) - {v}
         m = len(Z)
         phi_prime = Or(*(And(eta(Z, k), C(k + 1)) for k in range(1, m + 1)))
         logging.info(f'{self.qe1.__qualname__}: result is {phi_prime}')

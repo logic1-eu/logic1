@@ -13,13 +13,9 @@ first-order logic.
    :hidden:
    :maxdepth: 2
 
-   manual/index.rst
    api/index.rst
    py-modindex.rst
    genindex.rst
-
-:ref:`User Manual <manual-index>`
----------------------------------
 
 :ref:`API Reference <api-index>`
 --------------------------------

@@ -1,7 +1,8 @@
 .. _api-abc:
 
-Package :mod:`logic1.abc`
-==============================
+*********************
+Abstract Base Classes
+*********************
 
 .. automodule:: logic1.abc
 

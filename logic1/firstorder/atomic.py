@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from abc import abstractmethod
-from typing import Any
+from abc import ABC, abstractmethod
+from typing import Any, Iterator, Self, TypeAlias
 
 from .formula import Formula
 from ..support.decorators import classproperty
@@ -12,70 +12,66 @@ from ..support.tracing import trace  # noqa
 class AtomicFormula(Formula):
 
     @classproperty
-    def func(cls):
-        """A class property yielding this class or the derived subclass itself.
+    def complement_func(cls):
+        """The complement func of an atomic formula.
+
+        Should be an abstract class property
         """
-        return cls
-
-    # The following would be an abstract class property, which is not available
-    # at the moment.
-    complement_func: type[AtomicFormula]  #: :meta private:
-
-    # Instance variables
-    args: tuple
-
-    # Static methods on terms
-    @staticmethod
-    @abstractmethod
-    def term_get_vars(term: Any) -> set:
-        """Extract the set of variables occurring in `term`.
-        """
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def term_to_latex(term: Any) -> str:
-        """Convert `term` to LaTeX.
-        """
-        ...
-
-    # Static methods on variables
-    @staticmethod
-    @abstractmethod
-    def variable_type() -> Any:
-        """The Python type of variables in terms in subclasses of
-        :class:`AtomicFormula`.
-        """
-        ...
-
-    @staticmethod
-    @abstractmethod
-    def rename_var(variable: Any) -> Any:
-        """Return a fresh variable for replacing `variable` in the course of
-        renaming.
-
-        Compare :meth:`.Formula.to_distinct_vars`, :meth:`.Formula.to_pnf`.
-        """
-        ...
+        raise NotImplementedError
 
     def __init__(self, *args) -> None:
         self.args = args
 
     def __str__(self) -> str:
         # Overloading __str__ here breaks an infinite recursion in the
-        # inherited Formula.__str__. Nicer string representation are provided
+        # inherited Formula.__str__. Nicer string representations are provided
         # by various theory modules.
         return repr(self)
 
     def as_latex(self) -> str:
         return f'\\verb!{repr(self)}!'
 
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars`.
-        """
-        return set()
+    @abstractmethod
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
+        ...
+
+    @abstractmethod
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        ...
+
+    def simplify(self) -> Formula:
+        return self
+
+    @abstractmethod
+    def subs(self, substitution: dict) -> Self:
+        ...
 
     def to_complement(self) -> AtomicFormula:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)
+
+
+class Term(ABC):
+
+    @abstractmethod
+    def fresh(self) -> Variable:
+        ...
+
+    @abstractmethod
+    def as_latex(self) -> str:
+        """Convert `self` to LaTeX.
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def sort_key(term: Any) -> Any:
+        ...
+
+    @abstractmethod
+    def vars(self) -> Iterator[Variable]:
+        ...
+
+
+Variable: TypeAlias = Term

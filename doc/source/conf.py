@@ -18,29 +18,34 @@ release = '0.1'
 
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.mathjax',
     'sphinx.ext.doctest',
-    # 'sphinx.ext.viewcode',
+    'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
-    'sphinx_togglebutton'
 ]
 
 templates_path = ['_templates']
-exclude_patterns = []
+exclude_patterns = ['**/atomlib.rst', 'manual/*.rst']
 
 language = 'en'
 
 doctest_path = ['~/Documents/Dynamic/src/python/Logic1/logic1/logic1']
 
+
+autodoc_class_signature = 'separated'
+
 autodoc_default_options = {
     'member-order': 'bysource',
-    'show-inheritance': True
+    'show-inheritance': True,
 }
+
+autodoc_type_aliases = {'QuantifierBlock': 'QuantifierBlock'}
 
 intersphinx_mapping = {
     'sympy': ('https://docs.sympy.org/latest', None),
     'python': ('https://docs.python.org/3', None)
 }
+
+python_use_unqualified_type_names = True
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output

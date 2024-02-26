@@ -3,24 +3,20 @@ from __future__ import annotations
 import functools
 import inspect
 import operator
-from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore
-from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
-    MPolynomial_libsingular)
-import sys
+from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
+from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
+    MPolynomial_libsingular as Polynomial)
 from types import FrameType
-from typing import Final, Optional, Self, TypeAlias
+from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
-from ...atomlib import generic
-from ...support.containers import GetVars
 from ...support.decorators import classproperty
 
 from ...support.tracing import trace  # noqa
 
 
-Term: TypeAlias = MPolynomial_libsingular
-Variable: TypeAlias = MPolynomial_libsingular
+TERMORDER: Final = 'deglex'
 
 
 class _Ring:
@@ -36,340 +32,447 @@ class _Ring:
         return cls._instance
 
     def __init__(self):
-        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
+        self.sage_ring = PolynomialRing(
+            ZZ, 'unused_', implementation='singular', order=TERMORDER)
         self.stack = []
 
     def __repr__(self):
         return str(self.sage_ring)
 
-    def add_var(self, v: str) -> Variable:
-        return self.add_vars(v)[0]
+    def add_var(self, var: str) -> None:
+        new_vars = [str(g) for g in self.sage_ring.gens()]
+        assert var not in new_vars
+        new_vars.append(var)
+        new_vars.sort()
+        self.sage_ring = PolynomialRing(
+            ZZ, new_vars, implementation='singular', order=TERMORDER)
 
-    def add_vars(self, *args) -> tuple[Variable, ...]:
-        if len(args) == 0:
-            # The code below is correct also for len(args) == 0, but I do now
-            # want to recreate polynomial rings without a good reason.
-            return ()
-        added_as_str = list(args)
-        old_as_str = [str(gen) for gen in self.sage_ring.gens()]
-        for v in added_as_str:
-            if not isinstance(v, str):
-                raise ValueError(f'{v} is not a string')
-            if v in old_as_str:
-                raise ValueError(f'{v} is already a variable') from None
-        new_as_str = sorted(old_as_str + added_as_str)
-        self.sage_ring = PolynomialRing(ZZ, new_as_str, implementation='singular')
-        added_as_gen = (self.sage_ring(v) for v in added_as_str)
-        return tuple(added_as_gen)
+    def ensure_vars(self, vars_: Iterable[str]) -> None:
 
-    def get_vars(self) -> tuple[Variable]:
+        def sort_key(s: str) -> tuple[str, int]:
+            base = s.rstrip('0123456789')
+            index = s[len(base):]
+            n = int(index) if index else -1
+            return base, n
+
+        new_vars = [str(g) for g in self.sage_ring.gens()]
+        have_appended = False
+        for v in vars_:
+            if v not in new_vars:
+                have_appended = True
+                new_vars.append(v)
+        if have_appended:
+            new_vars.sort(key=sort_key)
+            self.sage_ring = PolynomialRing(
+                ZZ, new_vars, implementation='singular', order=TERMORDER)
+
+    def get_vars(self) -> tuple[Polynomial, ...]:
         gens = self.sage_ring.gens()
         gens = (g for g in gens if str(g) != 'unused_')
         return tuple(gens)
 
-    def import_vars(self, force: bool = False):
-        critical = []
-        gens = self.sage_ring.gens()
-        frame = inspect.currentframe()
-        assert isinstance(frame, FrameType)
-        frame = frame.f_back
-        try:
-            assert isinstance(frame, FrameType)
-            name = frame.f_globals['__name__']
-            assert name == '__main__', f'import_vars called from {name}'
-            for gen in gens:
-                try:
-                    expr = frame.f_globals[str(gen)]
-                    if expr != gen:
-                        critical.append(str(gen))
-                except KeyError:
-                    pass
-            for gen in gens:
-                if force or str(gen) not in critical:
-                    frame.f_globals[str(gen)] = gen
-            if not force:
-                if len(critical) == 1:
-                    print(f'{critical[0]} has another value already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-                elif len(critical) > 1:
-                    print(f'{", ".join(critical)} have other values already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-        finally:
-            # Compare Note here:
-            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
-            del frame
-
-    def pop(self) -> PolynomialRing:
+    def pop(self) -> None:
         self.sage_ring = self.stack.pop()
-        return self.sage_ring
 
-    def push(self) -> list[PolynomialRing]:
+    def push(self) -> None:
         self.stack.append(self.sage_ring)
-        return self.stack
-
-    def set_vars(self, *args) -> tuple[Variable, ...]:
-        self.sage_ring = PolynomialRing(ZZ, 'unused_', implementation='singular')
-        gens = self.add_vars(*args)
-        return gens
+        self.sage_ring = PolynomialRing(
+            ZZ, 'unused_', implementation='singular', order=TERMORDER)
 
 
 ring = _Ring()
 
 
-class TermMixin():
+class _VariableSet:
 
-    @staticmethod
-    def term_get_vars(term: Term) -> set[Variable]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_get_vars`.
-        """
-        return set(term.variables())
+    _instance: ClassVar[Optional[_VariableSet]] = None
 
-    @staticmethod
-    def term_to_latex(term: Term) -> str:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.term_to_latex`.
-        """
-        return str(latex(term))
+    wrapped_ring: PolynomialRing
 
-    @staticmethod
-    def variable_type() -> type[Variable]:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.variable_type`.
+    def fresh(self, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence G0001, G0002,
+        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
+        gensym(). If the optional argument :data:`suffix` is specified, the
+        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        return Variable
-
-    @staticmethod
-    def rename_var(variable: Variable) -> Variable:
-        """Implements the abstract method
-        :meth:`.firstorder.AtomicFormula.rename_var`.
-        """
-        i = 0
-        vars_as_str = tuple(str(v) for v in ring.get_vars())
-        v_as_str = str(variable)
-        while v_as_str in vars_as_str:
+        vars_ = set(str(g) for g in self.wrapped_ring.get_vars())
+        i = 1
+        v = f'G{i:04d}{suffix}'
+        while v in vars_:
             i += 1
-            v_as_str = str(variable) + "_R" + str(i)
-        v = ring.add_var(v_as_str)
-        return v
+            v = f'G{i:04d}{suffix}'
+        self.wrapped_ring.add_var(v)
+        return Term(self.wrapped_ring(v))
 
+    def get(self, *args) -> tuple[Variable, ...]:
+        return tuple(self[name] for name in args)
 
-class AtomicFormula(TermMixin, firstorder.AtomicFormula):
-    """Atomic Formula with Sage Terms. All terms are
-    :class:`sage.symbolic.expression.Expression`.
-    """
+    def __getitem__(self, index: str) -> Variable:
+        match index:
+            case str():
+                self.wrapped_ring.ensure_vars((index,))
+                return Term(self.wrapped_ring(index))
+            case _:
+                raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`.firstorder.Formula.get_vars`.
+    def imp(self, *args) -> None:
+        """Import variables into global namespace.
         """
-        all_vars = set()
-        for term in self.args:
-            all_vars.update(set(term.variables()))
-        return GetVars(free=all_vars - assume_quantified,
-                       bound=all_vars & assume_quantified)
+        vars_ = self.get(*args)
+        frame = inspect.currentframe()
+        assert isinstance(frame, FrameType)
+        frame = frame.f_back
+        try:
+            assert isinstance(frame, FrameType)
+            module = frame.f_globals['__name__']
+            assert module == '__main__', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is module {module}'
+            function = frame.f_code.co_name
+            assert function == '<module>', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is function {function} in module {module}'
+            for v in vars_:
+                frame.f_globals[str(v)] = v
+        finally:
+            # Compare Note here:
+            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
+            del frame
 
-    def subs(self, d: dict) -> Self:
-        """Implements the abstract method :meth:`.firstorder.Formula.subs`.
+    def __init__(self, ring_: PolynomialRing) -> None:
+        self.wrapped_ring = ring_
+
+    def __new__(cls, ring_: PolynomialRing):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def pop(self) -> None:
+        self.wrapped_ring.pop()
+
+    def push(self) -> None:
+        self.wrapped_ring.push()
+
+    def _stack(self) -> list[PolynomialRing]:
+        return self.wrapped_ring.stack
+
+    def __repr__(self):
+        vars_ = self.wrapped_ring.get_vars()
+        s = ', '.join(str(g) for g in (*vars_, '...'))
+        return f'{{{s}}}'
+
+
+VV = _VariableSet(ring)
+
+
+class Term(firstorder.Term):
+
+    wrapped_ring: _Ring = ring
+    wrapped_variable_set: _VariableSet = VV
+
+    _poly: Polynomial
+
+    @property
+    def poly(self):
+        if self.wrapped_ring.sage_ring is not self._poly.parent():
+            self.wrapped_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
+            self._poly = self.wrapped_ring(self._poly)
+        return self._poly
+
+    @poly.setter
+    def poly(self, value):
+        self._poly = value
+
+    def __add__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly + other.poly)
+        return Term(self.poly + other)
+
+    def __eq__(self, other: Term | Polynomial | Integer | int) -> Eq:  # type: ignore[override]
+        # discuss: we have Eq.__bool__ but this way we cannot compare Terms
+        # with arbitrary objects in a boolean context. Same for __ne__.
+        if isinstance(other, Term):
+            return Eq(self, other)
+        return Eq(self, Term(other))
+
+    def fresh(self) -> Variable:
+        assert self._is_variable()
+        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
+
+    def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
+        if isinstance(other, Term):
+            return Ge(self, other)
+        return Ge(self, Term(other))
+
+    def __gt__(self, other: Term | Polynomial | Integer | int) -> Gt:
+        if isinstance(other, Term):
+            return Gt(self, other)
+        return Gt(self, Term(other))
+
+    def __hash__(self) -> int:
+        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
+
+    def __init__(self, arg: Polynomial | Integer | int) -> None:
+        match arg:
+            case Polynomial():
+                self.poly = arg
+            case Integer() | int():
+                self.poly = self.wrapped_ring(arg)
+            case _:
+                raise ValueError(
+                    f'arguments must be polylnomial or integer; {arg} is {type(arg)}')
+
+    def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
+        if isinstance(other, Term):
+            return Le(self, other)
+        return Le(self, Term(other))
+
+    def __lt__(self, other: Term | Polynomial | Integer | int) -> Lt:
+        if isinstance(other, Term):
+            return Lt(self, other)
+        return Lt(self, Term(other))
+
+    def __mul__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return Term(self.poly * other.poly)
+        return Term(self.poly * other)
+
+    def __ne__(self, other: Term | Polynomial | Integer | int) -> Ne:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Ne(self, other)
+        return Ne(self, Term(other))
+
+    def __neg__(self) -> Term:
+        return Term(- self.poly)
+
+    def __pow__(self, other: object) -> Term:
+        return Term(self.poly ** other)
+
+    def __repr__(self) -> str:
+        return str(self.poly)
+
+    def __radd__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__add__`.
+        return Term(other + self.poly)
+
+    def __rmul__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
+        return Term(other * self.poly)
+
+    def __rsub__(self, other: object) -> Term:
+        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
+        return Term(other - self.poly)
+
+    def __sub__(self, other: object) -> Term:
+        if isinstance(other, Term):
+            return self + (- other)
+        return Term(self.poly - other)
+
+    def __xor__(self, other: object) -> Term:
+        raise NotImplementedError(
+            "Use ** for exponentiation, not '^', which means xor "
+            "in Python, and has the wrong precedence")
+
+    def as_latex(self) -> str:
+        """Convert `self` to LaTeX.
+
+        Implements the abstract method
+        :meth:`.firstorder.atomic.Term.as_Latex`.
         """
-        sage_keywords = {str(v): t for v, t in d.items()}
-        args = (arg.subs(**sage_keywords) for arg in self.args)
-        return self.func(*args)
+        return str(latex(self.poly))
+
+    def _coefficient(self, d: dict[Variable, int]) -> Term:
+        d_poly = {key.poly: value for key, value in d.items()}
+        return Term(self.poly.coefficient(d_poly))
+
+    def _degree(self, x: Variable) -> int:
+        return self.poly.degree(x.poly)
+
+    def _derivative(self, x: Variable, n: int = 1) -> Term:
+        return Term(self.poly.derivative(x.poly, n))
+
+    def vars(self) -> Iterator[Variable]:
+        # discuss "from" vs. "for"
+        yield from (Term(g) for g in self.poly.variables())
+
+    def _is_constant(self) -> bool:
+        return self.poly.is_constant()
+
+    def _is_variable(self) -> bool:
+        return self.poly in self.poly.parent().gens()
+
+    def _is_zero(self) -> bool:
+        return self.poly.is_zero()
+
+    @staticmethod
+    def sort_key(term: Term) -> Polynomial:
+        return term.poly
+
+    def subs(self, d: dict[Variable, Term]) -> Term:
+        sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
+        return Term(self.poly.subs(**sage_keywords))
+
+
+Variable: TypeAlias = Term
 
 
 @functools.total_ordering
-class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):
+class AtomicFormula(firstorder.AtomicFormula):
 
-    def __init__(self, lhs, rhs, chk: bool = True):
-        if chk:
-            args_ = []
-            for arg in (lhs, rhs):
-                assert isinstance(arg, (int, Integer, MPolynomial_libsingular)), arg
-                args_.append(ring(arg))
-            super().__init__(*args_)
-        else:
-            super().__init__(lhs, rhs)
+    @classproperty
+    def complement_func(cls) -> type[AtomicFormula]:
+        """Complement relation.
+        """
+        D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
+        return D[cls]
+
+    @classproperty
+    def converse_func(cls) -> type[AtomicFormula]:
+        """Converse relation.
+        """
+        D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
+        return D[cls]
+
+    @classproperty
+    def dual_func(cls) -> type[AtomicFormula]:
+        """Dual relation.
+        """
+        return cls.complement_func.converse_func
+
+    @property
+    def lhs(self) -> Term:
+        return self.args[0]
+
+    @property
+    def rhs(self) -> Term:
+        return self.args[1]
+
+    def __init__(self, lhs: Term | Polynomial | Integer | int,
+                 rhs: Term | Polynomial | Integer | int):
+        # Integer is a candidate for removal
+        assert not isinstance(lhs, Integer)
+        assert not isinstance(rhs, Integer)
+        if not isinstance(lhs, Term):
+            lhs = Term(lhs)
+        if not isinstance(rhs, Term):
+            rhs = Term(rhs)
+        super().__init__(lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         match other:
-            case BinaryAtomicFormula():
+            case AtomicFormula():
                 if self.lhs != other.lhs:
-                    return not self.lhs <= other.lhs
+                    return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
                 if self.rhs != other.rhs:
-                    return not self.rhs <= other.rhs
+                    return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
                 L = [Eq, Ne, Le, Lt, Ge, Gt]
                 return L.index(self.func) <= L.index(other.func)
             case _:
-                assert not isinstance(other, AtomicFormula)
                 return True
+
+    def __repr__(self) -> str:
+        if self.lhs.poly.is_constant() and self.rhs.poly.is_constant():
+            # Return Eq(1, 2) instead of 1 == 2, because the latter is not
+            # suitable as input.
+            return super().__repr__()
+        return str(self)
 
     def __str__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+        return f'{self.lhs.poly}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.poly}'
 
     def as_latex(self) -> str:
         SYMBOL: Final = {
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        lhs = str(latex(self.lhs))
-        rhs = str(latex(self.rhs))
-        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
+        return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
+
+    def _bvars(self, quantified: set) -> Iterator[Variable]:
+        yield from (v for v in self.lhs.vars() if v in quantified)
+        yield from (v for v in self.rhs.vars() if v in quantified)
+
+    def _fvars(self, quantified: set) -> Iterator[Variable]:
+        yield from (v for v in self.lhs.vars() if v not in quantified)
+        yield from (v for v in self.rhs.vars() if v not in quantified)
+
+    def subs(self, d: dict[Variable, Term]) -> Self:
+        """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        """
+        return self.func(self.lhs.subs(d), self.rhs.subs(d))
 
 
-class Eq(generic.EqMixin, BinaryAtomicFormula):
+class Eq(AtomicFormula):
 
     sage_func = operator.eq
-    func: type[Eq]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Ne of Eq.
-        """
-        return Ne
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Eq of Eq.
-        """
-        return Eq
+    def __bool__(self) -> bool:
+        return self.lhs.poly == self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return T
         if lhs.is_constant():
             return F
-        return Eq(lhs, 0, chk=False)
+        return Eq(Term(lhs), Term(0))
 
 
-class Ne(generic.NeMixin, BinaryAtomicFormula):
+class Ne(AtomicFormula):
 
     sage_func = operator.ne  #: :meta private:
-    func: type[Ne]
 
-    @classproperty
-    def complement_func(cls):
-        """The complement relation Eq of Ne.
-        """
-        return Eq
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Ne of Ne.
-        """
-        return Ne
+    def __bool__(self) -> bool:
+        return self.lhs.poly != self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return F
         if lhs.is_constant():
             return T
-        return Ne(lhs, 0, chk=False)
+        return Ne(Term(lhs), Term(0))
 
 
-class Ge(generic.GeMixin, BinaryAtomicFormula):
+class Ge(AtomicFormula):
 
     sage_func = operator.ge  #: :meta private:
-    func: type[Ge]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Lt` of :class:`Ge`.
-        """
-        return Lt
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Le of Ge.
-        """
-        return Le
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs >= 0 else F
-        return Ge(lhs, 0, chk=False)
+        return Ge(Term(lhs), Term(0))
 
 
-class Le(generic.LeMixin, BinaryAtomicFormula):
+class Le(AtomicFormula):
 
     sage_func = operator.le
-    func: type[Le]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Lt` of :class:`Ge`.
-        """
-        return Gt
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Le of Ge.
-        """
-        return Ge
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs <= 0 else F
-        return Le(lhs, 0, chk=False)
+        return Le(Term(lhs), Term(0))
 
 
-class Gt(generic.GtMixin, BinaryAtomicFormula):
+class Gt(AtomicFormula):
 
     sage_func = operator.gt
-    func: type[Gt]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Le` of :class:`Gt`.
-        """
-        return Le
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Lt of Gt.
-        """
-        return Lt
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs > 0 else F
-        return Gt(lhs, 0, chk=False)
+        return Gt(Term(lhs), Term(0))
 
 
-class Lt(generic.LtMixin, BinaryAtomicFormula):
+class Lt(AtomicFormula):
 
     sage_func = operator.lt
-    func: type[Lt]
-
-    @classproperty
-    def complement_func(cls):
-        """The complement relation :class:`Ge` of :class:`Lt`.
-        """
-        return Ge
-
-    @classproperty
-    def converse_func(cls):
-        """The converse relation Gt of Lt.
-        """
-        return Gt
 
     def simplify(self, Theta=None) -> Formula:
-        lhs = self.lhs - self.rhs
+        lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return T if lhs < 0 else F
-        return Lt(lhs, 0, chk=False)
-
-
-# The type alias `RcfAtomicFormula` supports :code:`cast(RcfAtomicFormula,
-# ...)`. Furthermore, :code:`type[RcfAtomicFormula]` can be used for
-# annotating, e.g., :attr:`dual_func`. The tuple `RcfAtomicFormulas` supports
-# :code:`assert isinstance(..., RcfAtomicFormulas)`.
-RcfAtomicFormula: TypeAlias = Eq | Ne | Ge | Le | Gt | Lt
-
-RcfAtomicFormulas = (Eq, Ne, Ge, Le, Gt, Lt)
+        return Lt(Term(lhs), Term(0))

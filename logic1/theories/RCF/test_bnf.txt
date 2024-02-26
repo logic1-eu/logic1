@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d = ring.set_vars('a', 'b', 'c', 'd')
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> dnf(T)
 T
@@ -10,22 +10,22 @@ T
 T
 
 >>> dnf(Eq(a, 0))
-Eq(a, 0)
+a == 0
 
 >>> dnf(Gt(a, 0))
-Gt(a, 0)
+a > 0
 
 >>> dnf(Equivalent(Eq(a, 0), Eq(b, 0)))
-Or(And(Eq(a, 0), Eq(b, 0)), And(Ne(a, 0), Ne(b, 0)))
+Or(And(b == 0, a == 0), And(b != 0, a != 0))
 
 >>> dnf((Eq(a, 0) | Ne(b, 0)) & (Ne(a, 0) | Eq(b, 0)))
-Or(And(Eq(a, 0), Eq(b, 0)), And(Ne(a, 0), Ne(b, 0)))
+Or(And(b == 0, a == 0), And(b != 0, a != 0))
 
 >>> dnf((Gt(a, 0) | Ne(b, 0)) & (Le(c, 0) | Eq(b, 0)))
-Or(And(Gt(a, 0), Eq(b, 0)), And(Ne(b, 0), Le(c, 0)))
+Or(And(c <= 0, b != 0), And(b == 0, a > 0))
 
 >>> dnf((Gt(a, 0) | Eq(b, 0)) & (Le(a, 0) | Eq(b, 0)))
-Eq(b, 0)
+b == 0
 
 >>> cnf(T)
 T
@@ -34,16 +34,16 @@ T
 T
 
 >>> cnf(Eq(a, 0))
-Eq(a, 0)
+a == 0
 
 >>> cnf(Gt(a, 0))
-Gt(a, 0)
+a > 0
 
 >>> cnf(Equivalent(Eq(a, 0), Eq(b, 0)))
-And(Or(Eq(a, 0), Ne(b, 0)), Or(Ne(a, 0), Eq(b, 0)))
+And(Or(b == 0, a != 0), Or(b != 0, a == 0))
 
 >>> cnf((Eq(a, 0) & Ne(b, 0)) | (Ne(a, 0) & Eq(b, 0)))
-And(Or(Eq(a, 0), Eq(b, 0)), Or(Ne(a, 0), Ne(b, 0)))
+And(Or(b == 0, a == 0), Or(b != 0, a != 0))
 
 >>> cnf((Gt(a, 0) & Eq(b, 0)) | (Le(a, 0) & Eq(b, 0)))
-Eq(b, 0)
+b == 0

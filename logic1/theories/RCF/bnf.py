@@ -1,6 +1,5 @@
-from ...firstorder import Formula
+from ...firstorder import Formula, pnf as _pnf
 from ... import abc
-from .pnf import pnf as _pnf
 from .simplify import simplify as _simplify
 
 

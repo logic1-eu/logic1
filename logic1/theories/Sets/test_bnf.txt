@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.Sets import *
 
->>> from sympy.abc import a, b, c, d, o
+>>> a, b, c, d, o = VV.set_vars('a', 'b', 'c', 'd', 'o')
 
 >>> dnf(T)
 T
@@ -13,16 +13,16 @@ F
 T
 
 >>> dnf(Eq(a, o))
-Eq(a, o)
+a == o
 
->>> dnf(Equivalent(Eq(a, o), Eq(b, o)))
-Or(And(Eq(a, b), Eq(a, o)), And(Ne(a, o), Ne(b, o)))
+>>> dnf(Equivalent(a == o, b == o))
+Or(And(a == b, a == o), And(a != o, b != o))
 
->>> dnf((Eq(a, o) | Ne(b, o)) & (Ne(a, o) | Eq(b, o)))
-Or(And(Eq(a, b), Eq(a, o)), And(Ne(a, o), Ne(b, o)))
+>>> dnf(((a == o) | (b != o)) & ((a != o) | (b == o)))
+Or(And(a == b, a == o), And(a != o, b != o))
 
->>> dnf((Ne(a, o) | Eq(b, o)) & (Eq(a, o) | Eq(b, o)))
-Eq(b, o)
+>>> dnf(((a != o) | (b == o)) & ((a == o) | (b == o)))
+b == o
 
 >>> cnf(T)
 T
@@ -34,7 +34,7 @@ F
 T
 
 >>> cnf(Eq(a, o))
-Eq(a, o)
+a == o
 
 >>> cnf(Equivalent(Eq(a, o), Eq(b, o)))
-And(Or(Eq(a, o), Ne(b, o)), Or(Ne(a, o), Eq(b, o)))
+And(Or(a == o, b != o), Or(b == o, a != o))

@@ -1,70 +1,31 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import final, Optional
 
 from .formula import Formula
-from ..support.containers import GetVars
 from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
 
-if TYPE_CHECKING:
-    from .atomic import AtomicFormula
-
 
 class BooleanFormula(Formula):
     r"""A class whose instances are Boolean formulas in the sense that their
-    toplevel operator is one of the Boolean operators :math:`\lnot`,
-    :math:`\wedge`, :math:`\vee`, :math:`\longrightarrow`,
-    :math:`\longleftrightarrow`.
-
-    Note that members of :class:`BooleanFormula` may have subformulas with
-    other logical operators deeper in the expression tree.
+    toplevel operator is one of the Boolean operators :math:`\top`,
+    :math:`\bot`, :math:`\lnot`, :math:`\wedge`, :math:`\vee`,
+    :math:`\longrightarrow`, :math:`\longleftrightarrow`.
     """
+
     # The following would be abstract class variables, which are not available
     # at the moment.
-    func: type[BooleanFormula]  #: :meta private:
     dual_func: type[BooleanFormula]  #: :meta private:
 
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[Formula, ...]  #: :meta private:
 
-    def get_qvars(self) -> set:
-        """Implements the abstract method :meth:`Formula.get_qvars`.
-        """
-        qvars = set()
-        for arg in self.args:
-            qvars |= arg.get_qvars()
-        return qvars
-
-    def get_vars(self, assume_quantified: set = set()) -> GetVars:
-        """Implements the abstract method :meth:`Formula.get_vars`.
-        """
-        vars = GetVars()
-        for arg in self.args:
-            vars |= arg.get_vars(assume_quantified=assume_quantified)
-        return vars
-
-    def subs(self, substitution: dict) -> BooleanFormula:
-        """Implements the abstract method :meth:`Formula.subs`.
-        """
-        return self.func(*(arg.subs(substitution) for arg in self.args))
-
-
+@final
 class Equivalent(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\longleftrightarrow`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Equivalent` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula, Formula]
-
     @property
     def lhs(self) -> Formula:
         """The left-hand side of the equivalence."""
@@ -76,50 +37,15 @@ class Equivalent(BooleanFormula):
         return self.args[1]
 
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
+        # discuss: To what extent does this check for 2 args?
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
 
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y
-        >>>
-        >>> e1 = Equivalent(~ Eq(x, y), F)
-        >>> e1.simplify()
-        Eq(x, y)
-        """
-        lhs = self.lhs.simplify()
-        rhs = self.rhs.simplify()
-        if lhs is T:
-            return rhs
-        if rhs is T:
-            return lhs
-        if lhs is F:
-            if isinstance(rhs, Not):
-                return rhs.arg
-            return Not(rhs)
-        if rhs is F:
-            if isinstance(lhs, Not):
-                return lhs.arg
-            return Not(lhs)
-        if lhs == rhs:
-            return T
-        return Equivalent(lhs, rhs)
-
-
+@final
 class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator :math:`\longrightarrow`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Equivalent` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula, Formula]
-
     @property
     def lhs(self) -> Formula:
         """The left-hand side of the implication."""
@@ -133,96 +59,25 @@ class Implies(BooleanFormula):
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-        """
-        if self.rhs is T:
-            return self.lhs
-        lhs_simplify = self.lhs.simplify()
-        if lhs_simplify is F:
-            return T
-        rhs_simplify = self.rhs.simplify()
-        if rhs_simplify is T:
-            return T
-        if lhs_simplify is T:
-            return rhs_simplify
-        if rhs_simplify is F:
-            return involutive_not(lhs_simplify)
-        assert {lhs_simplify, rhs_simplify}.isdisjoint({T, F})
-        if lhs_simplify == rhs_simplify:
-            return T
-        return Implies(lhs_simplify, rhs_simplify)
 
-
-class AndOr(BooleanFormula):
-    # The following would be abstract class variables, which are not available
-    # at the moment.
-    func: type[AndOr]  #: :meta private:
-    dual_func: type[AndOr]  #: :meta private:
-    definite_func: type[BooleanFormula]  #: :meta private:
-    neutral_func: type[BooleanFormula]  #: :meta private:
-
-    # Similarly the following would be an abstract instance variable:
-    args: tuple[Formula, ...]  #: :meta private:
-
-    def simplify(self):
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1.theories.RCF import Eq, ring
-        >>> x, y, z = ring.set_vars('x', 'y', 'z')
-        >>>
-        >>> f1 = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(x, x + z)))
-        >>> f1.simplify()
-        And(Eq(x - y, 0), Eq(x - z, 0), Eq(-z, 0))
-        >>>
-        >>> f2 = Or(Eq(x, 0), Or(Eq(x, 1), Eq(x, 2)), And(Eq(x, y), Eq(x, z)))
-        >>> f2.simplify()
-        Or(Eq(x, 0), Eq(x - 1, 0), Eq(x - 2, 0), And(Eq(x - y, 0), Eq(x - z, 0)))
-        """
-        gAnd = And if self.func is And else Or
-        gT = T if self.func is And else F
-        gF = F if self.func is And else T
-        simplified_args = []
-        for arg in self.args:
-            arg_simplify = arg.simplify()
-            if arg_simplify is gF:
-                return gF
-            if arg_simplify is gT:
-                continue
-            if arg_simplify in simplified_args:
-                continue
-            if arg_simplify.func is gAnd:
-                simplified_args.extend(arg_simplify.args)
-            else:
-                simplified_args.append(arg_simplify)
-        if not simplified_args:
-            return gT
-        return gAnd(*simplified_args)
-
-
-class And(AndOr):
+@final
+class And(BooleanFormula):
     r"""A class whose instances are conjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\wedge`.
 
-    >>> from logic1.theories.Sets import Eq
-    >>> from sympy.abc import x, y, z, O
+    >>> from logic1.theories.Sets import Eq, VV
+    >>> x, y, z, O = VV.set_vars('x', 'y', 'z', 'O')
     >>>
     >>> And()
     T
     >>>
     >>> And(Eq(O, O))
-    Eq(O, O)
+    O == O
     >>>
     >>> And(Eq(x, O), Eq(x, y), Eq(y, z))
-    And(Eq(x, O), Eq(x, y), Eq(y, z))
+    And(x == O, x == y, y == z)
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`And` itself.
-        """
-        return cls
-
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`Or`, which implements
@@ -251,9 +106,6 @@ class And(AndOr):
         """
         return _T
 
-    # Instance variables
-    args: tuple[Formula, ...]
-
     def __new__(cls, *args: Formula):
         if not args:
             return T
@@ -271,27 +123,22 @@ class And(AndOr):
         self.args = tuple(args_flat)
 
 
-class Or(AndOr):
+@final
+class Or(BooleanFormula):
     r"""A class whose instances are disjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\vee`.
 
-    >>> from logic1.theories.RCF import Eq
+    >>> from logic1.theories.RCF import VV
     >>> Or()
     F
+    >>> x, = VV.get('x')
+    >>> Or(x == 0)
+    x == 0
     >>>
-    >>> Or(Eq(1, 0))
-    Eq(1, 0)
-    >>>
-    >>> Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
-    Or(Eq(1, 0), Eq(2, 0), Eq(3, 0))
+    >>> Or(x == 1, x == 2, x == 3)
+    Or(x == 1, x == 2, x == 3)
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Or` itself.
-        """
-        return cls
-
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`And`, which implements
@@ -320,9 +167,6 @@ class Or(AndOr):
         """
         return _F
 
-    # Instance variables
-    args: tuple[Formula, ...]
-
     def __new__(cls, *args):
         if not args:
             return F
@@ -340,20 +184,12 @@ class Or(AndOr):
         self.args = tuple(args_flat)
 
 
+@final
 class Not(BooleanFormula):
     r"""A class whose instances are negated formulas in the sense that their
     toplevel operator is the Boolean operator
     :math:`\neg`.
     """
-    @classproperty
-    def func(cls):
-        """A class property yielding the class :class:`Not` itself.
-        """
-        return cls
-
-    # Instance variables
-    args: tuple[Formula]
-
     @property
     def arg(self) -> Formula:
         r"""The one argument of the operator :math:`\neg`.
@@ -363,34 +199,17 @@ class Not(BooleanFormula):
     def __init__(self, arg: Formula) -> None:
         self.args = (arg, )
 
-    def simplify(self) -> Formula:
-        """Compare the parent method :meth:`Formula.simplify`.
-
-        >>> from logic1 import Ex, All
-        >>> from logic1.theories.Sets import Eq
-        >>> from sympy.abc import x, y, z
-        >>>
-        >>> f = And(Eq(x, y), T, Eq(x, y), And(Eq(x, z), Eq(y, x)))
-        >>> ~ All(x, Ex(y, f)).simplify()
-        Not(All(x, Ex(y, And(Eq(x, y), Eq(x, z)))))
-        """
-        arg_simplify = self.arg.simplify()
-        if arg_simplify is T:
-            return F
-        if arg_simplify is F:
-            return T
-        return involutive_not(arg_simplify)
-
 
 def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.theories.RCF import Eq
-    >>> involutive_not(Eq(0, 0))
-    Not(Eq(0, 0))
-    >>> involutive_not(~Eq(1, 0))
-    Eq(1, 0)
+    >>> from logic1.theories.RCF import VV
+    >>> x, = VV.get('x')
+    >>> involutive_not(x == 0)
+    Not(x == 0)
+    >>> involutive_not(~ (x == 0))
+    x == 0
     >>> involutive_not(T)
     Not(T)
     """
@@ -399,6 +218,75 @@ def involutive_not(arg: Formula) -> Formula:
     return Not(arg)
 
 
-# The following imports are intentionally late to avoid circularity.
-from .atomic import AtomicFormula  # noqa
-from .truth import _T, _F, T, F
+@final
+class _T(BooleanFormula):
+    """The constant Formula that is always true.
+
+    This is a quite basic implementation of a singleton class. It does not
+    support subclassing. We do not use a module because we need _T to be a
+    subclass itself.
+
+    >>> _T() is _T()
+    True
+    """
+    @classproperty
+    def dual_func(cls):
+        r"""A class property yielding the class :class:`_F`, which implements
+        the dual operator :math:`\bot` or :math:`\top`.
+        """
+        return _F
+
+    _instance: Optional[_T] = None
+
+    def __init__(self) -> None:
+        self.args = ()
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return 'T'
+
+
+T = _T()
+"""Support use as a constant without parentheses.
+"""
+
+
+@final
+class _F(BooleanFormula):
+    """The constant Formula that is always false.
+
+    This is a quite basic implementation of a singleton class. It does not
+    support subclassing. We do not use a module because we need _F to be a
+    subclass itself.
+
+    >>> _F() is _F()
+    True
+    """
+    @classproperty
+    def dual_func(cls):
+        r"""A class property yielding the class :class:`_T`, which implements
+        the dual operator :math:`\top` or :math:`\bot`.
+        """
+        return (lambda: _T)()
+
+    _instance: Optional[_F] = None
+
+    def __init__(self) -> None:
+        self.args = ()
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        return 'F'
+
+
+F = _F()
+"""Support use as a constant without parentheses.
+"""

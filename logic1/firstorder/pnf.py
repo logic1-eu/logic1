@@ -11,16 +11,18 @@ alternations in the prenex block [Burhenne90]_.
        Diploma Thesis, University of Passau, Germany, 1990
 """
 
-from abc import ABC, abstractmethod
 from typing import Any, TypeAlias
 
-from ..firstorder import (All, AndOr, AtomicFormula, BooleanFormula, Ex,
-                          Formula, QuantifiedFormula, TruthValue)
+from . import (All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
+               QuantifiedFormula, _T)
 
 Variable: TypeAlias = Any
 
 
-class PrenexNormalForm(ABC):
+class PrenexNormalForm:
+
+    def __call__(self, f: Formula, prefer_universal: bool = False, is_nnf: bool = False):
+        return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
     def pnf(self, f: Formula, prefer_universal: bool, is_nnf: bool) -> Formula:
         """If the minimal number of alternations in the result can be achieved
@@ -34,7 +36,7 @@ class PrenexNormalForm(ABC):
         """
         if not is_nnf:
             f = f.to_nnf()
-        f = self.with_distinct_vars(f, f.get_vars().free)
+        f = self.with_distinct_vars(f, set(f.fvars()))
         return self._pnf(f)[All if prefer_universal else Ex]
 
     def _pnf(self, f) -> dict[type[All | Ex], Formula]:
@@ -47,9 +49,9 @@ class PrenexNormalForm(ABC):
         or d[Ex] is d[All], i.e., identity is guaranteed.
         """
         match f:
-            case AtomicFormula() | TruthValue():
+            case AtomicFormula() | _F() | _T():
                 return {Ex: f, All: f}
-            case AndOr(func=op, args=args):
+            case And(func=op, args=args) | Or(func=op, args=args):
                 L1 = []
                 L2 = []
                 for arg in args:
@@ -79,7 +81,7 @@ class PrenexNormalForm(ABC):
             case _:
                 assert False
 
-    def interchange(self, f: AndOr, q: type[Ex | All]) -> Formula:
+    def interchange(self, f: And | Or, q: type[Ex | All]) -> Formula:
         quantifiers = []
         quantifier_positions = set()
         args = list(f.args)
@@ -129,7 +131,7 @@ class PrenexNormalForm(ABC):
             case QuantifiedFormula(func=Q, var=var, arg=arg):
                 new_arg = self.with_distinct_vars(arg, badlist)
                 if var in badlist:
-                    new_var = self.rename(var)
+                    new_var = var.fresh()
                     new_arg = new_arg.subs({var: new_var})
                     badlist.update({new_var})  # mutable
                     return Q(new_var, new_arg)
@@ -142,6 +144,5 @@ class PrenexNormalForm(ABC):
             case _:
                 assert False
 
-    @abstractmethod
-    def rename(self, var: Variable) -> Variable:
-        ...
+
+pnf = PrenexNormalForm()

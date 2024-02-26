@@ -1,13 +1,21 @@
 .. _api-theories:
 
-Package :mod:`logic1.theories`
-==============================
+********
+Theories
+********
 
-.. automodule:: logic1.theories
 
-Module :mod:`sets <logic1.theories.sets>`
+Module :mod:`RCF <logic1.theories.RCF>`
 -----------------------------------------
 
-.. automodule:: logic1.theories.sets
+.. automodule:: logic1.theories.RCF.rcf
+  :members:
+  :undoc-members:
+
+
+Module :mod:`sets <logic1.theories.Sets>`
+-----------------------------------------
+
+.. automodule:: logic1.theories.Sets
   :members:
   :undoc-members:
