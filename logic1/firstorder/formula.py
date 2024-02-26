@@ -223,10 +223,16 @@ class Formula(ABC):
                 assert False, repr(self)
 
     def all(self, ignore: Iterable = set()) -> Formula:
-        """Universal closure.
+        """Universal closure. Universally quantifiy all variables occurring
+        free in `self`, except the ones in `ignore`.
 
-        Universally quantifiy all variables occurring free in self, except the
-        ones mentioned in ignore.
+        >>> from logic1.theories import RCF
+        >>> a, b, x = RCF.VV.get('a', 'b', 'x')
+        >>> f = Ex(x, (x >= 0) & (a*x + b == 0))
+        >>> f.all()
+        All(b, All(a, Ex(x, And(x >= 0, a*x + b == 0))))
+
+        .. seealso:: :meth:`ex` -- Existential closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -237,6 +243,14 @@ class Formula(ABC):
         return f
 
     def as_latex(self) -> str:
+        r"""A LaTeX representation of `self`.
+
+        >>> from logic1.theories import RCF
+        >>> x, y = RCF.VV.get('x', 'y')
+        >>> f = All(x, (x < 1) | (x - 1 == 0) | (x > 1))
+        >>> f.as_latex()
+        '\\forall x \\, (x < 1 \\, \\vee \\, x - 1 = 0 \\, \\vee \\, x > 1)'
+        """
         SYMBOL: Final = {
             All: '\\forall', Ex: '\\exists', And: '\\wedge', Or: '\\vee',
             Implies: '\\longrightarrow', Equivalent: '\\longleftrightarrow',
@@ -274,32 +288,36 @@ class Formula(ABC):
 
     def atoms(self) -> Iterator[AtomicFormula]:
         """
-        An iterator over all instances of AtomicFormula occurring in
-        :data:`self`.
+        An iterator over all instances of :class:`AtomicFormula
+        <.atomic.AtomicFormula>` occurring in `self`.
 
-        >>> from logic1 import Ex, All, T, F
-        >>> from logic1.theories.RCF import Eq, VV
-        >>> x, y, z = VV.get('x', 'y', 'z')
-        >>>
-        >>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x,
-        ...     ~ Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
-        >>> type(f.atoms())
-        <class 'generator'>
+        Recall that the truth values :data:`T <.boolean.T>` and :data:`F
+        <.boolean.F>` are not atoms:
+
+        >>> from logic1.theories import RCF
+        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
+        >>> f = ((x == 0) & (y == 0) & T) | ((x == 0) & (y == z) & (z != 0))
         >>> list(f.atoms())
-        [3*x == 0, 3*x == 0, x == 0, x*y == 1]
-        >>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
-        True
+        [x == 0, y == 0, x == 0, y == z, z != 0]
 
-        This admits counting using common Python constructions:
+        The overall number of atoms:
 
         >>> sum(1 for _ in f.atoms())
-        4
+        5
+
+        Count numbers of occurrences for each occurring atom using a
+        :external+python:class:`Counter <collections.Counter>`:
+
         >>> from collections import Counter
         >>> Counter(f.atoms())
-        Counter({3*x == 0: 2, x == 0: 1, x*y == 1: 1})
+        Counter({x == 0: 2, y == 0: 1, y == z: 1, z != 0: 1})
 
-        >>> empty = (T & F).atoms()
-        >>> next(empty)
+        Recall the Python builtin :func:`next`:
+
+        >>> iter = (x == 0).atoms()
+        >>> next(iter)
+        x == 0
+        >>> next(iter)
         Traceback (most recent call last):
         ...
         StopIteration
@@ -316,19 +334,23 @@ class Formula(ABC):
                 assert False, type(self)
 
     def bvars(self) -> Iterator[Variable]:
-        """An iterator over all variables with bound ocurrences in self. Each
+        """An iterator over all bound occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories.RCF import VV
-        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
-        >>>
-        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).bvars())
+        >>> from logic1.theories import RCF
+        >>> a, x, y, z = RCF.VV.get('a', 'x', 'y', 'z')
+        >>> f = All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x))
+        >>> list(f.bvars())
         [x, y, y]
 
         Note that following the common definition in logic, *occurrence* refers
         to the occurrence in a term. Appearances of variables as a quantified
-        variables without use in any term are not considered. Compare
-        :meth:`qvars`.
+        variables without use in any term are not considered.
+
+        .. seealso::
+            :meth:`fvars` -- An iterator over all free occurrences of variables
+
+            :meth:`qvars` -- An iterator over all quantified variables
         """
         return self._bvars(set())
 
@@ -352,12 +374,18 @@ class Formula(ABC):
         variables is not checked, so that quantifiers with unused variables are
         counted.
 
-        >>> from logic1 import Ex, All, T
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y, z = VV.set_vars('x', 'y', 'z')
-        >>>
-        >>> Ex(x, (x == y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
+        >>> from logic1.theories import RCF
+        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
+        >>> f = Ex(x, (x == y) & All(x, Ex(y, Ex(z, x == x + 1))))
+        >>> f.count_alternations()
         2
+
+        In this example the following path has two alternations, one from
+        :class:`Ex <.quantified.Ex>` to :class:`All <.quantified.All>` and
+        another one from :class:`All <.quantified.All>` to
+        :class:`Ex <.quantified.Ex>`::
+
+            Ex ———— And ———— All ———— Ex ———— Ex ———— x == y + 1
         """
         return self._count_alternations()[0]
 
@@ -385,6 +413,23 @@ class Formula(ABC):
                 assert False, type(self)
 
     def depth(self) -> int:
+        """The depth of a formula is the maximal length of a path from the root
+        to a truth value or an :class:`AtomicFormula <.atomic.AtomicFormula>`
+        in the expression tree:
+
+        >>> from logic1.theories import RCF
+        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
+        >>> f = Ex(x, (x == y) & All(x, Ex(y, Ex(z, x == y + 1))))
+        >>> f.depth()
+        5
+
+        In this example the the following path has the maximal length 5::
+
+            Ex ———— And ———— All ———— Ex ———— Ex ———— x == y + 1
+
+        Note that for this purpose truth values and :class:`AtomicFormula
+        <.atomic.AtomicFormula>` are considered to have depth 0.
+        """
         match self:
             case All() | Ex():
                 return self.arg.depth() + 1
@@ -396,10 +441,16 @@ class Formula(ABC):
                 assert False, type(self)
 
     def ex(self, ignore: Iterable = set()) -> Formula:
-        """Existential closure.
+        """Existential closure. Existentially quantifiy all variables occurring
+        free in `self`, except the ones in `ignore`.
 
-        Existentially quantifiy all variables occurring free in self, except
-        the ones mentioned in ignore.
+        >>> from logic1.theories import RCF
+        >>> a, b, c, x = RCF.VV.get('a', 'b', 'c', 'x')
+        >>> f = All(x, (a < x) & (a + b + c < x))
+        >>> f.ex(ignore={c})
+        Ex(b, Ex(a, All(x, And(a < x, a + b + c < x))))
+
+        .. seealso:: :meth:`all` -- Universal closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -410,14 +461,19 @@ class Formula(ABC):
         return f
 
     def fvars(self) -> Iterator[Variable]:
-        """An iterator over all variables with free ocurrences in self. Each
+        """An iterator over all free occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories.RCF import VV
-        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
-        >>>
-        >>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).fvars())
+        >>> from logic1.theories import RCF
+        >>> a, x, y, z = RCF.VV.get('a', 'x', 'y', 'z')
+        >>> f = All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x))
+        >>> list(f.fvars())
         [a, x, a, x]
+
+        .. seealso::
+            :meth:`bvars` -- An iterator over all bound occurrences of variables
+
+            :meth:`qvars` -- An iterator over all quantified variables
         """
         return self._fvars(set())
 
@@ -434,6 +490,43 @@ class Formula(ABC):
                 assert False, type(self)
 
     def matrix(self) -> tuple[Formula, list[QuantifierBlock]]:
+        """The matrix of a prenex formula is its quantifier free part. This
+        method returns the matrix along with the leading quantifiers.
+
+        >>> from logic1.theories import RCF
+        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
+        >>> f = All(x, All(y, Ex(z, x + z == y)))
+        >>> m, B = f.matrix()
+        >>> m
+        x + z == y
+        >>> B
+        [(<class 'logic1.firstorder.quantified.All'>, [x, y]),
+         (<class 'logic1.firstorder.quantified.Ex'>, [z])]
+
+        Reconstruct ``f`` from ``m`` and ``B``:
+
+        >>> g = m
+        >>> for q, V in reversed(B):
+        ...     g= q(V, g)
+        >>> g == f
+        True
+
+        If `self` is not prenex, then the leading quantifiers are considered
+        and the matrix will not be quantifier-free:
+
+        >>> h = All(x, All(y, (x != 0) >> Ex(z, x * z == y)))
+        >>> m, B = h.matrix()
+        >>> m
+        Implies(x != 0, Ex(z, x*z == y))
+        >>> B
+        [(<class 'logic1.firstorder.quantified.All'>, [x, y])]
+
+        .. seealso::
+            :func:`pnf <.pnf.pnf>` -- Prenex normal form
+
+            :data:`QuantifierBlock <.quantified.QuantifierBlock>` \
+                -- A type holding a block of quantifiers
+        """
         blocks = []
         block_vars = []
         f: Formula = self
@@ -447,16 +540,21 @@ class Formula(ABC):
         return f, blocks
 
     def qvars(self) -> Iterator[Variable]:
-        """An iterator over all variables that are quantified in self.
+        """An iterator over all quantified variables in `self`.
 
-        >>> from logic1.theories.Sets import VV
-        >>> a, b, c, x, y, z = VV.set_vars('a', 'b', 'c', 'x', 'y', 'z')
-        >>>
-        >>> list(All(y, Ex(x, a == y) & Ex(z, a == y)).qvars())
+        In the following example, ``z`` is a quantified variable but not a
+        bound variable:
+
+        >>> from logic1.theories import RCF
+        >>> a, b, c, x, y, z = RCF.VV.get('a', 'b', 'c', 'x', 'y', 'z')
+        >>> f = All(y, Ex(x, a == y) & Ex(z, a == y))
+        >>> list(f.qvars())
         [y, x, z]
 
-        Note that the mere quantification of a variable does not establish a
-        bound ocurrence of that variable. Compare :meth:`bvars`, :meth:`fvars`.
+        .. seealso::
+            :meth:`bvars` -- An iterator over all bound occurrences of variables
+
+            :meth:`fvars` -- An iterator over all free occurrences of  variables
         """
         match self:
             case All() | Ex():
