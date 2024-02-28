@@ -89,6 +89,17 @@ class NSP(Enum):
     MINUS_INFINITY = auto()
 
 
+class TAG(Enum):
+    EQ = auto()
+    GE = auto()
+    GT = auto()
+    LE = auto()
+    LT = auto()
+    NE = auto()
+    XE = auto()
+    XT = auto()
+
+
 @dataclass
 class TestPoint:
 
@@ -137,45 +148,99 @@ class Node:
     def regular_eset(self) -> EliminationSet:
 
         def guard():
-            return Ne(a, 0) if not a._is_constant() else None
+            return Ne(den, 0) if not den._is_constant() else None
 
-        x = self.variables.pop()
-        test_points = [TestPoint(nsp=NSP.MINUS_INFINITY)]
-        for atom in self.formula.atoms():
-            assert isinstance(atom, AtomicFormula)
-            match atom.lhs._degree(x):
-                case -1 | 0:
-                    continue
-                case 1:
-                    a = atom.lhs._coefficient({x: 1})
-                    b = atom.lhs._coefficient({x: 0})
-                    match atom:
-                        case Eq():
-                            tp = TestPoint(guard=guard(), num=-b, den=a)
-                        case Ne():
-                            tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
-                        case Le():
-                            if a._is_constant() and a.poly > 0:
-                                continue
-                            tp = TestPoint(guard=guard(), num=-b, den=a)
-                        case Ge():
-                            if a._is_constant() and a.poly < 0:
-                                continue
-                            tp = TestPoint(guard=guard(), num=-b, den=a)
-                        case Lt():
-                            if a._is_constant() and a.poly > 0:
-                                continue
-                            tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
-                        case Gt():
-                            if a._is_constant() and a.poly < 0:
-                                continue
-                            tp = TestPoint(guard=guard(), num=-b, den=a, nsp=NSP.PLUS_EPSILON)
-                        case _:
-                            assert False, atom
-                    test_points.append(tp)
-                case _:
-                    raise DegreeViolation(atom, x, atom.lhs._degree(x))
-        return EliminationSet(variable=x, test_points=test_points, method='e')
+        bt1n = None
+        bx1n = None
+        assert self.variables
+        for x in self.variables:
+            tagged_points: dict[TAG, set[tuple[Term, Term]]] = {tag: set() for tag in TAG}
+            for atom in sorted(set(self.formula.atoms())):
+                assert isinstance(atom, AtomicFormula)
+                assert atom.rhs == Term(0)
+                match atom.lhs._degree(x):
+                    case -1:
+                        assert False, atom
+                    case 0:
+                        continue
+                    case 1:
+                        a = atom.lhs._coefficient({x: 1})
+                        b = atom.lhs._coefficient({x: 0})
+                        quotient = (-b, a)
+                        match atom:
+                            case Eq():
+                                tagged_points[TAG.EQ].add(quotient)
+                            case Ne():
+                                tagged_points[TAG.NE].add(quotient)
+                            case Le():
+                                if a._is_constant():
+                                    if a.poly > 0:
+                                        tagged_points[TAG.LE].add(quotient)
+                                    else:
+                                        assert a.poly < 0, a.poly
+                                        tagged_points[TAG.GE].add(quotient)
+                                else:
+                                    tagged_points[TAG.XE].add(quotient)
+                            case Ge():
+                                if a._is_constant():
+                                    if a.poly > 0:
+                                        tagged_points[TAG.GE].add(quotient)
+                                    else:
+                                        assert a.poly < 0, a.poly
+                                        tagged_points[TAG.LE].add(quotient)
+                                else:
+                                    tagged_points[TAG.XE].add(quotient)
+                            case Lt():
+                                if a._is_constant():
+                                    if a.poly > 0:
+                                        tagged_points[TAG.LT].add(quotient)
+                                    else:
+                                        assert a.poly < 0, a.poly
+                                        tagged_points[TAG.GT].add(quotient)
+                                else:
+                                    tagged_points[TAG.XT].add(quotient)
+                            case Gt():
+                                if a._is_constant():
+                                    if a.poly > 0:
+                                        tagged_points[TAG.GT].add(quotient)
+                                    else:
+                                        assert a.poly < 0, a.poly
+                                        tagged_points[TAG.LT].add(quotient)
+                                else:
+                                    tagged_points[TAG.XT].add(quotient)
+                            case _:
+                                assert False, atom
+                    case _:
+                        raise DegreeViolation(atom, x, atom.lhs._degree(x))
+            lt1n = len(tagged_points[TAG.LT])
+            lx1n = len(tagged_points[TAG.LE]) + lt1n
+            gt1n = len(tagged_points[TAG.GT])
+            gx1n = len(tagged_points[TAG.GE]) + gt1n
+            if bx1n is None or (bx1n, bt1n) > (lx1n, lt1n):
+                bx1n, bt1n = lx1n, lt1n
+                best_variable = x
+                best_weak_points = tagged_points[TAG.EQ]
+                best_strict_points = tagged_points[TAG.XT] | tagged_points[TAG.NE]
+                best_weak_points = best_weak_points | tagged_points[TAG.LE]
+                best_strict_points = best_strict_points | tagged_points[TAG.LT]
+                best_nsp = NSP.MINUS_EPSILON
+                best_infinity = NSP.PLUS_INFINITY
+            if bx1n is None or (bx1n, bt1n) > (gx1n, gt1n):
+                bx1n, bt1n = gx1n, gt1n
+                best_variable = x
+                best_weak_points = tagged_points[TAG.EQ]
+                best_strict_points = tagged_points[TAG.XT] | tagged_points[TAG.NE]
+                best_weak_points = best_weak_points | tagged_points[TAG.GE]
+                best_strict_points = best_strict_points | tagged_points[TAG.GT]
+                best_nsp = NSP.PLUS_EPSILON
+                best_infinity = NSP.MINUS_INFINITY
+        test_points = [TestPoint(nsp=best_infinity)]
+        for (num, den) in best_weak_points:
+            test_points.append(TestPoint(guard=guard(), num=num, den=den))
+        for (num, den) in best_strict_points:
+            test_points.append(TestPoint(guard=guard(), num=num, den=den, nsp=best_nsp))
+        self.variables.remove(best_variable)
+        return EliminationSet(variable=best_variable, test_points=test_points, method='e')
 
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
@@ -914,7 +979,7 @@ class VirtualSubstitution:
                 if t - last_log >= self.log_rate:
                     logger.info(self.working_nodes.periodic_statistics())
                     logger.info(self.success_nodes.periodic_statistics('S'))
-                    logger.info(self.success_nodes.periodic_statistics('F'))
+                    logger.info(self.failure_nodes.periodic_statistics('F'))
                     last_log = t
             node = self.working_nodes.pop()
             try:
@@ -929,7 +994,7 @@ class VirtualSubstitution:
                 self.success_nodes.extend(nodes)
         logger.info(self.working_nodes.final_statistics())
         logger.info(self.success_nodes.final_statistics('success'))
-        logger.info(self.success_nodes.final_statistics('failure'))
+        logger.info(self.failure_nodes.final_statistics('failure'))
 
     def setup(self, f: Formula, workers: int) -> None:
         logger.debug(f'entering {self.setup.__name__}')
