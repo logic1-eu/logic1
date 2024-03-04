@@ -37,6 +37,7 @@ stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(delta_time_formatter)
 
 logger = logging.getLogger(__name__)
+logger.propagate = False
 logger.addHandler(stream_handler)
 logger.addFilter(lambda record: record.msg.strip() != '')
 logger.setLevel(logging.WARNING)
@@ -48,6 +49,7 @@ multiprocessing_formatter = DeltaTimeFormatter(
 multiprocessing_handler = logging.StreamHandler()
 multiprocessing_handler.setFormatter(multiprocessing_formatter)
 multiprocessing_logger = logging.getLogger('multiprocessing')
+multiprocessing_logger.propagate = False
 multiprocessing_logger.addHandler(multiprocessing_handler)
 
 
