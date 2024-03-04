@@ -605,46 +605,57 @@ class Formula(ABC):
         """Fast basic simplification. The result is equivalent to `self`. The
         following first-order simplifications are applied:
 
-        1. Evaluation of ``Not(F)`` and ``Not(T)`` to :data:`T <.boolean.T>`
-           and :data:`F<.boolean.F>`, respectively.
+        1. Truth values:
 
-        2. Transformation of ``And(..., T, ...)`` into ``And(...)``. The dual
-           for ``Or``.
+           a. Evaluate ``Not(F)`` to ``T``, and evaluate ``Not(T)`` to ``F``.
 
-        3. Transformation of ``And(..., F, ...)`` into ``F``. The dual for
-           ``Or``.
+           b. Evaluate ``And(..., F, ...)`` to ``F`` and ``Or(..., T, ...)`` to
+              ``T``.
 
-        4. Transformation of ``Not(Not(f))`` into ``f``.
+           c. Evaluate ``Implies(F, arg)`` and ``Implies(arg, T)`` to ``T``.
 
-        5. Transformation of ``And(..., And(*args), ...)`` into ``And(...,
-           *args, ...)``. The same for ``Or``.
+           d. Remove ``T`` from ``And(..., T, ...)`` and ``F`` from ``Or(...,
+              F, ...)``.
 
-        6. Transformation of ``And(..., f, ..., f, ...)`` into ``And(..., f,
-           ...)``. The same for ``Or``.
+           e. Transform ``Implies(T, arg)`` into ``arg``, and transform
+              ``Implies(arg, F)`` into ``Not(arg)``.
 
-        7. Sorting of ``f1, ..., fn`` within ``And(f1, ..., fn)`` using a
-           canonical order. The same for ``Or``.
+           f. Transform ``Equivalent(T, arg)`` and ``Equivalent(arg, T)`` into
+              ``arg``, and transform ``Equivalent(F, arg)``, ``Equivalent(arg,
+              F)`` into ``Not(arg)``.
 
-        8. Elimination of :data:`T <.boolean.T>` and :data:`F<.boolean.F>` as
-           arguments of
-           :class:`Implies <.boolean.Implies>`, :class:`Equivalent
-           <.boolean.Equivalent>`.
+        2. Nested operators:
 
+           a. Transform ``Not(Not(arg))`` into ``arg``.
+
+           b. Transform ``And(..., And(*args), ...)`` into ``And(..., *args,
+              ...)``. The same for ``Or`` instead of ``And``.
+
+        3. Equal arguments:
+
+           a. Transform ``And(..., arg, ..., arg, ...)`` into ``And(..., arg,
+              ...)``. The same for ``Or`` instead of ``And``.
+
+           b. Evaluate ``Implies(arg, arg)`` to ``T``. The same for
+              ``Equivalent`` instead of ``Implies``.
+
+        4. Sort ``arg_1, ..., arg_n`` within ``And(arg_1, ..., arg_n)`` using a
+           canonical order. The same for ``Or`` instead of ``And``.
 
         Overloading of :class:`AtomicFormula <.atomic.AtomicFormula>` provides
         a hook for theories to extend :meth:`simplify` to atomic formulas.
 
         .. seealso::
-            `simplify` methods of classes derived from :class:`AtomicFormula
-            <.atomic.AtomicFormula>` within various theories:
+           `simplify` methods of classes derived from :class:`AtomicFormula
+           <.atomic.AtomicFormula>` within various theories:
 
-            * :meth:`logic1.theories.RCF.rcf.AtomicFormula.simplify`
-            * :meth:`logic1.theories.Sets.rcf.AtomicFormula.simplify`
+           * :meth:`logic1.theories.RCF.rcf.AtomicFormula.simplify`
+           * :meth:`logic1.theories.Sets.rcf.AtomicFormula.simplify`
 
-            More powerful simplifiers provided by various theories:
+           More powerful simplifiers provided by various theories:
 
-            * :func:`logic1.theories.RCF.simplify.simplify`
-            * :func:`logic1.theories.Sets.simplify.simplify`
+           * :func:`logic1.theories.RCF.simplify.simplify`
+           * :func:`logic1.theories.Sets.simplify.simplify`
         """
         match self:
             case _F() | _T():
