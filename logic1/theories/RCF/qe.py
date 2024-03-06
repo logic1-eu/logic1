@@ -18,7 +18,7 @@ from sage.rings.integer_ring import ZZ  # type: ignore[import-untyped]
 import sys
 import threading
 import time
-from typing import Collection, Iterable, Optional
+from typing import Collection, Iterable, Literal, Optional
 
 from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
@@ -92,22 +92,67 @@ class NSP(Enum):
 
 
 class TAG(Enum):
-    EQ = auto()
-    GE = auto()
-    GT = auto()
-    LE = auto()
-    LT = auto()
-    NE = auto()
-    XE = auto()
-    XT = auto()
+    IP = auto()
+    EP = auto()
+    SLB = auto()
+    WLB = auto()
+    SUB = auto()
+    WUB = auto()
+
+
+@dataclass
+class RealType:
+
+    degree: int
+    signs: tuple[Literal[-1, 0, 1], ...]
+
+    @property
+    def kosta_code(self):
+        D = {(1, (-1, 0, 1)): 1,
+             (1, (1, 0, -1)): -1,
+             (2, (1, 0, -1, 0, 1)): 1,
+             (2, (1, 0, 1)): 2,
+             (2, (1,)): 3,
+             (2, (-1, 0, 1, 0, -1)): -1,
+             (2, (-1, 0, -1)): -2,
+             (2, (-1,)): -3,
+             (3, (-1, 0, 1)): 1,
+             (3, (-1, 0, -1, 0, 1)): 2,
+             (3, (-1, 0, 1, 0, 1)): 3,
+             (3, (-1, 0, 1, 0, -1, 0, 1)): 4,
+             (3, (1, 0, -1)): -1,
+             (3, (1, 0, 1, 0, -1)): -2,
+             (3, (1, 0, -1, 0, -1)): -3,
+             (3, (1, 0, -1, 0, 1, 0, -1)): -4}
+        return D[self.degree, self.signs]
+
+
+@dataclass
+class RootSpec:
+
+    real_type: RealType
+    index: int
+
+
+@dataclass
+class PRD:
+    """Parametric Root Description"""
+
+    term: Term
+    roots: set[RootSpec]
+
+
+@dataclass
+class CandidateSolution:
+
+    prd: PRD
+    tag: TAG
 
 
 @dataclass
 class TestPoint:
 
-    guard: Optional[Formula] = None
-    num: Term = field(default_factory=lambda: Term(0))
-    den: Term = field(default_factory=lambda: Term(1))
+    prd: Optional[PRD] = None
     nsp: NSP = NSP.NONE
 
 
@@ -142,21 +187,139 @@ class Node:
                             a = lhs._coefficient({x: 1})
                             if a._is_constant():
                                 self.variables.remove(x)
-                                b = lhs._coefficient({x: 0})
-                                tp = TestPoint(num=-b, den=a)
-                                return EliminationSet(variable=x, test_points=[tp], method='g')
+                                root_spec1 = RootSpec(RealType(1, (-1, 0, 1)), 1)
+                                tp1 = TestPoint(PRD(lhs, {root_spec1}))
+                                root_spec2 = RootSpec(RealType(1, (1, 0, -1)), 1)
+                                tp2 = TestPoint(PRD(lhs, {root_spec2}))
+                                return EliminationSet(variable=x, test_points=[tp1, tp2],
+                                                      method='g')
         return None
 
     def regular_eset(self) -> EliminationSet:
 
-        def guard():
-            return Ne(den, 0) if not den._is_constant() else None
+        def at_cs_1(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
+            prd_1 = PRD(atom.lhs, {RootSpec(RealType(1, (-1, 0, 1)), 1)})
+            prd_2 = PRD(atom.lhs, {RootSpec(RealType(1, (1, 0, -1)), 1)})
+            match atom:
+                case Eq():
+                    cs1 = CandidateSolution(prd_1, TAG.IP)
+                    cs2 = CandidateSolution(prd_2, TAG.IP)
+                    return {cs1, cs2}
+                case Ne():
+                    cs1 = CandidateSolution(prd_1, TAG.EP)
+                    cs2 = CandidateSolution(prd_2, TAG.EP)
+                    return {cs1, cs2}
+                case Le():
+                    cs1 = CandidateSolution(prd_1, TAG.WUB)
+                    cs2 = CandidateSolution(prd_2, TAG.WLB)
+                    return {cs1, cs2}
+                case Ge():
+                    cs1 = CandidateSolution(prd_1, TAG.WLB)
+                    cs2 = CandidateSolution(prd_2, TAG.WUB)
+                    return {cs1, cs2}
+                case Lt():
+                    cs1 = CandidateSolution(prd_1, TAG.SUB)
+                    cs2 = CandidateSolution(prd_2, TAG.SLB)
+                    return {cs1, cs2}
+                case Gt():
+                    cs1 = CandidateSolution(prd_1, TAG.SLB)
+                    cs2 = CandidateSolution(prd_2, TAG.SUB)
+                    return {cs1, cs2}
+                case _:
+                    assert False, atom
 
-        bt1n = None
-        bx1n = None
+        def vs_at(atom: AtomicFormula, e: TestPoint, x: Variable) -> Formula:
+            match e.nsp:
+                case NSP.NONE:
+                    h = pseudo_sgn_rem(atom.lhs, e.prd.term, x)
+                    return vs_prd_at(atom.func(h, 0), e, x)
+                case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
+                    phi = expand_eps_at(atom, e.nsp, x)
+                    recurse = lambda atom: vs_at(atom, TestPoint(e.prd, NSP.NONE), x)  # noqa E731
+                    return phi.transform_atoms(recurse)
+                case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
+                    return vs_inf_at(atom, e.nsp, x)
+                case _:
+                    assert False, e.nsp
+
+        def pseudo_sgn_rem():
+            ...
+
+        def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
+            match prd.term._degree(x):
+                case -1 | 0:
+                    assert False, prd
+                case 1:
+                    return atom
+                case _:
+                    raise NotImplementedError()
+
+        def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            assert nsp in (NSP.PLUS_INFINITY, NSP.MINUS_INFINITY), nsp
+            match atom:
+                case Eq() | Ne():
+                    return tau(atom, nsp, x)
+                case Le() | Lt() | Ge() | Gt():
+                    c = atom.lhs._coefficient({x: 0})
+                    mu: Formula = atom.func(c, 0)
+                    for e in range(1, atom.lhs._degree(x) + 1):
+                        c = atom.lhs._coefficient({x: e})
+                        if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
+                            c = - c
+                        sigma = atom.func.strict_part
+                        mu = Or(sigma(c, 0), And(Eq(c, 0), mu))
+                    return mu
+                case _:
+                    assert False, atom
+
+        def tau(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            args: list[AtomicFormula] = []
+            match atom:
+                case Eq():
+                    for e in range(atom.lhs._degree(x) + 1):
+                        c = atom.lhs._coefficient({x: e})
+                        if c._is_zero():
+                            continue
+                        if c._is_constant():
+                            return F
+                        args.append(Eq(c, 0))
+                    return And(*args)
+                case Ne():
+                    for e in range(atom.lhs._degree(x) + 1):
+                        c = atom.lhs._coefficient({x: e})
+                        if c._is_zero():
+                            continue
+                        if c._is_constant():
+                            return T
+                        args.append(Ne(c, 0))
+                    return Or(*args)
+                case _:
+                    assert False, atom
+
+        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            assert nsp in (NSP.PLUS_EPSILON, NSP.MINUS_EPSILON), nsp
+            match atom:
+                case Eq() | Ne():
+                    return tau(atom, nsp, x)
+                case Le() | Lt() | Ge() | Gt():
+                    return nu(atom, nsp, x)
+                case _:
+                    assert False, atom
+
+        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            if atom.lhs._degree(x) <= 0:
+                return atom
+            lhs_prime = atom.lhs._derivative(x)
+            if nsp == NSP.MINUS_EPSILON:
+                lhs_prime = - lhs_prime
+            atom_strict = atom.func.strict_part(atom.lhs, 0)
+            atom_prime = atom.func(lhs_prime, 0)
+            return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
+
+        smallest_eset_size = None
         assert self.variables
         for x in self.variables:
-            tagged_points: dict[TAG, set[tuple[Term, Term]]] = {tag: set() for tag in TAG}
+            candidates: dict[TAG, set[CandidateSolution]] = {tag: set() for tag in TAG}
             for atom in sorted(set(self.formula.atoms())):
                 assert isinstance(atom, AtomicFormula)
                 assert atom.rhs == Term(0)
@@ -164,85 +327,27 @@ class Node:
                     case -1:
                         assert False, atom
                     case 0:
+                        # lhs can still be a polynomial in other variables.
                         continue
                     case 1:
-                        a = atom.lhs._coefficient({x: 1})
-                        b = atom.lhs._coefficient({x: 0})
-                        quotient = (-b, a)
-                        match atom:
-                            case Eq():
-                                tagged_points[TAG.EQ].add(quotient)
-                            case Ne():
-                                tagged_points[TAG.NE].add(quotient)
-                            case Le():
-                                if a._is_constant():
-                                    if a.poly > 0:
-                                        tagged_points[TAG.LE].add(quotient)
-                                    else:
-                                        assert a.poly < 0, a.poly
-                                        tagged_points[TAG.GE].add(quotient)
-                                else:
-                                    tagged_points[TAG.XE].add(quotient)
-                            case Ge():
-                                if a._is_constant():
-                                    if a.poly > 0:
-                                        tagged_points[TAG.GE].add(quotient)
-                                    else:
-                                        assert a.poly < 0, a.poly
-                                        tagged_points[TAG.LE].add(quotient)
-                                else:
-                                    tagged_points[TAG.XE].add(quotient)
-                            case Lt():
-                                if a._is_constant():
-                                    if a.poly > 0:
-                                        tagged_points[TAG.LT].add(quotient)
-                                    else:
-                                        assert a.poly < 0, a.poly
-                                        tagged_points[TAG.GT].add(quotient)
-                                else:
-                                    tagged_points[TAG.XT].add(quotient)
-                            case Gt():
-                                if a._is_constant():
-                                    if a.poly > 0:
-                                        tagged_points[TAG.GT].add(quotient)
-                                    else:
-                                        assert a.poly < 0, a.poly
-                                        tagged_points[TAG.LT].add(quotient)
-                                else:
-                                    tagged_points[TAG.XT].add(quotient)
-                            case _:
-                                assert False, atom
+                        for candidate in at_cs_1(atom, x):
+                            candidates[candidate.tag].add(candidate)
                     case _:
                         raise DegreeViolation(atom, x, atom.lhs._degree(x))
-            lt1n = len(tagged_points[TAG.LT])
-            lx1n = len(tagged_points[TAG.LE]) + lt1n
-            gt1n = len(tagged_points[TAG.GT])
-            gx1n = len(tagged_points[TAG.GE]) + gt1n
-            if bx1n is None or (bx1n, bt1n) > (lx1n, lt1n):
-                bx1n, bt1n = lx1n, lt1n
+            eset_size = sum(len(candidates[tag]) for tag in (TAG.IP, TAG.EP, TAG.WLB, TAG.SLB))
+            if smallest_eset_size is None or eset_size < smallest_eset_size:
+                smallest_eset_size = eset_size
                 best_variable = x
-                best_weak_points = tagged_points[TAG.EQ]
-                best_strict_points = tagged_points[TAG.XT] | tagged_points[TAG.NE]
-                best_weak_points = best_weak_points | tagged_points[TAG.LE]
-                best_strict_points = best_strict_points | tagged_points[TAG.LT]
-                best_nsp = NSP.MINUS_EPSILON
-                best_infinity = NSP.PLUS_INFINITY
-            if bx1n is None or (bx1n, bt1n) > (gx1n, gt1n):
-                bx1n, bt1n = gx1n, gt1n
-                best_variable = x
-                best_weak_points = tagged_points[TAG.EQ]
-                best_strict_points = tagged_points[TAG.XT] | tagged_points[TAG.NE]
-                best_weak_points = best_weak_points | tagged_points[TAG.GE]
-                best_strict_points = best_strict_points | tagged_points[TAG.GT]
-                best_nsp = NSP.PLUS_EPSILON
-                best_infinity = NSP.MINUS_INFINITY
-        test_points = [TestPoint(nsp=best_infinity)]
-        for (num, den) in best_weak_points:
-            test_points.append(TestPoint(guard=guard(), num=num, den=den))
-        for (num, den) in best_strict_points:
-            test_points.append(TestPoint(guard=guard(), num=num, den=den, nsp=best_nsp))
+                best_candidates = candidates
+        E = [TestPoint(nsp=NSP.MINUS_INFINITY)]
+        for tag in (TAG.IP, TAG.WLB):
+            for candidate in best_candidates[tag]:
+                E.append(TestPoint(candidate.prd))
+        for tag in (TAG.EP, TAG.SLB):
+            for candidate in best_candidates[tag]:
+                E.append(TestPoint(candidate.prd, NSP.PLUS_EPSILON))
         self.variables.remove(best_variable)
-        return EliminationSet(variable=best_variable, test_points=test_points, method='e')
+        return EliminationSet(variable=best_variable, test_points=E, method='e')
 
     def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables

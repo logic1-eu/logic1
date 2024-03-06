@@ -339,6 +339,15 @@ class AtomicFormula(firstorder.AtomicFormula):
         """
         return cls.complement_func.converse_func
 
+    @classproperty
+    def strict_part(cls) -> type[Formula]:
+        """The strict part is the binary relation without the diagonal.
+        """
+        if cls in (Eq, Ne):
+            raise NotImplementedError()
+        D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
+        return D[cls]
+
     @property
     def lhs(self) -> Term:
         return self.args[0]
