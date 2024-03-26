@@ -6,6 +6,8 @@ import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
+from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
+    Polynomial_generic_dense as UnivariatePolynomial)
 from types import FrameType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
@@ -216,11 +218,11 @@ class Term(firstorder.Term):
         match arg:
             case Polynomial():
                 self.poly = arg
-            case Integer() | int():
+            case Integer() | int() | UnivariatePolynomial():
                 self.poly = self.wrapped_ring(arg)
             case _:
                 raise ValueError(
-                    f'arguments must be polylnomial or integer; {arg} is {type(arg)}')
+                    f'arguments must be polynomial or integer; {arg} is {type(arg)}')
 
     def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
         if isinstance(other, Term):
