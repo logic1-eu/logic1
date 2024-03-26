@@ -13,8 +13,6 @@ import multiprocessing.managers
 import multiprocessing.queues
 import os
 import queue
-from sage.rings.fraction_field import FractionField  # type: ignore[import-untyped]
-from sage.rings.integer_ring import ZZ  # type: ignore[import-untyped]
 import sys
 import threading
 import time
@@ -24,7 +22,6 @@ from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
-from logic1.theories.RCF import rcf
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.rcf import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable)
@@ -100,7 +97,7 @@ class TAG(Enum):
     WUB = auto()
 
 
-@dataclass
+@dataclass(frozen=True)
 class RealType:
 
     degree: int
@@ -127,23 +124,52 @@ class RealType:
         return D[self.degree, self.signs]
 
 
-@dataclass
+@dataclass(frozen=True)
 class RootSpec:
 
     real_type: RealType
     index: int
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class PRD:
     """Parametric Root Description"""
 
     term: Term
-    roots: set[RootSpec]
+    variable: Variable
+    roots: tuple[RootSpec]
+    guard: Formula
+
+    def __init__(self, term: Term, variable: Variable, roots: tuple[RootSpec]):
+        self.term = term
+        self.variable = variable
+        self.roots = roots
+        self.guard = simplify(self.compute_guard())
+
+    def compute_guard(self) -> Formula:
+        match self.term._degree(self.variable):
+            case 1:
+                return self.compute_guard_1()
+            case _:
+                raise NotImplementedError()
+
+    def compute_guard_1(self) -> Formula:
+        assert len(self.roots) == 1  # no clustering
+        lc = self.term._coefficient({self.variable: 1})
+        match self.roots:
+            case (RootSpec(RealType(1, (-1, 0, 1)), 1),):
+                return lc > 0
+            case (RootSpec(RealType(1, (1, 0, -1)), 1),):
+                return lc < 0
+            case _:
+                assert False, self
 
 
-@dataclass
+@dataclass(frozen=True)
 class CandidateSolution:
+    # CandidateSolutions are used as elements of sets. In order to become
+    # hashable, the dataclass is frozen, along with RootSpec, PRD, and
+    # RealType.
 
     prd: PRD
     tag: TAG
@@ -154,6 +180,14 @@ class TestPoint:
 
     prd: Optional[PRD] = None
     nsp: NSP = NSP.NONE
+
+    @property
+    def guard(self):
+        if self.prd is None:
+            return T
+        else:
+            assert self.prd.guard is not F, self
+            return self.prd.guard
 
 
 @dataclass
@@ -187,19 +221,23 @@ class Node:
                             a = lhs._coefficient({x: 1})
                             if a._is_constant():
                                 self.variables.remove(x)
-                                root_spec1 = RootSpec(RealType(1, (-1, 0, 1)), 1)
-                                tp1 = TestPoint(PRD(lhs, {root_spec1}))
-                                root_spec2 = RootSpec(RealType(1, (1, 0, -1)), 1)
-                                tp2 = TestPoint(PRD(lhs, {root_spec2}))
-                                return EliminationSet(variable=x, test_points=[tp1, tp2],
-                                                      method='g')
+                                if a.poly > 0:
+                                    root_spec = RootSpec(RealType(1, (-1, 0, 1)), 1)
+                                else:
+                                    assert a.poly < 0
+                                    root_spec = RootSpec(RealType(1, (1, 0, -1)), 1)
+                                tp = TestPoint(PRD(lhs, x, (root_spec,)))
+                                return EliminationSet(variable=x, test_points=[tp], method='g')
         return None
 
     def regular_eset(self) -> EliminationSet:
 
         def at_cs_1(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
-            prd_1 = PRD(atom.lhs, {RootSpec(RealType(1, (-1, 0, 1)), 1)})
-            prd_2 = PRD(atom.lhs, {RootSpec(RealType(1, (1, 0, -1)), 1)})
+            """Produce the set of candidate solutions of an atomic formula of
+            degree one.
+            """
+            prd_1 = PRD(atom.lhs, x, (RootSpec(RealType(1, (-1, 0, 1)), 1),))
+            prd_2 = PRD(atom.lhs, x, (RootSpec(RealType(1, (1, 0, -1)), 1),))
             match atom:
                 case Eq():
                     cs1 = CandidateSolution(prd_1, TAG.IP)
@@ -228,24 +266,90 @@ class Node:
                 case _:
                     assert False, atom
 
-        def vs_at(atom: AtomicFormula, e: TestPoint, x: Variable) -> Formula:
-            match e.nsp:
+        smallest_eset_size = None
+        assert self.variables
+        for x in self.variables:
+            candidates: dict[TAG, set[CandidateSolution]] = {tag: set() for tag in TAG}
+            for atom in sorted(set(self.formula.atoms())):
+                assert isinstance(atom, AtomicFormula)
+                assert atom.rhs == Term(0)
+                match atom.lhs._degree(x):
+                    case -1:
+                        assert False, atom
+                    case 0:
+                        # lhs can still be a polynomial in other variables.
+                        continue
+                    case 1:
+                        for candidate in at_cs_1(atom, x):
+                            if candidate.prd.guard is not F:
+                                candidates[candidate.tag].add(candidate)
+                    case _:
+                        raise DegreeViolation(atom, x, atom.lhs._degree(x))
+            num_xub = len(candidates[TAG.WUB]) + len(candidates[TAG.SUB])
+            num_xlb = len(candidates[TAG.WLB]) + len(candidates[TAG.SLB])
+            num_xp = len(candidates[TAG.IP]) + len(candidates[TAG.EP])
+            eset_size = min(num_xub, num_xlb) + num_xp
+            if smallest_eset_size is None or eset_size < smallest_eset_size:
+                smallest_eset_size = eset_size
+                best_variable = x
+                best_candidates = candidates
+                if num_xub < num_xlb:
+                    best_inf, best_eps, best_wb, best_sb = (
+                        NSP.PLUS_INFINITY, NSP.MINUS_EPSILON, TAG.WUB, TAG.SUB)
+                else:
+                    best_inf, best_eps, best_wb, best_sb = (
+                        NSP.MINUS_INFINITY, NSP.PLUS_EPSILON, TAG.WLB, TAG.SLB)
+        self.variables.remove(best_variable)
+        test_points = [TestPoint(nsp=best_inf)]
+        for tag in (TAG.IP, best_wb):
+            for candidate in best_candidates[tag]:
+                test_points.append(TestPoint(candidate.prd))
+        for tag in (TAG.EP, best_sb):
+            for candidate in best_candidates[tag]:
+                test_points.append(TestPoint(candidate.prd, best_eps))
+        return EliminationSet(variable=best_variable, test_points=test_points, method='e')
+
+    def vsubs(self, eset: EliminationSet) -> list[Node]:
+
+        def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> Formula:
+            """Virtually substitute a test point into an atom.
+            """
+            match tp.nsp:
                 case NSP.NONE:
-                    h = pseudo_sgn_rem(atom.lhs, e.prd.term, x)
-                    return vs_prd_at(atom.func(h, 0), e, x)
-                case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
-                    phi = expand_eps_at(atom, e.nsp, x)
-                    recurse = lambda atom: vs_at(atom, TestPoint(e.prd, NSP.NONE), x)  # noqa E731
+                    h = pseudo_sgn_rem(atom.lhs, tp.prd, x)
+                    return vs_prd_at(atom.func(h, 0), tp.prd, x)
+                case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
+                    phi = expand_eps_at(atom, tp.nsp, x)
+                    recurse = lambda atom: vs_at(atom, TestPoint(tp.prd, NSP.NONE), x)  # noqa E731
                     return phi.transform_atoms(recurse)
                 case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
-                    return vs_inf_at(atom, e.nsp, x)
+                    return vs_inf_at(atom, tp.nsp, x)
                 case _:
-                    assert False, e.nsp
+                    assert False, tp.nsp
 
-        def pseudo_sgn_rem():
-            ...
+        def pseudo_sgn_rem(g: Term, prd: PRD, x: Variable) -> Term:
+            """Sign-corrected pseudo-remainder
+            """
+            g1 = g.poly.polynomial(x.poly)
+            f1 = prd.term.poly.polynomial(x.poly)
+            _, h = g1.pseudo_quo_rem(f1)
+            delta = g1.degree() - f1.degree() + 1
+            if delta % 2 == 1:
+                first_signs = set(root.real_type.signs[0] for root in prd.roots)
+                if len(first_signs) == 1:
+                    first_sign = next(iter(first_signs))
+                    assert first_sign in (-1, 1)
+                    if first_sign == 1:
+                        h = - h
+                else:
+                    h *= f1.lc()
+            # One could check for even powers of f1.lc() in h. Currently the
+            # simplifier takes care of this.
+            return Term(h)
 
         def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
+            """Virtually substitute a parametric root description into an atom.
+            """
             match prd.term._degree(x):
                 case -1 | 0:
                     assert False, prd
@@ -255,10 +359,12 @@ class Node:
                     raise NotImplementedError()
 
         def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            """Virtually substitute ±∞ into an atom
+            """
             assert nsp in (NSP.PLUS_INFINITY, NSP.MINUS_INFINITY), nsp
             match atom:
                 case Eq() | Ne():
-                    return tau(atom, nsp, x)
+                    return tau(atom, x)
                 case Le() | Lt() | Ge() | Gt():
                     c = atom.lhs._coefficient({x: 0})
                     mu: Formula = atom.func(c, 0)
@@ -266,13 +372,41 @@ class Node:
                         c = atom.lhs._coefficient({x: e})
                         if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
                             c = - c
-                        sigma = atom.func.strict_part
-                        mu = Or(sigma(c, 0), And(Eq(c, 0), mu))
+                        strict_func = atom.func.strict_part
+                        mu = Or(strict_func(c, 0), And(Eq(c, 0), mu))
                     return mu
                 case _:
                     assert False, atom
 
-        def tau(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            """Reduce virtual substitution of a parametric root description ±ε
+            to virtual substituion of a parametric root description.
+            """
+            assert nsp in (NSP.PLUS_EPSILON, NSP.MINUS_EPSILON), nsp
+            match atom:
+                case Eq() | Ne():
+                    return tau(atom, x)
+                case Le() | Lt() | Ge() | Gt():
+                    return nu(atom, nsp, x)
+                case _:
+                    assert False, atom
+
+        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+            """Recursion on the vanishing of derivatives
+            """
+            if atom.lhs._degree(x) <= 0:
+                return atom
+            lhs_prime = atom.lhs._derivative(x)
+            if nsp == NSP.MINUS_EPSILON:
+                lhs_prime = - lhs_prime
+            atom_strict = atom.func.strict_part(atom.lhs, 0)
+            atom_prime = atom.func(lhs_prime, 0)
+            return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
+
+        def tau(atom: AtomicFormula, x: Variable) -> Formula:
+            """Virtually substitute a transcendental element into an equation
+            or inequation.
+            """
             args: list[AtomicFormula] = []
             match atom:
                 case Eq():
@@ -296,148 +430,18 @@ class Node:
                 case _:
                     assert False, atom
 
-        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
-            assert nsp in (NSP.PLUS_EPSILON, NSP.MINUS_EPSILON), nsp
-            match atom:
-                case Eq() | Ne():
-                    return tau(atom, nsp, x)
-                case Le() | Lt() | Ge() | Gt():
-                    return nu(atom, nsp, x)
-                case _:
-                    assert False, atom
-
-        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
-            if atom.lhs._degree(x) <= 0:
-                return atom
-            lhs_prime = atom.lhs._derivative(x)
-            if nsp == NSP.MINUS_EPSILON:
-                lhs_prime = - lhs_prime
-            atom_strict = atom.func.strict_part(atom.lhs, 0)
-            atom_prime = atom.func(lhs_prime, 0)
-            return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
-
-        smallest_eset_size = None
-        assert self.variables
-        for x in self.variables:
-            candidates: dict[TAG, set[CandidateSolution]] = {tag: set() for tag in TAG}
-            for atom in sorted(set(self.formula.atoms())):
-                assert isinstance(atom, AtomicFormula)
-                assert atom.rhs == Term(0)
-                match atom.lhs._degree(x):
-                    case -1:
-                        assert False, atom
-                    case 0:
-                        # lhs can still be a polynomial in other variables.
-                        continue
-                    case 1:
-                        for candidate in at_cs_1(atom, x):
-                            candidates[candidate.tag].add(candidate)
-                    case _:
-                        raise DegreeViolation(atom, x, atom.lhs._degree(x))
-            eset_size = sum(len(candidates[tag]) for tag in (TAG.IP, TAG.EP, TAG.WLB, TAG.SLB))
-            if smallest_eset_size is None or eset_size < smallest_eset_size:
-                smallest_eset_size = eset_size
-                best_variable = x
-                best_candidates = candidates
-        E = [TestPoint(nsp=NSP.MINUS_INFINITY)]
-        for tag in (TAG.IP, TAG.WLB):
-            for candidate in best_candidates[tag]:
-                E.append(TestPoint(candidate.prd))
-        for tag in (TAG.EP, TAG.SLB):
-            for candidate in best_candidates[tag]:
-                E.append(TestPoint(candidate.prd, NSP.PLUS_EPSILON))
-        self.variables.remove(best_variable)
-        return EliminationSet(variable=best_variable, test_points=E, method='e')
-
-    def vsubs(self, eset: EliminationSet) -> list[Node]:
         variables = self.variables
         x = eset.variable
         new_nodes = []
         for tp in eset.test_points:
-            new_formula = self.formula.transform_atoms(lambda atom: self.vsubs_atom(atom, x, tp))
-            if tp.guard is not None:
+            new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
+            if tp.guard is not T:
                 new_formula = And(tp.guard, new_formula)
             new_formula = simplify(new_formula)
             if new_formula is T:
                 raise FoundT()
             new_nodes.append(Node(variables.copy(), new_formula, []))
         return new_nodes
-
-    def vsubs_atom(self, atom: AtomicFormula, x: Variable, tp: TestPoint) -> Formula:
-
-        def mu() -> Formula:
-            """Substitute ±oo into ordering constraint.
-            """
-            c = lhs._coefficient({x: 0})
-            mu: Formula = func(c, 0)
-            for e in range(1, lhs._degree(x) + 1):
-                c = lhs._coefficient({x: e})
-                if tp.nsp == NSP.MINUS_INFINITY and e % 2 == 1:
-                    c = - c
-                mu = Or(Gt(c, 0), And(Eq(c, 0), mu))
-            return mu
-
-        def nu(lhs: Term) -> Formula:
-            """Substitute ±ε into any constraint.
-            """
-            if lhs._degree(x) <= 0:
-                return func(lhs, 0)
-            lhs_prime = lhs._derivative(x)
-            if tp.nsp == NSP.MINUS_EPSILON:
-                lhs_prime = - lhs_prime
-            return Or(Gt(lhs, 0), And(Eq(lhs, 0), nu(lhs_prime)))
-
-        def sigma() -> Formula:
-            """Substitute quotient into any constraint.
-            """
-            func = atom.func
-            FF = FractionField(ring.sage_ring)  # discuss
-            lhq = ring(atom.lhs.poly).subs(**{str(x.poly): FF(tp.num.poly, tp.den.poly)})
-            match func:
-                case rcf.Eq | rcf.Ne:
-                    lhp = lhq.numerator()
-                case rcf.Ge | rcf.Le | rcf.Gt | rcf.Lt:
-                    lhp = (lhq * lhq.denominator() ** 2).numerator()
-                case _:
-                    assert False, func
-            assert lhp.parent() in (ring.sage_ring, ZZ), lhp.parent()
-            return func(Term(lhp), 0)
-
-        def tau():
-            """Substitute transcendental element into equality.
-            """
-            args = []
-            for e in range(lhs._degree(x) + 1):
-                c = lhs._coefficient({x: e})
-                if c._is_zero():
-                    continue
-                if c._is_constant():
-                    return F
-                args.append(func(c, 0))
-            return And(*args) if func is Eq else Or(*args)
-
-        if tp.nsp is NSP.NONE:
-            # Substitute quotient into any constraint.
-            return sigma()
-        if atom.func in (Le, Lt):
-            atom = atom.converse_func(- atom.lhs, atom.rhs)
-        match atom:
-            case Eq(func=func, lhs=lhs) | Ne(func=func, lhs=lhs):
-                # Substitute transcendental element into equality.
-                result = tau()
-            case Ge(func=func, lhs=lhs) | Gt(func=func, lhs=lhs):
-                match tp.nsp:
-                    case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
-                        std_tp = TestPoint(num=tp.num, den=tp.den, nsp=NSP.NONE)
-                        result = nu(lhs).transform_atoms(lambda at: self.vsubs_atom(at, x, std_tp))
-                    case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
-                        # Substitute ±oo into ordering constraint.
-                        result = mu()
-            case _:
-                assert False, (atom, tp)
-        if atom.func in (Le, Lt):
-            result = Not(result)
-        return result
 
 
 @dataclass

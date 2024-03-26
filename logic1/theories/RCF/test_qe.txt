@@ -22,7 +22,7 @@ Or(b == 0, a != 0)
 Or(b <= 0, a != 0)
 
 >>> qe('ex(x, a * x + b <= 0 and x <= b)')
-Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a*b + b <= 0))
 
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
