@@ -16,7 +16,7 @@ import queue
 import sys
 import threading
 import time
-from typing import Collection, Iterable, Literal, Optional
+from typing import Callable, ClassVar, Collection, Iterable, Literal, Optional
 
 from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
@@ -100,6 +100,15 @@ class TAG(Enum):
 @dataclass(frozen=True)
 class RealType:
 
+    guards: ClassVar[dict[tuple[int, tuple[Literal[-1, 0, 1], ...]], Callable]] = {
+        (1, (-1, 0, 1)): lambda a, b: a > 0,
+        (1, (1, 0, -1)): lambda a, b: a < 0,
+        (2, (1, 0, -1, 0, 1)): lambda a, b, c: And(a > 0, RealType.D2(a, b, c) > 0),
+        (2, (-1, 0, 1, 0, -1)): lambda a, b, c: And(a < 0, RealType.D2(a, b, c) > 0),
+        (2, (1, 0, 1)): lambda a, b, c: And(a > 0, RealType.D2(a, b, c) == 0),
+        (2, (-1, 0, -1)): lambda a, b, c: And(a < 0, RealType.D2(a, b, c) == 0)
+    }
+
     degree: int
     signs: tuple[Literal[-1, 0, 1], ...]
 
@@ -123,6 +132,19 @@ class RealType:
              (3, (1, 0, -1, 0, 1, 0, -1)): -4}
         return D[self.degree, self.signs]
 
+    @staticmethod
+    def D2(a: Term, b: Term, c: Term):
+        return b**2 - 4 * a * c
+
+    def guard(self, f: Term, x: Variable) -> Formula:
+        d = f._degree(x)
+        assert d == self.degree, (self, f, x)
+        coefficients = tuple(f._coefficient({x: e}) for e in range(d, -1, -1))
+        try:
+            return RealType.guards[self.degree, self.signs](*coefficients)
+        except KeyError:
+            raise NotImplementedError(f'{self}')
+
 
 @dataclass(frozen=True)
 class RootSpec:
@@ -144,25 +166,8 @@ class PRD:
         self.term = term
         self.variable = variable
         self.roots = roots
-        self.guard = simplify(self.compute_guard())
-
-    def compute_guard(self) -> Formula:
-        match self.term._degree(self.variable):
-            case 1:
-                return self.compute_guard_1()
-            case _:
-                raise NotImplementedError()
-
-    def compute_guard_1(self) -> Formula:
         assert len(self.roots) == 1  # no clustering
-        lc = self.term._coefficient({self.variable: 1})
-        match self.roots:
-            case (RootSpec(RealType(1, (-1, 0, 1)), 1),):
-                return lc > 0
-            case (RootSpec(RealType(1, (1, 0, -1)), 1),):
-                return lc < 0
-            case _:
-                assert False, self
+        self.guard = simplify(self.roots[0].real_type.guard(term, variable))
 
 
 @dataclass(frozen=True)
