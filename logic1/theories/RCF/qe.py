@@ -215,6 +215,10 @@ class EliminationSet:
     method: str
 
 
+class CLUSTERING(Enum):
+    NONE = auto()
+
+
 @dataclass
 class Node:
 
@@ -222,8 +226,49 @@ class Node:
     formula: Formula
     answer: list
 
+    real_type_selection: ClassVar[dict[CLUSTERING,
+                                       dict[int, list[SignSequence]]]] = {
+        CLUSTERING.NONE: {
+            1: [(-1, 0, 1), (1, 0, -1)],
+            2: [(1, 0, -1, 0, 1), (-1, 0, 1, 0, -1), (1, 0, 1), (-1, 0, -1)]
+        }
+    }
+
     def __str__(self):
         return f'Node({self.variables}, {self.formula}, {self.answer})'
+
+    @staticmethod
+    def bound_type(atom: AtomicFormula, left: Literal[-1, 1],
+                   right: Literal[-1, 1]) -> Optional[TAG]:
+        """Return value None means that atom has a constant truth value
+        """
+        match (atom, left, right):
+            case (Eq(), _, _):
+                return TAG.IP
+
+            case (Ne(), _, _):
+                return TAG.EP
+
+            case (Lt(), -1, -1) | (Gt(), 1, 1):
+                return TAG.EP
+            case (Lt(), -1, 1) | (Gt(), 1, -1):
+                return TAG.SUB
+            case (Lt(), 1, -1) | (Gt(), -1, 1):
+                return TAG.SLB
+            case (Lt(), 1, 1) | (Gt(), -1, -1):
+                return None
+
+            case (Le(), -1, -1) | (Ge(), 1, 1):
+                return None
+            case (Le(), -1, 1) | (Ge(), 1, -1):
+                return TAG.WUB
+            case (Le(), 1, -1) | (Ge(), -1, 1):
+                return TAG.WLB
+            case (Le(), 1, 1) | (Ge(), -1, -1):
+                return TAG.IP
+
+            case _:
+                assert False, (atom, left, right)
 
     def eset(self) -> EliminationSet:
         return self.gauss_eset() or self.regular_eset()
@@ -249,39 +294,31 @@ class Node:
 
     def regular_eset(self) -> EliminationSet:
 
-        def at_cs_1(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
-            """Produce the set of candidate solutions of an atomic formula of
-            degree one.
+        def at_cs(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
+            """Produce the set of candidate solutions of an atomic formula.
             """
-            prd_1 = PRD(atom.lhs, x, (RootSpec(RealType(1, (-1, 0, 1)), 1),))
-            prd_2 = PRD(atom.lhs, x, (RootSpec(RealType(1, (1, 0, -1)), 1),))
-            match atom:
-                case Eq():
-                    cs1 = CandidateSolution(prd_1, TAG.IP)
-                    cs2 = CandidateSolution(prd_2, TAG.IP)
-                    return {cs1, cs2}
-                case Ne():
-                    cs1 = CandidateSolution(prd_1, TAG.EP)
-                    cs2 = CandidateSolution(prd_2, TAG.EP)
-                    return {cs1, cs2}
-                case Le():
-                    cs1 = CandidateSolution(prd_1, TAG.WUB)
-                    cs2 = CandidateSolution(prd_2, TAG.WLB)
-                    return {cs1, cs2}
-                case Ge():
-                    cs1 = CandidateSolution(prd_1, TAG.WLB)
-                    cs2 = CandidateSolution(prd_2, TAG.WUB)
-                    return {cs1, cs2}
-                case Lt():
-                    cs1 = CandidateSolution(prd_1, TAG.SUB)
-                    cs2 = CandidateSolution(prd_2, TAG.SLB)
-                    return {cs1, cs2}
-                case Gt():
-                    cs1 = CandidateSolution(prd_1, TAG.SLB)
-                    cs2 = CandidateSolution(prd_2, TAG.SUB)
-                    return {cs1, cs2}
-                case _:
-                    assert False, atom
+            def red(f, x, d):
+                return f - f._coefficient({x: d}) * x ** d
+
+            candidate_solutions = set()
+            f = atom.lhs
+            d = f._degree(x)
+            while d > 0:
+                for sign_sequence in Node.real_type_selection[CLUSTERING.NONE][d]:
+                    index = 0
+                    for i in range(1, len(sign_sequence) - 1, 2):
+                        index += 1
+                        left = sign_sequence[i - 1]
+                        right = sign_sequence[i + 1]
+                        assert sign_sequence[i] == 0 and left != 0 and right != 0, sign_sequence
+                        tag = Node.bound_type(atom, left, right)
+                        if tag is not None:
+                            prd = PRD(f, x, (RootSpec(RealType(d, sign_sequence), index),))
+                            cs = CandidateSolution(prd, tag)
+                            candidate_solutions.add(cs)
+                f = red(f, x, d)
+                d = f._degree(x)
+            return candidate_solutions
 
         smallest_eset_size = None
         assert self.variables
@@ -296,8 +333,8 @@ class Node:
                     case 0:
                         # lhs can still be a polynomial in other variables.
                         continue
-                    case 1:
-                        for candidate in at_cs_1(atom, x):
+                    case 1 | 2:
+                        for candidate in at_cs(atom, x):
                             if candidate.prd.guard is not F:
                                 candidates[candidate.tag].add(candidate)
                     case _:
