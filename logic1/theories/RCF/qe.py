@@ -16,7 +16,8 @@ import queue
 import sys
 import threading
 import time
-from typing import Callable, ClassVar, Collection, Iterable, Literal, Optional
+from typing import (Callable, ClassVar, Collection, Iterable, Literal,
+                    Optional, TypeAlias)
 
 from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
@@ -97,43 +98,54 @@ class TAG(Enum):
     WUB = auto()
 
 
+SignSequence: TypeAlias = tuple[Literal[-1, 0, 1], ...]
+
+
 @dataclass(frozen=True)
 class RealType:
 
-    guards: ClassVar[dict[tuple[int, tuple[Literal[-1, 0, 1], ...]], Callable]] = {
-        (1, (-1, 0, 1)): lambda a, b: a > 0,
-        (1, (1, 0, -1)): lambda a, b: a < 0,
-        (2, (1, 0, -1, 0, 1)): lambda a, b, c: And(a > 0, RealType.D2(a, b, c) > 0),
-        (2, (-1, 0, 1, 0, -1)): lambda a, b, c: And(a < 0, RealType.D2(a, b, c) > 0),
-        (2, (1, 0, 1)): lambda a, b, c: And(a > 0, RealType.D2(a, b, c) == 0),
-        (2, (-1, 0, -1)): lambda a, b, c: And(a < 0, RealType.D2(a, b, c) == 0)
+    guards: ClassVar[dict[tuple[int, SignSequence],
+                          Callable[..., Formula]]] = {
+        (1, (-1, 0, 1)):
+            lambda a, b: a > 0,
+        (1, (1, 0, -1)):
+            lambda a, b: a < 0,
+        (2, (1, 0, -1, 0, 1)):
+            lambda a, b, c: And(a > 0, RealType.D2(a, b, c) > 0),
+        (2, (-1, 0, 1, 0, -1)):
+            lambda a, b, c: And(a < 0, RealType.D2(a, b, c) > 0),
+        (2, (1, 0, 1)):
+            lambda a, b, c: And(a > 0, RealType.D2(a, b, c) == 0),
+        (2, (-1, 0, -1)):
+            lambda a, b, c: And(a < 0, RealType.D2(a, b, c) == 0)
     }
 
     degree: int
-    signs: tuple[Literal[-1, 0, 1], ...]
+    signs: SignSequence
 
     @property
-    def kosta_code(self):
-        D = {(1, (-1, 0, 1)): 1,
-             (1, (1, 0, -1)): -1,
-             (2, (1, 0, -1, 0, 1)): 1,
-             (2, (1, 0, 1)): 2,
-             (2, (1,)): 3,
-             (2, (-1, 0, 1, 0, -1)): -1,
-             (2, (-1, 0, -1)): -2,
-             (2, (-1,)): -3,
-             (3, (-1, 0, 1)): 1,
-             (3, (-1, 0, -1, 0, 1)): 2,
-             (3, (-1, 0, 1, 0, 1)): 3,
-             (3, (-1, 0, 1, 0, -1, 0, 1)): 4,
-             (3, (1, 0, -1)): -1,
-             (3, (1, 0, 1, 0, -1)): -2,
-             (3, (1, 0, -1, 0, -1)): -3,
-             (3, (1, 0, -1, 0, 1, 0, -1)): -4}
+    def kosta_code(self) -> int:
+        D: dict[tuple[int, SignSequence], int] = {
+            (1, (-1, 0, 1)): 1,
+            (1, (1, 0, -1)): -1,
+            (2, (1, 0, -1, 0, 1)): 1,
+            (2, (1, 0, 1)): 2,
+            (2, (1,)): 3,
+            (2, (-1, 0, 1, 0, -1)): -1,
+            (2, (-1, 0, -1)): -2,
+            (2, (-1,)): -3,
+            (3, (-1, 0, 1)): 1,
+            (3, (-1, 0, -1, 0, 1)): 2,
+            (3, (-1, 0, 1, 0, 1)): 3,
+            (3, (-1, 0, 1, 0, -1, 0, 1)): 4,
+            (3, (1, 0, -1)): -1,
+            (3, (1, 0, 1, 0, -1)): -2,
+            (3, (1, 0, -1, 0, -1)): -3,
+            (3, (1, 0, -1, 0, 1, 0, -1)): -4}
         return D[self.degree, self.signs]
 
     @staticmethod
-    def D2(a: Term, b: Term, c: Term):
+    def D2(a: Term, b: Term, c: Term) -> Term:
         return b**2 - 4 * a * c
 
     def guard(self, f: Term, x: Variable) -> Formula:
