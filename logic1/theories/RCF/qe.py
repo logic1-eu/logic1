@@ -181,6 +181,65 @@ class PRD:
         assert len(self.roots) == 1  # no clustering
         self.guard = simplify(self.roots[0].real_type.guard(term, variable))
 
+    def vsubs(self, atom: AtomicFormula) -> Formula:
+        """Virtually substitute self into atom yielding a quantifier-free
+        formula
+        """
+        match atom:
+            case Ne() | Gt() | Ge():
+                return Not(self._vsubs(atom.to_complement())).to_nnf()
+            case Eq() | Lt() | Le():
+                return self._vsubs(atom)
+            case _:
+                assert False, (self, atom)
+
+    def _vsubs(self, atom: AtomicFormula) -> Formula:
+        deg_g = atom.lhs._degree(self.variable)
+        match deg_g:
+            case -1 | 0:
+                return atom
+            case 1:
+                aa = atom.lhs._coefficient({self.variable: 1})
+                bb = atom.lhs._coefficient({self.variable: 0})
+            case _:
+                raise NotImplementedError(deg_g)
+        assert len(self.roots) == 1, (self, atom)  # Clustering not supported yet
+        deg_f = self.roots[0].real_type.degree
+        assert deg_g < deg_f, (self, atom)  # Pseudo-division has been applied
+        match deg_f:
+            case -1 | 0 | 1:
+                assert False
+            case 2:  # Kosta Appendix A.1
+                a = self.term._coefficient({self.variable: 2})
+                b = self.term._coefficient({self.variable: 1})
+                c = self.term._coefficient({self.variable: 0})
+                A = 2 * a * aa * bb - aa**2 * b
+                B = a * bb**2 + aa**2 * c - aa * b * bb
+                C = 2 * a * bb - aa * b
+                match (deg_g, atom, self.roots[0]):
+                    case (1, Eq(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 1)):
+                        return And(A >= 0, B == 0)
+                    case (1, Eq(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 2)):
+                        return And(A <= 0, B == 0)
+                    case (1, Eq(), RootSpec(RealType(2, (1, 0, 1)), 1)):
+                        return C == 0
+                    case (1, Lt(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 1)):
+                        return Or(And(C < 0, B > 0), And(aa >= 0, Or(C < 0, B < 0)))
+                    case (1, Lt(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 2)):
+                        return Or(And(C < 0, B > 0), And(aa <= 0, Or(C < 0, B < 0)))
+                    case (1, Lt(), RootSpec(RealType(2, (1, 0, 1)), 1)):
+                        return C < 0
+                    case (1, Le(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 1)):
+                        return Or(And(C <= 0, B >= 0), And(aa >= 0, B <= 0))
+                    case (1, Le(), RootSpec(RealType(2, (1, 0, -1, 0, 1)), 2)):
+                        return Or(And(C <= 0, B >= 0), And(aa <= 0, B <= 0))
+                    case (1, Le(), RootSpec(RealType(2, (1, 0, 1)), 1)):
+                        return C <= 0
+                    case _:
+                        assert False, (self, atom)
+            case _:
+                raise NotImplementedError(f'{(self, atom)=}')
+
 
 @dataclass(frozen=True)
 class CandidateSolution:
@@ -228,9 +287,10 @@ class Node:
 
     real_type_selection: ClassVar[dict[CLUSTERING,
                                        dict[int, list[SignSequence]]]] = {
+        # W.l.o.g. the last sign in a real type is always +1.
         CLUSTERING.NONE: {
-            1: [(-1, 0, 1), (1, 0, -1)],
-            2: [(1, 0, -1, 0, 1), (-1, 0, 1, 0, -1), (1, 0, 1), (-1, 0, -1)]
+            1: [(-1, 0, 1)],
+            2: [(1, 0, -1, 0, 1), (1, 0, 1)]
         }
     }
 
@@ -305,6 +365,7 @@ class Node:
             d = f._degree(x)
             while d > 0:
                 for sign_sequence in Node.real_type_selection[CLUSTERING.NONE][d]:
+                    assert sign_sequence[-1] == 1, (self, atom, x)
                     index = 0
                     for i in range(1, len(sign_sequence) - 1, 2):
                         index += 1
@@ -314,6 +375,11 @@ class Node:
                         tag = Node.bound_type(atom, left, right)
                         if tag is not None:
                             prd = PRD(f, x, (RootSpec(RealType(d, sign_sequence), index),))
+                            cs = CandidateSolution(prd, tag)
+                            candidate_solutions.add(cs)
+                        tag = Node.bound_type(atom, - left, - right)
+                        if tag is not None:
+                            prd = PRD(- f, x, (RootSpec(RealType(d, sign_sequence), index),))
                             cs = CandidateSolution(prd, tag)
                             candidate_solutions.add(cs)
                 f = red(f, x, d)
@@ -330,10 +396,7 @@ class Node:
                 match atom.lhs._degree(x):
                     case -1:
                         assert False, atom
-                    case 0:
-                        # lhs can still be a polynomial in other variables.
-                        continue
-                    case 1 | 2:
+                    case 0 | 1 | 2:
                         for candidate in at_cs(atom, x):
                             if candidate.prd.guard is not F:
                                 candidates[candidate.tag].add(candidate)
@@ -384,6 +447,8 @@ class Node:
         def pseudo_sgn_rem(g: Term, prd: PRD, x: Variable) -> Term:
             """Sign-corrected pseudo-remainder
             """
+            if g._degree(x) < prd.term._degree(x):
+                return g
             g1 = g.poly.polynomial(x.poly)
             f1 = prd.term.poly.polynomial(x.poly)
             _, h = g1.pseudo_quo_rem(f1)
@@ -404,13 +469,7 @@ class Node:
         def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
             """Virtually substitute a parametric root description into an atom.
             """
-            match prd.term._degree(x):
-                case -1 | 0:
-                    assert False, prd
-                case 1:
-                    return atom
-                case _:
-                    raise NotImplementedError()
+            return prd.vsubs(atom)
 
         def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
             """Virtually substitute ±∞ into an atom
@@ -1248,7 +1307,7 @@ class VirtualSubstitution:
                 self.success_nodes = NodeList(nodes=[Node(variables=[], formula=T, answer=[])])
             self.collect_success_nodes()
             if self.failure_nodes:
-                raise NotImplementedError('failure_nodes = {self.failure_nodes}')
+                raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
         self.final_simplification()
         logger.debug(f'leaving {self.virtual_substitution.__name__}')
         return self.result
