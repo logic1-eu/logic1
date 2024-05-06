@@ -305,36 +305,29 @@ class Simplify(abc.simplify.Simplify['Theory']):
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
         assert isinstance(atom, AtomicFormula)
-        lhp = atom.lhs.poly - atom.rhs.poly
-        if lhp.is_constant():
-            # The Python operators like operator.eq correctly compare constant
-            # polynomials with integers.
-            return T if atom.python_operator(lhp, 0) else F
-        lhp, _ = lhp.quo_rem(lhp.content())
-        factor = lhp.factor()
-        factor_list = list(factor)
+        lhs = atom.lhs - atom.rhs
+        if lhs.is_constant():
+            # In the following if-condition, the __bool__ method of atom.func
+            # will be called.
+            return T if atom.func(lhs, 0) else F
+        lhs, _ = lhs.quo_rem(lhs.content())
+        unit, factors = lhs.factor()
         match atom:
             case Eq() | Ne():
                 func = atom.func
-                # Compute squarefree part. Starting with an int in contrast to
-                # a constant polynomial works.
-                lhp = 1
-                for factor, _ in factor_list:
-                    lhp *= factor
-                if lhp.lc() < 0:
-                    lhp = - lhp
+                lhs = Term(1)
+                for factor in factors:
+                    # Square-free part
+                    lhs *= factor
             case Le() | Ge() | Lt() | Gt():
-                unit = factor.unit()
-                lhp = 1
-                for factor, multiplicity in factor_list:
-                    lhp *= factor ** 2 if multiplicity % 2 == 0 else factor
-                if lhp.lc() < 0:
-                    lhp = - lhp
-                    unit = - unit
+                lhs = Term(1)
+                for factor, multiplicity in factors.items():
+                    # Sign-preserving generalization of square-free part
+                    lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
                 func = atom.converse_func if unit < 0 else atom.func
             case _:
                 assert False
-        return func(Term(lhp), Term(0))
+        return func(lhs, 0)
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

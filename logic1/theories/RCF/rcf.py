@@ -307,12 +307,13 @@ class Term(firstorder.Term):
         F = self.poly.factor()
         unit = Term(F.unit())
         assert unit in (-1, 1), (self, F, unit)
-        D = {Term(poly): multiplicity for poly, multiplicity in F}
+        D = dict()
+        for poly, multiplicity in F:
+            if poly.lc() < 0:
+                poly = - poly
+                unit = - unit
+            D[Term(poly)] = multiplicity
         return unit, D
-
-    def vars(self) -> Iterator[Variable]:
-        # discuss "from" vs. "for"
-        yield from (Term(g) for g in self.poly.variables())
 
     def is_constant(self) -> bool:
         return self.poly.is_constant()
@@ -334,8 +335,11 @@ class Term(firstorder.Term):
     def is_zero(self) -> bool:
         return self.poly.is_zero()
 
+    def lc(self) -> int:
+        return int(self.poly.lc())
+
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
-        quo, rem = self.poly.quo_rem(other)
+        quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
 
     @staticmethod
@@ -345,6 +349,10 @@ class Term(firstorder.Term):
     def subs(self, d: dict[Variable, Term]) -> Term:
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
         return Term(self.poly.subs(**sage_keywords))
+
+    def vars(self) -> Iterator[Variable]:
+        for g in self.poly.variables():
+            yield Term(g)
 
 
 Variable: TypeAlias = Term
@@ -493,6 +501,9 @@ class Ne(AtomicFormula):
 
 class Ge(AtomicFormula):
 
+    def __bool__(self) -> bool:
+        return self.lhs.poly >= self.rhs.poly
+
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
@@ -501,6 +512,9 @@ class Ge(AtomicFormula):
 
 
 class Le(AtomicFormula):
+
+    def __bool__(self) -> bool:
+        return self.lhs.poly <= self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -511,6 +525,9 @@ class Le(AtomicFormula):
 
 class Gt(AtomicFormula):
 
+    def __bool__(self) -> bool:
+        return self.lhs.poly > self.rhs.poly
+
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
@@ -519,6 +536,9 @@ class Gt(AtomicFormula):
 
 
 class Lt(AtomicFormula):
+
+    def __bool__(self) -> bool:
+        return self.lhs.poly < self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
