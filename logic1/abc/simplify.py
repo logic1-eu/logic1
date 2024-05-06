@@ -12,6 +12,7 @@ from ..support.tracing import trace  # noqa
 # https://stackoverflow.com/q/74103528/
 # https://peps.python.org/pep-0484/
 
+AT = TypeVar('AT', bound='AtomicFormula')
 TH = TypeVar('TH', bound='Theory')
 
 
@@ -74,7 +75,7 @@ class Simplify(ABC, Generic[TH]):
     def _simpl_nnf(self, f: Formula, th: TH) -> Formula:
         match f:
             case AtomicFormula():
-                return self._simpl_at(f)
+                return self._simpl_at(f, None)
             case And() | Or():
                 return self._simpl_and_or(f, th)
             case _F() | _T():
@@ -100,7 +101,7 @@ class Simplify(ABC, Generic[TH]):
 
         gand = f.func
         others, atoms = split(f.args)
-        simplified_atoms = (self._simpl_at(atom) for atom in atoms)
+        simplified_atoms = (self._simpl_at(atom, f.func) for atom in atoms)
         new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
@@ -145,7 +146,9 @@ class Simplify(ABC, Generic[TH]):
         return gand(*final_atoms, *final_others)
 
     @abstractmethod
-    def _simpl_at(self, f: AtomicFormula) -> Formula:
+    def _simpl_at(self,
+                  atom: AtomicFormula,
+                  contexts: Optional[type[And] | type[Or]]) -> Formula:
         # Does not receive the theory, by design.
         ...
 

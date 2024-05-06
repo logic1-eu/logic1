@@ -144,11 +144,11 @@ class RootSpec:
                 assert False, (atom, left, right)
 
     def guard(self, term: Term, x: Variable) -> Formula:
-        match term._degree(x):
+        match term.degree(x):
             case -1 | 0:
                 assert False, (self, term, x)
             case 1:
-                a = term._coefficient({x: 1})
+                a = term.coefficient({x: 1})
                 match self.signs:
                     case (-1, 0, 1):
                         return a > 0
@@ -157,9 +157,9 @@ class RootSpec:
                     case _:
                         assert False, (self, term, x)
             case 2:
-                a = term._coefficient({x: 2})
-                b = term._coefficient({x: 1})
-                c = term._coefficient({x: 0})
+                a = term.coefficient({x: 2})
+                b = term.coefficient({x: 1})
+                c = term.coefficient({x: 0})
                 d2 = b**2 - 4 * a * c
                 match self.signs:
                     case (1, 0, -1, 0, 1):
@@ -262,24 +262,24 @@ class PRD:
 
     def _vsubs(self, atom: AtomicFormula) -> Formula:
         x = self.variable
-        deg_g = atom.lhs._degree(x)
+        deg_g = atom.lhs.degree(x)
         match deg_g:
             case -1 | 0:
                 return atom
             case 1:
-                aa = atom.lhs._coefficient({x: 1})
-                bb = atom.lhs._coefficient({x: 0})
+                aa = atom.lhs.coefficient({x: 1})
+                bb = atom.lhs.coefficient({x: 0})
             case _:
                 raise NotImplementedError(deg_g)
-        deg_f = self.term._degree(x)
+        deg_f = self.term.degree(x)
         assert deg_g < deg_f, (self, atom)  # Pseudo-division has been applied
         match deg_f:
             case -1 | 0 | 1:
                 assert False
             case 2:
-                a = self.term._coefficient({x: 2})
-                b = self.term._coefficient({x: 1})
-                c = self.term._coefficient({x: 0})
+                a = self.term.coefficient({x: 2})
+                b = self.term.coefficient({x: 1})
+                c = self.term.coefficient({x: 0})
                 A = 2 * a * aa * bb - aa**2 * b
                 B = a * bb**2 + aa**2 * c - aa * b * bb
                 C = 2 * a * bb - aa * b
@@ -406,9 +406,9 @@ class Node:
                 for arg in self.formula.args:
                     if isinstance(arg, Eq):
                         lhs = arg.lhs
-                        if lhs._degree(x) == 1:
-                            a = lhs._coefficient({x: 1})
-                            if a._is_constant():
+                        if lhs.degree(x) == 1:
+                            a = lhs.coefficient({x: 1})
+                            if a.is_constant():
                                 self.variables.remove(x)
                                 if a.poly > 0:
                                     root_spec = RootSpec(signs=(-1, 0, 1), index=1)
@@ -422,15 +422,15 @@ class Node:
     def regular_eset(self) -> EliminationSet:
 
         def red(f: Term, x: Variable, d: int) -> Term:
-            return f - f._coefficient({x: d}) * x ** d
+            return f - f.coefficient({x: d}) * x ** d
 
         # @trace(pretty=True)
         def at_cs(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
-            while atom.lhs._degree(x) > 0:
-                for cluster in Node.real_type_selection[_CLUSTERING][atom.lhs._degree(x)]:
+            while atom.lhs.degree(x) > 0:
+                for cluster in Node.real_type_selection[_CLUSTERING][atom.lhs.degree(x)]:
                     prd = PRD(atom.lhs, x, cluster)
                     (with_epsilon, tag) = cluster.bound_type(atom, x)
                     if tag is not None:
@@ -441,7 +441,7 @@ class Node:
                     if tag is not None:
                         cs = CandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
-                atom = atom.func(red(atom.lhs, x, atom.lhs._degree(x)), 0)
+                atom = atom.func(red(atom.lhs, x, atom.lhs.degree(x)), 0)
             return candidate_solutions
 
         smallest_eset_size = None
@@ -452,7 +452,7 @@ class Node:
             for atom in sorted(set(self.formula.atoms())):
                 assert isinstance(atom, AtomicFormula)
                 assert atom.rhs == Term(0)
-                match atom.lhs._degree(x):
+                match atom.lhs.degree(x):
                     case -1:
                         assert False, atom
                     case 0 | 1 | 2:
@@ -460,7 +460,7 @@ class Node:
                             if candidate.prd.guard is not F:
                                 candidates[candidate.tag].add(candidate)
                     case _:
-                        raise DegreeViolation(atom, x, atom.lhs._degree(x))
+                        raise DegreeViolation(atom, x, atom.lhs.degree(x))
             num_xub = len(candidates[TAG.XUB])
             num_xlb = len(candidates[TAG.XLB])
             num_any = len(candidates[TAG.ANY])
@@ -504,7 +504,7 @@ class Node:
         def pseudo_sgn_rem(g: Term, prd: PRD, x: Variable) -> Term:
             """Sign-corrected pseudo-remainder
             """
-            if g._degree(x) < prd.term._degree(x):
+            if g.degree(x) < prd.term.degree(x):
                 return g
             g1 = g.poly.polynomial(x.poly)
             f1 = prd.term.poly.polynomial(x.poly)
@@ -536,10 +536,10 @@ class Node:
                 case Eq() | Ne():
                     return tau(atom, x)
                 case Le() | Lt() | Ge() | Gt():
-                    c = atom.lhs._coefficient({x: 0})
+                    c = atom.lhs.coefficient({x: 0})
                     mu: Formula = atom.func(c, 0)
-                    for e in range(1, atom.lhs._degree(x) + 1):
-                        c = atom.lhs._coefficient({x: e})
+                    for e in range(1, atom.lhs.degree(x) + 1):
+                        c = atom.lhs.coefficient({x: e})
                         if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
                             c = - c
                         strict_func = atom.func.strict_part
@@ -564,9 +564,9 @@ class Node:
         def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
             """Recursion on the vanishing of derivatives
             """
-            if atom.lhs._degree(x) <= 0:
+            if atom.lhs.degree(x) <= 0:
                 return atom
-            lhs_prime = atom.lhs._derivative(x)
+            lhs_prime = atom.lhs.derivative(x)
             if nsp == NSP.MINUS_EPSILON:
                 lhs_prime = - lhs_prime
             atom_strict = atom.func.strict_part(atom.lhs, 0)
@@ -580,20 +580,20 @@ class Node:
             args: list[AtomicFormula] = []
             match atom:
                 case Eq():
-                    for e in range(atom.lhs._degree(x) + 1):
-                        c = atom.lhs._coefficient({x: e})
-                        if c._is_zero():
+                    for e in range(atom.lhs.degree(x) + 1):
+                        c = atom.lhs.coefficient({x: e})
+                        if c.is_zero():
                             continue
-                        if c._is_constant():
+                        if c.is_constant():
                             return F
                         args.append(Eq(c, 0))
                     return And(*args)
                 case Ne():
-                    for e in range(atom.lhs._degree(x) + 1):
-                        c = atom.lhs._coefficient({x: e})
-                        if c._is_zero():
+                    for e in range(atom.lhs.degree(x) + 1):
+                        c = atom.lhs.coefficient({x: e})
+                        if c.is_zero():
                             continue
-                        if c._is_constant():
+                        if c.is_constant():
                             return T
                         args.append(Ne(c, 0))
                     return Or(*args)

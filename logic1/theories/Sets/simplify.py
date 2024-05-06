@@ -139,8 +139,10 @@ class Simplify(abc.simplify.Simplify['Theory']):
         except Simplify.NotInPnf:
             return self.simplify(pnf(f), assume)
 
-    def _simpl_at(self, f: AtomicFormula) -> Formula:
-        return f.simplify()
+    def _simpl_at(self,
+                  atom: AtomicFormula,
+                  context: Optional[type[And] | type[Or]]) -> Formula:
+        return atom.simplify()
 
     def _Theory(self) -> Theory:
         return Theory()

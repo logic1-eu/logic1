@@ -8,8 +8,8 @@ from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
 from ... import firstorder
-from ...firstorder import And, F, Formula, Or, pnf, T
-from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, ring, Term, Variable
+from ...firstorder import And, _F, F, Formula, Or, pnf, _T, T
+from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -294,41 +294,44 @@ class Simplify(abc.simplify.Simplify['Theory']):
         return result
 
     @lru_cache(maxsize=None)
-    def _simpl_at(self, f: firstorder.AtomicFormula) -> Formula:
-        """
+    def _simpl_at(self,
+                  atom: firstorder.AtomicFormula,
+                  context: Optional[type[And] | type[Or]]) -> Formula:
+        """Simplify atomic formula.
+
         >>> from .rcf import VV
         >>> a, b = VV.get('a', 'b')
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
-        assert isinstance(f, AtomicFormula)
-        lhp = f.lhs.poly - f.rhs.poly
+        assert isinstance(atom, AtomicFormula)
+        lhp = atom.lhs.poly - atom.rhs.poly
         if lhp.is_constant():
-            _python_operator = f.sage_func  # type: ignore
-            eval_ = _python_operator(lhp, ring(0))  # type: ignore
-            return T if eval_ else F
+            # The Python operators like operator.eq correctly compare constant
+            # polynomials with integers.
+            return T if atom.python_operator(lhp, 0) else F
         lhp, _ = lhp.quo_rem(lhp.content())
         factor = lhp.factor()
         factor_list = list(factor)
-        func: type[AtomicFormula]
-        match f.func:
-            case rcf.Eq | rcf.Ne:
-                func = f.func
-                # Compute squarefree part
-                lhp = ring(1)
+        match atom:
+            case Eq() | Ne():
+                func = atom.func
+                # Compute squarefree part. Starting with an int in contrast to
+                # a constant polynomial works.
+                lhp = 1
                 for factor, _ in factor_list:
                     lhp *= factor
                 if lhp.lc() < 0:
                     lhp = - lhp
-            case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
+            case Le() | Ge() | Lt() | Gt():
                 unit = factor.unit()
-                lhp = ring(1)
+                lhp = 1
                 for factor, multiplicity in factor_list:
                     lhp *= factor ** 2 if multiplicity % 2 == 0 else factor
                 if lhp.lc() < 0:
                     lhp = - lhp
                     unit = - unit
-                func = f.converse_func if unit < 0 else f.func
+                func = atom.converse_func if unit < 0 else atom.func
             case _:
                 assert False
         return func(Term(lhp), Term(0))
@@ -339,3 +342,13 @@ class Simplify(abc.simplify.Simplify['Theory']):
 
 
 simplify = Simplify()
+
+
+def is_valid(f: Formula, assume=list[firstorder.AtomicFormula]) -> Optional[bool]:
+    match simplify(f, assume):
+        case _T():
+            return True
+        case _F():
+            return False
+        case _:
+            return None
