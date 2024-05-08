@@ -62,15 +62,13 @@ x2 + x3 + x4 != 0))))
 >>> davenport_heintz = Ex(c, All((b, a),
 ...    Implies(Or(And(a == d, b == c), And(a == c, b == 1)), a**2 == b)))
 >>> qe(davenport_heintz)
-And(d^4 - 1 == 0,
-    Or(d^2 - 1 == 0, d^2 - d != 0),
-    Or(d^3 - d == 0, And(d^2 - 1 != 0, d^2 - d != 0)))
+And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 
 # Kahan's Problem
 >>> ellipse = All((x, y),
 ...    Implies(b**2 * (x - c)**2 + a**2 * y**2 - a**2 * b**2 == 0, x**2 + y**2 <= 1))
 >>> sum(1 for _ in qe(ellipse).atoms())
-472
+134
 
 # 5 Generic quadratic polynomials
 >>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')
@@ -83,7 +81,7 @@ And(d^4 - 1 == 0,
 ...                          a5 * x**2 + b5 * x + c5 < 0))
 >>> result = qe(five_generic)
 >>> sum(1 for _ in result.atoms())
-575
+582
 
 # Motzkin's Polynomial (Should yield T when eliminating All(y, ...))
 >>> mp = All(x, Implies(And(x >= 0, y >= 0), 1 + x * y * (x + y - 3) >= 0))

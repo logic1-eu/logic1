@@ -9,7 +9,7 @@ from ... import abc
 
 from ... import firstorder
 from ...firstorder import And, _F, F, Formula, Or, pnf, _T, T
-from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, Variable
+from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -283,8 +283,14 @@ class Theory(abc.simplify.Theory):
 
 class Simplify(abc.simplify.Simplify['Theory']):
 
-    def __call__(self, f: Formula, assume: list[firstorder.AtomicFormula] = [],
-                 prefer_weak: bool = False, prefer_order: bool = True) -> Formula:
+    def __call__(self,
+                 f: Formula, assume: Optional[list[firstorder.AtomicFormula]] = None,
+                 explode_always: bool = True,
+                 prefer_weak: bool = False,
+                 prefer_order: bool = True) -> Formula:
+        if assume is None:
+            assume = []
+        self.explode_always = explode_always
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
         try:
@@ -304,30 +310,83 @@ class Simplify(abc.simplify.Simplify['Theory']):
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
+        def _simpl_at_eq_ne(rel, lhs, context):
+            if rel is Eq:
+                tsq_junctor = And
+                fac_junctor = Or
+            else:
+                assert rel is Ne
+                tsq_junctor = Or
+                fac_junctor = And
+            tsq = lhs.is_definite()
+            if tsq == TSQ.STRICT:
+                return tsq_junctor.definite_func()
+            unit, factors = lhs.factor()
+            primitive_lhs = Term(1)
+            for factor in factors:
+                # Square-free part
+                primitive_lhs *= factor
+            primitive_tsq = primitive_lhs.is_definite()
+            if primitive_tsq == TSQ.STRICT:
+                return tsq_junctor.definite_func()
+            if primitive_tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
+                args = (rel(power_product, 0) for _, power_product in primitive_lhs)
+                return tsq_junctor(*args)
+            if tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
+                args = (rel(power_product, 0) for _, power_product in lhs)
+                return tsq_junctor(*args)
+            if self.explode_always or context == fac_junctor:
+                args = (rel(factor, 0) for factor in factors if not factor.is_constant())
+                return fac_junctor(*args)
+            return rel(primitive_lhs, 0)
+
+        def _simpl_at_ge(lhs, context):
+            if lhs.is_definite() in (TSQ.STRICT, TSQ.WEAK):
+                return T
+            neg_tsq = (- lhs).is_definite()
+            if neg_tsq == TSQ.STRICT:
+                return F
+            if neg_tsq == TSQ.WEAK:
+                return _simpl_at_eq_ne(Eq, lhs, context)
+            unit, factors = lhs.factor()
+            sp_primitive_lhs = Term(1)
+            for factor, multiplicity in factors.items():
+                # Sign-preserving generalization of square-free part
+                sp_primitive_lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
+            sp_primitive_tsq = (unit * sp_primitive_lhs).is_definite()
+            if sp_primitive_tsq in (TSQ.STRICT, TSQ.WEAK):
+                return T
+            if unit < 0:
+                return Le(sp_primitive_lhs, 0)
+            else:
+                return Ge(sp_primitive_lhs, 0)
+
         assert isinstance(atom, AtomicFormula)
         lhs = atom.lhs - atom.rhs
         if lhs.is_constant():
             # In the following if-condition, the __bool__ method of atom.func
             # will be called.
             return T if atom.func(lhs, 0) else F
-        lhs, _ = lhs.quo_rem(lhs.content())
-        unit, factors = lhs.factor()
+        lhs /= lhs.content()
         match atom:
-            case Eq() | Ne():
-                func = atom.func
-                lhs = Term(1)
-                for factor in factors:
-                    # Square-free part
-                    lhs *= factor
-            case Le() | Ge() | Lt() | Gt():
+            case Eq():
+                return _simpl_at_eq_ne(Eq, lhs, context)
+            case Ne():
+                return _simpl_at_eq_ne(Ne, lhs, context)
+            case Ge():
+                return _simpl_at_ge(lhs, context)
+            case Le():
+                return _simpl_at_ge(- lhs, context)
+            case Lt() | Gt():
+                unit, factors = lhs.factor()
                 lhs = Term(1)
                 for factor, multiplicity in factors.items():
                     # Sign-preserving generalization of square-free part
                     lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
                 func = atom.converse_func if unit < 0 else atom.func
+                return func(lhs, 0)
             case _:
                 assert False
-        return func(lhs, 0)
 
     def _Theory(self) -> Theory:
         return Theory(prefer_weak=self.prefer_weak,

@@ -231,6 +231,10 @@ class Term(firstorder.Term):
                 raise ValueError(
                     f'arguments must be polynomial or integer; {arg} is {type(arg)}')
 
+    def __iter__(self) -> Iterator[tuple[int, Term]]:
+        for coefficient, power_product in self.poly:
+            yield int(coefficient), Term(power_product)
+
     def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
         if isinstance(other, Term):
             return Le(self, other)
@@ -277,6 +281,9 @@ class Term(firstorder.Term):
             return self + (- other)
         return Term(self.poly - other)
 
+    def __truediv__(self, other: object) -> Term:
+        return Term(self.poly / other)
+
     def __xor__(self, other: object) -> Term:
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
@@ -294,8 +301,8 @@ class Term(firstorder.Term):
         d_poly = {key.poly: value for key, value in d.items()}
         return Term(self.poly.coefficient(d_poly))
 
-    def content(self) -> Term:
-        return Term(self.poly.content())
+    def content(self) -> int:
+        return int(self.poly.content())
 
     def degree(self, x: Variable) -> int:
         return self.poly.degree(x.poly)
