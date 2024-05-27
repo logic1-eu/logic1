@@ -68,7 +68,7 @@ And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 >>> ellipse = All((x, y),
 ...    Implies(b**2 * (x - c)**2 + a**2 * y**2 - a**2 * b**2 == 0, x**2 + y**2 <= 1))
 >>> sum(1 for _ in qe(ellipse).atoms())
-134
+110
 
 # 5 Generic quadratic polynomials
 >>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')
@@ -81,10 +81,9 @@ And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 ...                          a5 * x**2 + b5 * x + c5 < 0))
 >>> result = qe(five_generic)
 >>> sum(1 for _ in result.atoms())
-582
+585
 
 # Motzkin's Polynomial (Should yield T when eliminating All(y, ...))
 >>> mp = All(x, Implies(And(x >= 0, y >= 0), 1 + x * y * (x + y - 3) >= 0))
 >>> qe(mp)
-And(Or(y != 0, y^2 - 3*y >= 0),
-    Or(y <= 0, y^2 - 3*y >= 0, y^4 - 6*y^3 + 9*y^2 - 4*y <= 0, y^5 - 6*y^4 + 9*y^3 - 4*y^2 <= 0))
+And(Or(y != 0, y^2 - 3*y >= 0), Or(y - 4 <= 0, y^2 - 4*y <= 0, y^2 - 3*y >= 0))

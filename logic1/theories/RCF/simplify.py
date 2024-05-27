@@ -1,6 +1,6 @@
 from functools import lru_cache
 from operator import xor
-from sage.all import oo, Rational  # type: ignore
+from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
 from typing import Iterable, Optional, Self
 
@@ -8,7 +8,7 @@ from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
 from ... import firstorder
-from ...firstorder import And, _F, F, Formula, Or, pnf, _T, T
+from ...firstorder import And, _F, F, Formula, Not, Or, pnf, _T, T
 from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
 from ...support.tracing import trace  # noqa
@@ -340,26 +340,56 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 return fac_junctor(*args)
             return rel(primitive_lhs, 0)
 
-        def _simpl_at_ge(lhs, context):
-            if lhs.is_definite() in (TSQ.STRICT, TSQ.WEAK):
+        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[Formula]:
+            if f.is_definite() in (TSQ.STRICT, TSQ.WEAK):
                 return T
-            neg_tsq = (- lhs).is_definite()
+            neg_tsq = (- f).is_definite()
             if neg_tsq == TSQ.STRICT:
                 return F
             if neg_tsq == TSQ.WEAK:
-                return _simpl_at_eq_ne(Eq, lhs, context)
+                return _simpl_at_eq_ne(Eq, f, context)
+            return None
+
+        def _simpl_at_ge(lhs, context):
+            # TSQ tests on original left hand side
+            hit = tsq_test_ge(lhs, context)
+            if hit is not None:
+                return hit
+            # Factorize
             unit, factors = lhs.factor()
-            sp_primitive_lhs = Term(1)
+            even_factors = []
+            odd_factor = unit
             for factor, multiplicity in factors.items():
-                # Sign-preserving generalization of square-free part
-                sp_primitive_lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
-            sp_primitive_tsq = (unit * sp_primitive_lhs).is_definite()
-            if sp_primitive_tsq in (TSQ.STRICT, TSQ.WEAK):
+                if factor.is_definite() is TSQ.STRICT:
+                    continue
+                if multiplicity % 2 == 0:
+                    even_factors.append(factor)
+                else:
+                    odd_factor *= factor
+            even_factor = product(even_factors)
+            signed_remaining_squarefree_part = odd_factor * even_factor
+            # TSQ tests on factorization
+            if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
                 return T
+            neg_tsq = (- odd_factor).is_definite()
+            if neg_tsq == TSQ.STRICT:
+                return _simpl_at_eq_ne(Eq, even_factor, context)
+            if neg_tsq == TSQ.WEAK:
+                return _simpl_at_eq_ne(Eq, signed_remaining_squarefree_part, context)
+            hit = tsq_test_ge(signed_remaining_squarefree_part, context)
+            if hit is not None:
+                return hit
+            # TSQ tests have failed
             if unit < 0:
-                return Le(sp_primitive_lhs, 0)
+                rel = Le
+                odd_factor = - odd_factor
             else:
-                return Ge(sp_primitive_lhs, 0)
+                rel = Ge
+            if context is Or or self.explode_always:
+                odd_part = rel(odd_factor, 0)
+                even_part = (Eq(f, 0) for f in even_factors)
+                return Or(odd_part, *even_part)
+            return rel(odd_factor * even_factor ** 2, 0)
 
         assert isinstance(atom, AtomicFormula)
         lhs = atom.lhs - atom.rhs
@@ -377,14 +407,14 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 return _simpl_at_ge(lhs, context)
             case Le():
                 return _simpl_at_ge(- lhs, context)
-            case Lt() | Gt():
-                unit, factors = lhs.factor()
-                lhs = Term(1)
-                for factor, multiplicity in factors.items():
-                    # Sign-preserving generalization of square-free part
-                    lhs *= factor ** 2 if multiplicity % 2 == 0 else factor
-                func = atom.converse_func if unit < 0 else atom.func
-                return func(lhs, 0)
+            case Gt():
+                if context is not None:
+                    context = context.dual_func
+                return Not(_simpl_at_ge(- lhs, context)).to_nnf()
+            case Lt():
+                if context is not None:
+                    context = context.dual_func
+                return Not(_simpl_at_ge(lhs, context)).to_nnf()
             case _:
                 assert False
 
