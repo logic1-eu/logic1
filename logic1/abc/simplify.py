@@ -56,6 +56,7 @@ class Simplify(ABC, Generic[TH]):
             th.add(And, assume)
         except th.Inconsistent:
             return _T()
+        th = th.next_()
         match f:
             case AtomicFormula():
                 return self._simpl_nnf(And(f), th)

@@ -23,7 +23,7 @@ from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
-from logic1.theories.RCF.simplify import simplify
+from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.rcf import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable)
 
@@ -511,14 +511,22 @@ class Node:
             _, h = g1.pseudo_quo_rem(f1)
             delta = g1.degree() - f1.degree() + 1
             if delta % 2 == 1:
-                first_signs = set(root_spec.signs[0] for root_spec in prd.cluster)
-                if len(first_signs) == 1:
-                    first_sign = next(iter(first_signs))
-                    assert first_sign in (-1, 1)
-                    if first_sign == 1:
+                lc_signs = set(root_spec.signs[-1] for root_spec in prd.cluster)
+                if len(lc_signs) == 1:
+                    lc_sign = next(iter(lc_signs))
+                    assert lc_sign in (-1, 1)
+                    if lc_sign == -1:
                         h = - h
                 else:
-                    h *= f1.lc()
+                    # Since there are no assumptions, we need not worry about
+                    # f1.lc() == 0. We currently believe that otherwise the
+                    # guard takes care that parametric f1.lc() cannot vanish.
+                    if is_valid(f1.lc() >= 0):
+                        pass
+                    elif is_valid(f1.lc() <= 0):
+                        h = - h
+                    else:
+                        h *= f1.lc()
             # One could check for even powers of f1.lc() in h. Currently the
             # simplifier takes care of this.
             return Term(h)

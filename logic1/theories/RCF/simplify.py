@@ -284,7 +284,8 @@ class Theory(abc.simplify.Theory):
 class Simplify(abc.simplify.Simplify['Theory']):
 
     def __call__(self,
-                 f: Formula, assume: Optional[list[firstorder.AtomicFormula]] = None,
+                 f: Formula,
+                 assume: Optional[list[firstorder.AtomicFormula]] = None,
                  explode_always: bool = True,
                  prefer_weak: bool = False,
                  prefer_order: bool = True) -> Formula:
@@ -426,7 +427,10 @@ class Simplify(abc.simplify.Simplify['Theory']):
 simplify = Simplify()
 
 
-def is_valid(f: Formula, assume=list[firstorder.AtomicFormula]) -> Optional[bool]:
+def is_valid(f: Formula,
+             assume: Optional[list[firstorder.AtomicFormula]] = None) -> Optional[bool]:
+    if assume is None:
+        assume = []
     match simplify(f, assume):
         case _T():
             return True
