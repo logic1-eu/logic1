@@ -8,7 +8,7 @@ from .sets import C, C_, Eq, Index, Ne, oo, Term, Variable
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory):
+class Theory(abc.simplify.Theory['AtomicFormula']):
 
     _ref_min_card: Index
     _ref_max_card: Index
@@ -128,10 +128,22 @@ class Theory(abc.simplify.Theory):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
     AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Term, Term]
     SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
+
+    @property
+    def class_AT(self) -> type[AtomicFormula]:
+        return AtomicFormula
+
+    @property
+    def class_TH(self) -> type[Theory]:
+        return Theory
+
+    @property
+    def TH_kwargs(self) -> dict[str, bool]:
+        return dict()
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
         try:
@@ -143,9 +155,6 @@ class Simplify(abc.simplify.Simplify['Theory']):
                   atom: AtomicFormula,
                   context: Optional[type[And] | type[Or]]) -> Formula:
         return atom.simplify()
-
-    def _Theory(self) -> Theory:
-        return Theory()
 
 
 simplify = Simplify()

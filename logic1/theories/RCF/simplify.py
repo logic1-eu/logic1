@@ -7,7 +7,6 @@ from typing import Iterable, Optional, Self
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ... import firstorder
 from ...firstorder import And, _F, F, Formula, Not, Or, pnf, _T, T
 from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
@@ -17,10 +16,10 @@ from ...support.tracing import trace  # noqa
 
 # discuss: firstorder.AtomicFormula vs. rcf.AtomicFormula. The problems existed
 # already before with AtomicFormula vs. BinaryAtomicFormula, resp. Also check
-# assert in l.306.
+# assert in l.395.
 
 
-class Theory(abc.simplify.Theory):
+class Theory(abc.simplify.Theory['AtomicFormula']):
 
     class _Interval:
         # Non-empty real intervals. Raises Inconsistent when an empty interval
@@ -84,7 +83,7 @@ class Theory(abc.simplify.Theory):
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
 
-    def add(self, gand: type[And | Or], atoms: Iterable[firstorder.AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
@@ -147,7 +146,7 @@ class Theory(abc.simplify.Theory):
     @staticmethod
     @lru_cache(maxsize=None)
     def _compose_atom(rel: type[AtomicFormula], p: Polynomial, q: Rational)\
-            -> firstorder.AtomicFormula:
+            -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
         return rel(Term(den * p - num), Term(0))
@@ -155,7 +154,7 @@ class Theory(abc.simplify.Theory):
     @staticmethod
     @lru_cache(maxsize=None)
     def _decompose_atom(f: AtomicFormula)\
-            -> tuple[type[firstorder.AtomicFormula], Polynomial, Rational]:
+            -> tuple[type[AtomicFormula], Polynomial, Rational]:
         r"""Decompose into relation :math:`\rho`, term :math:`p` without
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
@@ -186,8 +185,8 @@ class Theory(abc.simplify.Theory):
         q = q / c
         return f.func, p, q
 
-    def extract(self, gand: type[And | Or]) -> list[firstorder.AtomicFormula]:
-        L: list[firstorder.AtomicFormula] = []
+    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+        L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
                 ref_ivl, ref_exc = self._reference[p]
@@ -281,11 +280,23 @@ class Theory(abc.simplify.Theory):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
+
+    @property
+    def class_AT(self) -> type[AtomicFormula]:
+        return AtomicFormula
+
+    @property
+    def class_TH(self) -> type[Theory]:
+        return Theory
+
+    @property
+    def TH_kwargs(self) -> dict[str, bool]:
+        return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
 
     def __call__(self,
                  f: Formula,
-                 assume: Optional[list[firstorder.AtomicFormula]] = None,
+                 assume: Optional[list[AtomicFormula]] = None,
                  explode_always: bool = True,
                  prefer_weak: bool = False,
                  prefer_order: bool = True) -> Formula:
@@ -302,7 +313,7 @@ class Simplify(abc.simplify.Simplify['Theory']):
 
     @lru_cache(maxsize=None)
     def _simpl_at(self,
-                  atom: firstorder.AtomicFormula,
+                  atom: AtomicFormula,
                   context: Optional[type[And] | type[Or]]) -> Formula:
         """Simplify atomic formula.
 
@@ -392,7 +403,6 @@ class Simplify(abc.simplify.Simplify['Theory']):
                 return Or(odd_part, *even_part)
             return rel(odd_factor * even_factor ** 2, 0)
 
-        assert isinstance(atom, AtomicFormula)
         lhs = atom.lhs - atom.rhs
         if lhs.is_constant():
             # In the following if-condition, the __bool__ method of atom.func
@@ -419,16 +429,12 @@ class Simplify(abc.simplify.Simplify['Theory']):
             case _:
                 assert False
 
-    def _Theory(self) -> Theory:
-        return Theory(prefer_weak=self.prefer_weak,
-                      prefer_order=self.prefer_order)
-
 
 simplify = Simplify()
 
 
 def is_valid(f: Formula,
-             assume: Optional[list[firstorder.AtomicFormula]] = None) -> Optional[bool]:
+             assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
     if assume is None:
         assume = []
     match simplify(f, assume):
