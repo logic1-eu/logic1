@@ -146,10 +146,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
         return dict()
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
-        try:
-            return self.simplify(f, assume)
-        except Simplify.NotInPnf:
-            return self.simplify(pnf(f), assume)
+        return self.simplify(f, assume)
 
     def _simpl_at(self,
                   atom: AtomicFormula,

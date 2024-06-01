@@ -2,7 +2,7 @@ from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import Iterable, Optional, Self
+from typing import cast, Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
@@ -13,10 +13,6 @@ from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, V
 from ...support.tracing import trace  # noqa
 
 # discuss: indirect import of Polynomial
-
-# discuss: firstorder.AtomicFormula vs. rcf.AtomicFormula. The problems existed
-# already before with AtomicFormula vs. BinaryAtomicFormula, resp. Also check
-# assert in l.395.
 
 
 class Theory(abc.simplify.Theory['AtomicFormula']):
@@ -300,16 +296,10 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                  explode_always: bool = True,
                  prefer_weak: bool = False,
                  prefer_order: bool = True) -> Formula:
-        if assume is None:
-            assume = []
         self.explode_always = explode_always
         self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
-        try:
-            result = self.simplify(f, assume)
-        except Simplify.NotInPnf:
-            result = self.simplify(pnf(f), assume)
-        return result
+        return self.simplify(f, assume)
 
     @lru_cache(maxsize=None)
     def _simpl_at(self,
@@ -433,14 +423,15 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 simplify = Simplify()
 
 
-def is_valid(f: Formula,
-             assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
-    if assume is None:
-        assume = []
-    match simplify(f, assume):
-        case _T():
-            return True
-        case _F():
-            return False
-        case _:
-            return None
+class IsValid(abc.simplify.IsValid['AtomicFormula']):
+
+    def __call__(self,
+                 f: Formula,
+                 assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
+        return self.is_valid(f, assume)
+
+    def _simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
+        return simplify(f, assume)
+
+
+is_valid = IsValid()
