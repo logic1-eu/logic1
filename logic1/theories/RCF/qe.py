@@ -17,7 +17,7 @@ import queue
 import sys
 import threading
 import time
-from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
+from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, reveal_type, TypeAlias)
 
 from logic1.firstorder import (
     All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
@@ -370,10 +370,12 @@ _CLUSTERING = CLUSTERING.NONE
 
 @dataclass
 class Node:
+    # sequantial and parallel
 
     variables: list[Variable]
     formula: Formula
     answer: list
+    options: Options
 
     real_type_selection: ClassVar[dict[CLUSTERING,
                                        dict[int, list[Cluster]]]] = {
@@ -395,7 +397,7 @@ class Node:
     }
 
     def __str__(self):
-        return f'Node({self.variables}, {self.formula}, {self.answer})'
+        return f'Node({self.variables}, {self.formula}, {self.answer}, {self.options})'
 
     def eset(self) -> EliminationSet:
         return self.gauss_eset() or self.regular_eset()
@@ -424,13 +426,13 @@ class Node:
         def red(f: Term, x: Variable, d: int) -> Term:
             return f - f.coefficient({x: d}) * x ** d
 
-        # @trace(pretty=True)
         def at_cs(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
             while atom.lhs.degree(x) > 0:
-                for cluster in Node.real_type_selection[_CLUSTERING][atom.lhs.degree(x)]:
+                clusters = Node.real_type_selection[self.options.clustering][atom.lhs.degree(x)]
+                for cluster in clusters:
                     prd = PRD(atom.lhs, x, cluster)
                     (with_epsilon, tag) = cluster.bound_type(atom, x)
                     if tag is not None:
@@ -521,9 +523,9 @@ class Node:
                     # Since there are no assumptions, we need not worry about
                     # f1.lc() == 0. We currently believe that otherwise the
                     # guard takes care that parametric f1.lc() cannot vanish.
-                    if is_valid(f1.lc() >= 0):
+                    if is_valid(Term(f1.lc()) >= 0):
                         pass
-                    elif is_valid(f1.lc() <= 0):
+                    elif is_valid(Term(f1.lc()) <= 0):
                         h = - h
                     else:
                         h *= f1.lc()
@@ -618,12 +620,13 @@ class Node:
             new_formula = simplify(new_formula)
             if new_formula is T:
                 raise FoundT()
-            new_nodes.append(Node(variables.copy(), new_formula, []))
+            new_nodes.append(Node(variables.copy(), new_formula, [], options=self.options))
         return new_nodes
 
 
 @dataclass
 class NodeList(Collection):
+    # Sequantial only
 
     nodes: list[Node] = field(default_factory=list)
     memory: set[Formula] = field(default_factory=set)
@@ -679,8 +682,10 @@ class NodeList(Collection):
 
 @dataclass
 class WorkingNodeList(NodeList):
+    # Sequantial only
 
     node_counter: Counter[int] = field(default_factory=Counter)
+    options: Options = field(kw_only=True)
 
     def append(self, node: Node) -> bool:
         is_new = super().append(node)
@@ -726,7 +731,7 @@ class WorkingNodeList(NodeList):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        subnode = Node(node.variables.copy(), arg, node.answer)
+                        subnode = Node(node.variables.copy(), arg, node.answer, self.options)
                         self.append(subnode)
                 case And() | AtomicFormula():
                     self.append(node)
@@ -786,45 +791,49 @@ class NodeListManager:
             return (self.hits, self.candidates)
 
 
-class NodeListProxy(mp.managers.BaseProxy, Collection):
+class NodeListProxy(Collection):
+    # parallel
+
+    def __init__(self, proxy: _NodeListProxy):
+        self._proxy = proxy
 
     @property
     def nodes(self):
-        return self._callmethod('get_nodes')
+        return self._proxy.get_nodes()
 
     @property
     def memory(self):
-        return self._callmethod('get_memory')
+        return self._proxy.get_memory()
 
     @property
     def candidates(self):
-        return self._callmethod('get_candidates')
+        return self._proxy.get_candidates()
 
     @property
     def hits(self):
-        return self._callmethod('get_hits')
+        return self._proxy.get_hits()
 
     def __contains__(self, obj: object) -> bool:
         match obj:
             case Node():
-                return obj in self._callmethod('get_nodes')  # type: ignore
+                return obj in self._proxy.get_nodes()
             case _:
                 return False
 
     def __iter__(self):
-        yield from self._callmethod('get_nodes')
+        yield from self._proxy.get_nodes()
 
     def __len__(self):
-        return self._callmethod('__len__')
+        return len(self._proxy)
 
     def append(self, node: Node) -> bool:
-        return self._callmethod('append', (node,))  # type: ignore
+        return self._proxy.append(node)
 
     def extend(self, nodes: list[Node]) -> None:
-        self._callmethod('extend', (nodes,))
+        self._proxy.extend(nodes)
 
     def final_statistics(self, key: str) -> str:
-        hits, candidates = self._callmethod('statistics')  # type: ignore
+        hits, candidates = self._proxy.statistics()
         num_nodes = candidates - hits
         if num_nodes == 0:
             return ''
@@ -839,7 +848,7 @@ class NodeListProxy(mp.managers.BaseProxy, Collection):
             return float('nan')
 
     def periodic_statistics(self, key: str) -> str:
-        hits, candidates = self._callmethod('statistics')  # type: ignore
+        hits, candidates = self._proxy.statistics()
         num_nodes = candidates - hits
         if num_nodes == 0:
             return ''
@@ -895,9 +904,13 @@ class WorkingNodeListManager(NodeListManager):
 
 class WorkingNodeListProxy(NodeListProxy):
 
+    def __init__(self, proxy: _WorkingNodeListProxy, options: Options):
+        self._proxy: _WorkingNodeListProxy = proxy
+        self.options = options
+
     @property
     def node_counter(self):
-        return self._callmethod('get_node_counter')
+        return self._proxy.get_node_counter()
 
     def extend(self, nodes: Iterable[Node]) -> None:
         newnodes = []
@@ -907,7 +920,10 @@ class WorkingNodeListProxy(NodeListProxy):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        subnode = Node(node.variables.copy(), arg, node.answer)
+                        subnode = Node(variables=node.variables.copy(),
+                                       formula=arg,
+                                       answer=node.answer,
+                                       options=self.options)
                         if subnode not in newnodes:
                             newnodes.append(subnode)
                 case And() | AtomicFormula():
@@ -915,19 +931,19 @@ class WorkingNodeListProxy(NodeListProxy):
                         newnodes.append(node)
                 case _:
                     assert False, node
-        self._callmethod('extend', (newnodes,))
+        self._proxy.extend(newnodes)
 
     def final_statistics(self, key: Optional[str] = None) -> str:
         if key:
             return super().final_statistics(key)
-        hits, candidates, _, _ = self._callmethod('statistics')  # type: ignore
+        hits, candidates, _, _ = self._proxy.statistics()
         num_nodes = candidates - hits
         ratio = self.hit_ratio(hits, candidates)
         return (f'performed {num_nodes} elimination steps, '
                 f'skipped {hits}/{candidates} = {ratio:.0%}')
 
     def is_finished(self):
-        return self._callmethod('is_finished')
+        return self._proxy.is_finished()
 
     def periodic_statistics(self, key: str = 'W') -> str:
         hits, candidates, busy, node_counter = self._callmethod('statistics')  # type: ignore
@@ -944,24 +960,80 @@ class WorkingNodeListProxy(NodeListProxy):
         return f'{vw}, B={busy}, H={ratio:.0%}'
 
     def pop(self) -> Node:
-        return self._callmethod('pop')  # type: ignore
+        return self._proxy.pop()
 
     def task_done(self) -> None:
-        self._callmethod('task_done')
+        self._proxy.task_done()
+
+
+class _NodeListProxy(mp.managers.BaseProxy):
+
+    def get_nodes(self) -> list[Node]:
+        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
+
+    def get_memory(self) -> set[Formula]:
+        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
+
+    def get_candidates(self) -> int:
+        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
+
+    def get_hits(self) -> int:
+        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
+
+    def __len__(self) -> int:
+        return self._callmethod('__len__')  # type: ignore[func-returns-value]
+
+    def append(self, node: Node) -> bool:
+        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
+
+    def extend(self, nodes: Iterable[Node]) -> None:
+        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
+
+    def statistics(self) -> tuple:
+        return self._callmethod('statistics')  # type: ignore[func-returns-value]
+
+
+class _WorkingNodeListProxy(_NodeListProxy):
+
+    def get_node_counter(self) -> int:
+        return self._callmethod('get_node_counter')  # type: ignore[func-returns-value]
+
+    def is_finished(self) -> bool:
+        return self._callmethod('is_finished')  # type: ignore[func-returns-value]
+
+    def pop(self) -> Node:
+        return self._callmethod('pop')  # type: ignore[func-returns-value]
+
+    def task_done(self) -> None:
+        return self._callmethod('task_done')  # type: ignore[func-returns-value]
 
 
 class SyncManager(mp.managers.SyncManager):
-    pass
+
+    def NodeList(self) -> NodeListProxy:
+        proxy = self._NodeListProxy()  # type: ignore[attr-defined]
+        return NodeListProxy(proxy)
+
+    def WorkingNodeList(self, options: Options) -> WorkingNodeListProxy:
+        proxy = self._WorkingNodeListProxy()  # type: ignore[attr-defined]
+        return WorkingNodeListProxy(proxy, options)
 
 
-SyncManager.register("NodeList", NodeListManager, NodeListProxy,
+SyncManager.register('_NodeListProxy', NodeListManager, _NodeListProxy,
                      ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
                       '__len__', 'append', 'extend', 'statistics'])
 
-SyncManager.register("WorkingNodeList", WorkingNodeListManager, WorkingNodeListProxy,
+SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNodeListProxy,
                      ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
                       'get_node_counter', '__len__', 'append', 'extend',
                       'is_finished', 'pop', 'statistics', 'task_done'])
+
+
+@dataclass
+class Options:
+
+    clustering: CLUSTERING = CLUSTERING.NONE
+    generic: bool = False
 
 
 @dataclass
@@ -981,6 +1053,7 @@ class VirtualSubstitution:
     workers: int = 0
     log: int = logging.NOTSET
     log_rate: float = 0.5
+    options: Optional[Options] = None
 
     time_final_simplification: Optional[float] = None
     time_import_failure_nodes: Optional[float] = None
@@ -994,7 +1067,7 @@ class VirtualSubstitution:
     time_total: Optional[float] = None
 
     def __call__(self, f: Formula, workers: int = 0, log: int = logging.NOTSET,
-                 log_rate: float = 0.5) -> Optional[Formula]:
+                 log_rate: float = 0.5, **options) -> Optional[Formula]:
         """Virtual substitution entry point.
 
         workers is the number of processes used for virtual substitution. The
@@ -1019,6 +1092,8 @@ class VirtualSubstitution:
             save_level = logger.getEffectiveLevel()
             logger.setLevel(self.log_level)
             delta_time_formatter.set_reference_time(time.time())
+            self.options = Options(**options)
+            logger.info(f'{self.options}')
             result = self.virtual_substitution(f, workers)
         except KeyboardInterrupt:
             print('KeyboardInterrupt', file=sys.stderr, flush=True)
@@ -1073,7 +1148,7 @@ class VirtualSubstitution:
             self.time_syncmanager_enter = timer.get()
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            working_nodes = manager.WorkingNodeList()  # type: ignore
+            working_nodes = manager.WorkingNodeList(options=self.options)
             working_nodes.append(self.root_node)
             self.root_node = None
             success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
@@ -1153,7 +1228,8 @@ class VirtualSubstitution:
                 # our empty nodes.
                 self.working_nodes = WorkingNodeList(
                     hits=working_nodes.hits,
-                    candidates=working_nodes.candidates)
+                    candidates=working_nodes.candidates,
+                    options=self.options)
                 # TODO: wipe self.success_nodes and self.failure_nodes
                 raise FoundT()
             logger.info(working_nodes.final_statistics())
@@ -1168,7 +1244,8 @@ class VirtualSubstitution:
                 nodes=working_nodes.nodes,
                 hits=working_nodes.hits,
                 candidates=working_nodes.candidates,
-                node_counter=working_nodes.node_counter)
+                node_counter=working_nodes.node_counter,
+                options=self.options)
             self.time_import_working_nodes = timer.get()
             logger.debug(f'{self.time_import_working_nodes=:.3f}')
             assert self.working_nodes.nodes == []
@@ -1246,7 +1323,7 @@ class VirtualSubstitution:
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.root_node = Node(vars_, simplify(matrix), [])
+        self.root_node = Node(vars_, simplify(matrix), [], options=self.options)
 
     def process_block(self) -> None:
         logger.debug(f'entering {self.process_block.__name__}')
@@ -1255,7 +1332,7 @@ class VirtualSubstitution:
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
-        self.working_nodes = WorkingNodeList()
+        self.working_nodes = WorkingNodeList(options=self.options)
         self.working_nodes.append(self.root_node)
         self.root_node = None
         self.success_nodes = NodeList()
@@ -1369,7 +1446,8 @@ class VirtualSubstitution:
                 logger.info('found T')
                 logger.info(self.working_nodes.final_statistics())
                 self.working_nodes = None
-                self.success_nodes = NodeList(nodes=[Node(variables=[], formula=T, answer=[])])
+                self.success_nodes = NodeList(
+                    nodes=[Node(variables=[], formula=T, answer=[], options=self.options)])
             self.collect_success_nodes()
             if self.failure_nodes:
                 raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')

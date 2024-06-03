@@ -2,12 +2,12 @@ from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import cast, Iterable, Optional, Self
+from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ...firstorder import And, _F, F, Formula, Not, Or, pnf, _T, T
+from ...firstorder import And, F, Formula, Not, Or, T
 from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
 from ...support.tracing import trace  # noqa
