@@ -68,7 +68,7 @@ And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 >>> ellipse = All((x, y),
 ...    Implies(b**2 * (x - c)**2 + a**2 * y**2 - a**2 * b**2 == 0, x**2 + y**2 <= 1))
 >>> sum(1 for _ in qe(ellipse).atoms())
-108
+106
 
 # 5 Generic quadratic polynomials
 >>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')

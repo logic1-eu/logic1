@@ -2,8 +2,6 @@
 >>> from logic1.theories.RCF import *
 
 # Test renaming to distinct variables:
->>> VV
-{G0001_x, G0002_x, a, b, c, d, x, y, z, ...}
 >>> VV.push()
 >>> x, y, z = VV.get('x', 'y', 'z')
 >>> f = Eq(x, y) & Ex(x, Eq(x, y) & All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T))))

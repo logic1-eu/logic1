@@ -1,0 +1,54 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+1. Angle at Circumference vs. Angle at Center
+
+Let M be the midpoint of the circumcircle of a triangle ABC. Then \angle ACB =
+\angle AMB/2.
+
+>>> VV.push()
+>>> VV.imp('a', 'b', 'c', 'tan0', 'tan1', 'tan2', 'x0', 'y0')
+>>> ex1 = All((b, c, tan1, tan2, tan0),
+...     Implies(And(c**2 == a**2+b**2,
+...                 c**2 == x0**2+(y0-b)**2,
+...                 tan1*y0 == (a+x0),
+...                 tan2*y0 == (a-x0),
+...                 tan0*(1-tan1*tan2) == tan1+tan2),
+...             tan0*b == a))
+>>> # qe(ex1, clustering=CLUSTERING.FULL)
+>>> VV.pop()
+
+5. Example by MacLane
+
+Given eight points A,B,C,D,E,F,G,H such that the following eight triples are
+collinear: ABD, BCE, CDF, DEG, EFH, FGH, GHB, HAC. Then all other triples are
+also collinear (i.e. all eight points lie on one line). This is true over R but
+fails over C.
+
+>>> VV.push()
+>>> VV.imp('xb', 'xc', 'xd', 'xe', 'xf', 'xg', 'xh', 'yb', 'yc', 'yd', 'ye', 'yf', 'yg', 'yh')
+>>> ex5 = All((yh, xe, ye, xf, yf, xg, yg),
+...           Implies(And(xh*yc - xc*yh == 0,
+...                       xg*yf - xf*yg == 0,
+...                       xb*ye - xc*ye + xe*yc - xb*yc == 0,
+...                       xb*yh - xg*yh + xh*yg - xb*yg == 0,
+...                       xc*yf - xd*yf - xf*yc + xd*yc == 0,
+...                       xd*yg - xe*yg + xg*ye - xd*ye == 0,
+...                       xe*yh - xf*yh + xh*yf - xe*yf - xh*ye + xf*ye == 0),
+...                   xb*yc == 0))
+>>> # qe(ex5, workers=8, clustering=CLUSTERING.FULL)
+>>> VV.pop()
+
+6. Chou 2.1
+
+>>> VV.push()
+>>> VV.imp('u1', 'u2', 'u3', 'x1', 'x2', 'x3', 'x4')
+>>> ex6 = All((x1,x2,x3,x4),
+...           Implies(And(u1*x1 - u1*u3 == 0,
+...                       u3*x2 - (u2 - u1)*x1 == 0,
+...                       x1*x4 - (x2 - u1)*x3 - u1*x1 == 0,
+...                       u3*x4 - u2*x3 == 0),
+...                   2*u2*x4 + 2*u3*x3 - u3**2 - u2**2 == 0))
+>>> # qe(ex6, clustering=CLUSTERING.NONE)
+>>> VV.pop()
+

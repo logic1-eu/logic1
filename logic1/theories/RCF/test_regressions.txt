@@ -1,0 +1,6 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+>>> VV.imp('u2')
+>>> simplify(u2**2 == 0)
+u2 == 0

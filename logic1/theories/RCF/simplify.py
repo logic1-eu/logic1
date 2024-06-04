@@ -313,6 +313,16 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
         def _simpl_at_eq_ne(rel, lhs, context):
+
+            def split_tsq(term):
+                args = []
+                for _, power_product in term:
+                    if self.explode_always:
+                        args.append(fac_junctor(*(rel(v, 0) for v in power_product.vars())))
+                    else:
+                        args.append(rel(product(power_product.vars()), 0))
+                return tsq_junctor(*args)
+
             if rel is Eq:
                 tsq_junctor = And
                 fac_junctor = Or
@@ -332,11 +342,9 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
             if primitive_tsq == TSQ.STRICT:
                 return tsq_junctor.definite_func()
             if primitive_tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
-                args = (rel(power_product, 0) for _, power_product in primitive_lhs)
-                return tsq_junctor(*args)
+                return split_tsq(primitive_lhs)
             if tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
-                args = (rel(power_product, 0) for _, power_product in lhs)
-                return tsq_junctor(*args)
+                return split_tsq(lhs)
             if self.explode_always or context == fac_junctor:
                 args = (rel(factor, 0) for factor in factors if not factor.is_constant())
                 return fac_junctor(*args)

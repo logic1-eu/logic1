@@ -1,10 +1,10 @@
 import more_itertools
 
 from abc import ABC, abstractmethod
-from typing import Any, cast, Generic, Iterable, Iterator, Optional, Self, TypeVar
+from typing import Any, cast, Generic, Iterable, Optional, Self, TypeVar
 
-from ..firstorder import (All, And, AtomicFormula, Equivalent, Ex, _F, Formula,
-                          Implies, Not, Or, pnf, _T, T)
+from ..firstorder import (All, And, AtomicFormula, Ex, _F, Formula, Or, pnf,
+                          _T, T)
 
 from ..support.tracing import trace  # noqa
 
