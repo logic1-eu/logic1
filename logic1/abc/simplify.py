@@ -118,7 +118,7 @@ class Simplify(ABC, Generic[AT, TH]):
 
         gand = f.func
         others, atoms = split(f.args)
-        simplified_atoms = (self._simpl_at(atom, f.func) for atom in atoms)
+        simplified_atoms = (self.simpl_at(atom, f.func) for atom in atoms)
         new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
@@ -162,9 +162,9 @@ class Simplify(ABC, Generic[AT, TH]):
         return gand(*final_atoms, *final_others)
 
     @abstractmethod
-    def _simpl_at(self,
-                  atom: AT,
-                  context: Optional[type[And] | type[Or]]) -> Formula:
+    def simpl_at(self,
+                 atom: AT,
+                 context: Optional[type[And] | type[Or]]) -> Formula:
         # Does not receive the theory, by design.
         ...
 

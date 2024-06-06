@@ -278,6 +278,10 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
 
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
+    explode_always: bool = True
+    prefer_order: bool = True
+    prefer_weak: bool = False
+
     @property
     def class_AT(self) -> type[AtomicFormula]:
         return AtomicFormula
@@ -294,17 +298,23 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                  f: Formula,
                  assume: Optional[list[AtomicFormula]] = None,
                  explode_always: bool = True,
-                 prefer_weak: bool = False,
-                 prefer_order: bool = True) -> Formula:
+                 prefer_order: bool = True,
+                 prefer_weak: bool = False) -> Formula:
         self.explode_always = explode_always
-        self.prefer_weak = prefer_weak
         self.prefer_order = prefer_order
+        self.prefer_weak = prefer_weak
         return self.simplify(f, assume)
+
+    def simpl_at(self,
+                 atom: AtomicFormula,
+                 context: Optional[type[And] | type[Or]]) -> Formula:
+        return self._simpl_at(atom, context, self.explode_always)
 
     @lru_cache(maxsize=None)
     def _simpl_at(self,
                   atom: AtomicFormula,
-                  context: Optional[type[And] | type[Or]]) -> Formula:
+                  context: Optional[type[And] | type[Or]],
+                  explode_always: bool) -> Formula:
         """Simplify atomic formula.
 
         >>> from .rcf import VV
@@ -317,7 +327,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
             def split_tsq(term):
                 args = []
                 for _, power_product in term:
-                    if self.explode_always:
+                    if explode_always:
                         args.append(fac_junctor(*(rel(v, 0) for v in power_product.vars())))
                     else:
                         args.append(rel(product(power_product.vars()), 0))
@@ -341,11 +351,11 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
             primitive_tsq = primitive_lhs.is_definite()
             if primitive_tsq == TSQ.STRICT:
                 return tsq_junctor.definite_func()
-            if primitive_tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
+            if primitive_tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
                 return split_tsq(primitive_lhs)
-            if tsq == TSQ.WEAK and (self.explode_always or context == tsq_junctor):
+            if tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
                 return split_tsq(lhs)
-            if self.explode_always or context == fac_junctor:
+            if explode_always or context == fac_junctor:
                 args = (rel(factor, 0) for factor in factors if not factor.is_constant())
                 return fac_junctor(*args)
             return rel(primitive_lhs, 0)
@@ -395,7 +405,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 odd_factor = - odd_factor
             else:
                 rel = Ge
-            if context is Or or self.explode_always:
+            if context is Or or explode_always:
                 odd_part = rel(odd_factor, 0)
                 even_part = (Eq(f, 0) for f in even_factors)
                 return Or(odd_part, *even_part)

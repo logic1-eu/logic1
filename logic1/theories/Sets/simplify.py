@@ -2,7 +2,7 @@ from typing import Iterable, Optional, Self, TypeAlias
 
 from ... import abc
 
-from ...firstorder import And, AtomicFormula, Formula, Or, pnf
+from ...firstorder import And, AtomicFormula, Formula, Or
 from .sets import C, C_, Eq, Index, Ne, oo, Term, Variable
 
 from ...support.tracing import trace  # noqa
@@ -148,9 +148,9 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
         return self.simplify(f, assume)
 
-    def _simpl_at(self,
-                  atom: AtomicFormula,
-                  context: Optional[type[And] | type[Or]]) -> Formula:
+    def simpl_at(self,
+                 atom: AtomicFormula,
+                 context: Optional[type[And] | type[Or]]) -> Formula:
         return atom.simplify()
 
 
