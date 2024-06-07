@@ -345,6 +345,9 @@ class Term(firstorder.Term):
     def lc(self) -> int:
         return int(self.poly.lc())
 
+    def monomials(self) -> list[Term]:
+        return [Term(monomial) for monomial in self.poly.monomials()]
+
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)

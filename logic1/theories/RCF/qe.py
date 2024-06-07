@@ -7,7 +7,6 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass, field
 from enum import auto, Enum
-from functools import cached_property
 import logging
 import multiprocessing as mp
 import multiprocessing.managers
@@ -17,10 +16,11 @@ import queue
 import sys
 import threading
 import time
-from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, reveal_type, TypeAlias)
+from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
 
 from logic1.firstorder import (
-    All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T)
+    All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T, _T)
+from logic1.support.excepthook import NoTraceException
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF.simplify import is_valid, simplify
@@ -63,6 +63,31 @@ class FoundT(Exception):
     pass
 
 
+class CLUSTERING(Enum):
+    NONE = auto()
+    FULL = auto()
+
+
+class GENERIC(Enum):
+    NONE = auto()
+    MONOMIAL = auto()
+    FULL = auto()
+
+
+class NSP(Enum):
+    NONE = auto()
+    PLUS_EPSILON = auto()
+    MINUS_EPSILON = auto()
+    PLUS_INFINITY = auto()
+    MINUS_INFINITY = auto()
+
+
+class TAG(Enum):
+    XLB = auto()
+    XUB = auto()
+    ANY = auto()
+
+
 class Timer:
 
     def __init__(self):
@@ -81,18 +106,32 @@ class QuantifierBlocks(list[tuple[type[QuantifiedFormula], list[Variable]]]):
         return '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self)
 
 
-class NSP(Enum):
-    NONE = auto()
-    PLUS_EPSILON = auto()
-    MINUS_EPSILON = auto()
-    PLUS_INFINITY = auto()
-    MINUS_INFINITY = auto()
+@dataclass
+class Theory:
 
+    class Inconsistent(Exception):
+        pass
 
-class TAG(Enum):
-    XLB = auto()
-    XUB = auto()
-    ANY = auto()
+    atoms: list[AtomicFormula]
+
+    def append(self, new_atom: AtomicFormula) -> None:
+        self.extend([new_atom])
+
+    def extend(self, new_atoms: list[AtomicFormula]) -> None:
+        self.atoms.extend(new_atoms)
+        theta = simplify(And(*self.atoms),
+                         explode_always=False, prefer_order=False, prefer_weak=True)
+        match theta:
+            case AtomicFormula():
+                self.atoms = [theta]
+            case And():
+                self.atoms = [*theta.args]
+            case _T():
+                self.atoms = []
+            case _F():
+                raise self.Inconsistent(f'{self=}, {new_atoms=}, {theta=}')
+            case _:
+                assert False, (self, new_atoms, theta)
 
 
 SignSequence: TypeAlias = tuple[Literal[-1, 0, 1], ...]
@@ -207,11 +246,12 @@ class Cluster:
     def __iter__(self) -> Iterator[RootSpec]:
         return iter(self.root_specs)
 
-    def bound_type(self, atom: AtomicFormula, x: Variable) -> tuple[bool, Optional[TAG]]:
+    def bound_type(self, atom: AtomicFormula, x: Variable, theory: Theory)\
+            -> tuple[bool, Optional[TAG]]:
         epsilons = set()
         tags = set()
         for root_spec in self.root_specs:
-            if simplify(root_spec.guard(atom.lhs, x)) is F:
+            if simplify(root_spec.guard(atom.lhs, x), assume=theory.atoms) is F:
                 continue
             with_epsilon, tag = root_spec.bound_type(atom)
             if tag is not None:
@@ -233,7 +273,23 @@ class Cluster:
         return (epsilon, tag)
 
     def guard(self, term: Term, x: Variable) -> Formula:
-        return Or(*(root_spec.guard(term, x) for root_spec in self.root_specs))
+        d = term.degree(x)
+        match d, self:
+            case 1, Cluster((RootSpec(signs=(-1, 0, 1), index=1),
+                             RootSpec(signs=(1, 0, -1), index=1))):
+                a = term.coefficient({x: 1})
+                return a != 0
+            case 2, Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                             RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                             RootSpec(signs=(1, 0, 1), index=1),
+                             RootSpec(signs=(-1, 0, -1), index=1))):
+                a = term.coefficient({x: 2})
+                b = term.coefficient({x: 1})
+                c = term.coefficient({x: 0})
+                d2 = b**2 - 4 * a * c
+                return And(a != 0, d2 >= 0)
+            case _:
+                return Or(*(root_spec.guard(term, x) for root_spec in self.root_specs))
 
 
 @dataclass(frozen=True)
@@ -244,9 +300,8 @@ class PRD:
     variable: Variable
     cluster: Cluster
 
-    @cached_property
-    def guard(self) -> Formula:
-        return simplify(self.cluster.guard(self.term, self.variable))
+    def guard(self, theory: Theory) -> Formula:
+        return simplify(self.cluster.guard(self.term, self.variable), assume=theory.atoms)
 
     def vsubs(self, atom: AtomicFormula) -> Formula:
         """Virtually substitute self into atom yielding a quantifier-free
@@ -261,6 +316,8 @@ class PRD:
                 assert False, (self, atom)
 
     def _vsubs(self, atom: AtomicFormula) -> Formula:
+        """Virtual substitution of PRD into atom.
+        """
         x = self.variable
         deg_g = atom.lhs.degree(x)
         match deg_g:
@@ -272,7 +329,8 @@ class PRD:
             case _:
                 raise NotImplementedError(deg_g)
         deg_f = self.term.degree(x)
-        assert deg_g < deg_f, (self, atom)  # Pseudo-division has been applied
+        assert deg_g < deg_f, f'{self=}, {atom=}'  # Pseudo-division has been applied
+        # f into g
         match deg_f:
             case -1 | 0 | 1:
                 assert False
@@ -321,9 +379,9 @@ class PRD:
                                             RootSpec(signs=(-1, 0, -1), index=1)))):
                         return Or(And(a * C <= 0, a * B >= 0), And(a * aa >= 0, a * B <= 0))
                     case _:
-                        assert False, (self, atom)
+                        assert False, f'{self=}, {atom=}'
             case _:
-                raise NotImplementedError(f'{(self, atom)=}')
+                raise NotImplementedError(f'{self=}, {atom=}')
 
 
 @dataclass(frozen=True)
@@ -343,13 +401,13 @@ class TestPoint:
     prd: Optional[PRD] = None
     nsp: NSP = NSP.NONE
 
-    @property
-    def guard(self):
+    def guard(self, theory: Theory):
         if self.prd is None:
             return T
         else:
-            assert self.prd.guard is not F, self
-            return self.prd.guard
+            guard = self.prd.guard(theory)
+            assert guard is not F, self
+            return guard
 
 
 @dataclass
@@ -360,14 +418,6 @@ class EliminationSet:
     method: str
 
 
-class CLUSTERING(Enum):
-    NONE = auto()
-    FULL = auto()
-
-
-_CLUSTERING = CLUSTERING.NONE
-
-
 @dataclass
 class Node:
     # sequantial and parallel
@@ -375,6 +425,7 @@ class Node:
     variables: list[Variable]
     formula: Formula
     answer: list
+    outermost_block: bool
     options: Options
 
     real_type_selection: ClassVar[dict[CLUSTERING,
@@ -397,31 +448,78 @@ class Node:
     }
 
     def __str__(self):
-        return f'Node({self.variables}, {self.formula}, {self.answer}, {self.options})'
+        return (f'Node({self.variables}, {self.formula}, {self.answer}, {self.outermost_block}, '
+                f'{self.options})')
 
-    def eset(self) -> EliminationSet:
-        return self.gauss_eset() or self.regular_eset()
+    def eset(self, theory=Theory) -> Optional[EliminationSet]:
+        return self.gauss_eset(theory) or self.regular_eset(theory)
 
-    def gauss_eset(self) -> Optional[EliminationSet]:
-        if isinstance(self.formula, And):
-            for x in self.variables:
-                for arg in self.formula.args:
-                    if isinstance(arg, Eq):
+    def gauss_eset(self, theory: Theory) -> Optional[EliminationSet]:
+        if not isinstance(self.formula, And):
+            return None
+        for degree in (1, 2):
+            # Look for degree-Gauss with a non-zero coefficient modulo theory
+            for round_ in (GENERIC.NONE, GENERIC.MONOMIAL, GENERIC.FULL):
+                if round_ == GENERIC.MONOMIAL and not self.outermost_block:
+                    break
+                if round_ == GENERIC.MONOMIAL and self.options.generic == GENERIC.NONE:
+                    break
+                if round_ == GENERIC.FULL and self.options.generic == GENERIC.MONOMIAL:
+                    break
+                for x in self.variables:
+                    for arg in self.formula.args:
+                        if not isinstance(arg, Eq):
+                            continue
                         lhs = arg.lhs
-                        if lhs.degree(x) == 1:
-                            a = lhs.coefficient({x: 1})
-                            if a.is_constant():
-                                self.variables.remove(x)
-                                if a.poly > 0:
-                                    root_spec = RootSpec(signs=(-1, 0, 1), index=1)
-                                else:
-                                    assert a.poly < 0
-                                    root_spec = RootSpec(signs=(1, 0, -1), index=1)
-                                tp = TestPoint(PRD(lhs, x, Cluster((root_spec,))))
-                                return EliminationSet(variable=x, test_points=[tp], method='g')
+                        if lhs.degree(x) != degree:
+                            # Possibly lhs.degree(x) < 0 when x does not occur
+                            continue
+                        a = lhs.coefficient({x: degree})
+                        match round_:
+                            case GENERIC.NONE:
+                                if not is_valid(a != 0, theory.atoms):
+                                    continue
+                                logger.debug(f'{degree}-Gauss')
+                            case GENERIC.MONOMIAL:
+                                if len(a.monomials()) > 1:
+                                    continue
+                                if not set(a.vars()).isdisjoint(self.variables):
+                                    continue
+                                theory.append(a != 0)
+                                logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                            case GENERIC.FULL:
+                                if not set(a.vars()).isdisjoint(self.variables):
+                                    continue
+                                theory.append(a != 0)
+                                logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                        self.variables.remove(x)
+                        test_points = []
+                        for cluster in self.real_type_selection[self.options.clustering][degree]:
+                            for sign in (1, -1):
+                                prd = PRD(sign * lhs, x, cluster)
+                                if prd.guard(theory) is not F:
+                                    test_points.append(TestPoint(prd))
+                        return EliminationSet(variable=x, test_points=test_points, method='g')
         return None
 
-    def regular_eset(self) -> EliminationSet:
+    def is_admissible_assumption(self, atom: Ne) -> bool:
+        match self.options.generic:
+            case GENERIC.NONE:
+                return False
+            case GENERIC.MONOMIAL:
+                if len(atom.lhs.monomials()) > 1:
+                    return False
+                if not set(atom.fvars()).isdisjoint(self.variables):
+                    return False
+                return True
+            case GENERIC.FULL:
+                if not set(atom.fvars()).isdisjoint(self.variables):
+                    return False
+                return True
+            case _:
+                assert False, self.options.generic
+
+    def regular_eset(self, theory=Theory) -> EliminationSet:
 
         def red(f: Term, x: Variable, d: int) -> Term:
             return f - f.coefficient({x: d}) * x ** d
@@ -430,20 +528,23 @@ class Node:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
-            while atom.lhs.degree(x) > 0:
-                clusters = Node.real_type_selection[self.options.clustering][atom.lhs.degree(x)]
+            while (d := atom.lhs.degree(x)) > 0:
+                clusters = Node.real_type_selection[self.options.clustering][d]
                 for cluster in clusters:
                     prd = PRD(atom.lhs, x, cluster)
-                    (with_epsilon, tag) = cluster.bound_type(atom, x)
+                    (with_epsilon, tag) = cluster.bound_type(atom, x, theory)
                     if tag is not None:
                         cs = CandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
                     prd = PRD(- atom.lhs, x, cluster)
-                    (with_epsilon, tag) = (- cluster).bound_type(atom, x)
+                    (with_epsilon, tag) = (- cluster).bound_type(atom, x, theory)
                     if tag is not None:
                         cs = CandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
-                atom = atom.func(red(atom.lhs, x, atom.lhs.degree(x)), 0)
+                lc = atom.lhs.coefficient({x: d})
+                if self.is_admissible_assumption(lc != 0):
+                    theory.append(lc != 0)
+                atom = atom.func(red(atom.lhs, x, d), 0)
             return candidate_solutions
 
         smallest_eset_size = None
@@ -459,7 +560,7 @@ class Node:
                         assert False, atom
                     case 0 | 1 | 2:
                         for candidate in at_cs(atom, x):
-                            if candidate.prd.guard is not F:
+                            if candidate.prd.guard(theory) is not F:
                                 candidates[candidate.tag].add(candidate)
                     case _:
                         raise DegreeViolation(atom, x, atom.lhs.degree(x))
@@ -485,7 +586,7 @@ class Node:
                     test_points.append(TestPoint(candidate.prd))
         return EliminationSet(variable=best_variable, test_points=test_points, method='e')
 
-    def vsubs(self, eset: EliminationSet) -> list[Node]:
+    def vsubs(self, eset: EliminationSet, theory: Theory) -> list[Node]:
 
         def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> Formula:
             """Virtually substitute a test point into an atom.
@@ -615,12 +716,16 @@ class Node:
         new_nodes = []
         for tp in eset.test_points:
             new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
-            if tp.guard is not T:
-                new_formula = And(tp.guard, new_formula)
-            new_formula = simplify(new_formula)
+            # requires discussion: guard will be simplified twice
+            new_formula = simplify(And(tp.guard(theory), new_formula), assume=theory.atoms)
             if new_formula is T:
                 raise FoundT()
-            new_nodes.append(Node(variables.copy(), new_formula, [], options=self.options))
+            new_nodes.append(
+                Node(variables=variables.copy(),
+                     formula=new_formula,
+                     answer=[],
+                     outermost_block=self.outermost_block,
+                     options=self.options))
         return new_nodes
 
 
@@ -685,7 +790,6 @@ class WorkingNodeList(NodeList):
     # Sequantial only
 
     node_counter: Counter[int] = field(default_factory=Counter)
-    options: Options = field(kw_only=True)
 
     def append(self, node: Node) -> bool:
         is_new = super().append(node)
@@ -731,7 +835,11 @@ class WorkingNodeList(NodeList):
                     continue
                 case Or(args=args):
                     for arg in args:
-                        subnode = Node(node.variables.copy(), arg, node.answer, self.options)
+                        subnode = Node(variables=node.variables.copy(),
+                                       formula=arg,
+                                       answer=node.answer,
+                                       outermost_block=node.outermost_block,
+                                       options=node.options)
                         self.append(subnode)
                 case And() | AtomicFormula():
                     self.append(node)
@@ -856,6 +964,33 @@ class NodeListProxy(Collection):
         return f'{key}={num_nodes}, H={ratio:.0%}'
 
 
+class _NodeListProxy(mp.managers.BaseProxy):
+
+    def get_nodes(self) -> list[Node]:
+        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
+
+    def get_memory(self) -> set[Formula]:
+        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
+
+    def get_candidates(self) -> int:
+        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
+
+    def get_hits(self) -> int:
+        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
+
+    def __len__(self) -> int:
+        return self._callmethod('__len__')  # type: ignore[func-returns-value]
+
+    def append(self, node: Node) -> bool:
+        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
+
+    def extend(self, nodes: Iterable[Node]) -> None:
+        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
+
+    def statistics(self) -> tuple:
+        return self._callmethod('statistics')  # type: ignore[func-returns-value]
+
+
 @dataclass
 class WorkingNodeListManager(NodeListManager):
 
@@ -904,9 +1039,8 @@ class WorkingNodeListManager(NodeListManager):
 
 class WorkingNodeListProxy(NodeListProxy):
 
-    def __init__(self, proxy: _WorkingNodeListProxy, options: Options):
+    def __init__(self, proxy: _WorkingNodeListProxy):
         self._proxy: _WorkingNodeListProxy = proxy
-        self.options = options
 
     @property
     def node_counter(self):
@@ -923,7 +1057,8 @@ class WorkingNodeListProxy(NodeListProxy):
                         subnode = Node(variables=node.variables.copy(),
                                        formula=arg,
                                        answer=node.answer,
-                                       options=self.options)
+                                       outermost_block=node.outermost_block,
+                                       options=node.options)
                         if subnode not in newnodes:
                             newnodes.append(subnode)
                 case And() | AtomicFormula():
@@ -966,33 +1101,6 @@ class WorkingNodeListProxy(NodeListProxy):
         self._proxy.task_done()
 
 
-class _NodeListProxy(mp.managers.BaseProxy):
-
-    def get_nodes(self) -> list[Node]:
-        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
-
-    def get_memory(self) -> set[Formula]:
-        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
-
-    def get_candidates(self) -> int:
-        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
-
-    def get_hits(self) -> int:
-        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
-
-    def __len__(self) -> int:
-        return self._callmethod('__len__')  # type: ignore[func-returns-value]
-
-    def append(self, node: Node) -> bool:
-        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
-
-    def statistics(self) -> tuple:
-        return self._callmethod('statistics')  # type: ignore[func-returns-value]
-
-
 class _WorkingNodeListProxy(_NodeListProxy):
 
     def get_node_counter(self) -> int:
@@ -1014,9 +1122,9 @@ class SyncManager(mp.managers.SyncManager):
         proxy = self._NodeListProxy()  # type: ignore[attr-defined]
         return NodeListProxy(proxy)
 
-    def WorkingNodeList(self, options: Options) -> WorkingNodeListProxy:
+    def WorkingNodeList(self) -> WorkingNodeListProxy:
         proxy = self._WorkingNodeListProxy()  # type: ignore[attr-defined]
-        return WorkingNodeListProxy(proxy, options)
+        return WorkingNodeListProxy(proxy)
 
 
 SyncManager.register('_NodeListProxy', NodeListManager, _NodeListProxy,
@@ -1033,7 +1141,7 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 class Options:
 
     clustering: CLUSTERING = CLUSTERING.NONE
-    generic: bool = False
+    generic: GENERIC = GENERIC.NONE
 
 
 @dataclass
@@ -1048,6 +1156,7 @@ class VirtualSubstitution:
     working_nodes: Optional[WorkingNodeList] = None
     success_nodes: Optional[NodeList] = None
     failure_nodes: Optional[NodeList] = None
+    theory: Optional[Theory] = None
     result: Optional[Formula] = None
 
     workers: int = 0
@@ -1066,7 +1175,12 @@ class VirtualSubstitution:
     time_syncmanager_exit: Optional[float] = None
     time_total: Optional[float] = None
 
-    def __call__(self, f: Formula, workers: int = 0, log: int = logging.NOTSET,
+    @property
+    def assume(self):
+        return self.theory.atoms
+
+    def __call__(self, f: Formula, assume: Optional[list[AtomicFormula]] = None,
+                 workers: int = 0, log_level: int = logging.NOTSET,
                  log_rate: float = 0.5, **options) -> Optional[Formula]:
         """Virtual substitution entry point.
 
@@ -1087,7 +1201,8 @@ class VirtualSubstitution:
         timer = Timer()
         VirtualSubstitution.__init__(self)
         try:
-            self.log_level = log
+            self.theory = Theory([] if assume is None else assume)
+            self.log_level = log_level
             self.log_rate = log_rate
             save_level = logger.getEffectiveLevel()
             logger.setLevel(self.log_level)
@@ -1120,7 +1235,7 @@ class VirtualSubstitution:
             logger.debug(f'found {num_atoms} atoms')
         logger.info('final simplification')
         timer = Timer()
-        self.result = simplify(self.matrix)
+        self.result = simplify(self.matrix, assume=self.theory.atoms)
         self.time_final_simplification = timer.get()
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f'{self.time_final_simplification=:.3f}')
@@ -1148,7 +1263,7 @@ class VirtualSubstitution:
             self.time_syncmanager_enter = timer.get()
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            working_nodes = manager.WorkingNodeList(options=self.options)
+            working_nodes = manager.WorkingNodeList()
             working_nodes.append(self.root_node)
             self.root_node = None
             success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
@@ -1228,8 +1343,7 @@ class VirtualSubstitution:
                 # our empty nodes.
                 self.working_nodes = WorkingNodeList(
                     hits=working_nodes.hits,
-                    candidates=working_nodes.candidates,
-                    options=self.options)
+                    candidates=working_nodes.candidates)
                 # TODO: wipe self.success_nodes and self.failure_nodes
                 raise FoundT()
             logger.info(working_nodes.final_statistics())
@@ -1244,8 +1358,7 @@ class VirtualSubstitution:
                 nodes=working_nodes.nodes,
                 hits=working_nodes.hits,
                 candidates=working_nodes.candidates,
-                node_counter=working_nodes.node_counter,
-                options=self.options)
+                node_counter=working_nodes.node_counter)
             self.time_import_working_nodes = timer.get()
             logger.debug(f'{self.time_import_working_nodes=:.3f}')
             assert self.working_nodes.nodes == []
@@ -1287,13 +1400,13 @@ class VirtualSubstitution:
                     time.sleep(0.001)
                     continue
                 try:
-                    eset = node.eset()
+                    eset = node.eset(Theory([]))
                 except DegreeViolation:
                     failure_nodes.append(node)
                     working_nodes.task_done()
                     continue
                 try:
-                    nodes = node.vsubs(eset)
+                    nodes = node.vsubs(eset, Theory([]))
                 except FoundT:
                     with m_lock:
                         found_t.value += 1
@@ -1310,7 +1423,7 @@ class VirtualSubstitution:
 
     def pop_block(self) -> None:
         logger.debug(f'entering {self.pop_block.__name__}')
-        assert self.matrix is not None, self.matrix  # discuss
+        assert self.matrix is not None, self.matrix
         logger.info(str(self.blocks))
         if logger.isEnabledFor(logging.DEBUG):
             s = str(self.matrix)
@@ -1323,7 +1436,11 @@ class VirtualSubstitution:
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.root_node = Node(vars_, simplify(matrix), [], options=self.options)
+        self.root_node = Node(variables=vars_,
+                              formula=simplify(matrix, assume=self.theory.atoms),
+                              answer=[],
+                              outermost_block=not self.blocks,
+                              options=self.options)
 
     def process_block(self) -> None:
         logger.debug(f'entering {self.process_block.__name__}')
@@ -1332,7 +1449,7 @@ class VirtualSubstitution:
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
-        self.working_nodes = WorkingNodeList(options=self.options)
+        self.working_nodes = WorkingNodeList()
         self.working_nodes.append(self.root_node)
         self.root_node = None
         self.success_nodes = NodeList()
@@ -1349,11 +1466,11 @@ class VirtualSubstitution:
                     last_log = t
             node = self.working_nodes.pop()
             try:
-                eset = node.eset()
+                eset = node.eset(self.theory)
             except DegreeViolation:
                 self.failure_nodes.append(node)
                 continue
-            nodes = node.vsubs(eset)
+            nodes = node.vsubs(eset, self.theory)
             if nodes[0].variables:
                 self.working_nodes.extend(nodes)
             else:
@@ -1447,10 +1564,16 @@ class VirtualSubstitution:
                 logger.info(self.working_nodes.final_statistics())
                 self.working_nodes = None
                 self.success_nodes = NodeList(
-                    nodes=[Node(variables=[], formula=T, answer=[], options=self.options)])
+                    nodes=[Node(variables=[],
+                                formula=T,
+                                answer=[],
+                                outermost_block=False,
+                                options=self.options)])
             self.collect_success_nodes()
             if self.failure_nodes:
-                raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
+                raise NoTraceException(f'Degree violation - '
+                                       f'{len(self.failure_nodes.nodes)} failure nodes')
+                # raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
         self.final_simplification()
         logger.debug(f'leaving {self.virtual_substitution.__name__}')
         return self.result
