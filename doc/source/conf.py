@@ -28,7 +28,7 @@ exclude_patterns = ['**/atomlib.rst', 'manual/*.rst']
 
 language = 'en'
 
-doctest_path = ['~/Documents/Dynamic/src/python/Logic1/logic1/logic1']
+doctest_path = ['../logic1']
 
 
 autodoc_class_signature = 'separated'

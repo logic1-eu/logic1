@@ -1,0 +1,38 @@
+name: docs
+
+on:
+  push: { branches: [ 'main' ] }
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Initialize Conda
+        run: |
+          source $CONDA/etc/profile.d/conda.sh
+          conda config --add channels "conda-forge"
+          conda create -y -n logic1 sage
+          conda activate logic1
+      - name: Install dependencies using pip
+        run: pip install .
+      - name: Build doc
+        run: |
+          cd doc
+          make html
+      - uses: actions/upload-pages-artifact@v3
+        with: { path: 'doc/build/html' }
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment: { name: 'docs', url: '${{ steps.deployment.outputs.page_url }}' }
+    steps: [ { id: 'deployment', uses: 'actions/deploy-pages@v4' } ]

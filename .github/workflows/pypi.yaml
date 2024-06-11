@@ -1,0 +1,51 @@
+name: pypi
+
+on:
+  # push: { branches: [ 'main' ] }
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Initialize Conda
+        run: |
+          source $CONDA/etc/profile.d/conda.sh
+          conda config --add channels "conda-forge"
+          conda create -y -n logic1 sage
+          conda activate logic1
+      - name: Install dependencies using pip
+        run: pip install .
+      - name: Install pypa/build
+        run: pip install build
+      - name: Build a binary wheel and a source tarball
+        run: python -m build
+      - name: Store the distribution packages
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package-distributions
+          path: dist
+
+  publish:
+    name: upload release to TestPyPI
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+    environment:
+      name: pypi
+      url: https://test.pypi.org/p/logic1
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: python-package-distributions
+          path: dist
+      - name: Publish package distributions to TestPyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/

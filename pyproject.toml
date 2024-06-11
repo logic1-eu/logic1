@@ -1,0 +1,30 @@
+[project]
+name = "logic1"
+version = "0.1.0"
+description = "Interpreted first-order logic in Python"
+authors = [
+  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Thomas Sturm", email = "tsturm@me.com"}
+]
+maintainers = [
+  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Thomas Sturm", email = "tsturm@me.com"}
+]
+readme = "README.md"
+dependencies = [
+  "more-itertools",
+  "pyeda",
+  "sagemath",
+  "sphinx",
+  "sphinx-book-theme",
+  "sympy"
+]
+requires-python = ">=3.11,<3.12"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering",
+  "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+  "Programming Language :: Python :: 3.11",
+  "Typing :: Typed"
+]
