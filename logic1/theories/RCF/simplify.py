@@ -1,26 +1,21 @@
 from functools import lru_cache
 from operator import xor
-from sage.all import oo, Rational  # type: ignore
+from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
 from typing import Iterable, Optional, Self
 
 from . import rcf  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ... import firstorder
-from ...firstorder import And, F, Formula, Or, pnf, T
-from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, ring, Term, Variable
+from ...firstorder import And, F, Formula, Not, Or, T
+from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
 from ...support.tracing import trace  # noqa
 
 # discuss: indirect import of Polynomial
 
-# discuss: firstorder.AtomicFormula vs. rcf.AtomicFormula. The problems existed
-# already before with AtomicFormula vs. BinaryAtomicFormula, resp. Also check
-# assert in l.306.
 
-
-class Theory(abc.simplify.Theory):
+class Theory(abc.simplify.Theory['AtomicFormula']):
 
     class _Interval:
         # Non-empty real intervals. Raises Inconsistent when an empty interval
@@ -84,7 +79,7 @@ class Theory(abc.simplify.Theory):
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
 
-    def add(self, gand: type[And | Or], atoms: Iterable[firstorder.AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
@@ -147,7 +142,7 @@ class Theory(abc.simplify.Theory):
     @staticmethod
     @lru_cache(maxsize=None)
     def _compose_atom(rel: type[AtomicFormula], p: Polynomial, q: Rational)\
-            -> firstorder.AtomicFormula:
+            -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
         return rel(Term(den * p - num), Term(0))
@@ -155,7 +150,7 @@ class Theory(abc.simplify.Theory):
     @staticmethod
     @lru_cache(maxsize=None)
     def _decompose_atom(f: AtomicFormula)\
-            -> tuple[type[firstorder.AtomicFormula], Polynomial, Rational]:
+            -> tuple[type[AtomicFormula], Polynomial, Rational]:
         r"""Decompose into relation :math:`\rho`, term :math:`p` without
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
@@ -186,8 +181,8 @@ class Theory(abc.simplify.Theory):
         q = q / c
         return f.func, p, q
 
-    def extract(self, gand: type[And | Or]) -> list[firstorder.AtomicFormula]:
-        L: list[firstorder.AtomicFormula] = []
+    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+        L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
                 ref_ivl, ref_exc = self._reference[p]
@@ -281,61 +276,180 @@ class Theory(abc.simplify.Theory):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
-    def __call__(self, f: Formula, assume: list[firstorder.AtomicFormula] = [],
-                 prefer_weak: bool = False, prefer_order: bool = True) -> Formula:
-        self.prefer_weak = prefer_weak
+    explode_always: bool = True
+    prefer_order: bool = True
+    prefer_weak: bool = False
+
+    @property
+    def class_AT(self) -> type[AtomicFormula]:
+        return AtomicFormula
+
+    @property
+    def class_TH(self) -> type[Theory]:
+        return Theory
+
+    @property
+    def TH_kwargs(self) -> dict[str, bool]:
+        return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
+
+    def __call__(self,
+                 f: Formula,
+                 assume: Optional[list[AtomicFormula]] = None,
+                 explode_always: bool = True,
+                 prefer_order: bool = True,
+                 prefer_weak: bool = False) -> Formula:
+        self.explode_always = explode_always
         self.prefer_order = prefer_order
-        try:
-            result = self.simplify(f, assume)
-        except Simplify.NotInPnf:
-            result = self.simplify(pnf(f), assume)
-        return result
+        self.prefer_weak = prefer_weak
+        return self.simplify(f, assume)
+
+    def simpl_at(self,
+                 atom: AtomicFormula,
+                 context: Optional[type[And] | type[Or]]) -> Formula:
+        return self._simpl_at(atom, context, self.explode_always)
 
     @lru_cache(maxsize=None)
-    def _simpl_at(self, f: firstorder.AtomicFormula) -> Formula:
-        """
+    def _simpl_at(self,
+                  atom: AtomicFormula,
+                  context: Optional[type[And] | type[Or]],
+                  explode_always: bool) -> Formula:
+        """Simplify atomic formula.
+
         >>> from .rcf import VV
         >>> a, b = VV.get('a', 'b')
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
-        assert isinstance(f, AtomicFormula)
-        lhp = f.lhs.poly - f.rhs.poly
-        if lhp.is_constant():
-            _python_operator = f.sage_func  # type: ignore
-            eval_ = _python_operator(lhp, ring(0))  # type: ignore
-            return T if eval_ else F
-        lhp, _ = lhp.quo_rem(lhp.content())
-        factor = lhp.factor()
-        factor_list = list(factor)
-        func: type[AtomicFormula]
-        match f.func:
-            case rcf.Eq | rcf.Ne:
-                func = f.func
-                # Compute squarefree part
-                lhp = ring(1)
-                for factor, _ in factor_list:
-                    lhp *= factor
-                if lhp.lc() < 0:
-                    lhp = - lhp
-            case rcf.Le | rcf.Ge | rcf.Lt | rcf.Gt:
-                unit = factor.unit()
-                lhp = ring(1)
-                for factor, multiplicity in factor_list:
-                    lhp *= factor ** 2 if multiplicity % 2 == 0 else factor
-                if lhp.lc() < 0:
-                    lhp = - lhp
-                    unit = - unit
-                func = f.converse_func if unit < 0 else f.func
+        def _simpl_at_eq_ne(rel, lhs, context):
+
+            def split_tsq(term):
+                args = []
+                for _, power_product in term:
+                    if explode_always:
+                        args.append(fac_junctor(*(rel(v, 0) for v in power_product.vars())))
+                    else:
+                        args.append(rel(product(power_product.vars()), 0))
+                return tsq_junctor(*args)
+
+            if rel is Eq:
+                tsq_junctor = And
+                fac_junctor = Or
+            else:
+                assert rel is Ne
+                tsq_junctor = Or
+                fac_junctor = And
+            tsq = lhs.is_definite()
+            if tsq == TSQ.STRICT:
+                return tsq_junctor.definite_func()
+            unit, factors = lhs.factor()
+            primitive_lhs = Term(1)
+            for factor in factors:
+                # Square-free part
+                primitive_lhs *= factor
+            primitive_tsq = primitive_lhs.is_definite()
+            if primitive_tsq == TSQ.STRICT:
+                return tsq_junctor.definite_func()
+            if primitive_tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
+                return split_tsq(primitive_lhs)
+            if tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
+                return split_tsq(lhs)
+            if explode_always or context == fac_junctor:
+                args = (rel(factor, 0) for factor in factors if not factor.is_constant())
+                return fac_junctor(*args)
+            return rel(primitive_lhs, 0)
+
+        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[Formula]:
+            if f.is_definite() in (TSQ.STRICT, TSQ.WEAK):
+                return T
+            neg_tsq = (- f).is_definite()
+            if neg_tsq == TSQ.STRICT:
+                return F
+            if neg_tsq == TSQ.WEAK:
+                return _simpl_at_eq_ne(Eq, f, context)
+            return None
+
+        def _simpl_at_ge(lhs, context):
+            # TSQ tests on original left hand side
+            hit = tsq_test_ge(lhs, context)
+            if hit is not None:
+                return hit
+            # Factorize
+            unit, factors = lhs.factor()
+            even_factors = []
+            odd_factor = unit
+            for factor, multiplicity in factors.items():
+                if factor.is_definite() is TSQ.STRICT:
+                    continue
+                if multiplicity % 2 == 0:
+                    even_factors.append(factor)
+                else:
+                    odd_factor *= factor
+            even_factor = product(even_factors)
+            signed_remaining_squarefree_part = odd_factor * even_factor
+            # TSQ tests on factorization
+            if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
+                return T
+            neg_tsq = (- odd_factor).is_definite()
+            if neg_tsq == TSQ.STRICT:
+                return _simpl_at_eq_ne(Eq, even_factor, context)
+            if neg_tsq == TSQ.WEAK:
+                return _simpl_at_eq_ne(Eq, signed_remaining_squarefree_part, context)
+            hit = tsq_test_ge(signed_remaining_squarefree_part, context)
+            if hit is not None:
+                return hit
+            # TSQ tests have failed
+            if unit < 0:
+                rel = Le
+                odd_factor = - odd_factor
+            else:
+                rel = Ge
+            if context is Or or explode_always:
+                odd_part = rel(odd_factor, 0)
+                even_part = (Eq(f, 0) for f in even_factors)
+                return Or(odd_part, *even_part)
+            return rel(odd_factor * even_factor ** 2, 0)
+
+        lhs = atom.lhs - atom.rhs
+        if lhs.is_constant():
+            # In the following if-condition, the __bool__ method of atom.func
+            # will be called.
+            return T if atom.func(lhs, 0) else F
+        lhs /= lhs.content()
+        match atom:
+            case Eq():
+                return _simpl_at_eq_ne(Eq, lhs, context)
+            case Ne():
+                return _simpl_at_eq_ne(Ne, lhs, context)
+            case Ge():
+                return _simpl_at_ge(lhs, context)
+            case Le():
+                return _simpl_at_ge(- lhs, context)
+            case Gt():
+                if context is not None:
+                    context = context.dual_func
+                return Not(_simpl_at_ge(- lhs, context)).to_nnf()
+            case Lt():
+                if context is not None:
+                    context = context.dual_func
+                return Not(_simpl_at_ge(lhs, context)).to_nnf()
             case _:
                 assert False
-        return func(Term(lhp), Term(0))
-
-    def _Theory(self) -> Theory:
-        return Theory(prefer_weak=self.prefer_weak,
-                      prefer_order=self.prefer_order)
 
 
 simplify = Simplify()
+
+
+class IsValid(abc.simplify.IsValid['AtomicFormula']):
+
+    def __call__(self,
+                 f: Formula,
+                 assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
+        return self.is_valid(f, assume)
+
+    def _simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
+        return simplify(f, assume)
+
+
+is_valid = IsValid()

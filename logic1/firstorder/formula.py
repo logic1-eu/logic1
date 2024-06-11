@@ -243,13 +243,15 @@ class Formula(ABC):
         return f
 
     def as_latex(self) -> str:
-        r"""A LaTeX representation of `self`.
+        r"""LaTeX representation.
 
         >>> from logic1.theories import RCF
         >>> x, y = RCF.VV.get('x', 'y')
         >>> f = All(x, (x < 1) | (x - 1 == 0) | (x > 1))
         >>> f.as_latex()
         '\\forall x \\, (x < 1 \\, \\vee \\, x - 1 = 0 \\, \\vee \\, x > 1)'
+
+        .. seealso:: :meth:`_repr_latex_` -- LaTeX representation for Jupyter notebooks
         """
         SYMBOL: Final = {
             All: '\\forall', Ex: '\\exists', And: '\\wedge', Or: '\\vee',
@@ -569,8 +571,13 @@ class Formula(ABC):
                 assert False, type(self)
 
     def _repr_latex_(self) -> str:
-        """A LaTeX representation of the :class:`Formula` `self` for jupyter
-        notebooks. In general, use the method :meth:`to_latex` instead.
+        """A LaTeX representation for Jupyter notebooks. In general, the
+        underlying method :meth:`as_latex` should be used instead.
+
+        Due to a current limitation of Jupyter, the LaTeX representration is
+        cut off after at most 5000 characters.
+
+        .. seealso:: :meth:`as_latex` -- LaTeX representation
         """
         limit = 5000
         as_latex = self.as_latex()
@@ -595,11 +602,60 @@ class Formula(ABC):
         return f'$\\displaystyle {as_latex}$'
 
     def simplify(self) -> Formula:
-        """Fast simplification. The result is equivalent to `self`.
+        """Fast basic simplification. The result is equivalent to `self`. The
+        following first-order simplifications are applied:
 
-        Primary simplification goals are the elimination of occurrences of
-        :data:`T` and :data:`F` and of duplicate siblings in the expression
-        tree.
+        1. Truth values:
+
+           a. Evaluate ``Not(F)`` to ``T``, and evaluate ``Not(T)`` to ``F``.
+
+           b. Evaluate ``And(..., F, ...)`` to ``F`` and ``Or(..., T, ...)`` to
+              ``T``.
+
+           c. Evaluate ``Implies(F, arg)`` and ``Implies(arg, T)`` to ``T``.
+
+           d. Remove ``T`` from ``And(..., T, ...)`` and ``F`` from ``Or(...,
+              F, ...)``.
+
+           e. Transform ``Implies(T, arg)`` into ``arg``, and transform
+              ``Implies(arg, F)`` into ``Not(arg)``.
+
+           f. Transform ``Equivalent(T, arg)`` and ``Equivalent(arg, T)`` into
+              ``arg``, and transform ``Equivalent(F, arg)``, ``Equivalent(arg,
+              F)`` into ``Not(arg)``.
+
+        2. Nested operators:
+
+           a. Transform ``Not(Not(arg))`` into ``arg``.
+
+           b. Transform ``And(..., And(*args), ...)`` into ``And(..., *args,
+              ...)``. The same for ``Or`` instead of ``And``.
+
+        3. Equal arguments:
+
+           a. Transform ``And(..., arg, ..., arg, ...)`` into ``And(..., arg,
+              ...)``. The same for ``Or`` instead of ``And``.
+
+           b. Evaluate ``Implies(arg, arg)`` to ``T``. The same for
+              ``Equivalent`` instead of ``Implies``.
+
+        4. Sort ``arg_1, ..., arg_n`` within ``And(arg_1, ..., arg_n)`` using a
+           canonical order. The same for ``Or`` instead of ``And``.
+
+        Overloading of :class:`AtomicFormula <.atomic.AtomicFormula>` provides
+        a hook for theories to extend :meth:`simplify` to atomic formulas.
+
+        .. seealso::
+           `simplify` methods of classes derived from :class:`AtomicFormula
+           <.atomic.AtomicFormula>` within various theories:
+
+           * :meth:`logic1.theories.RCF.rcf.AtomicFormula.simplify`
+           * :meth:`logic1.theories.Sets.rcf.AtomicFormula.simplify`
+
+           More powerful simplifiers provided by various theories:
+
+           * :func:`logic1.theories.RCF.simplify.simplify`
+           * :func:`logic1.theories.Sets.simplify.simplify`
         """
         match self:
             case _F() | _T():

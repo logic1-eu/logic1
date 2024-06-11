@@ -46,7 +46,7 @@ class AtomicFormula(Formula):
     def subs(self, substitution: dict) -> Self:
         ...
 
-    def to_complement(self) -> AtomicFormula:
+    def to_complement(self) -> Self:
         """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
         """
         return self.complement_func(*self.args)

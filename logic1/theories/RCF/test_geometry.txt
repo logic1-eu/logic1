@@ -1,0 +1,91 @@
+[Stu99] Thomas Sturm. Real Quantifier Elimination in Geometry. Doctoral
+dissertation, Universität Passau, Germany, December 1999
+
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+
+Example 3.16 (Angle at circumference) Let O be the center of the circumcircle
+of a triangle ABC. If O does not lie outside of ABC, then ∠ACB = ∠AOB/2.
+
+>>> VV.push()
+>>> VV.imp('u1', 'u2', 'u3', 'r', 'x1', 't', 't_prime', 't1', 't2')
+>>> stu99_3_16 = Implies(And(r**2 == u1**2 + x1**2,
+...                          r**2 == u2**2 + (u3 - x1)**2,
+...                          u3 * t1 == u1 + u2,
+...                          u3 * t2 == u1 - u2,
+...                          (1 - t1 * t2) * t == t1 + t2,
+...                          x1 * t_prime == u1),
+...                      t == t_prime).all({u1, u2, u3})
+>>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.FULL), qe.assume
+(T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0])
+>>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.MONOMIAL), qe.assume
+(And(Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0),
+     Or(u3 > 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0)), [u3 != 0])
+>>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.FULL), qe.assume
+(T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0])
+>>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+(And(Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 == 0, u1^2 - u2^2 + u3^2 != 0, u1^2
+- u2^2 + 3*u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 +
+2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u3 < 0, u1 != 0, u1^2 - u2^2 -
+u3^2 != 0, u1^2 - u2^2 + u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4 -
+2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u3 > 0, u1 != 0,
+u1^2 - u2^2 - u3^2 == 0, u1^2 - u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0,
+u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
+2*u2^2*u3^2 + u3^4 < 0), Or(u3 > 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 -
+u2^2 + u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2
++ u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u1 != 0, u1^2 - u2^2 - u3^2 == 0, u1^2 -
+u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4
+- 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0, And(u3 < 0, u1^5 -
+2*u1^3*u2^2 + 2*u1^3*u3^2 + u1*u2^4 - 2*u1*u2^2*u3^2 - 3*u1*u3^4 >= 0)), Or(u1
+!= 0, u1^2 - u2^2 - u3^2 == 0, u1^2 - u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 !=
+0, u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
+2*u2^2*u3^2 + u3^4 < 0, And(u3 > 0, u1^5 - 2*u1^3*u2^2 + 2*u1^3*u3^2 + u1*u2^4 -
+2*u1*u2^2*u3^2 - 3*u1*u3^4 <= 0)), Or(u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 -
+u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 == 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4
+- 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u1 != 0, u1^2 -
+u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 == 0, u1^2*u3 -
+u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4
+< 0), Or(u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0, u1^2*u3 -
+u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4
+< 0, u1^5 - 2*u1^3*u2^2 + 2*u1^3*u3^2 + u1*u2^4 - 2*u1*u2^2*u3^2 - 3*u1*u3^4 >
+0), Or(u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0, u1^2*u3 -
+u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4
+< 0, u1^5 - 2*u1^3*u2^2 + 2*u1^3*u3^2 + u1*u2^4 - 2*u1*u2^2*u3^2 - 3*u1*u3^4 <
+0)), [u3 != 0])
+>>> qe(stu99_3_16, assume=[u1 != 0], clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+(T, [u3 != 0, u1 != 0])
+>>> VV.pop()
+
+
+Example 3.20 (MacLane) Consider eight points A, ..., H such that the following
+eight triples are collinear ABD , BCE , CDF , DEG , EFH , FGA, GHB , HAC. Then
+all eight points lie on a line. This holds over R but not over C.
+
+>>> VV.push()
+>>> VV.imp('xb', 'yb', 'xc', 'yc', 'xd', 'yd',
+...        'xe', 'ye', 'xf', 'yf', 'xg', 'yg', 'xh', 'yh')
+>>> stu99_3_20 = Implies(And(xh*yc - xc*yh == 0,
+...                          xg*yf - xf*yg == 0,
+...                          xb*ye - xc*ye + xe*yc - xb*yc == 0,
+...                          xb*yh - xg*yh + xh*yg - xb*yg == 0,
+...                          xc*yf - xd*yf - xf*yc + xd*yc == 0,
+...                          xd*yg - xe*yg + xg*ye - xd*ye == 0,
+...                          xe*yh - xf*yh + xh*yf - xe*yf - xh*ye + xf*ye == 0),
+...                      xb*yc == 0).all({xb, yb, xc, yc, xd, yd})
+>>> # qe(stu99_3_20, clustering=CLUSTERING.FULL, generic=GENERIC.FULL)
+>>> VV.pop()
+
+6. Chou 2.1
+
+>>> VV.push()
+>>> VV.imp('u1', 'u2', 'u3', 'x1', 'x2', 'x3', 'x4')
+>>> ex6 = All((x1,x2,x3,x4),
+...           Implies(And(u1*x1 - u1*u3 == 0,
+...                       u3*x2 - (u2 - u1)*x1 == 0,
+...                       x1*x4 - (x2 - u1)*x3 - u1*x1 == 0,
+...                       u3*x4 - u2*x3 == 0),
+...                   2*u2*x4 + 2*u3*x3 - u3**2 - u2**2 == 0))
+>>> qe(ex6, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+(u1 != 0, [u3 != 0])
+>>> VV.pop()

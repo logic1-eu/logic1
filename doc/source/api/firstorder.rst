@@ -19,6 +19,8 @@ Formula Base Class
 
     .. automethod:: __init__
 
+    .. automethod:: _repr_latex_
+
     .. property:: func
       :classmethod:
 

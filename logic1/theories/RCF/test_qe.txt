@@ -1,46 +1,65 @@
 >>> from logic1 import *
->>> from logic1.theories.RCF.interactive import *
+>>> from logic1.theories.RCF import *
 
->>> a, b, x, y, z = VV.get('a', 'b', 'x', 'y', 'z')
+>>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
 
->>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x)))')
+>>> phi_1 = All(x, Ex((y, z), And(y >= 0, z >= 0, y - z == x)))
+>>> qe(phi_1, clustering=CLUSTERING.NONE)
+T
+>>> qe(phi_1, clustering=CLUSTERING.FULL)
 T
 
->>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y - z == x and a * x + b == 0)))')
+>>> phi_2 = All(x, Ex((y, z), And(y >= 0, z >= 0, y - z == x, a * x + b == 0)))
+>>> qe(phi_2, clustering=CLUSTERING.NONE)
+And(b == 0, a == 0)
+>>> qe(phi_2, clustering=CLUSTERING.FULL)
 And(b == 0, a == 0)
 
->>> qe('all(x, ex(y, ex(z, y >= 0 and z >= 0 and y + z == x)))')
+>>> phi_3 = All(x, Ex((y, z), And(y >= 0, z >= 0, y + z == x)))
+>>> qe(phi_3, clustering=CLUSTERING.NONE)
+F
+>>> qe(phi_3, clustering=CLUSTERING.FULL)
 F
 
->>> qe('ex(x, a * x + b == 0)')
+>>> phi_4 = Ex(x, a * x + b == 0)
+>>> qe(phi_4, clustering=CLUSTERING.NONE)
+Or(b == 0, a != 0)
+>>> qe(phi_4, clustering=CLUSTERING.FULL)
 Or(b == 0, a != 0)
 
->>> qe('ex(x, a * x + b == 0)', workers=2)
+# Parallel qe
+>>> qe(phi_4, workers=2)
 Or(b == 0, a != 0)
 
->>> qe('ex(x, a * x + b <= 0)')
+>>> phi_5 = Ex(x, a * x + b <= 0)
+>>> qe(phi_5, clustering=CLUSTERING.NONE)
+Or(b <= 0, a != 0)
+>>> qe(phi_5, clustering=CLUSTERING.FULL)
 Or(b <= 0, a != 0)
 
->>> qe('ex(x, a * x + b <= 0 and x <= b)')
+>>> phi_6 = Ex(x, And(a * x + b <= 0, x <= b))
+>>> qe(phi_6, clustering=CLUSTERING.NONE)
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a*b + b <= 0))
+>>> qe(phi_6, clustering=CLUSTERING.FULL)
 Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
 
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
->>> phi1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
->>> phi2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)
->>> phi3 = (x4 >= 0) & (x5 == x4 - x3) | (x4 < 0) & (x5 == -x4 - x3)
->>> phi4 = (x5 >= 0) & (x6 == x5 - x4) | (x5 < 0) & (x6 == -x5 - x4)
->>> phi5 = (x6 >= 0) & (x7 == x6 - x5) | (x6 < 0) & (x7 == -x6 - x5)
->>> phi6 = (x7 >= 0) & (x8 == x7 - x6) | (x7 < 0) & (x8 == -x7 - x6)
->>> phi7 = (x8 >= 0) & (x9 == x8 - x7) | (x8 < 0) & (x9 == -x8 - x7)
->>> phi8 = (x9 >= 0) &  (x10 == x9 - x8) | (x9 < 0) & (x10 == -x9 - x8)
->>> phi9 = (x10 >= 0) & (x11 == x10 - x9) | (x10 < 0) & (x11 == -x10 - x9)
+>>> p9_1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
+>>> p9_2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)
+>>> p9_3 = (x4 >= 0) & (x5 == x4 - x3) | (x4 < 0) & (x5 == -x4 - x3)
+>>> p9_4 = (x5 >= 0) & (x6 == x5 - x4) | (x5 < 0) & (x6 == -x5 - x4)
+>>> p9_5 = (x6 >= 0) & (x7 == x6 - x5) | (x6 < 0) & (x7 == -x6 - x5)
+>>> p9_6 = (x7 >= 0) & (x8 == x7 - x6) | (x7 < 0) & (x8 == -x7 - x6)
+>>> p9_7 = (x8 >= 0) & (x9 == x8 - x7) | (x8 < 0) & (x9 == -x8 - x7)
+>>> p9_8 = (x9 >= 0) &  (x10 == x9 - x8) | (x9 < 0) & (x10 == -x9 - x8)
+>>> p9_9 = (x10 >= 0) & (x11 == x10 - x9) | (x10 < 0) & (x11 == -x10 - x9)
 
->>> phi = phi1 & phi2 & phi3 & phi4 & phi5 & phi6 & phi7 & phi8 & phi9
+>>> p9_0 = p9_1 & p9_2 & p9_3 & p9_4 & p9_5 & p9_6 & p9_7 & p9_8 & p9_9
 
->>> p9 = All(x1, phi >> ((x1 == x10) & (x2 == x11)))
->>> qe(p9)
+>>> p9 = All(x1, p9_0 >> ((x1 == x10) & (x2 == x11)))
+>>> qe(p9, clustering=CLUSTERING.NONE)
 And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x10 < 0, x9 - x10
 + x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
@@ -57,3 +76,75 @@ And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
 x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
 Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
 x2 + x3 + x4 != 0))))
+>>> qe(p9, clustering=CLUSTERING.FULL)
+And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x10 < 0, x9 - x10
++ x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
+0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
+>= 0, x7 + x8 + x9 != 0)), And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 +
+x7 + x8 != 0)), And(Or(x6 < 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 !=
+0)), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x2 - x11
+== 0, x2 + x3 + x10 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0, x9
++ x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
+x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8 >= 0, x7 + x8 + x9 != 0)),
+And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
+0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 != 0)), And(Or(x5 < 0, x4 - x5 +
+x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0))))
+
+# Davenport-Heintz (Result is d == 1 or d == -1)
+>>> davenport_heintz = Ex(c, All((b, a),
+...    Implies(Or(And(a == d, b == c), And(a == c, b == 1)), a**2 == b)))
+>>> qe(davenport_heintz, clustering=CLUSTERING.NONE)
+And(d != 0, Or(d - 1 == 0, d + 1 == 0))
+>>> qe(davenport_heintz, clustering=CLUSTERING.FULL)
+And(d != 0, Or(d - 1 == 0, d + 1 == 0))
+
+# Kahan's Problem
+>>> ellipse = All((x, y),
+...    Implies(b**2 * (x - c)**2 + a**2 * y**2 - a**2 * b**2 == 0, x**2 + y**2 <= 1))
+
+Degree violations with traditional guards:
+>>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE).atoms())
+Traceback (most recent call last):
+...
+logic1.support.excepthook.NoTraceException: Degree violation - 2 failure nodes
+
+Same with full clustering:
+>>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL).atoms())
+Traceback (most recent call last):
+...
+logic1.support.excepthook.NoTraceException: Degree violation - 2 failure nodes
+
+No degree violations with when turning traditional guards off:
+>>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE, traditional_guards=False).atoms())
+106
+>>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL, traditional_guards=False).atoms())
+47
+
+# 5 Generic quadratic polynomials
+>>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')
+>>> b1, b2, b3, b4, b5 = VV.get('b1', 'b2', 'b3', 'b4', 'b5')
+>>> c1, c2, c3, c4, c5 = VV.get('c1', 'c2', 'c3', 'c4', 'c5')
+>>> five_generic = Ex(x, And(a1 * x**2 + b1 * x + c1 == 0,
+...                          a2 * x**2 + b2 * x + c2 == 0,
+...                          a3 * x**2 + b3 * x + c3 < 0,
+...                          a4 * x**2 + b4 * x + c4 < 0,
+...                          a5 * x**2 + b5 * x + c5 < 0))
+>>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.NONE).atoms())
+566
+>>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.FULL).atoms())
+286
+
+# Motzkin's Polynomial
+>>> mp = All(x, Implies(And(x >= 0, y >= 0), 1 + x * y * (x + y - 3) >= 0))
+>>> qe(mp, clustering=CLUSTERING.NONE)
+And(Or(y != 0, y^2 - 3*y >= 0), Or(y - 4 <= 0, y^2 - 4*y <= 0, y^2 - 3*y >= 0))
+>>> qe(mp, clustering=CLUSTERING.FULL)
+And(Or(y != 0, y^2 - 3*y >= 0), Or(y <= 0, y - 3 >= 0, y - 1 == 0, y^2 - 4*y <= 0))
+>>> qe(mp.all(), clustering=CLUSTERING.NONE)
+T
+>>> qe(mp.all(), clustering=CLUSTERING.FULL)
+T

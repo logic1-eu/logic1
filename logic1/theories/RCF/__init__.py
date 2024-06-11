@@ -1,8 +1,8 @@
 from .rcf import VV, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable  # noqa
 from .bnf import cnf, dnf  # noqa
 from .parser import l1  # noqa
-from .qe import qe  # noqa
-from .simplify import simplify  # noqa
+from .qe import CLUSTERING, GENERIC, qe  # noqa
+from .simplify import is_valid, simplify  # noqa
 
 __all__ = [
     'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term', 'VV',
@@ -11,7 +11,9 @@ __all__ = [
 
     'l1',
 
-    'qe',
+    'CLUSTERING', 'GENERIC', 'qe',
 
-    'simplify'
+    'simplify',
+
+    'is_valid'
 ]

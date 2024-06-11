@@ -1,10 +1,10 @@
 import more_itertools
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic, Iterable, Iterator, Optional, Self, TypeVar
+from typing import Any, cast, Generic, Iterable, Optional, Self, TypeVar
 
-from ..firstorder import (And, AtomicFormula, Equivalent, _F, Formula, Implies,
-                          Not, Or, QuantifiedFormula, _T)
+from ..firstorder import (All, And, AtomicFormula, Ex, _F, Formula, Or, pnf,
+                          _T, T)
 
 from ..support.tracing import trace  # noqa
 
@@ -12,24 +12,25 @@ from ..support.tracing import trace  # noqa
 # https://stackoverflow.com/q/74103528/
 # https://peps.python.org/pep-0484/
 
+AT = TypeVar('AT', bound='AtomicFormula')
 TH = TypeVar('TH', bound='Theory')
 
 
-class Theory(ABC):
+class Theory(ABC, Generic[AT]):
 
     class Inconsistent(Exception):
         pass
 
     @abstractmethod
-    def __init__(self, th: Optional[Self] = None) -> None:
+    def __init__(self) -> None:
         ...
 
     @abstractmethod
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AT]) -> None:
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And | Or]) -> Iterable[AtomicFormula]:
+    def extract(self, gand: type[And | Or]) -> Iterable[AT]:
         ...
 
     @abstractmethod
@@ -37,12 +38,24 @@ class Theory(ABC):
         ...
 
 
-class Simplify(ABC, Generic[TH]):
+class Simplify(ABC, Generic[AT, TH]):
 
-    class NotInPnf(Exception):
-        pass
+    @property
+    @abstractmethod
+    def class_AT(self) -> type[AT]:
+        ...
 
-    def simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
+    @property
+    @abstractmethod
+    def class_TH(self) -> type[TH]:
+        ...
+
+    @property
+    @abstractmethod
+    def TH_kwargs(self) -> dict[str, bool]:
+        ...
+
+    def simplify(self, f: Formula, assume: Optional[list[AT]]) -> Formula:
         """
         Deep simplification according to [DS95].
 
@@ -50,85 +63,89 @@ class Simplify(ABC, Generic[TH]):
                Formulae over Ordered Fields J. Symb. Comput. 24(2):209–231,
                1997. Open access at doi:10.1006/jsco.1997.0123
         """
-        th = self._Theory()
+        if assume is None:
+            assume = []
+        th = self.class_TH(**self.TH_kwargs)
         try:
             th.add(And, assume)
         except th.Inconsistent:
-            return _T()
-        match f:
-            case AtomicFormula():
-                return self._simpl_nnf(And(f), th)
-            case _:
-                return self._simpl_pnf(f, th)
-
-    def _simpl_pnf(self, f: Formula, th: TH) -> Formula:
-        match f:
-            case QuantifiedFormula(func=Q, var=var, arg=arg):
-                simplified_arg = self._simpl_pnf(arg, th.next_(remove=var))
-                if var not in simplified_arg.fvars():
-                    return simplified_arg
-                return Q(var, simplified_arg)
-            case _:
-                return self._simpl_nnf(f, th)
+            return T
+        th = th.next_()
+        f = pnf(f)
+        quantifiers = []
+        while isinstance(f, (Ex, All)):
+            th = th.next_(remove=f.var)
+            quantifiers.append((f.func, f.var))
+            f = f.arg
+        f = self._simpl_nnf(f, th)
+        free_vars = set(f.fvars())
+        for Q, var in reversed(quantifiers):
+            if var in free_vars:
+                f = Q(var, f)
+        return f
 
     def _simpl_nnf(self, f: Formula, th: TH) -> Formula:
         match f:
-            case AtomicFormula():
-                return self._simpl_at(f)
             case And() | Or():
                 return self._simpl_and_or(f, th)
+            case self.class_AT():
+                # Build a trivial binary And in order to apply th. Unary And
+                # does not exist.
+                return self._simpl_and_or(And(f, T), th)
             case _F() | _T():
                 return f
-            case Not() | Implies() | Equivalent() | QuantifiedFormula():
-                raise Simplify.NotInPnf
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.func!r}')
 
-    def _simpl_and_or(self, f: And | Or, th: TH) -> Formula:
+    def _simpl_and_or(self, f: Formula, th: TH) -> Formula:
+        """
+        `f` must be in negation normal form (NNF).
+        """
 
-        def split(args: Iterable[Formula]) -> tuple[set[Formula], Iterator[AtomicFormula]]:
+        def split(args: Iterable[Formula]) -> tuple[set[Formula], set[AT]]:
             """
-            Returns iterators over non-atoms and atoms contained in
+            Returns the set of non-atoms and an iterator of atoms contained in
             :data:`args`, in that order.
             """
-            def f(arg):
-                return isinstance(arg, AtomicFormula)
+            def is_AT(f: Formula) -> bool:
+                if isinstance(f, self.class_AT):
+                    return True
+                assert not isinstance(f, AtomicFormula), (type(f), f)
+                return False
 
-            i1, i2 = more_itertools.partition(f, args)
-            return set(i1), i2  # type: ignore
-            # mypy would incorrectly derive that i2 is only Iterable[Formula].
+            i1, i2 = more_itertools.partition(is_AT, args)
+            return set(i1), cast(set[AT], set(i2))
 
         gand = f.func
         others, atoms = split(f.args)
-        simplified_atoms = (self._simpl_at(atom) for atom in atoms)
+        simplified_atoms = (self.simpl_at(atom, f.func) for atom in atoms)
         new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
             th.add(gand, atoms)
         except th.Inconsistent:
             return gand.definite_func()
+
         simplified_others: set[Formula] = set()
         while others:
             arg = others.pop()
-            simplified_arg = self._simpl_nnf(arg, th.next_())
+            simplified_arg = self._simpl_and_or(arg, th.next_())
             match simplified_arg:
                 case gand.definite_func():
                     return simplified_arg
                 case gand.neutral_func():
                     new_others = set()
-                    new_atoms: Iterable[AtomicFormula] = ()
-                case gand.func():  # MyPy does not accept gand() as a pattern here.
+                    new_atoms: Iterable[AT] = ()
+                case gand.func():
                     new_others, new_atoms = split(simplified_arg.args)
-                case AtomicFormula():
+                case self.class_AT():
                     new_others = set()
                     new_atoms = (simplified_arg,)
-                case gand.dual_func() | QuantifiedFormula():  # !
+                case gand.dual_func():
                     new_others = {simplified_arg}
                     new_atoms = ()
                 case _:
-                    # Implies and Equivalent have been recursively translated
-                    # in to AndOr.
-                    assert False
+                    raise NotImplementedError(f'unknown operator {simplified_arg.func} in {f}')
             if new_atoms:
                 try:
                     th.add(gand, new_atoms)  # Can save resimp if th does not change
@@ -145,10 +162,26 @@ class Simplify(ABC, Generic[TH]):
         return gand(*final_atoms, *final_others)
 
     @abstractmethod
-    def _simpl_at(self, f: AtomicFormula) -> Formula:
+    def simpl_at(self,
+                 atom: AT,
+                 context: Optional[type[And] | type[Or]]) -> Formula:
         # Does not receive the theory, by design.
         ...
 
+
+class IsValid(ABC, Generic[AT]):
+
+    def is_valid(self, f: Formula, assume: Optional[list[AT]]) -> Optional[bool]:
+        if assume is None:
+            assume = []
+        match self._simplify(f, assume):
+            case _T():
+                return True
+            case _F():
+                return False
+            case _:
+                return None
+
     @abstractmethod
-    def _Theory(self) -> TH:
+    def _simplify(self, f: Formula, assume: list[AT]) -> Formula:
         ...

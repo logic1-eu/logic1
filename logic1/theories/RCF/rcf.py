@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from enum import auto, Enum
 import functools
 import inspect
 import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
-from types import FrameType
+from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
+    Polynomial_generic_dense as UnivariatePolynomial)
+from types import FrameType, BuiltinFunctionType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
@@ -165,6 +168,12 @@ class _VariableSet:
 VV = _VariableSet(ring)
 
 
+class TSQ(Enum):
+    NONE = auto()
+    STRICT = auto()
+    WEAK = auto()
+
+
 class Term(firstorder.Term):
 
     wrapped_ring: _Ring = ring
@@ -196,7 +205,7 @@ class Term(firstorder.Term):
         return Eq(self, Term(other))
 
     def fresh(self) -> Variable:
-        assert self._is_variable()
+        assert self.is_variable()
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
@@ -216,11 +225,15 @@ class Term(firstorder.Term):
         match arg:
             case Polynomial():
                 self.poly = arg
-            case Integer() | int():
+            case Integer() | int() | UnivariatePolynomial():
                 self.poly = self.wrapped_ring(arg)
             case _:
                 raise ValueError(
-                    f'arguments must be polylnomial or integer; {arg} is {type(arg)}')
+                    f'arguments must be polynomial or integer; {arg} is {type(arg)}')
+
+    def __iter__(self) -> Iterator[tuple[int, Term]]:
+        for coefficient, power_product in self.poly:
+            yield int(coefficient), Term(power_product)
 
     def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
         if isinstance(other, Term):
@@ -268,6 +281,9 @@ class Term(firstorder.Term):
             return self + (- other)
         return Term(self.poly - other)
 
+    def __truediv__(self, other: object) -> Term:
+        return Term(self.poly / other)
+
     def __xor__(self, other: object) -> Term:
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
@@ -281,28 +297,60 @@ class Term(firstorder.Term):
         """
         return str(latex(self.poly))
 
-    def _coefficient(self, d: dict[Variable, int]) -> Term:
+    def coefficient(self, d: dict[Variable, int]) -> Term:
         d_poly = {key.poly: value for key, value in d.items()}
         return Term(self.poly.coefficient(d_poly))
 
-    def _degree(self, x: Variable) -> int:
+    def content(self) -> int:
+        return int(self.poly.content())
+
+    def degree(self, x: Variable) -> int:
         return self.poly.degree(x.poly)
 
-    def _derivative(self, x: Variable, n: int = 1) -> Term:
+    def derivative(self, x: Variable, n: int = 1) -> Term:
         return Term(self.poly.derivative(x.poly, n))
 
-    def vars(self) -> Iterator[Variable]:
-        # discuss "from" vs. "for"
-        yield from (Term(g) for g in self.poly.variables())
+    def factor(self) -> tuple[Term, dict[Term, int]]:
+        F = self.poly.factor()
+        unit = Term(F.unit())
+        assert unit in (-1, 1), (self, F, unit)
+        D = dict()
+        for poly, multiplicity in F:
+            if poly.lc() < 0:
+                poly = - poly
+                unit = - unit
+            D[Term(poly)] = multiplicity
+        return unit, D
 
-    def _is_constant(self) -> bool:
+    def is_constant(self) -> bool:
         return self.poly.is_constant()
 
-    def _is_variable(self) -> bool:
+    def is_definite(self) -> TSQ:
+        for exponent, coefficient in self.poly.dict().items():
+            if coefficient < 0:
+                return TSQ.NONE
+            for e in exponent:
+                if e % 2 == 1:
+                    return TSQ.NONE
+        if self.poly.constant_coefficient() == 0:
+            return TSQ.WEAK
+        return TSQ.STRICT
+
+    def is_variable(self) -> bool:
         return self.poly in self.poly.parent().gens()
 
-    def _is_zero(self) -> bool:
+    def is_zero(self) -> bool:
         return self.poly.is_zero()
+
+    def lc(self) -> int:
+        return int(self.poly.lc())
+
+    def monomials(self) -> list[Term]:
+        return [Term(monomial) for monomial in self.poly.monomials()]
+
+    def quo_rem(self, other: Term) -> tuple[Term, Term]:
+        quo, rem = self.poly.quo_rem(other.poly)
+        return Term(quo), Term(rem)
 
     @staticmethod
     def sort_key(term: Term) -> Polynomial:
@@ -311,6 +359,10 @@ class Term(firstorder.Term):
     def subs(self, d: dict[Variable, Term]) -> Term:
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
         return Term(self.poly.subs(**sage_keywords))
+
+    def vars(self) -> Iterator[Variable]:
+        for g in self.poly.variables():
+            yield Term(g)
 
 
 Variable: TypeAlias = Term
@@ -338,6 +390,25 @@ class AtomicFormula(firstorder.AtomicFormula):
         """Dual relation.
         """
         return cls.complement_func.converse_func
+
+    @classproperty
+    def python_operator(cls) -> BuiltinFunctionType:
+        """The operator correponding to `cls` for evaluation of constant
+        relations.
+        """
+        D: Any = {Eq: operator.eq, Ne: operator.ne,
+                  Le: operator.le, Lt: operator.lt,
+                  Ge: operator.ge, Gt: operator.gt}
+        return D[cls]
+
+    @classproperty
+    def strict_part(cls) -> type[Formula]:
+        """The strict part is the binary relation without the diagonal.
+        """
+        if cls in (Eq, Ne):
+            raise NotImplementedError()
+        D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
+        return D[cls]
 
     @property
     def lhs(self) -> Term:
@@ -389,12 +460,20 @@ class AtomicFormula(firstorder.AtomicFormula):
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
 
     def _bvars(self, quantified: set) -> Iterator[Variable]:
-        yield from (v for v in self.lhs.vars() if v in quantified)
-        yield from (v for v in self.rhs.vars() if v in quantified)
+        for v in self.lhs.vars():
+            if v in quantified:
+                yield v
+        for v in self.rhs.vars():
+            if v in quantified:
+                yield v
 
     def _fvars(self, quantified: set) -> Iterator[Variable]:
-        yield from (v for v in self.lhs.vars() if v not in quantified)
-        yield from (v for v in self.rhs.vars() if v not in quantified)
+        for v in self.lhs.vars():
+            if v not in quantified:
+                yield v
+        for v in self.rhs.vars():
+            if v not in quantified:
+                yield v
 
     def subs(self, d: dict[Variable, Term]) -> Self:
         """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
@@ -403,8 +482,6 @@ class AtomicFormula(firstorder.AtomicFormula):
 
 
 class Eq(AtomicFormula):
-
-    sage_func = operator.eq
 
     def __bool__(self) -> bool:
         return self.lhs.poly == self.rhs.poly
@@ -420,8 +497,6 @@ class Eq(AtomicFormula):
 
 class Ne(AtomicFormula):
 
-    sage_func = operator.ne  #: :meta private:
-
     def __bool__(self) -> bool:
         return self.lhs.poly != self.rhs.poly
 
@@ -436,7 +511,8 @@ class Ne(AtomicFormula):
 
 class Ge(AtomicFormula):
 
-    sage_func = operator.ge  #: :meta private:
+    def __bool__(self) -> bool:
+        return self.lhs.poly >= self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -447,7 +523,8 @@ class Ge(AtomicFormula):
 
 class Le(AtomicFormula):
 
-    sage_func = operator.le
+    def __bool__(self) -> bool:
+        return self.lhs.poly <= self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -458,7 +535,8 @@ class Le(AtomicFormula):
 
 class Gt(AtomicFormula):
 
-    sage_func = operator.gt
+    def __bool__(self) -> bool:
+        return self.lhs.poly > self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
@@ -469,7 +547,8 @@ class Gt(AtomicFormula):
 
 class Lt(AtomicFormula):
 
-    sage_func = operator.lt
+    def __bool__(self) -> bool:
+        return self.lhs.poly < self.rhs.poly
 
     def simplify(self, Theta=None) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly

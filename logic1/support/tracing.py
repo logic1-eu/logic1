@@ -3,6 +3,7 @@
 
 import sys
 from functools import wraps
+import pprint
 
 
 class trace(object):
@@ -44,4 +45,4 @@ class trace(object):
         return wrapper
 
     def _format(self, obj) -> str:
-        return str(obj) if self.pretty else repr(obj)
+        return pprint.pformat(obj) if self.pretty else repr(obj)
