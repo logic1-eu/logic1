@@ -4,6 +4,8 @@ Authors: Nicolas Faroß, Thomas Sturm
 
 License: GPL-2.0-or-later. See the [LICENSE](LICENSE) file for details.
 
+Documentation: [docs.logic1.eu](https://docs.logic1.eu)
+
 ## About
 
 This software is currently a research prototype. We want to arrive at a
