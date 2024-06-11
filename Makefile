@@ -1,6 +1,3 @@
-wheel:
-	python setup.py bdist_wheel
-
 pytest:
 	pytest --exitfirst --doctest-modules\
 		--ignore="logic1/theories/depricated"\
