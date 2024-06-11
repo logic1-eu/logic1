@@ -11,6 +11,7 @@
   font-style:normal;
   font-optical-sizing:auto;
   color: var(--pst-color-muted);
+  margin-right: auto;
 }
 
 /* anything related to the dark theme */

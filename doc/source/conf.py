@@ -9,8 +9,8 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Logic1'
-copyright = '2023, Thomas Sturm'
-author = '<a: href="https://science.thomas-sturm.de">Thomas Sturm</a>'
+copyright = '2023 by N. Faroß, T. Sturm'
+author = 'N. Faroß, <a: href="https://science.thomas-sturm.de">T. Sturm</a>'
 release = '0.1'
 
 # -- General configuration ---------------------------------------------------
