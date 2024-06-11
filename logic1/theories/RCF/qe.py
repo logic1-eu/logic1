@@ -561,7 +561,6 @@ class Node:
                                 if prd.guard(theory) is not F:
                                     test_points.append(TestPoint(prd))
                         eset = EliminationSet(variable=x, test_points=test_points, method='g')
-                        logger.debug(str(eset._translate(theory)))
                         return eset
         return None
 
@@ -653,7 +652,6 @@ class Node:
                 else:
                     test_points.append(TestPoint(candidate.prd))
         eset = EliminationSet(variable=best_variable, test_points=test_points, method='e')
-        logger.debug(str(eset._translate(theory)))
         return eset
 
     def vsubs(self, eset: EliminationSet, theory: Theory) -> list[Node]:
@@ -1340,6 +1338,7 @@ class VirtualSubstitution:
             success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
             self.success_nodes = NodeList()
             failure_nodes = manager.NodeList()  # type: ignore
+            final_theories: multiprocessing.Queue[Theory] = multiprocessing.Queue()
             found_t = manager.Value('i', 0)
             processes: list[Optional[mp.Process]] = [None] * self.workers
             sentinels: list[Optional[int]] = [None] * self.workers
@@ -1357,8 +1356,9 @@ class VirtualSubstitution:
             for i in range(self.workers):
                 processes[i] = mp.Process(
                     target=self.parallel_process_block_worker,
-                    args=(working_nodes, success_nodes, failure_nodes, m_lock,
-                          found_t, ring_vars, i, log_level, reference_time,
+                    args=(working_nodes, success_nodes, failure_nodes,
+                          self.theory, final_theories, m_lock, found_t,
+                          ring_vars, i, log_level, reference_time,
                           born_processes))
                 processes[i].start()
                 sentinels[i] = processes[i].sentinel
@@ -1404,6 +1404,10 @@ class VirtualSubstitution:
             wait_for_processes_to_finish()
             self.time_multiprocessing = timer.get() - self.time_start_first_worker
             logger.debug(f'{self.time_multiprocessing=:.3f}')
+            new_assumptions = []
+            for i in range(self.workers):
+                new_assumptions.extend(final_theories.get().atoms)
+            self.theory.extend(new_assumptions)
             if found_t.value > 0:
                 pl = 's' if found_t.value > 1 else ''
                 logger.debug(f'{found_t.value} worker{pl} found T')
@@ -1450,6 +1454,8 @@ class VirtualSubstitution:
     def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
                                       success_nodes: multiprocessing.Queue[Optional[list[Node]]],
                                       failure_nodes: NodeListProxy,
+                                      theory: Theory,
+                                      final_theories: multiprocessing.Queue[Theory],
                                       m_lock: threading.Lock,
                                       found_t: mp.sharedctypes.Synchronized,
                                       ring_vars: list[str],
@@ -1471,13 +1477,13 @@ class VirtualSubstitution:
                     time.sleep(0.001)
                     continue
                 try:
-                    eset = node.eset(Theory([]))
+                    eset = node.eset(theory)
                 except DegreeViolation:
                     failure_nodes.append(node)
                     working_nodes.task_done()
                     continue
                 try:
-                    nodes = node.vsubs(eset, Theory([]))
+                    nodes = node.vsubs(eset, theory)
                 except FoundT:
                     with m_lock:
                         found_t.value += 1
@@ -1491,6 +1497,8 @@ class VirtualSubstitution:
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
         success_nodes.put(None)
+        multiprocessing_logger.debug(f'sending {theory=}')
+        final_theories.put(theory)
         multiprocessing_logger.debug(f'worker process {i} exiting')
 
     def pop_block(self) -> None:
