@@ -12,6 +12,7 @@ import multiprocessing as mp
 import multiprocessing.managers
 import multiprocessing.queues
 import os
+
 import queue
 import sys
 import threading
@@ -117,7 +118,7 @@ class Theory:
     def append(self, new_atom: AtomicFormula) -> None:
         self.extend([new_atom])
 
-    def extend(self, new_atoms: list[AtomicFormula]) -> None:
+    def extend(self, new_atoms: Iterable[AtomicFormula]) -> None:
         self.atoms.extend(new_atoms)
         theta = simplify(And(*self.atoms),
                          explode_always=False, prefer_order=False, prefer_weak=True)
@@ -299,9 +300,11 @@ class PRD:
     term: Term
     variable: Variable
     cluster: Cluster
+    xguard: Formula = field(default_factory=_T)
 
     def guard(self, theory: Theory) -> Formula:
-        return simplify(self.cluster.guard(self.term, self.variable), assume=theory.atoms)
+        guard = self.cluster.guard(self.term, self.variable)
+        return simplify(And(self.xguard, guard), assume=theory.atoms)
 
     def vsubs(self, atom: AtomicFormula) -> Formula:
         """Virtually substitute self into atom yielding a quantifier-free
@@ -383,6 +386,44 @@ class PRD:
             case _:
                 raise NotImplementedError(f'{self=}, {atom=}')
 
+    def _translate(self) -> str:
+        x = self.variable
+        deg_f = self.term.degree(x)
+        a = self.term.coefficient({x: 2})
+        b = self.term.coefficient({x: 1})
+        c = self.term.coefficient({x: 0})
+        match deg_f:
+            case 1:
+                match self.cluster:
+                    # CLUSTERING.NONE
+                    case Cluster((RootSpec(signs=(-1, 0, 1), index=1),)):
+                        return f'({-c}) / ({b})'
+                    # CLUSTERING.FULL
+                    case Cluster((RootSpec(signs=(-1, 0, 1), index=1),
+                                  RootSpec(signs=(1, 0, -1), index=1))):
+                        return f'({-c}) / ({b})'
+                    case _:
+                        assert False, self
+            case 2:
+                match self.cluster:
+                    # CLUSTERING.NONE
+                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),)):
+                        return f'({-b} - sqrt({b**2- 4*a*c})) / ({2*a})'
+                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),)):
+                        return f'({-b} + sqrt({b**2- 4*a*c})) / ({2*a})'
+                    case Cluster((RootSpec(signs=(1, 0, 1), index=1),)):
+                        return f'({-b} ± sqrt({0})) / ({2*a})'
+                    # CLUSTERING.FULL
+                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                  RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                  RootSpec(signs=(1, 0, 1), index=1),
+                                  RootSpec(signs=(-1, 0, -1), index=1))):
+                        return f'({-b} - sqrt({b**2- 4*a*c})) / ({2*a})'
+                    case _:
+                        assert False, self
+            case _:
+                assert False, self
+
 
 @dataclass(frozen=True)
 class CandidateSolution:
@@ -409,6 +450,21 @@ class TestPoint:
             assert guard is not F, self
             return guard
 
+    def _translate(self) -> str:
+        match self.nsp:
+            case NSP.NONE:
+                return self.prd._translate()
+            case NSP.PLUS_EPSILON:
+                return self.prd._translate() + ' + epsilon'
+            case NSP.MINUS_EPSILON:
+                return self.prd._translate() + ' - epsilon'
+            case NSP.PLUS_INFINITY:
+                return '+inf'
+            case NSP.MINUS_INFINITY:
+                return '-inf'
+            case _:
+                assert False, self
+
 
 @dataclass
 class EliminationSet:
@@ -416,6 +472,11 @@ class EliminationSet:
     variable: Variable
     test_points: list[TestPoint]
     method: str
+
+    def _translate(self, theory: Theory):
+        return (self.method,
+                self.variable,
+                [(tp.guard(theory), tp._translate()) for tp in self.test_points])
 
 
 @dataclass
@@ -499,7 +560,9 @@ class Node:
                                 prd = PRD(sign * lhs, x, cluster)
                                 if prd.guard(theory) is not F:
                                     test_points.append(TestPoint(prd))
-                        return EliminationSet(variable=x, test_points=test_points, method='g')
+                        eset = EliminationSet(variable=x, test_points=test_points, method='g')
+                        logger.debug(str(eset._translate(theory)))
+                        return eset
         return None
 
     def is_admissible_assumption(self, atom: Ne) -> bool:
@@ -528,23 +591,28 @@ class Node:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
+            xguard: Formula = T
             while (d := atom.lhs.degree(x)) > 0:
                 clusters = Node.real_type_selection[self.options.clustering][d]
                 for cluster in clusters:
-                    prd = PRD(atom.lhs, x, cluster)
+                    prd = PRD(atom.lhs, x, cluster, xguard)
                     (with_epsilon, tag) = cluster.bound_type(atom, x, theory)
                     if tag is not None:
                         cs = CandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
-                    prd = PRD(- atom.lhs, x, cluster)
-                    (with_epsilon, tag) = (- cluster).bound_type(atom, x, theory)
-                    if tag is not None:
-                        cs = CandidateSolution(prd, with_epsilon, tag)
-                        candidate_solutions.add(cs)
+                    if set(cluster) != set(- cluster):
+                        prd = PRD(- atom.lhs, x, cluster, xguard)
+                        (with_epsilon, tag) = (- cluster).bound_type(atom, x, theory)
+                        if tag is not None:
+                            cs = CandidateSolution(prd, with_epsilon, tag)
+                            candidate_solutions.add(cs)
                 lc = atom.lhs.coefficient({x: d})
                 if self.is_admissible_assumption(lc != 0):
                     theory.append(lc != 0)
+                    break
                 atom = atom.func(red(atom.lhs, x, d), 0)
+                if self.options.traditional_guards:
+                    xguard = And(xguard, lc == 0)
             return candidate_solutions
 
         smallest_eset_size = None
@@ -584,7 +652,9 @@ class Node:
                     test_points.append(TestPoint(candidate.prd, best_eps))
                 else:
                     test_points.append(TestPoint(candidate.prd))
-        return EliminationSet(variable=best_variable, test_points=test_points, method='e')
+        eset = EliminationSet(variable=best_variable, test_points=test_points, method='e')
+        logger.debug(str(eset._translate(theory)))
+        return eset
 
     def vsubs(self, eset: EliminationSet, theory: Theory) -> list[Node]:
 
@@ -1140,8 +1210,9 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 @dataclass
 class Options:
 
-    clustering: CLUSTERING = CLUSTERING.NONE
+    clustering: CLUSTERING = CLUSTERING.FULL
     generic: GENERIC = GENERIC.NONE
+    traditional_guards: bool = True
 
 
 @dataclass
@@ -1179,7 +1250,7 @@ class VirtualSubstitution:
     def assume(self):
         return self.theory.atoms
 
-    def __call__(self, f: Formula, assume: Optional[list[AtomicFormula]] = None,
+    def __call__(self, f: Formula, assume: Optional[Iterable[AtomicFormula]] = None,
                  workers: int = 0, log_level: int = logging.NOTSET,
                  log_rate: float = 0.5, **options) -> Optional[Formula]:
         """Virtual substitution entry point.
@@ -1201,7 +1272,7 @@ class VirtualSubstitution:
         timer = Timer()
         VirtualSubstitution.__init__(self)
         try:
-            self.theory = Theory([] if assume is None else assume)
+            self.theory = Theory([] if assume is None else list(assume))
             self.log_level = log_level
             self.log_rate = log_rate
             save_level = logger.getEffectiveLevel()
@@ -1411,10 +1482,11 @@ class VirtualSubstitution:
                     with m_lock:
                         found_t.value += 1
                     break
-                if nodes[0].variables:
-                    working_nodes.extend(nodes)
-                else:
-                    success_nodes.put(nodes)
+                if nodes:
+                    if nodes[0].variables:
+                        working_nodes.extend(nodes)
+                    else:
+                        success_nodes.put(nodes)
                 working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
@@ -1471,10 +1543,11 @@ class VirtualSubstitution:
                 self.failure_nodes.append(node)
                 continue
             nodes = node.vsubs(eset, self.theory)
-            if nodes[0].variables:
-                self.working_nodes.extend(nodes)
-            else:
-                self.success_nodes.extend(nodes)
+            if nodes:
+                if nodes[0].variables:
+                    self.working_nodes.extend(nodes)
+                else:
+                    self.success_nodes.extend(nodes)
         logger.info(self.working_nodes.final_statistics())
         logger.info(self.success_nodes.final_statistics('success'))
         logger.info(self.failure_nodes.final_statistics('failure'))
