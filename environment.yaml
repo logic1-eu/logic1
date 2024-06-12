@@ -1,0 +1,28 @@
+# A minimal conda environment for testing and running Logic1
+#
+# You might want to adapt the name to your preferences.
+#
+# Install and activate as follows:
+#   $ conda env create -f environment.yaml
+#   $ conda activate logic1_minimal
+#
+# Further packages can be added interactively anytime later on.
+#
+# https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-environments.html
+#
+name: logic1_minimal
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - more-itertools
+  - mypy
+  - pip
+  - pytest
+  - sage
+  - sphinx
+  - sphinx-book-theme
+  - sympy
+  - pip:
+    - pyeda
