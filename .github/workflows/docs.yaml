@@ -1,7 +1,7 @@
 name: docs
 
 on:
-  push: { branches: [ 'main' ] }
+  # push: { branches: [ 'main' ] }
   workflow_dispatch:
 
 jobs:
@@ -16,10 +16,10 @@ jobs:
         run: |
           source $CONDA/etc/profile.d/conda.sh
           conda config --add channels "conda-forge"
-          conda create -y -n logic1 sage
-          conda activate logic1
-      - name: Install dependencies using pip
-        run: pip install .
+          conda env create -f environment.yaml
+          conda activate logic1_minimal
+          conda env list
+          conda list
       - name: Build doc
         run: |
           cd doc
