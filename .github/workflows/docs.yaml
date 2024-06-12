@@ -1,7 +1,7 @@
 name: docs
 
 on:
-  # push: { branches: [ 'main' ] }
+  push: { branches: [ 'main' ] }
   workflow_dispatch:
 
 jobs:
@@ -9,19 +9,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: 3.11
-      - name: Initialize Conda
-        run: |
+      - run: |
           source $CONDA/etc/profile.d/conda.sh
-          conda config --add channels "conda-forge"
           conda env create -f environment.yaml
           conda activate logic1_minimal
           conda env list
           conda list
-      - name: Build doc
-        run: |
+          export PYTHONPATH="$PYTHONPATH:$(pwd)"
           cd doc
           make html
       - uses: actions/upload-pages-artifact@v3
