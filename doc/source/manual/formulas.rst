@@ -106,10 +106,9 @@ function symbols, plays a crucial rule in the sense that slight variations of
 those choices lead to entirely different algorithmic approaches for the same
 problems. Examples for such algorithms are simplification, quantifier
 elimination, and decision procedures. The choice of admissible function and
-relation symbols takes place with the implementation of :ref:`theories
-<theories-index>`, which we discuss later on. It is also theories that fix a
-domain of computation and give function and relation symbol a semantics in that
-domain.
+relation symbols takes place with the implementation of theories, which we
+discuss later on. It is also theories that fix a domain of computation and give
+function and relation symbol a semantics in that domain.
 
 The module :mod:`logic1.atomlib.sympy` provides a library of classes for atomic
 formulas with SymPy terms. Theories can select a set classes from this
@@ -150,7 +149,7 @@ equations and inequalities as their instances.
 We have a closer look at the class :class:`Lt`. The other classes are similar.
 The following snippet is not complete and it contains attributes that are
 actually inherited from super classes. Compare the documentation of :class:`Lt`
-in the :ref:`API Reference <api-index>`.
+in the API Reference.
 
 .. class:: Lt
   :noindex:

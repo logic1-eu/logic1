@@ -24,7 +24,7 @@ extensions = [
 ]
 
 templates_path = ['_templates']
-exclude_patterns = ['**/atomlib.rst', 'manual/*.rst']
+exclude_patterns = ['**/atomlib.rst']
 
 language = 'en'
 
@@ -76,9 +76,11 @@ html_static_path = ['_static']
 html_theme = 'sphinx_book_theme'
 
 html_theme_options = {
+    'collapse_navbar': False,
     'home_page_in_toc': True,
+    'max_navbar_depth': 12,
     'repository_url': 'https://github.com/thomas-sturm/logic1',
-    'show_navbar_depth': 1,  # default is 1
+    'show_navbar_depth': 12,  # default is 1
     'show_toc_level': 1,  # default is 1
     'use_repository_button': True
 }

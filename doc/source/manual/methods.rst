@@ -9,13 +9,16 @@ Methods on Formulas
 Data Extraction
 ===============
 
-.. autofunction:: logic1.firstorder.formula.Formula.count_alternations
+.. autofunction:: logic1.firstorder.Formula.count_alternations
   :noindex:
 
-.. autofunction:: logic1.firstorder.formula.Formula.get_vars
+.. autofunction:: logic1.firstorder.Formula.bvars
   :noindex:
 
-.. autofunction:: logic1.firstorder.formula.Formula.get_qvars
+.. autofunction:: logic1.firstorder.Formula.fvars
+  :noindex:
+
+.. autofunction:: logic1.firstorder.Formula.qvars
   :noindex:
 
 .. index::
@@ -27,33 +30,27 @@ Transformations
 .. index::
   substitution
 
-.. autofunction:: logic1.firstorder.formula.Formula.subs
+.. autofunction:: logic1.firstorder.Formula.subs
   :noindex:
 
 .. index::
   simplification
 
-.. autofunction:: logic1.firstorder.formula.Formula.simplify
+.. autofunction:: logic1.firstorder.Formula.simplify
   :noindex:
 
 .. index::
   LaTeX; connversion to
 
-.. autofunction:: logic1.firstorder.formula.Formula.to_latex
+.. autofunction:: logic1.firstorder.Formula.as_latex
   :noindex:
 
-.. autofunction:: logic1.firstorder.formula.Formula.to_sympy
-  :noindex:
-
-.. autofunction:: logic1.firstorder.formula.Formula.transform_atoms
+.. autofunction:: logic1.firstorder.Formula.transform_atoms
   :noindex:
 
 This often allows to write uniform code
 for objects where the number or types of elements of :attr:`args` are not
 known, in particular in recursions.
-
-.. autofunction:: logic1.firstorder.formula.Formula.to_distinct_vars
-  :noindex:
 
 
 Normal Forms
@@ -66,7 +63,7 @@ Normal Forms
 Negation Normal Form
 --------------------
 
-.. autofunction:: logic1.firstorder.formula.Formula.to_nnf
+.. autofunction:: logic1.firstorder.Formula.to_nnf
   :noindex:
 
 .. index::
@@ -75,7 +72,7 @@ Negation Normal Form
 
 Prenex Normal Form
 ------------------
-.. autofunction:: logic1.firstorder.formula.Formula.to_pnf
+.. autofunction:: logic1.firstorder.pnf
    :noindex:
 
 
@@ -85,9 +82,9 @@ Prenex Normal Form
   disjunctive normal form
   DNF
 
-Conjunctive and Disjunctive Normal Form
----------------------------------------
-.. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_cnf
-   :noindex:
-.. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_dnf
-   :noindex:
+.. Conjunctive and Disjunctive Normal Form
+.. ---------------------------------------
+.. .. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_cnf
+..    :noindex:
+.. .. autofunction:: logic1.firstorder.boolean.BooleanFormula.to_dnf
+..    :noindex:
