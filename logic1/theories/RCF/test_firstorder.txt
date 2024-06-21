@@ -155,5 +155,5 @@ And(Or(Not(a == 0), Not(T), Ex(y, Not(y == a))), Or(All(y, y == a), And(a == 0, 
 
 transform_atoms:
 >>> f = Eq(x, y) & Lt(y, z)
->>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
+>>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
 And(x - y == 0, y - z < 0)

@@ -54,7 +54,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     def select_and_pop(self, vars_: list, f: Formula) -> Variable:
         # revise: use a counter
         d = {v: 0 for v in vars_}
-        args = f.args if f.func is And else (f,)
+        args = f.args if f.op is And else (f,)
         for atom in args:
             for v in set(atom.fvars()):
                 if v in vars_:
@@ -109,12 +109,12 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     def _split_by_relation(f) -> tuple[list[Eq], list[Ne]]:
         eqs = []
         nes = []
-        args = f.args if f.func is And else (f,)
+        args = f.args if f.op is And else (f,)
         for atom in args:
-            if atom.func is Eq:
+            if atom.op is Eq:
                 eqs.append(atom)
             else:
-                assert atom.func is Ne, f'bad atom {atom} - {atom.func}'
+                assert atom.op is Ne, f'bad atom {atom} - {atom.op}'
                 nes.append(atom)
         return eqs, nes
 

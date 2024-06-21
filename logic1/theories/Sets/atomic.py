@@ -193,7 +193,7 @@ Variable: TypeAlias = Term
 class AtomicFormula(firstorder.AtomicFormula):
 
     @classproperty
-    def complement_func(cls) -> type[AtomicFormula]:
+    def complement(cls) -> type[AtomicFormula]:
         D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
         return D[cls]
 
@@ -209,12 +209,12 @@ class AtomicFormula(firstorder.AtomicFormula):
                     case C() | C_():
                         assert isinstance(other, (C, C_))
                         if self.index == other.index:
-                            return L.index(self.func) <= L.index(other.func)
+                            return L.index(self.op) <= L.index(other.op)
                         return self.index <= other.index
                     case Eq() | Ne():
                         assert isinstance(other, (Eq, Ne))
-                        if self.func != other.func:
-                            return L.index(self.func) <= L.index(other.func)
+                        if self.op != other.op:
+                            return L.index(self.op) <= L.index(other.op)
                         if Term.sort_key(self.lhs) != Term.sort_key(other.lhs):
                             return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
                         return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
@@ -230,7 +230,7 @@ class AtomicFormula(firstorder.AtomicFormula):
             case Eq() | Ne():
                 SYMBOL: Final = {Eq: '==', Ne: '!='}
                 SPACING: Final = ' '
-                return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+                return f'{self.lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs}'
             case _:
                 assert False, f'{self}: {type(self)}'
 
@@ -276,7 +276,7 @@ class AtomicFormula(firstorder.AtomicFormula):
             case C() | C_():
                 return self
             case Eq() | Ne():
-                return self.func(self.lhs.subs(d), self.rhs.subs(d))
+                return self.op(self.lhs.subs(d), self.rhs.subs(d))
             case _:
                 assert False, f'{self}: {type(self)}'
 

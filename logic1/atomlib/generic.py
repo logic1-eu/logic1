@@ -5,19 +5,19 @@ from ..support.decorators import classproperty
 class BinaryAtomicFormulaMixin:
 
     @classproperty
-    def converse_func(cls):
+    def converse(cls):
         # Should be an abstract class property
         raise NotImplementedError
 
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         """The dual class of :class:`cls`.
 
         There is an implicit assumption that there are abstract class
-        properties `complement_func` and `converse_func` specified, which is
+        properties `complement` and `converse` specified, which is
         technically not possible at the moment.
         """
-        return cls.complement_func.converse_func
+        return cls.complement.converse
 
     @property
     def lhs(self):

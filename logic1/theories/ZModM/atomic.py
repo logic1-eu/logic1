@@ -36,14 +36,14 @@ class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
     def __str__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!='}
         SPACING: Final = ' '
-        return f'{self.lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs}'
+        return f'{self.lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs}'
 
     def as_latex(self) -> str:
         SYMBOL: Final = {Eq: '=', Ne: '\\neq'}
         SPACING: Final = ' '
         lhs = sympy.latex(self.lhs)
         rhs = sympy.latex(self.rhs)
-        return f'{lhs}{SPACING}{SYMBOL[self.func]}{SPACING}{rhs}'
+        return f'{lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{rhs}'
 
     def relations(self) -> list[ABCMeta]:
         return [Eq, Ne]
@@ -52,13 +52,13 @@ class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
 class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
 
     @classproperty
-    def complement_func(cls):
+    def complement(cls):
         """The complement relation Ne of Eq.
         """
         return Ne
 
     @classproperty
-    def converse_func(cls):
+    def converse(cls):
         """The converse relation Eq of Eq.
         """
         return Eq
@@ -76,13 +76,13 @@ class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
 class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
 
     @classproperty
-    def complement_func(cls):
+    def complement(cls):
         """The complement relation Eq of Ne.
         """
         return Eq
 
     @classproperty
-    def converse_func(cls):
+    def converse(cls):
         """The converse relation Ne of Ne.
         """
         return Ne

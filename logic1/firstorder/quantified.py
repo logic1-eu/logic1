@@ -23,8 +23,8 @@ class QuantifiedFormula(Formula):
 
     # The following would be abstract class variables, which are not available
     # at the moment.
-    func: Any  #: :meta private:
-    dual_func: type[QuantifiedFormula]  #: :meta private:
+    op: Any  #: :meta private:
+    dual: type[QuantifiedFormula]  #: :meta private:
 
     @property
     def var(self) -> Any:
@@ -62,7 +62,7 @@ class QuantifiedFormula(Formula):
         >>> All((a, b), Ex(x, a*x + b >= 0))
         All(a, All(b, Ex(x, a*x + b >= 0)))
         """
-        assert self.func in (Ex, All)  # in lack of abstract class properties
+        assert self.op in (Ex, All)  # in lack of abstract class properties
         if not isinstance(arg, Formula):
             raise ValueError(f'{arg!r} is not a Formula')
         match vars_:
@@ -72,7 +72,7 @@ class QuantifiedFormula(Formula):
             case (Variable(), *_):
                 f = arg
                 for v in reversed(vars_[1:]):
-                    f = self.func(v, f)
+                    f = self.op(v, f)
                 self.args = (vars_[0], f)
             case _:
                 raise ValueError(f'{vars_!r} is not a Variable')
@@ -94,7 +94,7 @@ class Ex(QuantifiedFormula):
     Ex(x, Ex(y, And(x > 0, y > 0, z == x - y)))
     """
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         r"""A class property yielding the class :class:`All`, which implements
         the dual operator :math:`\forall` of :math:`\exists`.
         """
@@ -116,7 +116,7 @@ class All(QuantifiedFormula):
     All(x, All(y, x^2 + 2*x*y + y^2 == x^2 + 2*x*y + y^2))
     """
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         """A class property yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex

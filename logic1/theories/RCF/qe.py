@@ -609,7 +609,7 @@ class Node:
                 if self.is_admissible_assumption(lc != 0):
                     theory.append(lc != 0)
                     break
-                atom = atom.func(red(atom.lhs, x, d), 0)
+                atom = atom.op(red(atom.lhs, x, d), 0)
                 if self.options.traditional_guards:
                     xguard = And(xguard, lc == 0)
             return candidate_solutions
@@ -662,7 +662,7 @@ class Node:
             match tp.nsp:
                 case NSP.NONE:
                     h = pseudo_sgn_rem(atom.lhs, tp.prd, x)
-                    return vs_prd_at(atom.func(h, 0), tp.prd, x)
+                    return vs_prd_at(atom.op(h, 0), tp.prd, x)
                 case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
                     phi = expand_eps_at(atom, tp.nsp, x)
                     recurse = lambda atom: vs_at(atom, TestPoint(tp.prd, NSP.NONE), x)  # noqa E731
@@ -716,13 +716,12 @@ class Node:
                     return tau(atom, x)
                 case Le() | Lt() | Ge() | Gt():
                     c = atom.lhs.coefficient({x: 0})
-                    mu: Formula = atom.func(c, 0)
+                    mu: Formula = atom.op(c, 0)
                     for e in range(1, atom.lhs.degree(x) + 1):
                         c = atom.lhs.coefficient({x: e})
                         if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
                             c = - c
-                        strict_func = atom.func.strict_part
-                        mu = Or(strict_func(c, 0), And(Eq(c, 0), mu))
+                        mu = Or(atom.op.strict_part(c, 0), And(Eq(c, 0), mu))
                     return mu
                 case _:
                     assert False, atom
@@ -748,8 +747,8 @@ class Node:
             lhs_prime = atom.lhs.derivative(x)
             if nsp == NSP.MINUS_EPSILON:
                 lhs_prime = - lhs_prime
-            atom_strict = atom.func.strict_part(atom.lhs, 0)
-            atom_prime = atom.func(lhs_prime, 0)
+            atom_strict = atom.op.strict_part(atom.lhs, 0)
+            atom_prime = atom.op(lhs_prime, 0)
             return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
 
         def tau(atom: AtomicFormula, x: Variable) -> Formula:

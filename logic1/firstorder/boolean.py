@@ -20,9 +20,9 @@ class BooleanFormula(Formula):
 
     # The following would be abstract class variables, which are not available
     # at the moment.
-    dual_func: type[BooleanFormula]  #: :meta private:
-    definite_func: type[BooleanFormula]  #: :meta private:
-    neutral_func: type[BooleanFormula]  #: :meta private:
+    dual: type[BooleanFormula]  #: :meta private:
+    definite_element: type[BooleanFormula]  #: :meta private:
+    neutral_element: type[BooleanFormula]  #: :meta private:
 
 
 @final
@@ -91,14 +91,14 @@ class And(BooleanFormula):
     And(x == 1, x == y, y == z)
     """
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         r"""A class property yielding the class :class:`Or`, which implements
         the dual operator :math:`\vee` of :math:`\wedge`.
         """
         return Or
 
     @classproperty
-    def definite_func(cls):
+    def definite_element(cls):
         r"""A class property yielding the class :class:`_F`, which implements
         the definite operator :math:`\bot` of :math:`\wedge`. The definite
         operator is the dual of the neutral.
@@ -109,7 +109,7 @@ class And(BooleanFormula):
         return _F
 
     @classproperty
-    def neutral_func(cls):
+    def neutral_element(cls):
         r"""A class property yielding the class :class:`_T`, which implements
         the neutral operator :math:`\top` of :math:`\wedge`.
 
@@ -157,14 +157,14 @@ class Or(BooleanFormula):
     Or(x == 1, x == 2, x == 3)
     """
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         r"""A class property yielding the class :class:`And`, which implements
         the dual operator :math:`\wedge` of :math:`\vee`.
         """
         return And
 
     @classproperty
-    def definite_func(cls):
+    def definite_element(cls):
         r"""A class property yielding the class :class:`_T`, which implements
         the definite operator :math:`\top` of :math:`\vee`. The definite
         operator is the dual of the neutral.
@@ -175,7 +175,7 @@ class Or(BooleanFormula):
         return _T
 
     @classproperty
-    def neutral_func(cls):
+    def neutral_element(cls):
         r"""A class property yielding the class :class:`_F`, which implements
         the neutral operator :math:`\bot` of :math:`\vee`.
 
@@ -268,7 +268,7 @@ class _T(BooleanFormula):
     # subclass itself.
 
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         r"""A class property yielding the class :class:`_F`, which implements
         the dual operator :math:`\bot` of :math:`\top`.
         """
@@ -312,7 +312,7 @@ class _F(BooleanFormula):
     # subclass itself.
 
     @classproperty
-    def dual_func(cls):
+    def dual(cls):
         r"""A class property yielding the class :class:`_T`, which implements
         the dual operator :math:`\top` of :math:`\bot`.
         """

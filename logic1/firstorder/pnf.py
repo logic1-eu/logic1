@@ -51,7 +51,7 @@ class PrenexNormalForm:
         match f:
             case AtomicFormula() | _F() | _T():
                 return {Ex: f, All: f}
-            case And(func=op, args=args) | Or(func=op, args=args):
+            case And(op=op, args=args) | Or(op=op, args=args):
                 L1 = []
                 L2 = []
                 for arg in args:
@@ -60,22 +60,22 @@ class PrenexNormalForm:
                     L2.append(d[All])
                 f1 = self.interchange(op(*L1), Ex)
                 f2 = self.interchange(op(*L2), All)
-                if f1.func is not Ex and f2.func is not All:
+                if f1.op is not Ex and f2.op is not All:
                     # f is quantifier-free
                     return {Ex: f, All: f}
                 f1_alternations = f1.count_alternations()
                 f2_alternations = f2.count_alternations()
                 d = {}
                 if f1_alternations == f2_alternations:
-                    d[Ex] = f1 if f1.func is Ex else f2
-                    d[All] = f2 if f2.func is All else f1
+                    d[Ex] = f1 if f1.op is Ex else f2
+                    d[All] = f2 if f2.op is All else f1
                     return d
                 if f1_alternations < f2_alternations:
                     d[Ex] = d[All] = f1
                     return d
                 d[Ex] = d[All] = f2
                 return d
-            case All(func=Q, var=var, arg=arg) | Ex(func=Q, var=var, arg=arg):
+            case All(op=Q, var=var, arg=arg) | Ex(op=Q, var=var, arg=arg):
                 new_f = Q(var, self._pnf(arg)[Q])
                 return {Ex: new_f, All: new_f}
             case _:
@@ -99,17 +99,17 @@ class PrenexNormalForm:
                 args[i] = arg_i
             if not found_quantifier:
                 break
-            q = q.dual_func
+            q = q.dual
         # The lifting of quantifiers above can introduce direct nested
-        # ocurrences of self.func, which is one of And, Or. We
+        # ocurrences of self.op, which is one of And, Or. We
         # flatten those now, but not any other nestings.
         args_pnf: list[Formula] = []
         for i, arg in enumerate(args):
-            if i in quantifier_positions and arg.func is f.func:
+            if i in quantifier_positions and arg.op is f.op:
                 args_pnf += arg.args
             else:
                 args_pnf += [arg]
-        pnf: Formula = f.func(*args_pnf)
+        pnf: Formula = f.op(*args_pnf)
         for q, v in reversed(quantifiers):
             pnf = q(v, pnf)
         return pnf
@@ -128,7 +128,7 @@ class PrenexNormalForm:
         in a mathematical sense.
         """
         match f:
-            case QuantifiedFormula(func=Q, var=var, arg=arg):
+            case QuantifiedFormula(op=Q, var=var, arg=arg):
                 new_arg = self.with_distinct_vars(arg, badlist)
                 if var in badlist:
                     new_var = var.fresh()
@@ -137,7 +137,7 @@ class PrenexNormalForm:
                     return Q(new_var, new_arg)
                 badlist.update({var})
                 return Q(var, new_arg)
-            case BooleanFormula(func=op, args=args):
+            case BooleanFormula(op=op, args=args):
                 return op(*(self.with_distinct_vars(arg, badlist) for arg in args))
             case AtomicFormula():
                 return f

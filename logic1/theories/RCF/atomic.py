@@ -443,32 +443,32 @@ class AtomicFormula(firstorder.AtomicFormula):
     +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     | :data:`self`            | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
     +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`complement_func` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
+    | :attr:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
     +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`converse_func`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
+    | :attr:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
     +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`dual_func`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
+    | :attr:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
     +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     """  # noqa
     @classproperty
-    def complement_func(cls) -> type[AtomicFormula]:
+    def complement(cls) -> type[AtomicFormula]:
         """Complement relation.
         """
         D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
         return D[cls]
 
     @classproperty
-    def converse_func(cls) -> type[AtomicFormula]:
+    def converse(cls) -> type[AtomicFormula]:
         """Converse relation.
         """
         D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
         return D[cls]
 
     @classproperty
-    def dual_func(cls) -> type[AtomicFormula]:
+    def dual(cls) -> type[AtomicFormula]:
         """Dual relation.
         """
-        return cls.complement_func.converse_func
+        return cls.complement.converse
 
     @classproperty
     def python_operator(cls) -> BuiltinFunctionType:
@@ -516,7 +516,7 @@ class AtomicFormula(firstorder.AtomicFormula):
                 if self.rhs != other.rhs:
                     return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
                 L = [Eq, Ne, Le, Lt, Ge, Gt]
-                return L.index(self.func) <= L.index(other.func)
+                return L.index(self.op) <= L.index(other.op)
             case _:
                 return True
 
@@ -530,13 +530,13 @@ class AtomicFormula(firstorder.AtomicFormula):
     def __str__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs.poly}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.poly}'
+        return f'{self.lhs.poly}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.poly}'
 
     def as_latex(self) -> str:
         SYMBOL: Final = {
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.func]}{SPACING}{self.rhs.as_latex()}'
+        return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
 
     def _bvars(self, quantified: set) -> Iterator[Variable]:
         for v in self.lhs.vars():
@@ -557,7 +557,7 @@ class AtomicFormula(firstorder.AtomicFormula):
     def subs(self, d: dict[Variable, Term]) -> Self:
         """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
-        return self.func(self.lhs.subs(d), self.rhs.subs(d))
+        return self.op(self.lhs.subs(d), self.rhs.subs(d))
 
 
 class Eq(AtomicFormula):

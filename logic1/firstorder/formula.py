@@ -35,12 +35,12 @@ class Formula(ABC):
     they do not need to know the semantics of the underlying theories.
     """
 
-    # The return type of func is type[Self]. However, @classproperty makes
+    # The return type of op is type[Self]. However, @classproperty makes
     # Python think that it is Self. Therefore, we do not annotate at all and
     # hope for the return of @property + @classmethod in the Standard Python
     # Library.
     @classproperty
-    def func(cls):
+    def op(cls):
         """This class property is supposed to be used with instances of
         subclasses of :class:`Formula`. It yields the respective subclass.
         """
@@ -85,7 +85,7 @@ class Formula(ABC):
             return True
         if not isinstance(other, Formula):
             return NotImplemented
-        return self.func == other.func and self.args == other.args
+        return self.op == other.op and self.args == other.args
 
     def __getnewargs__(self):
         return self.args
@@ -100,7 +100,7 @@ class Formula(ABC):
         Recall from the Python documentation that PYTHONHASHSEED should not be
         fixed in general.
         """
-        return hash((tuple(str(cls) for cls in self.func.mro()), self.args))
+        return hash((tuple(str(cls) for cls in self.op.mro()), self.args))
 
     @abstractmethod
     def __init__(self, *args: object) -> None:
@@ -126,8 +126,8 @@ class Formula(ABC):
                 return False
             case Formula():
                 L = [And, Or, Not, Implies, Equivalent, Ex, All, _T, _F]
-                if self.func != other.func:
-                    return L.index(self.func) < L.index(other.func)
+                if self.op != other.op:
+                    return L.index(self.op) < L.index(other.op)
                 return self.args <= other.args
 
     def __lshift__(self, other: Formula) -> Formula:
@@ -162,7 +162,7 @@ class Formula(ABC):
         """A Representation of the :class:`Formula` `self` that is suitable for
         use as an input.
         """
-        r = self.func.__name__
+        r = self.op.__name__
         r += '('
         if self.args:
             r += self.args[0].__repr__()
@@ -197,26 +197,26 @@ class Formula(ABC):
             case All() | Ex():
                 L = []
                 arg: Formula = self
-                while isinstance(arg, (All, Ex)) and arg.func == self.func:
+                while isinstance(arg, (All, Ex)) and arg.op == self.op:
                     L.append(arg.var)
                     arg = arg.arg
                 variables = tuple(L) if len(L) > 1 else L[0]
-                return f'{SYMBOL[self.func]}({variables}, {arg})'
+                return f'{SYMBOL[self.op]}({variables}, {arg})'
             case And() | Or() | Equivalent() | Implies():
                 L = []
                 for arg in self.args:
                     arg_as_str = str(arg)
-                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 100):
+                    if PRECEDENCE[self.op] >= PRECEDENCE.get(arg.op, 100):
                         arg_as_str = f'({arg_as_str})'
                     L.append(arg_as_str)
-                return f'{SPACING}{SYMBOL[self.func]}{SPACING}'.join(L)
+                return f'{SPACING}{SYMBOL[self.op]}{SPACING}'.join(L)
             case Not():
                 arg_as_str = str(self.arg)
-                if self.arg.func not in (Ex, All, Not):
+                if self.arg.op not in (Ex, All, Not):
                     arg_as_str = f'({arg_as_str})'
                 return f'{SYMBOL[Not]}{SPACING}{arg_as_str}'
             case _F() | _T():
-                return SYMBOL[self.func]
+                return SYMBOL[self.op]
             case _:
                 # Atomic formulas are caught by the implementation of the
                 # abstract method AtomicFormula.__str__.
@@ -265,24 +265,24 @@ class Formula(ABC):
             case All() | Ex():
                 var_as_latex = self.var.as_latex()
                 arg_as_latex = self.arg.as_latex()
-                if self.arg.func not in (Ex, All, Not):
+                if self.arg.op not in (Ex, All, Not):
                     arg_as_latex = f'({arg_as_latex})'
-                return f'{SYMBOL[self.func]} {var_as_latex}{SPACING}{arg_as_latex}'
+                return f'{SYMBOL[self.op]} {var_as_latex}{SPACING}{arg_as_latex}'
             case And() | Or() | Equivalent() | Implies():
                 L = []
                 for arg in self.args:
                     arg_as_latex = arg.as_latex()
-                    if PRECEDENCE[self.func] >= PRECEDENCE.get(arg.func, 99):
+                    if PRECEDENCE[self.op] >= PRECEDENCE.get(arg.op, 99):
                         arg_as_latex = f'({arg_as_latex})'
                     L.append(arg_as_latex)
-                return f'{SPACING}{SYMBOL[self.func]}{SPACING}'.join(L)
+                return f'{SPACING}{SYMBOL[self.op]}{SPACING}'.join(L)
             case Not():
                 arg_as_latex = self.arg.as_latex()
-                if self.arg.func not in (Ex, All, Not):
+                if self.arg.op not in (Ex, All, Not):
                     arg_as_latex = f'({arg_as_latex})'
                 return f'{SYMBOL[Not]}{SPACING}{arg_as_latex}'
             case _F() | _T():
-                return SYMBOL[self.func]
+                return SYMBOL[self.op]
             case _:
                 # Atomic formulas are caught by the implementation of as_latex
                 # in AtomicFormula or its subclasses.
@@ -395,8 +395,8 @@ class Formula(ABC):
         match self:
             case All() | Ex():
                 count, quantifiers = self.arg._count_alternations()
-                if self.dual_func in quantifiers:
-                    return (count + 1, {self.func})
+                if self.dual in quantifiers:
+                    return (count + 1, {self.op})
                 return (count, quantifiers)
             case And() | Or() | Not() | Implies() | Equivalent():
                 highest_count = -1
@@ -671,17 +671,17 @@ class Formula(ABC):
                 simplified_args: list[Formula] = []
                 for arg in self.args:
                     arg_simplify = arg.simplify()
-                    if arg_simplify is self.definite_func():
-                        return self.definite_func()
-                    if arg_simplify is self.neutral_func():
+                    if arg_simplify is self.definite_element():
+                        return self.definite_element()
+                    if arg_simplify is self.neutral_element():
                         continue
                     if arg_simplify in simplified_args:
                         continue
-                    if arg_simplify.func is self.func:
+                    if arg_simplify.op is self.op:
                         simplified_args.extend(arg_simplify.args)
                     else:
                         simplified_args.append(arg_simplify)
-                return self.func(*simplified_args)
+                return self.op(*simplified_args)
             case Implies():
                 if self.rhs is T:
                     return self.lhs
@@ -718,7 +718,7 @@ class Formula(ABC):
                     return T
                 return Equivalent(lhs_simplify, rhs_simplify)
             case All() | Ex():
-                return self.func(self.var, self.arg.simplify())
+                return self.op(self.var, self.arg.simplify())
             case _:
                 # Atomic formulas are caught by the implementation of simplify
                 # in AtomicFormula or its subclasses.
@@ -771,10 +771,10 @@ class Formula(ABC):
                     # renamed to var. In case of (iv) above, substitution will
                     # introduce new free occurrences of self.var, which do not
                     # clash with the new quantified variable var:
-                    return self.func(var, self.arg.subs(substitution))
-                return self.func(self.var, self.arg.subs(substitution))
+                    return self.op(var, self.arg.subs(substitution))
+                return self.op(self.var, self.arg.subs(substitution))
             case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
-                return self.func(*(arg.subs(substitution) for arg in self.args))
+                return self.op(*(arg.subs(substitution) for arg in self.args))
             case _:
                 # Atomic formulas are caught by the implementation of the
                 # abstract method AtomicFormula.subs.
@@ -807,9 +807,9 @@ class Formula(ABC):
         rewrite: Formula
         match self:
             case All() | Ex():
-                nnf_func = self.dual_func if _not else self.func
+                nnf_op = self.dual if _not else self.op
                 nnf_arg = self.arg.to_nnf(to_positive=to_positive, _not=_not)
-                return nnf_func(self.var, nnf_arg)
+                return nnf_op(self.var, nnf_arg)
             case Equivalent():
                 rewrite = And(Implies(*self.args), Implies(self.rhs, self.lhs))
                 return rewrite.to_nnf(to_positive=to_positive, _not=_not)
@@ -820,20 +820,20 @@ class Formula(ABC):
                     rewrite = Or(Not(self.lhs), self.rhs)
                 return rewrite.to_nnf(to_positive=to_positive, _not=_not)
             case And() | Or():
-                nnf_func = self.dual_func if _not else self.func
+                nnf_op = self.dual if _not else self.op
                 nnf_args: list[Formula] = []
                 for arg in self.args:
                     nnf_arg = arg.to_nnf(to_positive=to_positive, _not=_not)
-                    if nnf_arg.func is nnf_func:
+                    if nnf_arg.op is nnf_op:
                         nnf_args.extend(nnf_arg.args)
                     else:
                         nnf_args.append(nnf_arg)
-                return nnf_func(*nnf_args)
+                return nnf_op(*nnf_args)
             case Not():
                 return self.arg.to_nnf(to_positive=to_positive, _not=not _not)
             case _F() | _T():
                 if _not:
-                    return self.dual_func() if to_positive else Not(self)
+                    return self.dual() if to_positive else Not(self)
                 return self
             case AtomicFormula():
                 if _not:
@@ -853,16 +853,16 @@ class Formula(ABC):
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> f = Eq(x, y) & Lt(y, z)
-        >>> f.transform_atoms(lambda atom: atom.func(atom.lhs - atom.rhs, 0))
+        >>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
         And(x - y == 0, y - z < 0)
         """
         # type of tr requieres discussion
         match self:
             case All() | Ex():
-                return self.func(self.var, self.arg.transform_atoms(tr))
+                return self.op(self.var, self.arg.transform_atoms(tr))
             case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
                 args = (arg.transform_atoms(tr) for arg in self.args)
-                return self.func(*args)
+                return self.op(*args)
             case AtomicFormula():
                 return tr(self)
             case _:

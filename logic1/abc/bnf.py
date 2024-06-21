@@ -30,7 +30,7 @@ class DisjunctiveNormalForm(ABC):
         quantifiers = []
         mtx = f
         while isinstance(mtx, (Ex, All)):
-            Q = mtx.func
+            Q = mtx.op
             v = mtx.var
             quantifiers.append((Q, v))
             mtx = mtx.arg
@@ -71,7 +71,7 @@ class DisjunctiveNormalForm(ABC):
                 self.pyeda_to_atoms[new_exprvar] = f
                 return new_exprvar
             case And(args=args) | Or(args=args):
-                name = self.logic1_to_pyeda[f.func]
+                name = self.logic1_to_pyeda[f.op]
                 xs = (self.to_pyeda(arg) for arg in args)
                 return name(*xs, simplify=False)
             case _:

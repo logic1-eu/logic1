@@ -52,7 +52,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
                     if self.args[i] != other.args[i]:
                         return self.args[i].sort_key() <= other.args[i].sort_key()  # type: ignore
                 L = self.relations()
-                return L.index(self.func) <= L.index(other.func)
+                return L.index(self.op) <= L.index(other.op)
             case _:
                 return True
 
@@ -64,7 +64,7 @@ class AtomicFormula(TermMixin, firstorder.AtomicFormula):
         """Implements the abstract method :meth:`.firstorder.Formula.subs`.
         """
         args = (arg.subs(substitution, simultaneous=True) for arg in self.args)  # type: ignore
-        return self.func(*args)
+        return self.op(*args)
 
 
 class BinaryAtomicFormula(generic.BinaryAtomicFormulaMixin, AtomicFormula):

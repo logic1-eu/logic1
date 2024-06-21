@@ -33,7 +33,7 @@ class PoolOneExistential(Pool):
     def push(self, vars_: list[Variable], f: Formula) -> None:
         logging.debug(f'res = {f}')
         if f is not F:
-            split_f = [*f.args] if f.func is Or else [f]
+            split_f = [*f.args] if f.op is Or else [f]
             self.extend([(vars_.copy(), mt) for mt in split_f])
 
 
@@ -45,7 +45,7 @@ class PoolOnePrimitive(Pool):
         if dnf is T:
             raise FoundT
         if dnf is not F:
-            split_dnf = [*dnf.args] if dnf.func is Or else [dnf]
+            split_dnf = [*dnf.args] if dnf.op is Or else [dnf]
             self.extend([(vars_.copy(), mt) for mt in split_dnf])
 
     @abstractmethod

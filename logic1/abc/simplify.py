@@ -75,7 +75,7 @@ class Simplify(ABC, Generic[AT, TH]):
         quantifiers = []
         while isinstance(f, (Ex, All)):
             th = th.next_(remove=f.var)
-            quantifiers.append((f.func, f.var))
+            quantifiers.append((f.op, f.var))
             f = f.arg
         f = self._simpl_nnf(f, th)
         free_vars = set(f.fvars())
@@ -95,7 +95,7 @@ class Simplify(ABC, Generic[AT, TH]):
             case _F() | _T():
                 return f
             case _:
-                raise NotImplementedError(f'Simplify does not know {f.func!r}')
+                raise NotImplementedError(f'Simplify does not know {f.op!r}')
 
     def _simpl_and_or(self, f: Formula, th: TH) -> Formula:
         """
@@ -116,41 +116,41 @@ class Simplify(ABC, Generic[AT, TH]):
             i1, i2 = more_itertools.partition(is_AT, args)
             return set(i1), cast(set[AT], set(i2))
 
-        gand = f.func
+        gand = f.op
         others, atoms = split(f.args)
-        simplified_atoms = (self.simpl_at(atom, f.func) for atom in atoms)
+        simplified_atoms = (self.simpl_at(atom, f.op) for atom in atoms)
         new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
             th.add(gand, atoms)
         except th.Inconsistent:
-            return gand.definite_func()
+            return gand.definite_element()
 
         simplified_others: set[Formula] = set()
         while others:
             arg = others.pop()
             simplified_arg = self._simpl_and_or(arg, th.next_())
             match simplified_arg:
-                case gand.definite_func():
+                case gand.definite_element():
                     return simplified_arg
-                case gand.neutral_func():
+                case gand.neutral_element():
                     new_others = set()
                     new_atoms: Iterable[AT] = ()
-                case gand.func():
+                case gand.op():
                     new_others, new_atoms = split(simplified_arg.args)
                 case self.class_AT():
                     new_others = set()
                     new_atoms = (simplified_arg,)
-                case gand.dual_func():
+                case gand.dual():
                     new_others = {simplified_arg}
                     new_atoms = ()
                 case _:
-                    raise NotImplementedError(f'unknown operator {simplified_arg.func} in {f}')
+                    raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
             if new_atoms:
                 try:
                     th.add(gand, new_atoms)  # Can save resimp if th does not change
                 except th.Inconsistent:
-                    return gand.definite_func()
+                    return gand.definite_element()
                 others = others.union(simplified_others)
                 simplified_others = new_others
             else:

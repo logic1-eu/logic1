@@ -12,12 +12,12 @@ from ..support.tracing import trace  # noqa
 class AtomicFormula(Formula):
 
     @classproperty
-    def complement_func(cls):
-        """The complement func of an atomic formula.
+    def complement(cls):
+        """The complement operator of an atomic formula.
 
         Should be an abstract class property
         """
-        raise NotImplementedError
+        raise NotImplementedError()
 
     def __init__(self, *args) -> None:
         self.args = args
@@ -66,9 +66,9 @@ class AtomicFormula(Formula):
         """Returns an :class:`AtomicFormula` equivalent to ``Not(self)``.
 
         .. seealso::
-            :attr:`complement_func` -- complement relation
+            :attr:`complement` -- complement relation
         """
-        return self.complement_func(*self.args)
+        return self.complement(*self.args)
 
 
 class Term(ABC):

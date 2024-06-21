@@ -85,7 +85,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             # the negative of the Rational absolute summand.
             rel, p, q = self._decompose_atom(atom)
             if gand is Or:
-                rel = rel.complement_func
+                rel = rel.complement
             match rel:
                 # We model p in ivl \ exc.
                 #
@@ -179,7 +179,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
         # _compose_atom to work.
         assert c == 1 or not c.divides(q), f'{c} divides {q}'
         q = q / c
-        return f.func, p, q
+        return f.op, p, q
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
@@ -342,7 +342,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 fac_junctor = And
             tsq = lhs.is_definite()
             if tsq == TSQ.STRICT:
-                return tsq_junctor.definite_func()
+                return tsq_junctor.definite_element()
             unit, factors = lhs.factor()
             primitive_lhs = Term(1)
             for factor in factors:
@@ -350,7 +350,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 primitive_lhs *= factor
             primitive_tsq = primitive_lhs.is_definite()
             if primitive_tsq == TSQ.STRICT:
-                return tsq_junctor.definite_func()
+                return tsq_junctor.definite_element()
             if primitive_tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
                 return split_tsq(primitive_lhs)
             if tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
@@ -413,9 +413,9 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
         lhs = atom.lhs - atom.rhs
         if lhs.is_constant():
-            # In the following if-condition, the __bool__ method of atom.func
+            # In the following if-condition, the __bool__ method of atom.op
             # will be called.
-            return T if atom.func(lhs, 0) else F
+            return T if atom.op(lhs, 0) else F
         lhs /= lhs.content()
         match atom:
             case Eq():
@@ -428,11 +428,11 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 return _simpl_at_ge(- lhs, context)
             case Gt():
                 if context is not None:
-                    context = context.dual_func
+                    context = context.dual
                 return Not(_simpl_at_ge(- lhs, context)).to_nnf()
             case Lt():
                 if context is not None:
-                    context = context.dual_func
+                    context = context.dual
                 return Not(_simpl_at_ge(lhs, context)).to_nnf()
             case _:
                 assert False

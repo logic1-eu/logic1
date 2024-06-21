@@ -8,18 +8,18 @@ formulas with a binary relation symbol :math:`r`. For instance, if `R` is
 the following discussion:
 
 >>> from logic1.theories.RCF import Eq, Ne, Ge, Le, Gt, Lt
->>> Eq(0, 0).func
+>>> Eq(0, 0).op
  <class 'logic1.theories.RCF.atomic.Eq'>
- >>> Eq.func
+ >>> Eq.op
  <class 'logic1.theories.RCF.atomic.Eq'>
 
 Assume that :math:`r` is defined on a domain :math:`D`. Then the
 *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
-\setminus r`. It is avaialable as a class property `R.complement_func`,
+\setminus r`. It is avaialable as a class property `R.complement`,
 e.g.:
 
 >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
->>> tuple(r.complement_func for r in rels)
+>>> tuple(r.complement for r in rels)
 (<class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Lt'>,
@@ -34,9 +34,9 @@ with keyword argument `to_positive=True`.
 
 The *converse relation* of :math:`r` is defined as
 :math:`r^{-1} = \{ (x, y) \in D : (y, x) \in r \}`.
-It is avaialable as a class property `R.converse_func`, e.g.:
+It is avaialable as a class property `R.converse`, e.g.:
 
->>> tuple(r.converse_func for r in rels)
+>>> tuple(r.converse for r in rels)
 (<class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Le'>,
@@ -48,19 +48,19 @@ The converse relation is the inverse with respect to composition.
 
 Finally, the *dual relation* of :math:`r` is defined as
 :math:`\overline{r}^{-1}`. It is available as a class property
-`R.dual_func`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
+`R.dual`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
 e.g.:
 
->>> tuple(r.dual_func for r in rels)
+>>> tuple(r.dual for r in rels)
 (<class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Gt'>,
  <class 'logic1.theories.RCF.atomic.Lt'>,
  <class 'logic1.theories.RCF.atomic.Ge'>,
  <class 'logic1.theories.RCF.atomic.Le'>)
->>> all(r.dual_func == r.complement_func.converse_func for r in rels)
+>>> all(r.dual == r.complement.converse for r in rels)
 True
->>> all(r.dual_func == r.converse_func.complement_func for r in rels)
+>>> all(r.dual == r.converse.complement for r in rels)
 True
 
 In the context of orderings, dualization turns strict inequalities into
@@ -70,9 +70,9 @@ differently.
 
 All those operators on relations are involutive:
 
->>> all(r.complement_func.complement_func == r for r in rels)
+>>> all(r.complement.complement == r for r in rels)
 True
->>> all(r.converse_func.converse_func == r for r in rels)
+>>> all(r.converse.converse == r for r in rels)
 True
->>> all(r.dual_func.dual_func == r for r in rels)
+>>> all(r.dual.dual == r for r in rels)
 True
