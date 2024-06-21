@@ -7,4 +7,4 @@ Sets
 .. toctree::
    :hidden:
 
-   sets.rst
+   atomic.rst

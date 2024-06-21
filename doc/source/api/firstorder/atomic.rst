@@ -18,7 +18,7 @@ Terms and Atoms
     :exclude-members: complement_func
 
     .. property:: complement_func
-    :classmethod:
+      :classmethod:
 
     The complement relation of an atomic formula, i.e.,
     :code:`a.complement_func(*a.args)` is an atomic formula equivalent to
@@ -28,4 +28,4 @@ Terms and Atoms
     for abstract class properties art not properly supported in Python.
 
     .. seealso::
-    :attr:`logic1.theories.RCF.rcf.AtomicFormula.complement_func`
+      :attr:`logic1.theories.RCF.atomic.AtomicFormula.complement_func`

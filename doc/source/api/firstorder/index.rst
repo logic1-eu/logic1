@@ -1,4 +1,4 @@
-.. _api-Firstorder:
+.. _api-firstorder-index:
 
 *********************
 First-order Framework

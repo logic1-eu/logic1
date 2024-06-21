@@ -291,7 +291,7 @@ class Formula(ABC):
     def atoms(self) -> Iterator[AtomicFormula]:
         """
         An iterator over all instances of :class:`AtomicFormula
-        <.atomic.AtomicFormula>` occurring in `self`.
+        <.firstorder.atomic.AtomicFormula>` occurring in `self`.
 
         Recall that the truth values :data:`T <.boolean.T>` and :data:`F
         <.boolean.F>` are not atoms:
@@ -352,7 +352,7 @@ class Formula(ABC):
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
             * :meth:`qvars` -- all occurring quantified variables
-            * :meth:`.Term.vars` -- all occurring variables
+            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
         return self._bvars(set())
 
@@ -416,8 +416,8 @@ class Formula(ABC):
 
     def depth(self) -> int:
         """The depth of a formula is the maximal length of a path from the root
-        to a truth value or an :class:`AtomicFormula <.atomic.AtomicFormula>`
-        in the expression tree:
+        to a truth value or an :class:`AtomicFormula
+        <.firstorder.atomic.AtomicFormula>` in the expression tree:
 
         >>> from logic1.theories import RCF
         >>> x, y, z = RCF.VV.get('x', 'y', 'z')
@@ -430,7 +430,7 @@ class Formula(ABC):
             Ex ———— And ———— All ———— Ex ———— Ex ———— x == y + 1
 
         Note that for this purpose truth values and :class:`AtomicFormula
-        <.atomic.AtomicFormula>` are considered to have depth 0.
+        <.firstorder.atomic.AtomicFormula>` are considered to have depth 0.
         """
         match self:
             case All() | Ex():
@@ -473,9 +473,9 @@ class Formula(ABC):
         [a, x, a, x]
 
         .. seealso::
-            :meth:`bvars` -- all occurring bound variables
-            :meth:`qvars` -- all occurring quantified variables
-            :meth:`.Term.vars` -- all occurring variables
+            * :meth:`bvars` -- all occurring bound variables
+            * :meth:`qvars` -- all occurring quantified variables
+            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
         return self._fvars(set())
 
@@ -555,7 +555,7 @@ class Formula(ABC):
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
             * :meth:`fvars` -- all occurring free variables
-            * :meth:`.Term.vars` -- all occurring variables
+            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
         match self:
             case All() | Ex():
@@ -641,12 +641,13 @@ class Formula(ABC):
         4. Sort ``arg_1, ..., arg_n`` within ``And(arg_1, ..., arg_n)`` using a
            canonical order. The same for ``Or`` instead of ``And``.
 
-        Overloading of :class:`AtomicFormula <.atomic.AtomicFormula>` provides
-        a hook for theories to extend :meth:`simplify` to atomic formulas.
+        Overloading of :class:`AtomicFormula
+        <.firstorder.atomic.AtomicFormula>` provides a hook for theories to
+        extend :meth:`simplify` to atomic formulas.
 
         .. seealso::
            `simplify` methods of classes derived from :class:`AtomicFormula
-           <.atomic.AtomicFormula>` within various theories:
+           <.firstorder.atomic.AtomicFormula>` within various theories:
 
            * :meth:`logic1.theories.RCF.atomic.AtomicFormula.simplify`
            * :meth:`logic1.theories.Sets.atomic.AtomicFormula.simplify`

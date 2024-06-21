@@ -1,4 +1,4 @@
-.. _api-firstorder:
+.. _api-firstorder-firstorder:
 
 ********************
 First-order Formulas

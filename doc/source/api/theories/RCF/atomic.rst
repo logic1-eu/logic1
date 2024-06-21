@@ -1,10 +1,10 @@
-.. _api-RCF-rcf:
+.. _api-RCF-atomic:
 
 ***************
 Terms and Atoms
 ***************
 
-.. automodule:: logic1.theories.RCF.rcf
+.. automodule:: logic1.theories.RCF.atomic
 
   .. autoclass:: _Ring
     :members:
@@ -31,14 +31,6 @@ Terms and Atoms
     :undoc-members:
 
   .. autoclass:: Ne
-    :members:
-    :undoc-members:
-
-  .. autoclass:: Le
-    :members:
-    :undoc-members:
-
-  .. autoclass:: Ge
     :members:
     :undoc-members:
 
