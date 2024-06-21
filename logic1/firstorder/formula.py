@@ -648,8 +648,8 @@ class Formula(ABC):
            `simplify` methods of classes derived from :class:`AtomicFormula
            <.atomic.AtomicFormula>` within various theories:
 
-           * :meth:`logic1.theories.RCF.rcf.AtomicFormula.simplify`
-           * :meth:`logic1.theories.Sets.rcf.AtomicFormula.simplify`
+           * :meth:`logic1.theories.RCF.atomic.AtomicFormula.simplify`
+           * :meth:`logic1.theories.Sets.atomic.AtomicFormula.simplify`
 
            More powerful simplifiers provided by various theories:
 

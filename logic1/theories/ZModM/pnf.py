@@ -1,7 +1,7 @@
 from ... import abc
 
 from ...firstorder import Formula
-from .zmodm import Eq, Variable
+from .atomic import Eq, Variable
 
 from ...support.tracing import trace  # noqa
 

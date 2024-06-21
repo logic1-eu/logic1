@@ -4,11 +4,11 @@ from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
 from typing import Iterable, Optional, Self
 
-from . import rcf  # need qualified names of relations for pattern matching
+from . import atomic  # need qualified names of relations for pattern matching
 from ... import abc
 
 from ...firstorder import And, F, Formula, Not, Or, T
-from .rcf import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
+from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -91,22 +91,22 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
                 #
                 # Compare https://stackoverflow.com/q/71441761/ which suggests
                 # the use of __qualname__ here.
-                case rcf.Eq:
+                case atomic.Eq:
                     ivl = Theory._Interval(False, q, q, False)
                     exc = set()
-                case rcf.Ne:
+                case atomic.Ne:
                     ivl = Theory._Interval(True, -oo, oo, True)
                     exc = {q}
-                case rcf.Ge:
+                case atomic.Ge:
                     ivl = Theory._Interval(False, q, oo, True)
                     exc = set()
-                case rcf.Le:
+                case atomic.Le:
                     ivl = Theory._Interval(True, -oo, q, False)
                     exc = set()
-                case rcf.Gt:
+                case atomic.Gt:
                     ivl = Theory._Interval(True, q, oo, True)
                     exc = set()
-                case rcf.Lt:
+                case atomic.Lt:
                     ivl = Theory._Interval(True, -oo, q, True)
                     exc = set()
                 case _:
@@ -159,11 +159,11 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
         right hand side is zero and its left hand side polynomial has gone
         through SymPy's :meth:`expand`.
 
-        >>> from .rcf import VV
+        >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
         >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
-        (<class 'logic1.theories.RCF.rcf.Le'>, a^2 + 2*a*b + b^2, -1/2)
+        (<class 'logic1.theories.RCF.atomic.Le'>, a^2 + 2*a*b + b^2, -1/2)
         >>> g = Theory._compose_atom(rel, p, q); g
         2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
         >>> (f.lhs.poly / g.lhs.poly)
@@ -317,7 +317,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                   explode_always: bool) -> Formula:
         """Simplify atomic formula.
 
-        >>> from .rcf import VV
+        >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0

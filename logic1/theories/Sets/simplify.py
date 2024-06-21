@@ -3,7 +3,7 @@ from typing import Iterable, Optional, Self, TypeAlias
 from ... import abc
 
 from ...firstorder import And, AtomicFormula, Formula, Or
-from .sets import C, C_, Eq, Index, Ne, oo, Term, Variable
+from .atomic import C, C_, Eq, Index, Ne, oo, Term, Variable
 
 from ...support.tracing import trace  # noqa
 

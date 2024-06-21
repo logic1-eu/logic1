@@ -3,7 +3,7 @@ from typing import Optional
 
 from ... import abc
 from ...firstorder import Formula, Or
-from .zmodm import mod, set_mod, Variable
+from .atomic import mod, set_mod, Variable
 from .bnf import dnf as _dnf
 from .pnf import pnf as _pnf
 

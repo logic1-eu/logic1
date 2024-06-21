@@ -1,4 +1,4 @@
-The following discussion once was a docstring in theories.RCF.rcf, where it
+The following discussion once was a docstring in theories.RCF.atomic, where it
 definitely does not belong anymore. It should become part of the documentation
 in some way.
 
@@ -9,9 +9,9 @@ the following discussion:
 
 >>> from logic1.theories.RCF import Eq, Ne, Ge, Le, Gt, Lt
 >>> Eq(0, 0).func
- <class 'logic1.theories.RCF.rcf.Eq'>
+ <class 'logic1.theories.RCF.atomic.Eq'>
  >>> Eq.func
- <class 'logic1.theories.RCF.rcf.Eq'>
+ <class 'logic1.theories.RCF.atomic.Eq'>
 
 Assume that :math:`r` is defined on a domain :math:`D`. Then the
 *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
@@ -20,12 +20,12 @@ e.g.:
 
 >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
 >>> tuple(r.complement_func for r in rels)
-(<class 'logic1.theories.RCF.rcf.Ne'>,
- <class 'logic1.theories.RCF.rcf.Eq'>,
- <class 'logic1.theories.RCF.rcf.Lt'>,
- <class 'logic1.theories.RCF.rcf.Gt'>,
- <class 'logic1.theories.RCF.rcf.Le'>,
- <class 'logic1.theories.RCF.rcf.Ge'>)
+(<class 'logic1.theories.RCF.atomic.Ne'>,
+ <class 'logic1.theories.RCF.atomic.Eq'>,
+ <class 'logic1.theories.RCF.atomic.Lt'>,
+ <class 'logic1.theories.RCF.atomic.Gt'>,
+ <class 'logic1.theories.RCF.atomic.Le'>,
+ <class 'logic1.theories.RCF.atomic.Ge'>)
 
 Since :math:`\overline{r}(s, t)` is equivalent to :math:`\neg r(s, t)`, the
 availability of complement relations is relevant for the computation of
@@ -37,12 +37,12 @@ The *converse relation* of :math:`r` is defined as
 It is avaialable as a class property `R.converse_func`, e.g.:
 
 >>> tuple(r.converse_func for r in rels)
-(<class 'logic1.theories.RCF.rcf.Eq'>,
- <class 'logic1.theories.RCF.rcf.Ne'>,
- <class 'logic1.theories.RCF.rcf.Le'>,
- <class 'logic1.theories.RCF.rcf.Ge'>,
- <class 'logic1.theories.RCF.rcf.Lt'>,
- <class 'logic1.theories.RCF.rcf.Gt'>)
+(<class 'logic1.theories.RCF.atomic.Eq'>,
+ <class 'logic1.theories.RCF.atomic.Ne'>,
+ <class 'logic1.theories.RCF.atomic.Le'>,
+ <class 'logic1.theories.RCF.atomic.Ge'>,
+ <class 'logic1.theories.RCF.atomic.Lt'>,
+ <class 'logic1.theories.RCF.atomic.Gt'>)
 
 The converse relation is the inverse with respect to composition.
 
@@ -52,12 +52,12 @@ Finally, the *dual relation* of :math:`r` is defined as
 e.g.:
 
 >>> tuple(r.dual_func for r in rels)
-(<class 'logic1.theories.RCF.rcf.Ne'>,
- <class 'logic1.theories.RCF.rcf.Eq'>,
- <class 'logic1.theories.RCF.rcf.Gt'>,
- <class 'logic1.theories.RCF.rcf.Lt'>,
- <class 'logic1.theories.RCF.rcf.Ge'>,
- <class 'logic1.theories.RCF.rcf.Le'>)
+(<class 'logic1.theories.RCF.atomic.Ne'>,
+ <class 'logic1.theories.RCF.atomic.Eq'>,
+ <class 'logic1.theories.RCF.atomic.Gt'>,
+ <class 'logic1.theories.RCF.atomic.Lt'>,
+ <class 'logic1.theories.RCF.atomic.Ge'>,
+ <class 'logic1.theories.RCF.atomic.Le'>)
 >>> all(r.dual_func == r.complement_func.converse_func for r in rels)
 True
 >>> all(r.dual_func == r.converse_func.complement_func for r in rels)

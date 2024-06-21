@@ -25,7 +25,7 @@ from logic1.support.excepthook import NoTraceException
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF.simplify import is_valid, simplify
-from logic1.theories.RCF.rcf import (
+from logic1.theories.RCF.atomic import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable)
 
 # Create logger

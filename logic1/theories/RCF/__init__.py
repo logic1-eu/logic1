@@ -1,4 +1,4 @@
-from .rcf import VV, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable  # noqa
+from .atomic import VV, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable  # noqa
 from .bnf import cnf, dnf  # noqa
 from .parser import l1  # noqa
 from .qe import CLUSTERING, GENERIC, qe  # noqa

@@ -4,7 +4,7 @@ from itertools import combinations
 
 from ... import abc
 from ...firstorder import And, Formula, pnf as _pnf, Or
-from .sets import C, Eq, Ne, Variable
+from .atomic import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
 from .simplify import simplify as _simplify
 
