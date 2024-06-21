@@ -1,5 +1,5 @@
-r"""Implementation of first-order formulas over arbitrary signatures
-(languages) and theories.
+r"""Implementation of first-order formulas over arbitrary signatures and
+theories.
 
 Throughout this documentation we use the term *theory* to refer to a choice of
 function and relation symbols along with their arities (signature) plus a
@@ -24,9 +24,9 @@ methods on first-order formulas recursively built using first-order operators:
    variable.
 
 As an abstract base class, :class:`Formula` cannot be instantiated.
-Nevertheless, it implements a number of methods on first-order formulas. Those
-methods are typically syntactic in the sense that they do not need to know the
-semantics of the underlying theories.
+Nevertheless, it implements a number of properties and methods on first-order
+formulas. Those properties and methods are typically syntactic in the sense
+that they do not need to know the semantics of the underlying theories.
 
 Boolean operators are implemented as classes derived from another abstract
 class :class:`BooleanFormula` which is, in turn, derived from :class:`Formula`.
@@ -58,7 +58,7 @@ recursive construction. This is implemented via another abstract subclass
 various theories via further subclassing. For some of its methods,
 :class:`AtomicFormula` already provides implementations, which delegate
 theory-specific parts to an abstract class :class:`Term` for argument terms
-of relations of atomic formulas.
+of atomic formulas.
 
 We give an example using the theory RCF of Real Closed Fields, which is
 implemented outside :mod:`logic1.firstorder`. RCF is the first-order theory of
@@ -67,14 +67,13 @@ the real numbers using the signature of ordered rings:
 >>> from logic1.theories import RCF
 >>> # Assign RCF variables to Python identifiers:
 >>> a, b, x = RCF.VV.get('a', 'b', 'x')
->>> # Construct formula using first-order operators along with RCF variables,
->>> # functions and relations:
+>>> # Build formula with first-order operators + RCF variables, functions, relations:
 >>> And(x >= 0, a*x + b == 0)
 And(x >= 0, a*x + b == 0)
 
-After learning about the introduction of variables in theories, we can finally
-discuss first-order quantifiers and corresponding quantified formulas.
-Quantifiers are implemented as classes derived from another abstract class
+Having learned about variables, we can finally discuss first-order quantifiers
+and corresponding quantified formulas. Quantifiers are implemented as classes
+derived from another abstract class
 :class:`QuantifiedFormula` which is, in turn, derived from :class:`Formula`.
 Quantifiers are mapped to classes as follows:
 
@@ -93,9 +92,9 @@ corresponding classes. Here is an example:
 >>> f
 Ex(x, And(x >= 0, a*x + b == 0))
 
-Implementations of theories provide semantically meaningful methods and
-functions on first-order formulas. For instance, quantifier elimination (QE)
-computes equivalent formulas that do not contain quantifiers anymore:
+Implementations of theories contribute semantic-aware methods and functions on
+first-order formulas. For instance, quantifier elimination (QE) computes
+equivalent formulas that do not contain quantifiers anymore:
 
 >>> RCF.qe(f)
 Or(And(b == 0, a == 0), And(a != 0, a*b <= 0))

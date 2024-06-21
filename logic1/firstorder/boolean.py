@@ -1,3 +1,6 @@
+"""We introduce formulas with Boolean toplevel operators as subclasses of
+:class:`.Formula`.
+"""
 from __future__ import annotations
 
 from typing import final, Optional
@@ -18,6 +21,8 @@ class BooleanFormula(Formula):
     # The following would be abstract class variables, which are not available
     # at the moment.
     dual_func: type[BooleanFormula]  #: :meta private:
+    definite_func: type[BooleanFormula]  #: :meta private:
+    neutral_func: type[BooleanFormula]  #: :meta private:
 
 
 @final
@@ -25,6 +30,11 @@ class Equivalent(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\longleftrightarrow`.
+
+    >>> from logic1.theories.RCF import *
+    >>> x, = VV.get('x')
+    >>> Equivalent(x >= 0, Or(x > 0, x == 0))
+    Equivalent(x >= 0, Or(x > 0, x == 0))
     """
     @property
     def lhs(self) -> Formula:
@@ -45,6 +55,11 @@ class Equivalent(BooleanFormula):
 class Implies(BooleanFormula):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator :math:`\longrightarrow`.
+
+    >>> from logic1.theories.RCF import *
+    >>> x, = VV.get('x')
+    >>> Implies(x == 0, x >= 0)
+    Implies(x == 0, x >= 0)
     """
     @property
     def lhs(self) -> Formula:
@@ -66,17 +81,14 @@ class And(BooleanFormula):
     toplevel operator represents the Boolean operator
     :math:`\wedge`.
 
-    >>> from logic1.theories.Sets import Eq, VV
-    >>> x, y, z, O = VV.set_vars('x', 'y', 'z', 'O')
-    >>>
+    >>> from logic1.theories.RCF import *
+    >>> x, y, z = VV.get('x', 'y', 'z')
     >>> And()
     T
-    >>>
-    >>> And(Eq(O, O))
-    O == O
-    >>>
-    >>> And(Eq(x, O), Eq(x, y), Eq(y, z))
-    And(x == O, x == y, y == z)
+    >>> And(x == 0)
+    x == 0
+    >>> And(x == 1, x == y, y == z)
+    And(x == 1, x == y, y == z)
     """
     @classproperty
     def dual_func(cls):
@@ -114,6 +126,12 @@ class And(BooleanFormula):
         return super().__new__(cls)
 
     def __init__(self, *args: Formula) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> And(a >= 0, a != 0)
+        And(a >= 0, a != 0)
+        """
         args_flat = []
         for arg in args:
             if isinstance(arg, And):
@@ -129,13 +147,12 @@ class Or(BooleanFormula):
     toplevel operator represents the Boolean operator
     :math:`\vee`.
 
-    >>> from logic1.theories.RCF import VV
+    >>> from logic1.theories.RCF import *
+    >>> x, = VV.get('x')
     >>> Or()
     F
-    >>> x, = VV.get('x')
     >>> Or(x == 0)
     x == 0
-    >>>
     >>> Or(x == 1, x == 2, x == 3)
     Or(x == 1, x == 2, x == 3)
     """
@@ -175,6 +192,12 @@ class Or(BooleanFormula):
         return super().__new__(cls)
 
     def __init__(self, *args) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> Or(a > 0, a == 0)
+        Or(a > 0, a == 0)
+        """
         args_flat = []
         for arg in args:
             if isinstance(arg, Or):
@@ -189,6 +212,11 @@ class Not(BooleanFormula):
     r"""A class whose instances are negated formulas in the sense that their
     toplevel operator is the Boolean operator
     :math:`\neg`.
+
+    >>> from logic1.theories.RCF import *
+    >>> a, = VV.get('a')
+    >>> Not(a == 0)
+    Not(a == 0)
     """
     @property
     def arg(self) -> Formula:
@@ -197,6 +225,12 @@ class Not(BooleanFormula):
         return self.args[0]
 
     def __init__(self, arg: Formula) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> Not(a == 0)
+        Not(a == 0)
+        """
         self.args = (arg, )
 
 
@@ -204,11 +238,11 @@ def involutive_not(arg: Formula) -> Formula:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
-    >>> from logic1.theories.RCF import VV
+    >>> from logic1.theories.RCF import *
     >>> x, = VV.get('x')
     >>> involutive_not(x == 0)
     Not(x == 0)
-    >>> involutive_not(~ (x == 0))
+    >>> involutive_not(Not(x == 0))
     x == 0
     >>> involutive_not(T)
     Not(T)
@@ -220,19 +254,23 @@ def involutive_not(arg: Formula) -> Formula:
 
 @final
 class _T(BooleanFormula):
-    """The constant Formula that is always true.
+    """A singleton class whose sole instance represents the constant Formula
+    that is always true.
 
-    This is a quite basic implementation of a singleton class. It does not
-    support subclassing. We do not use a module because we need _T to be a
-    subclass itself.
-
+    >>> _T()
+    T
     >>> _T() is _T()
     True
     """
+
+    # This is a quite basic implementation of a singleton class. It does not
+    # support subclassing. We do not use a module because we need _T to be a
+    # subclass itself.
+
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`_F`, which implements
-        the dual operator :math:`\bot` or :math:`\top`.
+        the dual operator :math:`\bot` of :math:`\top`.
         """
         return _F
 
@@ -252,24 +290,31 @@ class _T(BooleanFormula):
 
 T = _T()
 """Support use as a constant without parentheses.
+
+    >>> T is _T()
+    True
 """
 
 
 @final
 class _F(BooleanFormula):
-    """The constant Formula that is always false.
+    """A singleton class whose sole instance represents the constant Formula
+    that is always false.
 
-    This is a quite basic implementation of a singleton class. It does not
-    support subclassing. We do not use a module because we need _F to be a
-    subclass itself.
-
+    >>> _F()
+    F
     >>> _F() is _F()
     True
     """
+
+    # This is a quite basic implementation of a singleton class. It does not
+    # support subclassing. We do not use a module because we need _F to be a
+    # subclass itself.
+
     @classproperty
     def dual_func(cls):
         r"""A class property yielding the class :class:`_T`, which implements
-        the dual operator :math:`\top` or :math:`\bot`.
+        the dual operator :math:`\top` of :math:`\bot`.
         """
         return (lambda: _T)()
 
@@ -289,4 +334,7 @@ class _F(BooleanFormula):
 
 F = _F()
 """Support use as a constant without parentheses.
+
+    >>> F is _F()
+    True
 """

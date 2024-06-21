@@ -12,7 +12,7 @@
    :caption: API Reference
    :hidden:
 
-   api/firstorder.rst
+   api/firstorder/index.rst
    api/theories/RCF/index.rst
    api/theories/Sets/index.rst
 

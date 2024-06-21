@@ -6,6 +6,22 @@ First-order Formulas
 
 .. automodule:: logic1.firstorder
 
+The following picture summarizes the inheritance hierarchy. Next, we are going
+to describe the occurring classes starting at the top.
+
+.. graphviz::
+
+   digraph foo {
+      bgcolor="#f3f4f5";
+      edge [dir=back, arrowtail=empty];
+      node [shape=plaintext, fontname="monospace"];
+      "Formula" -> "QuantifiedFormula";
+      "Formula" -> "BooleanFormula" ;
+      "Formula" -> "AtomicFormula";
+      QuantifiedFormula -> "Ex | All";
+      "BooleanFormula" -> "Equivalent | Implies | And | Or | Not | _T | _F";
+      AtomicFormula -> "RCF.AtomicFormula | ...";
+   }
 
 Formula Base Class
 ******************
@@ -95,14 +111,17 @@ Boolean Formulas
   .. autoclass:: Equivalent
     :members:
     :undoc-members:
+    :exclude-members: __init__
 
   .. autoclass:: Implies
     :members:
     :undoc-members:
+    :exclude-members: __init__
 
   .. autoclass:: And
     :members:
     :undoc-members:
+    :exclude-members: __init__, __new__
 
     .. property:: dual_func
       :classmethod:
@@ -110,9 +129,26 @@ Boolean Formulas
       A class property yielding the class :class:`Or`, which implements
       the dual operator :math:`\lor` or :math:`\land`.
 
+    .. property:: definite_func
+      :classmethod:
+
+      A class property yielding the class :class:`_F`, which implements the
+      definite operator :math:`\bot` of :math:`\wedge`. The definite operator is
+      the dual of the neutral. Note that the return value :class:`_F` is the
+      bare operator, in contrast to the formula :data:`F`.
+
+    .. property:: neutral_func
+      :classmethod:
+
+      A class property yielding the class :class:`_T`, which implements the
+      neutral operator :math:`\top` of :math:`\wedge.` Note that the return
+      value :class:`_T` is the bare operator, in contrast to the formula
+      :data:`T`.
+
   .. autoclass:: Or
     :members:
     :undoc-members:
+    :exclude-members: __init__, __new__
 
     .. property:: dual_func
       :classmethod:
@@ -120,19 +156,39 @@ Boolean Formulas
       A class property yielding the class :class:`And`, which implements
       the dual operator :math:`\land` or :math:`\lor`.
 
+    .. property:: definite_func
+      :classmethod:
+
+      A class property yielding the class :class:`_T`, which implements the
+      definite operator :math:`\top` of :math:`\vee`. The definite operator is
+      the dual of the neutral. Note that the return value :class:`_T` is the
+      bare operator, in contrast to the formula :data:`T`.
+
+    .. property:: neutral_func
+      :classmethod:
+
+      A class property yielding the class :class:`_F`, which implements the
+      neutral operator :math:`\bot` of :math:`\vee.` Note that the return
+      value :class:`_F` is the bare operator, in contrast to the formula
+      :data:`F`.
+
   .. autoclass:: Not
     :members:
     :undoc-members:
+    :exclude-members: __init__
+
+  .. autofunction:: involutive_not
 
   .. autoclass:: _T
     :members:
     :undoc-members:
+    :exclude-members: __init__, __new__
 
     .. property:: dual_func
       :classmethod:
 
       A class property yielding the class :class:`_F`, which implements the dual
-      operator :math:`\bot` or :math:`\top`.
+      operator :math:`\bot` of :math:`\top`.
 
   .. autodata:: T
     :annotation: = _T()
@@ -140,45 +196,16 @@ Boolean Formulas
   .. autoclass:: _F
     :members:
     :undoc-members:
-
-      A class property yielding the class :class:`_F` itself.
+    :exclude-members: __init__, __new__
 
     .. property:: dual_func
       :classmethod:
 
       A class property yielding the class :class:`_T`, which implements
-      the dual operator :math:`\top` or :math:`\bot`.
+      the dual operator :math:`\top` of :math:`\bot`.
 
   .. autodata:: F
     :annotation: = _F()
-
-
-Atomic Formulas
-***************
-
-.. automodule:: logic1.firstorder.atomic
-
-  .. autoclass:: AtomicFormula
-    :members:
-    :undoc-members:
-    :exclude-members: complement_func
-
-    .. property:: complement_func
-      :classmethod:
-
-      The complement func of an atomic formula. Let :code:`A` be a
-      subclass of :class:`AtomicFormula`. Then
-      :code:`A.complement_func(*args)` is equivalent to
-      :code:`Not(A.func(*args))`.
-
-      The implementation in here raises :exc:`NotImplementedError`, which is
-      a workaround for missing abstract class properties. Relevant subclasses
-      are implemented in various theories, e.g.,
-      :class:`logic1.theories.RCF.rcf.AtomicFormula`
-
-  .. autoclass:: Term
-    :members:
-    :undoc-members:
 
 
 Quantified Formulas
@@ -187,23 +214,26 @@ Quantified Formulas
 .. automodule:: logic1.firstorder.quantified
 
   .. autoclass:: QuantifiedFormula
-    :members:
-    :undoc-members:
+    :special-members:
 
   .. autoclass:: Ex
-    :members:
+    :members: var, arg
+    :special-members:
 
     .. property:: dual_func
       :classmethod:
 
-      A class property yielding the dual class :class:`All` of :class:`Ex`.
+      A class property yielding the class :class:`All`, which implements the
+      dual operator :math:`\forall` of :math:`\exists`.
 
   .. autoclass:: All
-    :members:
+    :members: var, arg
+    :special-members:
 
     .. property:: dual_func
       :classmethod:
 
-      A class property yielding the dual class :class:`Ex` of :class:`All`.
+      A class property yielding the class :class:`Ex`, which implements the
+      dual operator :math:`\exists` of :math:`\forall`.
 
   .. autodata:: QuantifierBlock

@@ -232,7 +232,7 @@ class Formula(ABC):
         >>> f.all()
         All(b, All(a, Ex(x, And(x >= 0, a*x + b == 0))))
 
-        .. seealso:: :meth:`ex` -- Existential closure
+        .. seealso:: :meth:`ex` -- existential closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -350,9 +350,9 @@ class Formula(ABC):
         variables without use in any term are not considered.
 
         .. seealso::
-            :meth:`fvars` -- An iterator over all free occurrences of variables
-
-            :meth:`qvars` -- An iterator over all quantified variables
+            * :meth:`fvars` -- all occurring free variables
+            * :meth:`qvars` -- all occurring quantified variables
+            * :meth:`.Term.vars` -- all occurring variables
         """
         return self._bvars(set())
 
@@ -452,7 +452,7 @@ class Formula(ABC):
         >>> f.ex(ignore={c})
         Ex(b, Ex(a, All(x, And(a < x, a + b + c < x))))
 
-        .. seealso:: :meth:`all` -- Universal closure
+        .. seealso:: :meth:`all` -- universal closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -473,9 +473,9 @@ class Formula(ABC):
         [a, x, a, x]
 
         .. seealso::
-            :meth:`bvars` -- An iterator over all bound occurrences of variables
-
-            :meth:`qvars` -- An iterator over all quantified variables
+            :meth:`bvars` -- all occurring bound variables
+            :meth:`qvars` -- all occurring quantified variables
+            :meth:`.Term.vars` -- all occurring variables
         """
         return self._fvars(set())
 
@@ -524,9 +524,8 @@ class Formula(ABC):
         [(<class 'logic1.firstorder.quantified.All'>, [x, y])]
 
         .. seealso::
-            :func:`pnf <.pnf.pnf>` -- Prenex normal form
-
-            :data:`QuantifierBlock <.quantified.QuantifierBlock>` \
+            * :func:`pnf <.pnf.pnf>` -- prenex normal form
+            * :data:`QuantifierBlock <.quantified.QuantifierBlock>` \
                 -- A type holding a block of quantifiers
         """
         blocks = []
@@ -554,9 +553,9 @@ class Formula(ABC):
         [y, x, z]
 
         .. seealso::
-            :meth:`bvars` -- An iterator over all bound occurrences of variables
-
-            :meth:`fvars` -- An iterator over all free occurrences of  variables
+            * :meth:`bvars` -- all occurring bound variables
+            * :meth:`fvars` -- all occurring free variables
+            * :meth:`.Term.vars` -- all occurring variables
         """
         match self:
             case All() | Ex():

@@ -1,4 +1,4 @@
-r"""Provides subclasses of :class:`Formula <.formula.Formula>` that implement
+r"""We provide subclasses of :class:`Formula <.formula.Formula>` that implement
 quanitfied formulas in the sense that their toplevel operator is a one of the
 quantifiers :math:`\exists` or :math:`\forall`.
 """
@@ -16,24 +16,24 @@ class QuantifiedFormula(Formula):
     r"""A class whose instances are quanitfied formulas in the sense that their
     toplevel operator is a one of the quantifiers :math:`\exists` or
     :math:`\forall`.
-
-    Note that members of :class:`QuantifiedFormula` may have subformulas with
-    other logical operators deeper in the expression tree.
     """
+
+    # Note that members of :class:`QuantifiedFormula` may have subformulas with
+    # other logical operators deeper in the expression tree.
 
     # The following would be abstract class variables, which are not available
     # at the moment.
+    func: Any  #: :meta private:
     dual_func: type[QuantifiedFormula]  #: :meta private:
 
     @property
     def var(self) -> Any:
         """The variable of the quantifier.
 
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y = VV.set_vars('x', 'y')
-        >>>
-        >>> e1 = All(x, Ex(y, Eq(x, y)))
-        >>> e1.var
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> f = All(x, Ex(y, x == y))
+        >>> f.var
         x
         """
         return self.args[0]
@@ -46,17 +46,16 @@ class QuantifiedFormula(Formula):
     def arg(self) -> Formula:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
 
-        >>> from logic1.theories.Sets import Eq, VV
-        >>> x, y = VV.set_vars('x', 'y')
-        >>>
-        >>> e1 = All(x, Ex(y, x == y))
-        >>> e1.arg
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> f = All(x, Ex(y, x == y))
+        >>> f.arg
         Ex(y, x == y)
         """
         return self.args[1]
 
     def __init__(self, vars_: Variable | Sequence[Variable], arg: Formula) -> None:
-        """Construct an quantified formula.
+        """Construct a quantified formula.
 
         >>> from logic1.theories.RCF import VV
         >>> a, b, x = VV.get('a', 'b', 'x')
@@ -83,18 +82,21 @@ class QuantifiedFormula(Formula):
 class Ex(QuantifiedFormula):
     r"""A class whose instances are existentially quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
-    :math:`\exists`.
+    :math:`\exists`. Besides variables, the quantifier accepts sequences of
+    variables as a shorthand.
 
-    >>> from logic1.theories.Sets import Eq, VV
-    >>> x, y = VV.set_vars('x', 'y')
-    >>>
-    >>> Ex(x, Eq(x, y))
-    Ex(x, x == y)
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> Ex(x, x**2 == y)
+    Ex(x, x^2 == y)
+    >>> Ex([x, y], And(x > 0, y > 0, z == x - y))
+    Ex(x, Ex(y, And(x > 0, y > 0, z == x - y)))
     """
-
     @classproperty
     def dual_func(cls):
-        """A class property yielding the dual class :class:`All` of class:`Ex`.
+        r"""A class property yielding the class :class:`All`, which implements
+        the dual operator :math:`\forall` of :math:`\exists`.
         """
         return All
 
@@ -103,13 +105,15 @@ class Ex(QuantifiedFormula):
 class All(QuantifiedFormula):
     r"""A class whose instances are universally quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
-    :math:`\forall`.
+    :math:`\forall`. Besides variables, the quantifier accepts sequences of
+    variables as a shorthand.
 
-    >>> from logic1.theories.RCF import VV
+    >>> from logic1.theories.RCF import *
     >>> x, y = VV.get('x', 'y')
-    >>>
-    >>> All(x, All(y, (x + y)**2 + 1 == x**2 + 2*x*y + y**2))
-    All(x, All(y, x^2 + 2*x*y + y^2 + 1 == x^2 + 2*x*y + y^2))
+    >>> All(x, x**2 >= 0)
+    All(x, x^2 >= 0)
+    >>> All([x, y], (x + y)**2 == x**2 + 2*x*y + y**2)
+    All(x, All(y, x^2 + 2*x*y + y^2 == x^2 + 2*x*y + y^2))
     """
     @classproperty
     def dual_func(cls):
@@ -119,3 +123,7 @@ class All(QuantifiedFormula):
 
 
 QuantifierBlock: TypeAlias = tuple[type[All | Ex], list]
+"""
+.. seealso::
+    :meth:`matrix <.Formula.matrix>` -- the matrix of a prenex formula
+"""

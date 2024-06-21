@@ -183,6 +183,11 @@ class Term(firstorder.Term):
 
     @property
     def poly(self):
+        """
+        An instance of :class:`MPolynomial_libsingular
+        <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
+        which is wrapped by ``self``.
+        """
         if self.wrapped_ring.sage_ring is not self._poly.parent():
             self.wrapped_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
             self._poly = self.wrapped_ring(self._poly)
@@ -205,6 +210,10 @@ class Term(firstorder.Term):
         return Eq(self, Term(other))
 
     def fresh(self) -> Variable:
+        """
+        .. seealso::
+            :meth:`logic1.firstorder.atomic.Term.fresh`
+        """
         assert self.is_variable()
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
@@ -298,19 +307,44 @@ class Term(firstorder.Term):
         return str(latex(self.poly))
 
     def coefficient(self, d: dict[Variable, int]) -> Term:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.coefficient()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.coefficient>`
+        """
         d_poly = {key.poly: value for key, value in d.items()}
         return Term(self.poly.coefficient(d_poly))
 
     def content(self) -> int:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial.content()
+            <sage.rings.polynomial.multi_polynomial.MPolynomial.content>`
+        """
         return int(self.poly.content())
 
     def degree(self, x: Variable) -> int:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.degree()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.degree>`
+        """
         return self.poly.degree(x.poly)
 
     def derivative(self, x: Variable, n: int = 1) -> Term:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial.derivative()
+            <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
+        """
         return Term(self.poly.derivative(x.poly, n))
 
     def factor(self) -> tuple[Term, dict[Term, int]]:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.factor()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.factor>`
+        """
         F = self.poly.factor()
         unit = Term(F.unit())
         assert unit in (-1, 1), (self, F, unit)
@@ -323,6 +357,11 @@ class Term(firstorder.Term):
         return unit, D
 
     def is_constant(self) -> bool:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.is_constant()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_constant>`
+        """
         return self.poly.is_constant()
 
     def is_definite(self) -> TSQ:
@@ -340,15 +379,35 @@ class Term(firstorder.Term):
         return self.poly in self.poly.parent().gens()
 
     def is_zero(self) -> bool:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.is_zero()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_zero>`
+        """
         return self.poly.is_zero()
 
     def lc(self) -> int:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.lc()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.lc>`
+        """
         return int(self.poly.lc())
 
     def monomials(self) -> list[Term]:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.monomials()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomials>`
+        """
         return [Term(monomial) for monomial in self.poly.monomials()]
 
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.quo_rem()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
+        """
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
 
@@ -357,10 +416,20 @@ class Term(firstorder.Term):
         return term.poly
 
     def subs(self, d: dict[Variable, Term]) -> Term:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.subs()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
+        """
         sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
         return Term(self.poly.subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
+        """
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.variables()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.variables>`
+        """
         for g in self.poly.variables():
             yield Term(g)
 
@@ -370,7 +439,17 @@ Variable: TypeAlias = Term
 
 @functools.total_ordering
 class AtomicFormula(firstorder.AtomicFormula):
-
+    """
+    +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+    | :data:`self`            | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
+    +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+    | :attr:`complement_func` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
+    +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+    | :attr:`converse_func`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
+    +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+    | :attr:`dual_func`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
+    +-------------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+    """  # noqa
     @classproperty
     def complement_func(cls) -> type[AtomicFormula]:
         """Complement relation.

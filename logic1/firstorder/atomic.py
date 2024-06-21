@@ -29,6 +29,12 @@ class AtomicFormula(Formula):
         return repr(self)
 
     def as_latex(self) -> str:
+        """Provides verbatim output of :code:`repr(self)` as a default
+        implementation. This is expected to be overridden in subclasses.
+
+        .. seealso::
+            :meth:`.Formula.as_latex` -- LaTeX representation
+        """
         return f'\\verb!{repr(self)}!'
 
     @abstractmethod
@@ -40,14 +46,27 @@ class AtomicFormula(Formula):
         ...
 
     def simplify(self) -> Formula:
+        """Provides identity as a default implementation of simplification.
+        This is expected to be overridden in subclasses.
+
+        .. seealso::
+            :meth:`.Formula.simplify` -- simplification
+        """
         return self
 
     @abstractmethod
     def subs(self, substitution: dict) -> Self:
+        """
+        .. seealso::
+            :meth:`.Formula.subs` -- substitution
+        """
         ...
 
     def to_complement(self) -> Self:
-        """Returns an :class:`AtomicFormula` equivalent to ``~ self``.
+        """Returns an :class:`AtomicFormula` equivalent to ``Not(self)``.
+
+        .. seealso::
+            :attr:`complement_func` -- complement relation
         """
         return self.complement_func(*self.args)
 
@@ -56,21 +75,36 @@ class Term(ABC):
 
     @abstractmethod
     def fresh(self) -> Variable:
+        """Returns a variable that has not been used so far.
+        """
         ...
 
     @abstractmethod
     def as_latex(self) -> str:
-        """Convert `self` to LaTeX.
+        """LaTeX representation.
+
+        .. seealso::
+            :meth:`.Formula.as_latex` -- LaTeX representation
         """
         ...
 
     @staticmethod
     @abstractmethod
     def sort_key(term: Any) -> Any:
+        """A sort key suitable for ordering terms. Note that ``<``, ``<=`` etc.
+        are reserved as constructors for instances of :class:`.AtomicFormula`.
+        """
         ...
 
     @abstractmethod
     def vars(self) -> Iterator[Variable]:
+        """All variables occurring in self.
+
+        .. seealso::
+            * :meth:`.Formula.bvars` -- all occurring bound variables
+            * :meth:`.Formula.fvars` -- all occurring free variables
+            * :meth:`.Formula.qvars` -- all occurring quantified variables
+        """
         ...
 
 
