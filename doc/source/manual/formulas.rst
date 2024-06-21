@@ -160,29 +160,29 @@ in the API Reference.
 
   # Class data attributes:
 
-  .. attribute:: func
+  .. attribute:: op
     :noindex:
     :value: Lt
 
     The relation symbol of the atomic formula.
 
-  .. attribute:: complement_func
+  .. attribute:: complement
     :noindex:
     :value: Ge
 
-    The complement relation symbol of :attr:`func`.
+    The complement relation symbol of :attr:`op`.
 
-  .. attribute:: converse_func
+  .. attribute:: converse
     :noindex:
     :value: Gt
 
-    The converse relation symbol of :attr:`func`.
+    The converse relation symbol of :attr:`op`.
 
-  .. attribute:: dual_func
+  .. attribute:: dual
     :noindex:
     :value: Le
 
-    The dual relation symbol of :attr:`func`.
+    The dual relation symbol of :attr:`op`.
 
   # Instance data attributes:
 
@@ -190,7 +190,7 @@ in the API Reference.
     :noindex:
     :type: tuple
 
-    The tuple of arguments of :attr:`func`, which equals ``(lhs, rhs)``.
+    The tuple of arguments of :attr:`op`, which equals ``(lhs, rhs)``.
 
   .. property:: lhs
     :noindex:
@@ -204,7 +204,7 @@ in the API Reference.
 
     The right hand side term of the atomic formula, which is ``args[1]``.
 
-The attributes :attr:`func`, :attr:`lhs`, and :attr:`rhs` give
+The attributes :attr:`op`, :attr:`lhs`, and :attr:`rhs` give
 access to the mathematical components of an atomic formula:
 
 .. doctest::
@@ -213,16 +213,16 @@ access to the mathematical components of an atomic formula:
   >>> atom = Lt(0, 1)
   >>> atom
   Lt(0, 1)
-  >>> atom.func, atom.lhs, atom.rhs
+  >>> atom.op, atom.lhs, atom.rhs
   (<class 'logic1.atomlib.sympy.Lt'>, 1, 0)
 
-Since :attr:`func` is the class :class:`Lt` itself, it is callable as a
+Since :attr:`op` is the class :class:`Lt` itself, it is callable as a
 constructor, and we have everything together to decompose and construct atomic
 formulas:
 
 .. doctest::
 
-  >>> new_atom = atom.func(atom.lhs, atom.rhs)
+  >>> new_atom = atom.op(atom.lhs, atom.rhs)
   >>> new_atom
   Lt(0, 1)
   >>> new_atom == atom
@@ -237,14 +237,14 @@ More generally, one can use the argument tuple :attr:`args` instead of
 
 .. important::
 
-  If ``f`` is any of our atomic formulas, then ``f == f.func(*f.args)``.
+  If ``f`` is any of our atomic formulas, then ``f == f.op(*f.args)``.
 
 The same holds for SymPy expressions, which is discussed in the section
 `Recursing through an Expression Tree
 <https://docs.sympy.org/latest/tutorials/intro-tutorial/manipulation.html#recursing-through-an-expression-tree>`_
 of the SymPy documentation. This explains our generic attribute name
-:attr:`func` when actually referring to relations.
-The attributes :attr:`func` and :attr:`args` will be available throughout
+:attr:`op` when actually referring to relations.
+The attributes :attr:`op` and :attr:`args` will be available throughout
 |logic1| also for non-atomic formulas.
 
 The constructors and initializers of our classes here check the validity of
@@ -258,8 +258,8 @@ problems are detected:
   ...
   ValueError: '1' is not a Term
 
-It remains to clarify the values of :attr:`complement_func`,
-:attr:`converse_func`, and :attr:`dual_func` in general.
+It remains to clarify the values of :attr:`complement`,
+:attr:`converse`, and :attr:`dual` in general.
 
 .. admonition:: Mathematical definitions
 
@@ -298,30 +298,30 @@ It remains to clarify the values of :attr:`complement_func`,
 
 .. table::
 
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :attr:`func` | :attr:`complement_func` | :attr:`converse_func` | :attr:`dual_func` |
-  +==============+=========================+=======================+===================+
-  | :class:`Eq`  | :class:`Ne`             | :class:`Eq`           | :class:`Ne`       |
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :class:`Ne`  | :class:`Eq`             | :class:`Ne`           | :class:`Eq`       |
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :class:`Ge`  | :class:`Lt`             | :class:`Le`           | :class:`Gt`       |
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :class:`Le`  | :class:`Gt`             | :class:`Ge`           | :class:`Lt`       |
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :class:`Gt`  | :class:`Le`             | :class:`Lt`           | :class:`Ge`       |
-  +--------------+-------------------------+-----------------------+-------------------+
-  | :class:`Lt`  | :class:`Ge`             | :class:`Gt`           | :class:`Le`       |
-  +--------------+-------------------------+-----------------------+-------------------+
+  +-------------+--------------------+------------------+--------------+
+  | :attr:`op`  | :attr:`complement` | :attr:`converse` | :attr:`dual` |
+  +=============+====================+==================+==============+
+  | :class:`Eq` | :class:`Ne`        | :class:`Eq`      | :class:`Ne`  |
+  +-------------+--------------------+------------------+--------------+
+  | :class:`Ne` | :class:`Eq`        | :class:`Ne`      | :class:`Eq`  |
+  +-------------+--------------------+------------------+--------------+
+  | :class:`Ge` | :class:`Lt`        | :class:`Le`      | :class:`Gt`  |
+  +-------------+--------------------+------------------+--------------+
+  | :class:`Le` | :class:`Gt`        | :class:`Ge`      | :class:`Lt`  |
+  +-------------+--------------------+------------------+--------------+
+  | :class:`Gt` | :class:`Le`        | :class:`Lt`      | :class:`Ge`  |
+  +-------------+--------------------+------------------+--------------+
+  | :class:`Lt` | :class:`Ge`        | :class:`Gt`      | :class:`Le`  |
+  +-------------+--------------------+------------------+--------------+
 
-Of course, :attr:`complement_func`, :attr:`converse_func`, and
-:attr:`dual_func` work as constructors in the same way as :attr:`func`:
+Of course, :attr:`complement`, :attr:`converse`, and
+:attr:`dual` work as constructors in the same way as :attr:`op`:
 
 .. doctest::
 
   >>> atom
   Lt(1, 0)
-  >>> atom.dual_func(atom.lhs, atom.rhs)
+  >>> atom.dual(atom.lhs, atom.rhs)
   Le(1, 0)
 
 .. note::
@@ -374,17 +374,17 @@ their instances.
 
   # Class data attributes:
 
-  .. attribute:: func
+  .. attribute:: op
     :noindex:
     :value: C
 
     The relation symbol of the atomic formula.
 
-  .. attribute:: complement_func
+  .. attribute:: complement
     :noindex:
     :value: C_
 
-    The complement relation symbol of :attr:`func`.
+    The complement relation symbol of :attr:`op`.
 
   # Instance data attributes:
 
@@ -392,7 +392,7 @@ their instances.
     :noindex:
     :type: tuple
 
-    The tuple of arguments of the constructor :attr:`func`, which equals ``(index,)``.
+    The tuple of arguments of the constructor :attr:`op`, which equals ``(index,)``.
 
   .. property:: index
     :noindex:

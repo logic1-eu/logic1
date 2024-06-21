@@ -31,13 +31,13 @@ Formula Base Class
   .. autoclass:: Formula
     :members:
     :undoc-members:
-    :exclude-members: func, args, __init__
+    :exclude-members: op, args, __init__
 
     .. automethod:: __init__
 
     .. automethod:: _repr_latex_
 
-    .. property:: func
+    .. property:: op
       :classmethod:
 
       This class property is supposed to be used read-only on instances of
@@ -45,8 +45,8 @@ Formula Base Class
 
     .. autoproperty:: args
 
-    The properties :attr:`func` and :attr:`args` are useful for decomposing and
-    reconstructing formulas, using the invariant :code:`f = f.func(*f.args)`,
+    The properties :attr:`op` and :attr:`args` are useful for decomposing and
+    reconstructing formulas, using the invariant :code:`f = f.op(*f.args)`,
     which holds for all formulas :code:`f`. This approach has been adopted from
     the `SymPy <https://www.sympy.org/>`_ project:
 
@@ -55,16 +55,16 @@ Formula Base Class
       >>> from logic1.firstorder import *
       >>> f = And(Implies(F, T), Or(T, Not(T)))
       >>> # The class of f:
-      >>> f.func
+      >>> f.op
       <class 'logic1.firstorder.boolean.And'>
       >>> # The argument tuple of f:
       >>> f.args
       (Implies(F, T), Or(T, Not(T)))
       >>> # The invariant:
-      >>> f == f.func(*f.args)
+      >>> f == f.op(*f.args)
       True
       >>> # Construction of a new formula using components of f:
-      >>> f.func(Equivalent(T, T), *f.args)
+      >>> f.op(Equivalent(T, T), *f.args)
       And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
 
     .. method:: ~, &, |, >>, <<
@@ -123,13 +123,13 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`Or`, which implements
       the dual operator :math:`\lor` or :math:`\land`.
 
-    .. property:: definite_func
+    .. property:: definite_element
       :classmethod:
 
       A class property yielding the class :class:`_F`, which implements the
@@ -137,7 +137,7 @@ Boolean Formulas
       the dual of the neutral. Note that the return value :class:`_F` is the
       bare operator, in contrast to the formula :data:`F`.
 
-    .. property:: neutral_func
+    .. property:: neutral_element
       :classmethod:
 
       A class property yielding the class :class:`_T`, which implements the
@@ -150,13 +150,13 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`And`, which implements
       the dual operator :math:`\land` or :math:`\lor`.
 
-    .. property:: definite_func
+    .. property:: definite_element
       :classmethod:
 
       A class property yielding the class :class:`_T`, which implements the
@@ -164,7 +164,7 @@ Boolean Formulas
       the dual of the neutral. Note that the return value :class:`_T` is the
       bare operator, in contrast to the formula :data:`T`.
 
-    .. property:: neutral_func
+    .. property:: neutral_element
       :classmethod:
 
       A class property yielding the class :class:`_F`, which implements the
@@ -184,7 +184,7 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`_F`, which implements the dual
@@ -198,7 +198,7 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`_T`, which implements
@@ -220,7 +220,7 @@ Quantified Formulas
     :members: var, arg
     :special-members:
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`All`, which implements the
@@ -230,7 +230,7 @@ Quantified Formulas
     :members: var, arg
     :special-members:
 
-    .. property:: dual_func
+    .. property:: dual
       :classmethod:
 
       A class property yielding the class :class:`Ex`, which implements the
