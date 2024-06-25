@@ -5,7 +5,7 @@
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Project information -----------------------------------------------------
+# Project information
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Logic1'
@@ -13,8 +13,10 @@ copyright = '2023 by N. Faroß, T. Sturm'
 author = 'N. Faroß, <a: href="https://science.thomas-sturm.de">T. Sturm</a>'
 release = '0.1'
 
-# -- General configuration ---------------------------------------------------
+# General configuration
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
+
+exclude_patterns = ['**/atomlib.rst']
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -24,13 +26,7 @@ extensions = [
     'sphinx.ext.intersphinx',
 ]
 
-templates_path = ['_templates']
-exclude_patterns = ['**/atomlib.rst']
-
-language = 'en'
-
-doctest_path = ['../logic1']
-
+# doctest_path = ['../logic1']
 
 autodoc_class_signature = 'separated'
 
@@ -41,6 +37,8 @@ autodoc_default_options = {
 
 autodoc_type_aliases = {'QuantifierBlock': 'QuantifierBlock'}
 
+# _extra_footer = ''
+
 intersphinx_mapping = {
     'sympy': ('https://docs.sympy.org/latest', None),
     'python': ('https://docs.python.org/3', None),
@@ -48,13 +46,18 @@ intersphinx_mapping = {
     'sage-polynomial-rings': ('https://doc.sagemath.org/html/en/reference/polynomial_rings/', None)
 }
 
+language = 'en'
+
+# nitpicky = False
+
+# pygments_style = 'tango'
+
 python_use_unqualified_type_names = True
 
-# -- Options for HTML output -------------------------------------------------
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
+templates_path = ['_templates']
 
-# _extra_footer = """
-# """
+# Options for HTML output
+# https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_context = {
     # 'default_mode': 'auto'
@@ -89,5 +92,3 @@ html_theme_options = {
 }
 
 html_title = 'Logic1'
-
-# pygments_style = 'tango'
