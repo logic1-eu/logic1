@@ -14,7 +14,6 @@ from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, Typ
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
-from ...support.decorators import classproperty
 
 from ...support.tracing import trace  # noqa
 
@@ -443,34 +442,34 @@ class AtomicFormula(firstorder.AtomicFormula):
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     | :data:`self`       | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
+    | :meth:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
+    | :meth:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :attr:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
+    | :meth:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     """  # noqa
-    @classproperty
+    @classmethod
     def complement(cls) -> type[AtomicFormula]:
         """Complement relation.
         """
         D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
         return D[cls]
 
-    @classproperty
+    @classmethod
     def converse(cls) -> type[AtomicFormula]:
         """Converse relation.
         """
         D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
         return D[cls]
 
-    @classproperty
+    @classmethod
     def dual(cls) -> type[AtomicFormula]:
         """Dual relation.
         """
-        return cls.complement.converse
+        return cls.complement().converse()
 
-    @classproperty
+    @classmethod
     def python_operator(cls) -> BuiltinFunctionType:
         """The operator correponding to `cls` for evaluation of constant
         relations.
@@ -480,7 +479,7 @@ class AtomicFormula(firstorder.AtomicFormula):
                   Ge: operator.ge, Gt: operator.gt}
         return D[cls]
 
-    @classproperty
+    @classmethod
     def strict_part(cls) -> type[Formula]:
         """The strict part is the binary relation without the diagonal.
         """

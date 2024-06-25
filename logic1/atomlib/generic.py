@@ -1,23 +1,20 @@
+from abc import ABC, abstractmethod
+
 from ..firstorder import F, T
-from ..support.decorators import classproperty
 
 
-class BinaryAtomicFormulaMixin:
+class BinaryAtomicFormulaMixin(ABC):
 
-    @classproperty
+    @classmethod
+    @abstractmethod
     def converse(cls):
-        # Should be an abstract class property
-        raise NotImplementedError
+        ...
 
-    @classproperty
+    @classmethod
     def dual(cls):
         """The dual class of :class:`cls`.
-
-        There is an implicit assumption that there are abstract class
-        properties `complement` and `converse` specified, which is
-        technically not possible at the moment.
         """
-        return cls.complement.converse
+        return cls.complement().converse()
 
     @property
     def lhs(self):

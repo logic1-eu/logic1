@@ -13,11 +13,11 @@ the following discussion:
 
 Assume that :math:`r` is defined on a domain :math:`D`. Then the
 *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
-\setminus r`. It is avaialable as a class property `R.complement`,
+\setminus r`. It is avaialable as a class method :meth:`R.complement`,
 e.g.:
 
 >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
->>> tuple(r.complement for r in rels)
+>>> tuple(r.complement() for r in rels)
 (<class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Lt'>,
@@ -32,9 +32,9 @@ with keyword argument `to_positive=True`.
 
 The *converse relation* of :math:`r` is defined as
 :math:`r^{-1} = \{ (x, y) \in D : (y, x) \in r \}`.
-It is avaialable as a class property `R.converse`, e.g.:
+It is avaialable as a class method :meth:`R.converse`, e.g.:
 
->>> tuple(r.converse for r in rels)
+>>> tuple(r.converse() for r in rels)
 (<class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Le'>,
@@ -45,20 +45,20 @@ It is avaialable as a class property `R.converse`, e.g.:
 The converse relation is the inverse with respect to composition.
 
 Finally, the *dual relation* of :math:`r` is defined as
-:math:`\overline{r}^{-1}`. It is available as a class property
-`R.dual`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
+:math:`\overline{r}^{-1}`. It is available as a class method
+:meth:`R.dual`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
 e.g.:
 
->>> tuple(r.dual for r in rels)
+>>> tuple(r.dual() for r in rels)
 (<class 'logic1.theories.RCF.atomic.Ne'>,
  <class 'logic1.theories.RCF.atomic.Eq'>,
  <class 'logic1.theories.RCF.atomic.Gt'>,
  <class 'logic1.theories.RCF.atomic.Lt'>,
  <class 'logic1.theories.RCF.atomic.Ge'>,
  <class 'logic1.theories.RCF.atomic.Le'>)
->>> all(r.dual == r.complement.converse for r in rels)
+>>> all(r.dual() == r.complement().converse() for r in rels)
 True
->>> all(r.dual == r.converse.complement for r in rels)
+>>> all(r.dual() == r.converse().complement() for r in rels)
 True
 
 In the context of orderings, dualization turns strict inequalities into
@@ -68,9 +68,9 @@ differently.
 
 All those operators on relations are involutive:
 
->>> all(r.complement.complement == r for r in rels)
+>>> all(r.complement().complement() == r for r in rels)
 True
->>> all(r.converse.converse == r for r in rels)
+>>> all(r.converse().converse() == r for r in rels)
 True
->>> all(r.dual.dual == r for r in rels)
+>>> all(r.dual().dual() == r for r in rels)
 True

@@ -4,18 +4,16 @@ from abc import ABC, abstractmethod
 from typing import Any, Iterator, Self, TypeAlias
 
 from .formula import Formula
-from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
 
 
 class AtomicFormula(Formula):
 
-    @classproperty
+    @classmethod
+    @abstractmethod
     def complement(cls):
         """The complement operator of an atomic formula.
-
-        Should be an abstract class property
         """
         raise NotImplementedError()
 
@@ -68,7 +66,7 @@ class AtomicFormula(Formula):
         .. seealso::
             :attr:`complement` -- complement relation
         """
-        return self.complement(*self.args)
+        return self.complement()(*self.args)
 
 
 class Term(ABC):

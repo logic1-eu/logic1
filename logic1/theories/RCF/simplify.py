@@ -85,7 +85,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             # the negative of the Rational absolute summand.
             rel, p, q = self._decompose_atom(atom)
             if gand is Or:
-                rel = rel.complement
+                rel = rel.complement()
             match rel:
                 # We model p in ivl \ exc.
                 #

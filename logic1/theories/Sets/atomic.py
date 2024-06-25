@@ -11,7 +11,6 @@ from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
 from ... import firstorder
 from ...firstorder import F, Formula, T
-from ...support.decorators import classproperty
 
 
 logging.basicConfig(
@@ -192,7 +191,7 @@ Variable: TypeAlias = Term
 @functools.total_ordering
 class AtomicFormula(firstorder.AtomicFormula):
 
-    @classproperty
+    @classmethod
     def complement(cls) -> type[AtomicFormula]:
         D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
         return D[cls]

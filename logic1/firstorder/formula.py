@@ -5,7 +5,6 @@ import functools
 from typing import Any, Callable, Final, Iterable, Iterator
 from typing_extensions import Self
 
-from ..support.decorators import classproperty  # noqa
 from ..support.tracing import trace  # noqa
 
 

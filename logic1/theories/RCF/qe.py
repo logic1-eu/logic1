@@ -721,7 +721,7 @@ class Node:
                         c = atom.lhs.coefficient({x: e})
                         if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
                             c = - c
-                        mu = Or(atom.op.strict_part(c, 0), And(Eq(c, 0), mu))
+                        mu = Or(atom.op.strict_part()(c, 0), And(Eq(c, 0), mu))
                     return mu
                 case _:
                     assert False, atom
@@ -747,7 +747,7 @@ class Node:
             lhs_prime = atom.lhs.derivative(x)
             if nsp == NSP.MINUS_EPSILON:
                 lhs_prime = - lhs_prime
-            atom_strict = atom.op.strict_part(atom.lhs, 0)
+            atom_strict = atom.op.strict_part()(atom.lhs, 0)
             atom_prime = atom.op(lhs_prime, 0)
             return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
 

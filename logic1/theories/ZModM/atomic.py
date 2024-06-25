@@ -51,13 +51,13 @@ class BinaryAtomicFormula(atomlib.sympy.BinaryAtomicFormula):
 
 class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
 
-    @classproperty
+    @classmethod
     def complement(cls):
         """The complement relation Ne of Eq.
         """
         return Ne
 
-    @classproperty
+    @classmethod
     def converse(cls):
         """The converse relation Eq of Eq.
         """
@@ -75,13 +75,13 @@ class Eq(atomlib.generic.EqMixin, BinaryAtomicFormula):
 
 class Ne(atomlib.generic.NeMixin, BinaryAtomicFormula):
 
-    @classproperty
+    @classmethod
     def complement(cls):
         """The complement relation Eq of Ne.
         """
         return Eq
 
-    @classproperty
+    @classmethod
     def converse(cls):
         """The converse relation Ne of Ne.
         """
