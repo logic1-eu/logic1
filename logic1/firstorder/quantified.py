@@ -8,24 +8,15 @@ from typing import Any, final, Sequence, TypeAlias
 
 from .formula import Formula
 from .atomic import Variable
-from ..support.decorators import classproperty
 from ..support.tracing import trace  # noqa
 
 
 class QuantifiedFormula(Formula):
     r"""A class whose instances are quanitfied formulas in the sense that their
     toplevel operator is a one of the quantifiers :math:`\exists` or
-    :math:`\forall`.
+    :math:`\forall`. Note that members of :class:`QuantifiedFormula` may have
+    subformulas with other logical operators deeper in the expression tree.
     """
-
-    # Note that members of :class:`QuantifiedFormula` may have subformulas with
-    # other logical operators deeper in the expression tree.
-
-    # The following would be abstract class variables, which are not available
-    # at the moment.
-    op: Any  #: :meta private:
-    dual: type[QuantifiedFormula]  #: :meta private:
-
     @property
     def var(self) -> Any:
         """The variable of the quantifier.
@@ -93,9 +84,9 @@ class Ex(QuantifiedFormula):
     >>> Ex([x, y], And(x > 0, y > 0, z == x - y))
     Ex(x, Ex(y, And(x > 0, y > 0, z == x - y)))
     """
-    @classproperty
-    def dual(cls):
-        r"""A class property yielding the class :class:`All`, which implements
+    @classmethod
+    def dual(cls) -> type[All]:
+        r"""A class method yielding the class :class:`All`, which implements
         the dual operator :math:`\forall` of :math:`\exists`.
         """
         return All
@@ -115,9 +106,9 @@ class All(QuantifiedFormula):
     >>> All([x, y], (x + y)**2 == x**2 + 2*x*y + y**2)
     All(x, All(y, x^2 + 2*x*y + y^2 == x^2 + 2*x*y + y^2))
     """
-    @classproperty
-    def dual(cls):
-        """A class property yielding the dual class :class:`Ex` of class:`All`.
+    @classmethod
+    def dual(cls) -> type[Ex]:
+        """A class method yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
 

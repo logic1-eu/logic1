@@ -51,15 +51,15 @@ class PrenexNormalForm:
         match f:
             case AtomicFormula() | _F() | _T():
                 return {Ex: f, All: f}
-            case And(op=op, args=args) | Or(op=op, args=args):
+            case And() | Or():
                 L1 = []
                 L2 = []
-                for arg in args:
+                for arg in f.args:
                     d = self._pnf(arg)
                     L1.append(d[Ex])
                     L2.append(d[All])
-                f1 = self.interchange(op(*L1), Ex)
-                f2 = self.interchange(op(*L2), All)
+                f1 = self.interchange(f.op(*L1), Ex)
+                f2 = self.interchange(f.op(*L2), All)
                 if f1.op is not Ex and f2.op is not All:
                     # f is quantifier-free
                     return {Ex: f, All: f}
@@ -75,8 +75,8 @@ class PrenexNormalForm:
                     return d
                 d[Ex] = d[All] = f2
                 return d
-            case All(op=Q, var=var, arg=arg) | Ex(op=Q, var=var, arg=arg):
-                new_f = Q(var, self._pnf(arg)[Q])
+            case All() | Ex():
+                new_f = f.op(f.var, self._pnf(f.arg)[f.op])
                 return {Ex: new_f, All: new_f}
             case _:
                 assert False
@@ -99,7 +99,7 @@ class PrenexNormalForm:
                 args[i] = arg_i
             if not found_quantifier:
                 break
-            q = q.dual
+            q = q.dual()
         # The lifting of quantifiers above can introduce direct nested
         # ocurrences of self.op, which is one of And, Or. We
         # flatten those now, but not any other nestings.

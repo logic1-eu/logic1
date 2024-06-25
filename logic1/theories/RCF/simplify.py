@@ -428,11 +428,11 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 return _simpl_at_ge(- lhs, context)
             case Gt():
                 if context is not None:
-                    context = context.dual
+                    context = context.dual()
                 return Not(_simpl_at_ge(- lhs, context)).to_nnf()
             case Lt():
                 if context is not None:
-                    context = context.dual
+                    context = context.dual()
                 return Not(_simpl_at_ge(lhs, context)).to_nnf()
             case _:
                 assert False

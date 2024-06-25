@@ -10,8 +10,6 @@ the following discussion:
 >>> from logic1.theories.RCF import Eq, Ne, Ge, Le, Gt, Lt
 >>> Eq(0, 0).op
  <class 'logic1.theories.RCF.atomic.Eq'>
- >>> Eq.op
- <class 'logic1.theories.RCF.atomic.Eq'>
 
 Assume that :math:`r` is defined on a domain :math:`D`. Then the
 *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2

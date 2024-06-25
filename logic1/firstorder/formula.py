@@ -35,16 +35,12 @@ class Formula(ABC):
     they do not need to know the semantics of the underlying theories.
     """
 
-    # The return type of op is type[Self]. However, @classproperty makes
-    # Python think that it is Self. Therefore, we do not annotate at all and
-    # hope for the return of @property + @classmethod in the Standard Python
-    # Library.
-    @classproperty
-    def op(cls):
-        """This class property is supposed to be used with instances of
-        subclasses of :class:`Formula`. It yields the respective subclass.
+    @property
+    def op(self) -> type[Self]:
+        """This property is supposed to be used with instances of subclasses of
+        :class:`Formula`. It yields the respective subclass.
         """
-        return cls
+        return type(self)
 
     @property
     def args(self) -> tuple[Any, ...]:
@@ -395,7 +391,7 @@ class Formula(ABC):
         match self:
             case All() | Ex():
                 count, quantifiers = self.arg._count_alternations()
-                if self.dual in quantifiers:
+                if self.dual() in quantifiers:
                     return (count + 1, {self.op})
                 return (count, quantifiers)
             case And() | Or() | Not() | Implies() | Equivalent():
@@ -771,10 +767,11 @@ class Formula(ABC):
                     # renamed to var. In case of (iv) above, substitution will
                     # introduce new free occurrences of self.var, which do not
                     # clash with the new quantified variable var:
-                    return self.op(var, self.arg.subs(substitution))
-                return self.op(self.var, self.arg.subs(substitution))
+                    return self.op(var, self.arg.subs(substitution))  # type: ignore[return-value]
+                return self.op(self.var, self.arg.subs(substitution))  # type: ignore[return-value]
             case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
-                return self.op(*(arg.subs(substitution) for arg in self.args))
+                return_value = self.op(*(arg.subs(substitution) for arg in self.args))
+                return return_value  # type: ignore[return-value]
             case _:
                 # Atomic formulas are caught by the implementation of the
                 # abstract method AtomicFormula.subs.
@@ -804,10 +801,11 @@ class Formula(ABC):
         >>> f.to_nnf()
         And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
         """
+        nnf_op: type[Formula]
         rewrite: Formula
         match self:
             case All() | Ex():
-                nnf_op = self.dual if _not else self.op
+                nnf_op = self.dual() if _not else self.op
                 nnf_arg = self.arg.to_nnf(to_positive=to_positive, _not=_not)
                 return nnf_op(self.var, nnf_arg)
             case Equivalent():
@@ -820,7 +818,7 @@ class Formula(ABC):
                     rewrite = Or(Not(self.lhs), self.rhs)
                 return rewrite.to_nnf(to_positive=to_positive, _not=_not)
             case And() | Or():
-                nnf_op = self.dual if _not else self.op
+                nnf_op = self.dual() if _not else self.op
                 nnf_args: list[Formula] = []
                 for arg in self.args:
                     nnf_arg = arg.to_nnf(to_positive=to_positive, _not=_not)
@@ -833,7 +831,7 @@ class Formula(ABC):
                 return self.arg.to_nnf(to_positive=to_positive, _not=not _not)
             case _F() | _T():
                 if _not:
-                    return self.dual() if to_positive else Not(self)
+                    return self.dual()() if to_positive else Not(self)
                 return self
             case AtomicFormula():
                 if _not:

@@ -6,7 +6,6 @@ from __future__ import annotations
 from typing import final, Optional
 
 from .formula import Formula
-from ..support.decorators import classproperty
 
 from ..support.tracing import trace  # noqa
 
@@ -17,12 +16,7 @@ class BooleanFormula(Formula):
     :math:`\bot`, :math:`\lnot`, :math:`\wedge`, :math:`\vee`,
     :math:`\longrightarrow`, :math:`\longleftrightarrow`.
     """
-
-    # The following would be abstract class variables, which are not available
-    # at the moment.
-    dual: type[BooleanFormula]  #: :meta private:
-    definite_element: type[BooleanFormula]  #: :meta private:
-    neutral_element: type[BooleanFormula]  #: :meta private:
+    pass
 
 
 @final
@@ -90,33 +84,42 @@ class And(BooleanFormula):
     >>> And(x == 1, x == y, y == z)
     And(x == 1, x == y, y == z)
     """
-    @classproperty
-    def dual(cls):
-        r"""A class property yielding the class :class:`Or`, which implements
+    @classmethod
+    def dual(cls) -> type[Or]:
+        r"""A class method yielding the class :class:`Or`, which implements
         the dual operator :math:`\vee` of :math:`\wedge`.
         """
         return Or
 
-    @classproperty
-    def definite_element(cls):
-        r"""A class property yielding the class :class:`_F`, which implements
-        the definite operator :math:`\bot` of :math:`\wedge`. The definite
-        operator is the dual of the neutral.
-
-        Note that the return value :class:`_F` is the naked operator, in
-        contrast to the formula :data:`F`.
+    @classmethod
+    def definite(cls) -> type[_F]:
+        r"""A class method yielding the class :class:`_F`, which is the
+        operator of the constant Formula :data:`F`. The definite is the dual of
+        the neutral.
         """
         return _F
 
-    @classproperty
-    def neutral_element(cls):
-        r"""A class property yielding the class :class:`_T`, which implements
-        the neutral operator :math:`\top` of :math:`\wedge`.
+    @classmethod
+    def definite_element(cls) -> _F:
+        r"""A class method yielding the unique instance :data:`F` of the
+        :class:`_F`.
+        """
+        return F
 
-        Note that the return value :class:`_T` is the naked operator, in
-        contrast to the formula :data:`T`.
+    @classmethod
+    def neutral(cls) -> type[_T]:
+        r"""A class method yielding the class :class:`_T`, which is the
+        operator of the constant Formula :data:`T`. The neutral is the dual of
+        the definite.
         """
         return _T
+
+    @classmethod
+    def neutral_element(cls) -> _T:
+        r"""A class method yielding the unique instance :data:`T` of the
+        :class:`_T`.
+        """
+        return T
 
     def __new__(cls, *args: Formula):
         if not args:
@@ -156,33 +159,42 @@ class Or(BooleanFormula):
     >>> Or(x == 1, x == 2, x == 3)
     Or(x == 1, x == 2, x == 3)
     """
-    @classproperty
-    def dual(cls):
-        r"""A class property yielding the class :class:`And`, which implements
+    @classmethod
+    def dual(cls) -> type[And]:
+        r"""A class method yielding the class :class:`And`, which implements
         the dual operator :math:`\wedge` of :math:`\vee`.
         """
         return And
 
-    @classproperty
-    def definite_element(cls):
-        r"""A class property yielding the class :class:`_T`, which implements
-        the definite operator :math:`\top` of :math:`\vee`. The definite
-        operator is the dual of the neutral.
-
-        Note that the return value :class:`_T` is the naked operator, in
-        contrast to the formula :data:`T`.
+    @classmethod
+    def definite(cls) -> type[_T]:
+        r"""A class method yielding the class :class:`_T`, which is the
+        operator of the constant Formula :data:`T`. The definite is the dual of
+        the neutral.
         """
         return _T
 
-    @classproperty
-    def neutral_element(cls):
-        r"""A class property yielding the class :class:`_F`, which implements
-        the neutral operator :math:`\bot` of :math:`\vee`.
+    @classmethod
+    def definite_element(cls) -> _T:
+        r"""A class method yielding the unique instance :data:`T` of the
+        :class:`_T`.
+        """
+        return T
 
-        Note that the return value :class:`_F` is the naked operator, in
-        contrast to the formula :data:`F`.
+    @classmethod
+    def neutral(cls) -> type[_F]:
+        r"""A class method yielding the class :class:`_F`, which is the
+        operator of the constant Formula :data:`F`. The neutral is the dual of
+        the definite.
         """
         return _F
+
+    @classmethod
+    def neutral_element(cls) -> _F:
+        r"""A class method yielding the unique instance :data:`F` of the
+        :class:`_F`.
+        """
+        return F
 
     def __new__(cls, *args):
         if not args:
@@ -267,9 +279,9 @@ class _T(BooleanFormula):
     # support subclassing. We do not use a module because we need _T to be a
     # subclass itself.
 
-    @classproperty
-    def dual(cls):
-        r"""A class property yielding the class :class:`_F`, which implements
+    @classmethod
+    def dual(cls) -> type[_F]:
+        r"""A class method yielding the class :class:`_F`, which implements
         the dual operator :math:`\bot` of :math:`\top`.
         """
         return _F
@@ -311,12 +323,12 @@ class _F(BooleanFormula):
     # support subclassing. We do not use a module because we need _F to be a
     # subclass itself.
 
-    @classproperty
-    def dual(cls):
-        r"""A class property yielding the class :class:`_T`, which implements
+    @classmethod
+    def dual(cls) -> type[_T]:
+        r"""A class method yielding the class :class:`_T`, which implements
         the dual operator :math:`\top` of :math:`\bot`.
         """
-        return (lambda: _T)()
+        return _T
 
     _instance: Optional[_F] = None
 

@@ -88,16 +88,16 @@ class Simplify(ABC, Generic[AT, TH]):
         match f:
             case And() | Or():
                 return self._simpl_and_or(f, th)
+            case _F() | _T():
+                return f
             case self.class_AT():
                 # Build a trivial binary And in order to apply th. Unary And
                 # does not exist.
                 return self._simpl_and_or(And(f, T), th)
-            case _F() | _T():
-                return f
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.op!r}')
 
-    def _simpl_and_or(self, f: Formula, th: TH) -> Formula:
+    def _simpl_and_or(self, f: And | Or, th: TH) -> Formula:
         """
         `f` must be in negation normal form (NNF).
         """
@@ -125,27 +125,25 @@ class Simplify(ABC, Generic[AT, TH]):
             th.add(gand, atoms)
         except th.Inconsistent:
             return gand.definite_element()
-
         simplified_others: set[Formula] = set()
         while others:
             arg = others.pop()
-            simplified_arg = self._simpl_and_or(arg, th.next_())
-            match simplified_arg:
-                case gand.definite_element():
-                    return simplified_arg
-                case gand.neutral_element():
-                    new_others = set()
-                    new_atoms: Iterable[AT] = ()
-                case gand.op():
-                    new_others, new_atoms = split(simplified_arg.args)
-                case self.class_AT():
-                    new_others = set()
-                    new_atoms = (simplified_arg,)
-                case gand.dual():
-                    new_others = {simplified_arg}
-                    new_atoms = ()
-                case _:
-                    raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
+            simplified_arg = self._simpl_nnf(arg, th.next_())
+            if isinstance(simplified_arg, gand.definite()):
+                return simplified_arg
+            elif isinstance(simplified_arg, gand.neutral()):
+                new_others = set()
+                new_atoms: Iterable[AT] = ()
+            elif isinstance(simplified_arg, gand):
+                new_others, new_atoms = split(simplified_arg.args)
+            elif isinstance(simplified_arg, self.class_AT):
+                new_others = set()
+                new_atoms = (simplified_arg,)
+            elif isinstance(simplified_arg, gand.dual()):
+                new_others = {simplified_arg}
+                new_atoms = ()
+            else:
+                raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
             if new_atoms:
                 try:
                     th.add(gand, new_atoms)  # Can save resimp if th does not change
