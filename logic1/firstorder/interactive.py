@@ -36,7 +36,7 @@ def Ex(variables: object, arg: Formula) -> Formula:
     """Build an Ex-quantified Formula, checking arguments.
 
     >>> from logic1.theories.Sets import Eq, VV
-    >>> x, = VV.set_vars('x')
+    >>> x, = VV.get('x')
     >>> Ex(x, x == x)
     Ex(x, x == x)
 

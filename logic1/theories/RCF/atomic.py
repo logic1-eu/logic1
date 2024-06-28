@@ -113,7 +113,7 @@ class _VariableSet:
         match index:
             case str():
                 self.wrapped_ring.ensure_vars((index,))
-                return Term(self.wrapped_ring(index))
+                return Variable(self.wrapped_ring(index))
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
@@ -155,13 +155,13 @@ class _VariableSet:
     def push(self) -> None:
         self.wrapped_ring.push()
 
-    def _stack(self) -> list[PolynomialRing]:
-        return self.wrapped_ring.stack
-
     def __repr__(self):
         vars_ = self.wrapped_ring.get_vars()
         s = ', '.join(str(g) for g in (*vars_, '...'))
         return f'{{{s}}}'
+
+    def _stack(self) -> list[PolynomialRing]:
+        return self.wrapped_ring.stack
 
 
 VV = _VariableSet(ring)
@@ -207,14 +207,6 @@ class Term(firstorder.Term):
         if isinstance(other, Term):
             return Eq(self, other)
         return Eq(self, Term(other))
-
-    def fresh(self) -> Variable:
-        """
-        .. seealso::
-            :meth:`logic1.firstorder.atomic.Term.fresh`
-        """
-        assert self.is_variable()
-        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
         if isinstance(other, Term):
@@ -354,6 +346,14 @@ class Term(firstorder.Term):
                 unit = - unit
             D[Term(poly)] = multiplicity
         return unit, D
+
+    def fresh(self) -> Variable:
+        """
+        .. seealso::
+            :meth:`logic1.firstorder.atomic.Term.fresh`
+        """
+        assert self.is_variable()
+        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def is_constant(self) -> bool:
         """

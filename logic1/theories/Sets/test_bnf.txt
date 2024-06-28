@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.Sets import *
 
->>> a, b, c, d, o = VV.set_vars('a', 'b', 'c', 'd', 'o')
+>>> a, b, c, d, o = VV.get('a', 'b', 'c', 'd', 'o')
 
 >>> dnf(T)
 T

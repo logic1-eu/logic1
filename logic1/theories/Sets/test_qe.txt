@@ -1,9 +1,10 @@
 >>> import itertools
->>> from logic1.firstorder.interactive import *
+>>> from logic1.firstorder import *
 >>> from logic1.theories.Sets import *
 
->>> V = list(VV.set_vars(*(f'c{i}' for i in range(1, 28))))
->>> VV.import_vars()
+>>> V = list(VV.get(*(f'c{i}' for i in range(1, 28))))
+>>> for v in V:
+...     VV.imp(str(v))
 
 >>> gamma = [
 ...     # Dummy

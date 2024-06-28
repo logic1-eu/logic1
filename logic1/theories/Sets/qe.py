@@ -22,7 +22,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
 
     >>> from logic1.firstorder import *
     >>> from logic1.theories.Sets import *
-    >>> a, u, v, w, x, y, z = VV.set_vars('a', 'u', 'v', 'w', 'x', 'y', 'z')
+    >>> a, u, v, w, x, y, z = VV.get('a', 'u', 'v', 'w', 'x', 'y', 'z')
     >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, (Eq(u, v) | Ne(v, w))
     ...     & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
     >>> f

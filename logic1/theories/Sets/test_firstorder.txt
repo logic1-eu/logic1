@@ -1,6 +1,6 @@
 >>> from logic1.firstorder import *
 >>> from logic1.theories.Sets import *
->>> a, b, x, y, z = VV.set_vars('a', 'b', 'x', 'y', 'z')
+>>> a, b, x, y, z = VV.get('a', 'b', 'x', 'y', 'z')
 
 bvars:
 >>> f = C(2) & All(y, Ex(x, (x == y) & (y == a)) & Ex(z, x == a))

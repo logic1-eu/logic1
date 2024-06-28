@@ -1,8 +1,8 @@
 >>> from logic1.firstorder import *
 >>> from logic1.theories.Sets import *
 
->>> x = VV.set_vars(*(f'x{i}' for i in range(9)))
->>> a, b, o, y = VV.set_vars('a', 'b', 'o', 'y')
+>>> x = VV.get(*(f'x{i}' for i in range(9)))
+>>> a, b, o, y = VV.get('a', 'b', 'o', 'y')
 
 # Example from p.88 in "K. Burhenne. Implementierung eines Algorithmus zur
 # Quantorenelimination für lineare reelle Probleme. Diploma Thesis, University

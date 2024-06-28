@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import functools
 import inspect
 import logging
 import string
-import sys
 from types import FrameType
 from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
@@ -23,118 +21,95 @@ oo = float('Inf')
 Index: TypeAlias = int | float
 
 
-class _VariableRegistry:
-    """Instances of the singleton VariableRegsitry register, store, and provide
+class _VariableSet:
+    """Instances of the singleton VariableSet register, store, and provide
     variables, which are instances of Terms and suitable for building complex
-    insrtances of Terms using operators and methods defined in :class:`Term`.
+    instances of Terms using operators and methods defined in :class:`Term`.
     """
 
-    _instance: ClassVar[Optional[_VariableRegistry]] = None
+    _instance: ClassVar[Optional[_VariableSet]] = None
+    _stack: list[set[str]]
+    _used: set[str]
+
+    def fresh(self, suffix: str = '') -> Variable:
+        """Return a fresh variable, by default from the sequence G0001, G0002,
+        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
+        gensym(). If the optional argument :data:`suffix` is specified, the
+        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
+        """
+        i = 1
+        v_as_str = f'G{i:04d}{suffix}'
+        while v_as_str in self._used:
+            i += 1
+            v_as_str = f'G{i:04d}{suffix}'
+        return self[v_as_str]
+
+    def get(self, *args) -> tuple[Variable, ...]:
+        return tuple(self[name] for name in args)
+
+    def __getitem__(self, index: str) -> Variable:
+        match index:
+            case str():
+                self._used.update((index,))
+                return Variable(index)
+            case _:
+                raise ValueError(f'expecting string as index; {index} is {type(index)}')
+
+    def imp(self, *args) -> None:
+        """Import variables into global namespace.
+        """
+        vars_ = self.get(*args)
+        frame = inspect.currentframe()
+        assert isinstance(frame, FrameType)
+        frame = frame.f_back
+        try:
+            assert isinstance(frame, FrameType)
+            module = frame.f_globals['__name__']
+            assert module == '__main__', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is module {module}'
+            function = frame.f_code.co_name
+            assert function == '<module>', \
+                f'expecting imp to be called from the top level of module __main__; ' \
+                f'context is function {function} in module {module}'
+            for v in vars_:
+                frame.f_globals[str(v)] = v
+        finally:
+            # Compare Note here:
+            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
+            del frame
+
+    def __init__(self):
+        self._stack = []
+        self._used = set()
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __init__(self):
-        self.variables = []
-        self.stack = []
+    def pop(self) -> set[str]:
+        self._used = self._stack.pop()
+        return self._used
+
+    def push(self) -> list[set[str]]:
+        self._stack.append(self._used)
+        self._used = set()
+        return self._stack
 
     def __repr__(self):
-        return f'Term Algebra in {", ".join(self.variables)}'
-
-    def add_var(self, v: str) -> Variable:
-        return self.add_vars(v)[0]
-
-    def add_vars(self, *args) -> tuple[Variable, ...]:
-        added_as_str = list(args)
-        old_as_str = self.variables
-        for v in added_as_str:
-            if not isinstance(v, str):
-                raise ValueError(f'{v} is not a string')
-            if v in old_as_str:
-                raise ValueError(f'{v} is already a variable')
-        new_as_str = sorted(old_as_str + added_as_str)
-        self.variables = new_as_str
-        added_as_var = (Variable(v) for v in added_as_str)
-        return tuple(added_as_var)
-
-    def get_vars(self) -> tuple[Variable, ...]:
-        return tuple(Variable(v) for v in self.variables)
-
-    def import_vars(self, force: bool = False):
-        critical = []
-        variables = self.get_vars()
-        frame = inspect.currentframe()
-        assert isinstance(frame, FrameType)
-        frame = frame.f_back
-        try:
-            assert isinstance(frame, FrameType)
-            name = frame.f_globals['__name__']
-            assert name == '__main__', f'import_vars called from {name}'
-            for v in variables:
-                try:
-                    expr = frame.f_globals[str(v)]
-                    if expr != v:
-                        critical.append(str(v))
-                except KeyError:
-                    pass
-            for v in variables:
-                if force or str(v) not in critical:
-                    frame.f_globals[str(v)] = v
-            if not force:
-                if len(critical) == 1:
-                    print(f'{critical[0]} has another value already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-                elif len(critical) > 1:
-                    print(f'{", ".join(critical)} have other values already, '
-                          f'use force=True to overwrite ',
-                          file=sys.stderr)
-        finally:
-            # Compare Note here:
-            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
-            del frame
-
-    def pop(self) -> list[str]:
-        self.variables = self.stack.pop()
-        return self.variables
-
-    def push(self) -> list[list[str]]:
-        self.stack.append(self.variables)
-        return self.stack
-
-    def set_vars(self, *args) -> tuple[Variable, ...]:
-        self.variables = []
-        return self.add_vars(*args)
+        s = ', '.join(str(g) for g in (*self._used, '...'))
+        return f'{{{s}}}'
 
 
-VV = _VariableRegistry()
+VV = _VariableSet()
 
 
-@dataclass
 class Term(firstorder.Term):
 
-    var: str
+    wrapped_variable_set: _VariableSet = VV
 
-    def fresh(self) -> Variable:
-        return self.fresh_variable(suffix=f'_{str(self)}')
-
-    @classmethod
-    def fresh_variable(cls, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence G0001, G0002,
-        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
-        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
-        """
-        vars_as_str = tuple(str(v) for v in VV.get_vars())
-        i = 1
-        v_as_str = f'G{i:04d}{suffix}'
-        while v_as_str in vars_as_str:
-            i += 1
-            v_as_str = f'G{i:04d}{suffix}'
-        v = VV.add_var(v_as_str)
-        return v
+    string: str
 
     def __eq__(self, other: Term) -> Eq:  # type: ignore[override]
         if isinstance(other, Term):
@@ -142,12 +117,12 @@ class Term(firstorder.Term):
         raise ValueError(f'arguments must be terms - {other} is {type(other)}')
 
     def __hash__(self) -> int:
-        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.var))
+        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.string))
 
     def __init__(self, arg: str) -> None:
         if not isinstance(arg, str):
             raise ValueError(f'argument must be a string; {arg} is {type(arg)}')
-        self.var = arg
+        self.string = arg
 
     def __ne__(self, other: Term) -> Ne:  # type: ignore[override]
         if isinstance(other, Term):
@@ -155,7 +130,7 @@ class Term(firstorder.Term):
         raise ValueError(f'arguments must be terms; {other} is {type(other)}')
 
     def __repr__(self) -> str:
-        return self.var
+        return self.string
 
     def as_latex(self) -> str:
         """Convert `self` to LaTeX.
@@ -163,15 +138,18 @@ class Term(firstorder.Term):
         Implements the abstract method
         :meth:`logic1.firstorder.atomic.Term.as_Latex`.
         """
-        base = self.var.rstrip(string.digits)
-        index = self.var[len(base):]
+        base = self.string.rstrip(string.digits)
+        index = self.string[len(base):]
         if index:
             return f'{base}_{{{index}}}'
         return base
 
+    def fresh(self) -> Variable:
+        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
+
     @staticmethod
     def sort_key(term: Term) -> str:
-        return term.var
+        return term.string
 
     def subs(self, d: dict[Variable, Term]) -> Term:
         return d.get(self, self)
@@ -291,7 +269,7 @@ class Eq(AtomicFormula):
         return self.args[1]
 
     def __bool__(self) -> bool:
-        return self.lhs.var == self.rhs.var
+        return self.lhs.string == self.rhs.string
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         for arg in (lhs, rhs):
@@ -319,7 +297,7 @@ class Ne(AtomicFormula):
         return self.args[1]
 
     def __bool__(self) -> bool:
-        return self.lhs.var != self.rhs.var
+        return self.lhs.string != self.rhs.string
 
     def __init__(self, lhs: Term, rhs: Term) -> None:
         for arg in (lhs, rhs):
