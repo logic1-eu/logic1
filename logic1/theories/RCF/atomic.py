@@ -91,6 +91,27 @@ class _VariableSet:
 
     wrapped_ring: PolynomialRing
 
+    def __getitem__(self, index: str) -> Variable:
+        match index:
+            case str():
+                self.wrapped_ring.ensure_vars((index,))
+                return Variable(self.wrapped_ring(index))
+            case _:
+                raise ValueError(f'expecting string as index; {index} is {type(index)}')
+
+    def __init__(self, ring_: PolynomialRing) -> None:
+        self.wrapped_ring = ring_
+
+    def __new__(cls, ring_: PolynomialRing):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self):
+        vars_ = self.wrapped_ring.get_vars()
+        s = ', '.join(str(g) for g in (*vars_, '...'))
+        return f'{{{s}}}'
+
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
         ..., G9999, G10000, ... This naming convention is inspired by Lisp's
@@ -108,14 +129,6 @@ class _VariableSet:
 
     def get(self, *args) -> tuple[Variable, ...]:
         return tuple(self[name] for name in args)
-
-    def __getitem__(self, index: str) -> Variable:
-        match index:
-            case str():
-                self.wrapped_ring.ensure_vars((index,))
-                return Variable(self.wrapped_ring(index))
-            case _:
-                raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
     def imp(self, *args) -> None:
         """Import variables into global namespace.
@@ -141,24 +154,11 @@ class _VariableSet:
             # https://docs.python.org/3/library/inspect.html#inspect.Traceback
             del frame
 
-    def __init__(self, ring_: PolynomialRing) -> None:
-        self.wrapped_ring = ring_
-
-    def __new__(cls, ring_: PolynomialRing):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def pop(self) -> None:
         self.wrapped_ring.pop()
 
     def push(self) -> None:
         self.wrapped_ring.push()
-
-    def __repr__(self):
-        vars_ = self.wrapped_ring.get_vars()
-        s = ', '.join(str(g) for g in (*vars_, '...'))
-        return f'{{{s}}}'
 
     def _stack(self) -> list[PolynomialRing]:
         return self.wrapped_ring.stack
