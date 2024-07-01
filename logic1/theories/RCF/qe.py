@@ -1565,7 +1565,7 @@ class VirtualSubstitution:
             self.workers = workers
         else:
             self.workers = os.cpu_count() + workers
-        f = pnf(f)
+        f = f.to_pnf()
         self.matrix, blocks = f.matrix()
         self.blocks = QuantifierBlocks(blocks)
 

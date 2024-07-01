@@ -108,13 +108,9 @@ from .boolean import BooleanFormula, Equivalent, Implies, And, Or, Not, _T, T, _
 
 from .quantified import QuantifiedFormula, Ex, All  # noqa
 
-from .pnf import pnf  # noqa
-
 
 __all__ = [
     'Ex', 'All',
 
     'Equivalent', 'Implies', 'And', 'Or', 'Not', 'T', 'F',
-
-    'pnf'
 ]

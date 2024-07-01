@@ -1,4 +1,4 @@
-from ...firstorder import Formula, pnf as _pnf
+from ...firstorder import Formula
 from ... import abc
 from .simplify import simplify as _simplify
 
@@ -6,7 +6,7 @@ from .simplify import simplify as _simplify
 class DisjunctiveNormalForm(abc.bnf.DisjunctiveNormalForm):
 
     def pnf(self, f: Formula) -> Formula:
-        return _pnf(f)
+        return f.to_pnf()
 
     def simplify(self, f: Formula) -> Formula:
         return _simplify(f)

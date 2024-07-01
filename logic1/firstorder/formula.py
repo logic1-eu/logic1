@@ -843,6 +843,40 @@ class Formula(ABC):
             case _:
                 assert False, type(self)
 
+    def to_pnf(self, prefer_universal: bool = False, is_nnf: bool = False):
+        """Convert to Prenex Normal Form.
+
+        A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
+        quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
+        formula. The method used here minimizes the number of quantifier
+        alternations in the prenex block [Burhenne90]_.
+
+        If the minimal number of alternations in the result can be achieved
+        with both :class:`Ex` and :class:`All` as the first quantifier in the
+        result, then the former is preferred. This preference can be changed
+        with a keyword argument `prefer_universal=True`.
+
+        An keyword argument `is_nnf=True` indicates that `self` is already in
+        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
+        be useful in time-critical situations.
+
+        >>> from logic1.theories.RCF import *
+        >>> a, b, y = VV.get('a', 'b', 'y')
+        >>> f = Equivalent(And(a == 0, b == 0, y == 0),
+        ...                Ex(y, Or(y == a, a == 0)))
+        >>> f.to_pnf()
+        Ex(G0001_y, All(G0002_y,
+            And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
+                Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
+
+        .. [Burhenne90]
+               Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
+               Quantorenelimination für lineare reelle Probleme.
+               Diploma Thesis, University of Passau, Germany, 1990
+        """
+        from .pnf import pnf
+        return pnf(self, prefer_universal, is_nnf)
+
     def transform_atoms(self, tr: Callable[[Any], Formula]) -> Formula:
         """Apply `tr` to all atomic formulas.
 

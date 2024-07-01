@@ -3,7 +3,7 @@ import logging
 from itertools import combinations
 
 from ... import abc
-from ...firstorder import And, Formula, pnf as _pnf, Or
+from ...firstorder import And, Formula, Or
 from .atomic import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
 from .simplify import simplify as _simplify
@@ -65,7 +65,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         return v
 
     def pnf(self, f: Formula) -> Formula:
-        return _pnf(f)
+        return f.to_pnf()
 
     def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
         return Pool(vars_, f)

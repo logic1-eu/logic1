@@ -1,4 +1,5 @@
->>> from logic1 import *
+>>> from logic1.firstorder import *
+>>> from logic1.firstorder.pnf import pnf
 >>> from logic1.theories.RCF import *
 
 # Test renaming to distinct variables:

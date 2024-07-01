@@ -71,7 +71,7 @@ class Simplify(ABC, Generic[AT, TH]):
         except th.Inconsistent:
             return T
         th = th.next_()
-        f = pnf(f)
+        f = f.to_pnf()
         quantifiers = []
         while isinstance(f, (Ex, All)):
             th = th.next_(remove=f.var)
