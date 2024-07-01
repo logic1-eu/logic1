@@ -675,12 +675,11 @@ class Node:
         def pseudo_sgn_rem(g: Term, prd: PRD, x: Variable) -> Term:
             """Sign-corrected pseudo-remainder
             """
-            if g.degree(x) < prd.term.degree(x):
+            f = prd.term
+            if g.degree(x) < f.degree(x):
                 return g
-            g1 = g.poly.polynomial(x.poly)
-            f1 = prd.term.poly.polynomial(x.poly)
-            _, h = g1.pseudo_quo_rem(f1)
-            delta = g1.degree() - f1.degree() + 1
+            _, h = g.pseudo_quo_rem(f, x)
+            delta = g.degree(x) - f.degree(x) + 1
             if delta % 2 == 1:
                 lc_signs = set(root_spec.signs[-1] for root_spec in prd.cluster)
                 if len(lc_signs) == 1:
@@ -690,17 +689,18 @@ class Node:
                         h = - h
                 else:
                     # Since there are no assumptions, we need not worry about
-                    # f1.lc() == 0. We currently believe that otherwise the
-                    # guard takes care that parametric f1.lc() cannot vanish.
-                    if is_valid(Term(f1.lc()) >= 0):
+                    # f_lc == 0. We currently believe that otherwise the guard
+                    # takes care that parametric f_lc cannot vanish.
+                    f_lc = f.coefficient({x: f.degree(x)})
+                    if is_valid(f_lc >= 0):
                         pass
-                    elif is_valid(Term(f1.lc()) <= 0):
+                    elif is_valid(f_lc <= 0):
                         h = - h
                     else:
-                        h *= f1.lc()
-            # One could check for even powers of f1.lc() in h. Currently the
+                        h *= f_lc
+            # One could check for even powers of f_lc in h. Currently the
             # simplifier takes care of this.
-            return Term(h)
+            return h
 
         def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
             """Virtually substitute a parametric root description into an atom.

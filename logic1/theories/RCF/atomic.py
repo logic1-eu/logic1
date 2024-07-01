@@ -410,6 +410,12 @@ class Term(firstorder.Term):
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
 
+    def pseudo_quo_rem(self, other: Term, x: Variable):
+        self1 = self.poly.polynomial(x.poly)
+        other1 = other.poly.polynomial(x.poly)
+        quotient, remainder = self1.pseudo_quo_rem(other1)
+        return Term(quotient), Term(remainder)
+
     @staticmethod
     def sort_key(term: Term) -> Polynomial:
         return term.poly
