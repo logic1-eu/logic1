@@ -27,10 +27,6 @@ Or(b == 0, a != 0)
 >>> qe(phi_4, clustering=CLUSTERING.FULL)
 Or(b == 0, a != 0)
 
-# Parallel qe
->>> qe(phi_4, workers=2)
-Or(b == 0, a != 0)
-
 >>> phi_5 = Ex(x, a * x + b <= 0)
 >>> qe(phi_5, clustering=CLUSTERING.NONE)
 Or(b <= 0, a != 0)

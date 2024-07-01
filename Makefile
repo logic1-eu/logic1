@@ -1,5 +1,5 @@
 pytest:
-	pytest --exitfirst --doctest-modules\
+	pytest -n 5 --exitfirst --doctest-modules\
 		--ignore="logic1/theories/depricated"\
 		--ignore="logic1/theories/ZModM"
 

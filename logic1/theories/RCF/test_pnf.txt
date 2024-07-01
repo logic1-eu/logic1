@@ -4,7 +4,8 @@
 # Test renaming to distinct variables:
 >>> VV.push()
 >>> x, y, z = VV.get('x', 'y', 'z')
->>> f = Eq(x, y) & Ex(x, Eq(x, y) & All(z, Ex(y, Eq(x, y) & Eq(y, z) & Ex(x, T))))
+>>> f = And(x == y,
+...         Ex(x, And(x == y, All(z, Ex(y, And(x == y,  y == z, Ex(x, T)))))))
 >>> pnf(f)
 Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
     And(x == y, G0002_x == y, G0002_x == G0001_y, G0001_y == z, T)))))
@@ -18,7 +19,7 @@ Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
 >>> x = VV.get(*('x' + str(i) for i in range(8)))
 >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
 >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
->>> f3 = Ex(x[7], Eq(x[0], 0))
+>>> f3 = Ex(x[7], x[0] == 0)
 >>> pnf(f1 & f2 & f3)
 All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
 >>> VV.pop()
@@ -28,8 +29,8 @@ All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
 #
 >>> VV.push()
 >>> a, b, y = VV.get('a', 'b', 'y')
->>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
->>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
+>>> f1 = And(a == 0, b == 0, y == 0)
+>>> f2 = Ex(y, Or(y == a, a == 0))
 >>> pnf(Equivalent(f1, f2))
 Ex(G0001_y, All(G0002_y,
     And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
@@ -37,8 +38,8 @@ Ex(G0001_y, All(G0002_y,
 >>> VV.pop()
 >>> VV.push()
 >>> a, b, y = VV.get('a', 'b', 'y')
->>> f1 = Eq(a, 0) & Eq(b, 0) & Eq(y, 0)
->>> f2 = Ex(y, Eq(y, a) | Eq(a, 0))
+>>> f1 = And(a == 0, b == 0, y == 0)
+>>> f2 = Ex(y, Or(y == a, a == 0))
 >>> pnf(Equivalent(f1, f2), prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
     And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),

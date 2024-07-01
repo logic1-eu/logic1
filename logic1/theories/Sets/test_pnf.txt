@@ -10,7 +10,7 @@
 #
 >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
 >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
->>> f3 = Ex(x[7], Eq(x[0], o))
+>>> f3 = Ex(x[7], x[0] == o)
 >>> pnf(f1 & f2 & f3)
 All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == o))))))))
 
@@ -18,8 +18,8 @@ All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == o))))))))
 # https://sourceforge.net/p/reduce-algebra/code/HEAD/tree/trunk/packages/redlog/rl/redlog.tst
 #
 >>> _ = VV.push()
->>> f1 = Eq(a, o) & Eq(b, o) & Eq(y, o)
->>> f2 = Ex(y, Eq(y, a) | Eq(a, o))
+>>> f1 = And(a == o, b == o, y == o)
+>>> f2 = Ex(y, Or(y == a, a == o))
 >>> pnf(Equivalent(f1, f2))
 Ex(G0001_y, All(G0002_y,
     And(Or(a != o, b != o, y != o, G0001_y == a, a == o),

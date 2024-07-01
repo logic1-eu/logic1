@@ -10,61 +10,60 @@
 ...     # Dummy
 ...     [T],
 ...     # Austria
-...     [Ne(c1, c11), Ne(c1, c6), Ne(c1, c24), Ne(c1, c13), Ne(c1, c25),
-...      Ne(c1, c15)],
+...     [c1 != c11, c1 != c6, c1 != c24, c1 != c13, c1 != c25, c1 != c15],
 ...     # Belgium
-...     [Ne(c2, c20), Ne(c2, c11), Ne(c2, c18), Ne(c2, c10)],
+...     [c2 != c20, c2 != c11, c2 != c18, c2 != c10],
 ...     # Bulgaria
-...     [Ne(c3, c23), Ne(c3, c12)],
+...     [c3 != c23, c3 != c12],
 ...     # Croatia
-...     [Ne(c4, c25), Ne(c4, c13)],
+...     [c4 != c25, c4 != c13],
 ...     # Cyprus
 ...     [T],
 ...     # Czechia
-...     [Ne(c6, c11), Ne(c6, c21), Ne(c6, c24), Ne(c6, c1)],
+...     [c6 != c11, c6 != c21, c6 != c24, c6 != c1],
 ...     # Denmark
-...     [Ne(c7, c11)],
+...     [c7 != c11],
 ...     # Estonia
-...     [Ne(c8, c16)],
+...     [c8 != c16],
 ...     # Finland
-...     [Ne(c9, c27)],
+...     [c9 != c27],
 ...     # France
-...     [Ne(c10, c2), Ne(c10, c18), Ne(c10, c11), Ne(c10, c15), Ne(c10, c26)],
+...     [c10 != c2, c10 != c18, c10 != c11, c10 != c15, c10 != c26],
 ...     # Germany
-...     [Ne(c11, c7), Ne(c11, c21), Ne(c11, c6), Ne(c11, c1), Ne(c11, c10),
-...      Ne(c11, c18), Ne(c11, c2), Ne(c11, c20)],
+...     [c11 != c7, c11 != c21, c11 != c6, c11 != c1, c11 != c10,
+...      c11 != c18, c11 != c2, c11 != c20],
 ...     # Greece
-...     [Ne(c12, c3)],
+...     [c12 != c3],
 ...     # Hungary
-...     [Ne(c13, c24), Ne(c13, c23), Ne(c13, c4), Ne(c13, c25), Ne(c13, c1)],
+...     [c13 != c24, c13 != c23, c13 != c4, c13 != c25, c13 != c1],
 ...     # Ireland
 ...     [T],
 ...     # Italy
-...     [Ne(c15, c10), Ne(c15, c1), Ne(c15, c25)],
+...     [c15 != c10, c15 != c1, c15 != c25],
 ...     # Latvia
-...     [Ne(c16, c8), Ne(c16, c17)],
+...     [c16 != c8, c16 != c17],
 ...     # Lithuania
-...     [Ne(c17, c16), Ne(c17, c21)],
+...     [c17 != c16, c17 != c21],
 ...     # Luxembourg
-...     [Ne(c18, c2), Ne(c18, c11), Ne(c18, c10)],
+...     [c18 != c2, c18 != c11, c18 != c10],
 ...     # Malta
 ...     [T],
 ...     # Netherlands
-...     [Ne(c20, c11), Ne(c20, c2)],
+...     [c20 != c11, c20 != c2],
 ...     # Poland
-...     [Ne(c21, c17), Ne(c21, c25), Ne(c21, c6), Ne(c21, c11)],
+...     [c21 != c17, c21 != c25, c21 != c6, c21 != c11],
 ...     # Portugal
-...     [Ne(c22, c26)],
+...     [c22 != c26],
 ...     # Romania
-...     [Ne(c23, c3), Ne(c23, c13)],
+...     [c23 != c3, c23 != c13],
 ...     # Slovakia
-...     [Ne(c24, c21), Ne(c24, c13), Ne(c24, c1), Ne(c24, c6)],
+...     [c24 != c21, c24 != c13, c24 != c1, c24 != c6],
 ...     # Slovenia
-...     [Ne(c25, c1), Ne(c25, c13), Ne(c25, c4), Ne(c25, c15)],
+...     [c25 != c1, c25 != c13, c25 != c4, c25 != c15],
 ...     # Spain
-...     [Ne(c26, c10), Ne(c26, c22)],
+...     [c26 != c10, c26 != c22],
 ...     # Sweden
-...     [Ne(c27, c9)]]
+...     [c27 != c9]]
 
 >>> psi = And(*(itertools.chain.from_iterable(gamma[1:])))
 >>> qe(Ex(V, psi))
@@ -72,7 +71,7 @@ C(4)
 
 >>> W = [c6, c13, c24, c25]  # Czechia, Hungary, Slovakia, Slovenia
 >>> V_minus_W = [v for v in V if v not in W]
->>> chi = Ne(c6, c24) & Ne(c24, c13) & Ne(c13, c25)
+>>> chi = (c6 != c24) & (c24 != c13) & (c13 != c25)
 >>> phi2 = All(W, chi >> Ex(V_minus_W, psi))
 >>> phi2_prime = qe(phi2)
 >>> phi2_prime

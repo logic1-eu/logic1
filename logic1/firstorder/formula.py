@@ -132,7 +132,7 @@ class Formula(ABC):
         >>> from logic1.theories.RCF import Eq, VV
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
-        >>> Eq(x + z, y + z) << Eq(x, y)
+        >>> (x + z == y + z) << (x == y)
         Implies(x == y, x + z == y + z)
         """
         return Implies(other, self)
@@ -145,10 +145,10 @@ class Formula(ABC):
     def __or__(self, other: Formula) -> Formula:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
-        >>> from logic1.theories.RCF import Eq, VV
+        >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
-        >>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
+        >>> (x == 0) | (x == y) | (x == z)
         Or(x == 0, x == y, x == z)
         """
         return Or(self, other)
@@ -170,10 +170,10 @@ class Formula(ABC):
         """Override the :obj:`>> <object.__rshift__>` operator to apply
         :class:`Implies`.
 
-        >>> from logic1.theories.RCF import Eq, VV
+        >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
-        >>> Eq(x, y) >> Eq(x + z, y + z)
+        >>> (x == y) >> (x + z == y + z)
         Implies(x == y, x + z == y + z)
         """
         return Implies(self, other)
@@ -519,9 +519,13 @@ class Formula(ABC):
         [(<class 'logic1.firstorder.quantified.All'>, [x, y])]
 
         .. seealso::
-            * :func:`pnf <.pnf.pnf>` -- prenex normal form
+            * :mod:`.firstorder`
+            * :mod:`.firstorder.boolean`
+            * :mod:`.firstorder.pnf`
+            * :mod:`.RCF`
+            * :class:`pnf() <.firstorder.pnf>` -- prenex normal form
             * :data:`QuantifierBlock <.quantified.QuantifierBlock>` \
-                -- A type holding a block of quantifiers
+                -- a type that holds a block of quantifiers
         """
         blocks = []
         block_vars = []
@@ -796,7 +800,7 @@ class Formula(ABC):
         >>> from logic1.theories.RCF import Eq, VV
         >>> a, y = VV.get('a', 'y')
         >>>
-        >>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
+        >>> f = Equivalent(And(a == 0, T), Ex(y, Not(y == a)))
         >>> f.to_nnf()
         And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
         """
@@ -849,7 +853,7 @@ class Formula(ABC):
         >>> from logic1.theories.RCF import Eq, Lt, VV
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
-        >>> f = Eq(x, y) & Lt(y, z)
+        >>> f = And(x == y, y < z)
         >>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
         And(x - y == 0, y - z < 0)
         """

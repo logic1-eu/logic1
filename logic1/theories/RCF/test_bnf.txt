@@ -9,22 +9,22 @@ T
 >>> dnf(And(T, T))
 T
 
->>> dnf(Eq(a, 0))
+>>> dnf(a == 0)
 a == 0
 
->>> dnf(Gt(a, 0))
+>>> dnf(a > 0)
 a > 0
 
->>> dnf(Equivalent(Eq(a, 0), Eq(b, 0)))
+>>> dnf(Equivalent(a == 0, b == 0))
 Or(And(b == 0, a == 0), And(b != 0, a != 0))
 
->>> dnf((Eq(a, 0) | Ne(b, 0)) & (Ne(a, 0) | Eq(b, 0)))
+>>> dnf(And(Or(a == 0, b != 0), Or(a != 0, b == 0)))
 Or(And(b == 0, a == 0), And(b != 0, a != 0))
 
->>> dnf((Gt(a, 0) | Ne(b, 0)) & (Le(c, 0) | Eq(b, 0)))
+>>> dnf(And(Or(a > 0, b != 0), Or(c <= 0, b == 0)))
 Or(And(c <= 0, b != 0), And(b == 0, a > 0))
 
->>> dnf((Gt(a, 0) | Eq(b, 0)) & (Le(a, 0) | Eq(b, 0)))
+>>> dnf(And(Or(a > 0, b == 0), Or(a <= 0, b == 0)))
 b == 0
 
 >>> cnf(T)
@@ -33,17 +33,17 @@ T
 >>> cnf(And(T, T))
 T
 
->>> cnf(Eq(a, 0))
+>>> cnf(a == 0)
 a == 0
 
->>> cnf(Gt(a, 0))
+>>> cnf(a > 0)
 a > 0
 
->>> cnf(Equivalent(Eq(a, 0), Eq(b, 0)))
+>>> cnf(Equivalent(a == 0, b == 0))
 And(Or(b == 0, a != 0), Or(b != 0, a == 0))
 
->>> cnf((Eq(a, 0) & Ne(b, 0)) | (Ne(a, 0) & Eq(b, 0)))
+>>> cnf(Or(And(a == 0, b != 0), And(a != 0, b == 0)))
 And(Or(b == 0, a == 0), Or(b != 0, a != 0))
 
->>> cnf((Gt(a, 0) & Eq(b, 0)) | (Le(a, 0) & Eq(b, 0)))
+>>> cnf(Or(And(a > 0, b == 0), And(a <= 0, b == 0)))
 b == 0

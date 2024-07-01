@@ -12,7 +12,7 @@ F
 >>> dnf(And(T, T))
 T
 
->>> dnf(Eq(a, o))
+>>> dnf(a == o)
 a == o
 
 >>> dnf(Equivalent(a == o, b == o))
@@ -33,8 +33,8 @@ F
 >>> cnf(And(T, T))
 T
 
->>> cnf(Eq(a, o))
+>>> cnf(a == o)
 a == o
 
->>> cnf(Equivalent(Eq(a, o), Eq(b, o)))
+>>> cnf(Equivalent(a == o, b == o))
 And(Or(a == o, b != o), Or(b == o, a != o))

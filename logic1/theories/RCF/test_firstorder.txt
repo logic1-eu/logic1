@@ -15,21 +15,21 @@ __le__:
 ...
 
 __lshift__:
->>> Eq(x + z, y + z) << Eq(x, y)
+>>> (x + z == y + z) << (x == y)
 Implies(x == y, x + z == y + z)
 
 __or__:
->>> Eq(x, 0) | Eq(x, y) | Eq(x, z)
+>>> (x == 0) | (x == y) | (x == z)
 Or(x == 0, x == y, x == z)
 
 __rshift__:
->>> Eq(x, y) >> Eq(x + z, y + z)
+>>> (x == y) >> (x + z == y + z)
 Implies(x == y, x + z == y + z)
 
 __eq__, __ne__, __hash__:
 >>> e1 = Ne(1, 0)
 >>> e2 = Ne(1, 0)
->>> f = Ex(x, Eq(a * x + b, 0))
+>>> f = Ex(x, a * x + b == 0)
 >>> e1 == e2
 True
 >>> e1 != e2
@@ -49,7 +49,7 @@ __init__:
 ...
 
 __repr__, __str__, _repr_latex_:
->>> f = Ex(x, Eq(a * x + b, 0))
+>>> f = Ex(x, a * x + b == 0)
 >>> repr(f)
 'Ex(x, a*x + b == 0)'
 >>> str(f)
@@ -58,7 +58,7 @@ __repr__, __str__, _repr_latex_:
 '$\\displaystyle \\exists x \\, (a x + b = 0)$'
 
 __all__, __ex__:
->>> g = Eq(a * x + b, 0)
+>>> g = a * x + b == 0
 >>> g.all()
 All(x, All(b, All(a, a*x + b == 0)))
 >>> g.all(ignore=(x,))
@@ -73,12 +73,13 @@ all:
 All(b, All(a, a*x + b != 0))
 
 atoms:
->>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+>>> f = And(Implies(3 * x == 0, All(z, 3 * x == 0)),
+...         Implies(All(x, x == 0), Ex(y, x * y == 1)))
 >>> type(f.atoms())
 <class 'generator'>
 >>> list(f.atoms())
 [3*x == 0, 3*x == 0, x == 0, x*y == 1]
->>> set(f.atoms()) == {Eq(x, 0), Eq(3*x, 0), Eq(x*y, 1)}
+>>> set(f.atoms()) == {x == 0, 3*x == 0, x*y == 1}
 True
 >>> sum(1 for _ in f.atoms())
 4
@@ -95,11 +96,17 @@ bvars:
 [x, y, y]
 
 count_alternations:
->>> Ex(x, Eq(x, y) & All(x, Ex(y, Ex(z, T)))).count_alternations()
+>>> Ex(x, And(x == y, All(x, Ex(y, Ex(z, T))))).count_alternations()
 2
 
 depth:
->>> f = Eq(3 * x, 0) >> All(z, Eq(3 * x, 0) & All(x, Eq(x, 0) >> Ex(y, Eq(x * y, 1))))
+>>> f = Implies(3*x == 0,
+...             All(z,
+...                 And(3*x == 0,
+...                     All(x,
+...                         Implies(x == 0,
+...                                 Ex(y,
+...                                    x*y == 1))))))
 >>> f.depth()
 6
 
@@ -147,13 +154,14 @@ to_latex:
 ...
 
 to_nnf:
->>> f = Equivalent(Eq(a, 0) & T, Ex(y, ~ Eq(y, a)))
+>>> f = Equivalent(And(a == 0, T), Ex(y, Not(y == a)))
 >>> f.to_nnf()
 And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
 >>> f.to_nnf(to_positive=False)
-And(Or(Not(a == 0), Not(T), Ex(y, Not(y == a))), Or(All(y, y == a), And(a == 0, T)))
+And(Or(Not(a == 0), Not(T), Ex(y, Not(y == a))),
+    Or(All(y, y == a), And(a == 0, T)))
 
 transform_atoms:
->>> f = Eq(x, y) & Lt(y, z)
+>>> f = And(x == y, y < z)
 >>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
 And(x - y == 0, y - z < 0)

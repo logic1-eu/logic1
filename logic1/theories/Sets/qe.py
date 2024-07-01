@@ -23,20 +23,18 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     >>> from logic1.firstorder import *
     >>> from logic1.theories.Sets import *
     >>> a, u, v, w, x, y, z = VV.get('a', 'u', 'v', 'w', 'x', 'y', 'z')
-    >>> f = All(u, Ex(w, All(x, Ex(y, Ex(v, (Eq(u, v) | Ne(v, w))
-    ...     & ~ Equivalent(Eq(u, x), Ne(u, w)) & Eq(y, a))))))
-    >>> f
-    All(u, Ex(w, All(x, Ex(y, Ex(v,
-        And(Or(u == v, v != w), Not(Equivalent(u == x, u != w)), y == a))))))
+    >>> f = All(u, Ex(w, All(x, Ex([y, v], And(Or(u == v, v != w),
+    ...                                        ~ Equivalent(u == x, u != w),
+    ...                                        y == a)))))
     >>> qe(f)
     C_(2)
-
-    >>> g = Ex(x, Ex(y, Ex(z, Ne(x, y) & Ne(x, z) & Ne(y, z)
-    ...     & All(u, Eq(u, x) | Eq(u, y) | Eq(u, z)))))
+    >>> g = Ex([x, y, z],
+    ...        And(x != y, x != z, y != z, All(u, Or(u == x, u == y, u == z))))
     >>> qe(g)
     And(C(3), C_(4))
-    >>> h = Ex(w, Ex(x, Ne(w, x))) >> Ex(w, Ex(x, Ex(y, Ex(z,
-    ...     Ne(w, x) & Ne(w, y) & Ne(w, z) & Ne(x, y) & Ne(x, z) & Ne(y, z)))))
+    >>> h = Implies(Ex([w, x], w != x),
+    ...             Ex([w, x, y, z],
+    ...                And(w != x, w != y, w != z, x != y, x != z, y != z)))
     >>> qe(h)
     Or(C_(2), C(4))
     """
