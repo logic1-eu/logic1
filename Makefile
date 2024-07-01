@@ -1,16 +1,11 @@
 pytest:
-	pytest -n 5 --exitfirst --doctest-modules\
-		--ignore="logic1/theories/depricated"\
-		--ignore="logic1/theories/ZModM"
+	pytest -n 5 --exitfirst --doctest-modules
 
 pytest-full:
-	pytest --doctest-modules\
-		--ignore="logic1/theories/depricated"\
-		--ignore="logic1/theories/ZModM"
+	pytest -n 5 --doctest-modules
 
 mypy:
-	mypy logic1 --exclude logic1/theories/depricated\
-		--exclude logic1/theories/ZModM
+	mypy logic1
 
 test: mypy pytest
 
@@ -18,9 +13,7 @@ pygount:
 	pygount -f summary logic1
 
 coverage:
-	coverage run -m pytest --doctest-modules\
-		--ignore="logic1/theories/depricated"\
-		--ignore="logic1/theories/ZModM"
+	coverage run -m pytest --doctest-modules
 
 coverage_html: coverage
 	coverage html
