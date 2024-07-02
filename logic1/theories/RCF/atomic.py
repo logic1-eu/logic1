@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from enum import auto, Enum
 import functools
-import inspect
 import operator
 from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
 from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
     Polynomial_generic_dense as UnivariatePolynomial)
-from types import FrameType, BuiltinFunctionType
+from types import BuiltinFunctionType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
@@ -24,6 +23,8 @@ TERMORDER: Final = 'deglex'
 class _Ring:
 
     _instance: Optional[_Ring] = None
+
+    sage_ring: PolynomialRing
 
     def __call__(self, obj):
         return self.sage_ring(obj)
@@ -85,11 +86,15 @@ class _Ring:
 ring = _Ring()
 
 
-class _VariableSet:
+class _VariableSet(firstorder.atomic._VariableSet):
 
     _instance: ClassVar[Optional[_VariableSet]] = None
 
     wrapped_ring: PolynomialRing
+
+    @property
+    def stack(self) -> list[PolynomialRing]:
+        return self.wrapped_ring.stack
 
     def __getitem__(self, index: str) -> Variable:
         match index:
@@ -102,12 +107,12 @@ class _VariableSet:
     def __init__(self, ring_: PolynomialRing) -> None:
         self.wrapped_ring = ring_
 
-    def __new__(cls, ring_: PolynomialRing):
+    def __new__(cls, ring_: PolynomialRing) -> _VariableSet:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         vars_ = self.wrapped_ring.get_vars()
         s = ', '.join(str(g) for g in (*vars_, '...'))
         return f'{{{s}}}'
@@ -127,41 +132,11 @@ class _VariableSet:
         self.wrapped_ring.add_var(v)
         return Term(self.wrapped_ring(v))
 
-    def get(self, *args) -> tuple[Variable, ...]:
-        return tuple(self[name] for name in args)
-
-    def imp(self, *args) -> None:
-        """Import variables into global namespace.
-        """
-        vars_ = self.get(*args)
-        frame = inspect.currentframe()
-        assert isinstance(frame, FrameType)
-        frame = frame.f_back
-        try:
-            assert isinstance(frame, FrameType)
-            module = frame.f_globals['__name__']
-            assert module == '__main__', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is module {module}'
-            function = frame.f_code.co_name
-            assert function == '<module>', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is function {function} in module {module}'
-            for v in vars_:
-                frame.f_globals[str(v)] = v
-        finally:
-            # Compare Note here:
-            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
-            del frame
-
     def pop(self) -> None:
         self.wrapped_ring.pop()
 
     def push(self) -> None:
         self.wrapped_ring.push()
-
-    def _stack(self) -> list[PolynomialRing]:
-        return self.wrapped_ring.stack
 
 
 VV = _VariableSet(ring)

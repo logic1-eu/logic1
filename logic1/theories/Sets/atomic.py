@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import functools
-import inspect
 import logging
 import string
-from types import FrameType
-from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
+from typing import Any, ClassVar, Final, Iterator, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import F, Formula, T
@@ -21,15 +19,38 @@ oo = float('Inf')
 Index: TypeAlias = int | float
 
 
-class _VariableSet:
+class _VariableSet(firstorder.atomic._VariableSet):
     """Instances of the singleton VariableSet register, store, and provide
     variables, which are instances of Terms and suitable for building complex
     instances of Terms using operators and methods defined in :class:`Term`.
     """
 
     _instance: ClassVar[Optional[_VariableSet]] = None
-    _stack: list[set[str]]
-    _used: set[str]
+
+    @property
+    def stack(self) -> list[set[str]]:
+        return self._stack
+
+    def __getitem__(self, index: str) -> Variable:
+        match index:
+            case str():
+                self._used.update((index,))
+                return Variable(index)
+            case _:
+                raise ValueError(f'expecting string as index; {index} is {type(index)}')
+
+    def __init__(self) -> None:
+        self._stack: list[set[str]] = []
+        self._used: set[str] = set()
+
+    def __new__(cls) -> _VariableSet:
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
+    def __repr__(self) -> str:
+        s = ', '.join(str(g) for g in (*self._used, '...'))
+        return f'{{{s}}}'
 
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
@@ -44,62 +65,12 @@ class _VariableSet:
             v_as_str = f'G{i:04d}{suffix}'
         return self[v_as_str]
 
-    def get(self, *args) -> tuple[Variable, ...]:
-        return tuple(self[name] for name in args)
-
-    def __getitem__(self, index: str) -> Variable:
-        match index:
-            case str():
-                self._used.update((index,))
-                return Variable(index)
-            case _:
-                raise ValueError(f'expecting string as index; {index} is {type(index)}')
-
-    def imp(self, *args) -> None:
-        """Import variables into global namespace.
-        """
-        vars_ = self.get(*args)
-        frame = inspect.currentframe()
-        assert isinstance(frame, FrameType)
-        frame = frame.f_back
-        try:
-            assert isinstance(frame, FrameType)
-            module = frame.f_globals['__name__']
-            assert module == '__main__', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is module {module}'
-            function = frame.f_code.co_name
-            assert function == '<module>', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is function {function} in module {module}'
-            for v in vars_:
-                frame.f_globals[str(v)] = v
-        finally:
-            # Compare Note here:
-            # https://docs.python.org/3/library/inspect.html#inspect.Traceback
-            del frame
-
-    def __init__(self):
-        self._stack = []
-        self._used = set()
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def pop(self) -> set[str]:
+    def pop(self) -> None:
         self._used = self._stack.pop()
-        return self._used
 
-    def push(self) -> list[set[str]]:
+    def push(self) -> None:
         self._stack.append(self._used)
         self._used = set()
-        return self._stack
-
-    def __repr__(self):
-        s = ', '.join(str(g) for g in (*self._used, '...'))
-        return f'{{{s}}}'
 
 
 VV = _VariableSet()
