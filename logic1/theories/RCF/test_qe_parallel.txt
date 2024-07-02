@@ -1,0 +1,9 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+>>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
+
+# Parallel qe
+>>> phi_4 = Ex(x, a * x + b == 0)
+>>> qe(phi_4, workers=2)
+Or(b == 0, a != 0)
