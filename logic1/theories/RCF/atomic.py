@@ -3,13 +3,13 @@ from __future__ import annotations
 from enum import auto, Enum
 import functools
 import operator
-from sage.all import Integer, latex, PolynomialRing, ZZ  # type: ignore[import-untyped]
+import sage.all as sage  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
 from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
     Polynomial_generic_dense as UnivariatePolynomial)
 from types import BuiltinFunctionType
-from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self
+from typing import Any, ClassVar, Final, Iterable, Iterator, Self
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -17,26 +17,16 @@ from ...firstorder import Formula, T, F
 from ...support.tracing import trace  # noqa
 
 
-TERMORDER: Final = 'deglex'
+class PolynomialRing:
 
-
-class _Ring:
-
-    _instance: Optional[_Ring] = None
-
-    sage_ring: PolynomialRing
+    sage_ring: sage.PolynomialRing
 
     def __call__(self, obj):
         return self.sage_ring(obj)
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
-        self.sage_ring = PolynomialRing(
-            ZZ, 'unused_', implementation='singular', order=TERMORDER)
+    def __init__(self, term_order='deglex'):
+        self.sage_ring = sage.PolynomialRing(
+            sage.ZZ, 'unused_', implementation='singular', order=term_order)
         self.stack = []
 
     def __repr__(self):
@@ -47,8 +37,8 @@ class _Ring:
         assert var not in new_vars
         new_vars.append(var)
         new_vars.sort()
-        self.sage_ring = PolynomialRing(
-            ZZ, new_vars, implementation='singular', order=TERMORDER)
+        self.sage_ring = sage.PolynomialRing(
+            sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
 
     def ensure_vars(self, vars_: Iterable[str]) -> None:
 
@@ -66,8 +56,8 @@ class _Ring:
                 new_vars.append(v)
         if have_appended:
             new_vars.sort(key=sort_key)
-            self.sage_ring = PolynomialRing(
-                ZZ, new_vars, implementation='singular', order=TERMORDER)
+            self.sage_ring = sage.PolynomialRing(
+                sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
 
     def get_vars(self) -> tuple[Polynomial, ...]:
         gens = self.sage_ring.gens()
@@ -79,41 +69,31 @@ class _Ring:
 
     def push(self) -> None:
         self.stack.append(self.sage_ring)
-        self.sage_ring = PolynomialRing(
-            ZZ, 'unused_', implementation='singular', order=TERMORDER)
+        self.sage_ring = sage.PolynomialRing(
+            sage.ZZ, 'unused_', implementation='singular', order=self.sage_ring.term_order())
 
 
-ring = _Ring()
+polynomial_ring = PolynomialRing()
 
 
 class _VariableSet(firstorder.atomic._VariableSet['Variable']):
 
-    _instance: ClassVar[Optional[_VariableSet]] = None
-
-    wrapped_ring: _Ring
+    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
     @property
-    def stack(self) -> list[PolynomialRing]:
-        return self.wrapped_ring.stack
+    def stack(self) -> list[sage.PolynomialRing]:
+        return self.polynomial_ring.stack
 
     def __getitem__(self, index: str) -> Variable:
         match index:
             case str():
-                self.wrapped_ring.ensure_vars((index,))
-                return Variable(self.wrapped_ring(index))
+                self.polynomial_ring.ensure_vars((index,))
+                return Variable(self.polynomial_ring(index))
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
-    def __init__(self, ring_: PolynomialRing) -> None:
-        self.wrapped_ring = ring_
-
-    def __new__(cls, ring_: PolynomialRing) -> _VariableSet:
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
     def __repr__(self) -> str:
-        vars_ = self.wrapped_ring.get_vars()
+        vars_ = self.polynomial_ring.get_vars()
         s = ', '.join(str(g) for g in (*vars_, '...'))
         return f'{{{s}}}'
 
@@ -123,23 +103,23 @@ class _VariableSet(firstorder.atomic._VariableSet['Variable']):
         gensym(). If the optional argument :data:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        vars_ = set(str(g) for g in self.wrapped_ring.get_vars())
+        vars_ = set(str(g) for g in self.polynomial_ring.get_vars())
         i = 1
         v = f'G{i:04d}{suffix}'
         while v in vars_:
             i += 1
             v = f'G{i:04d}{suffix}'
-        self.wrapped_ring.add_var(v)
-        return Variable(self.wrapped_ring(v))
+        self.polynomial_ring.add_var(v)
+        return Variable(self.polynomial_ring(v))
 
     def pop(self) -> None:
-        self.wrapped_ring.pop()
+        self.polynomial_ring.pop()
 
     def push(self) -> None:
-        self.wrapped_ring.push()
+        self.polynomial_ring.push()
 
 
-VV = _VariableSet(ring)
+VV = _VariableSet()
 
 
 class TSQ(Enum):
@@ -150,8 +130,7 @@ class TSQ(Enum):
 
 class Term(firstorder.Term['Variable']):
 
-    wrapped_ring: _Ring = ring
-    wrapped_variable_set: _VariableSet = VV
+    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
     _poly: Polynomial
 
@@ -162,9 +141,9 @@ class Term(firstorder.Term['Variable']):
         <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
         which is wrapped by ``self``.
         """
-        if self.wrapped_ring.sage_ring is not self._poly.parent():
-            self.wrapped_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
-            self._poly = self.wrapped_ring(self._poly)
+        if self.polynomial_ring.sage_ring is not self._poly.parent():
+            self.polynomial_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
+            self._poly = self.polynomial_ring(self._poly)
         return self._poly
 
     @poly.setter
@@ -176,7 +155,7 @@ class Term(firstorder.Term['Variable']):
             return Term(self.poly + other.poly)
         return Term(self.poly + other)
 
-    def __eq__(self, other: Term | Polynomial | Integer | int) -> Eq:  # type: ignore[override]
+    def __eq__(self, other: Term | Polynomial | sage.Integer | int) -> Eq:  # type: ignore[override]
         # discuss: we have Eq.__bool__ but this way we cannot compare Terms
         # with arbitrary objects in a boolean context. Same for __ne__.
         lhs = self - (other if isinstance(other, Term) else Term(other))
@@ -184,13 +163,13 @@ class Term(firstorder.Term['Variable']):
             lhs = - lhs
         return Eq(lhs, Term(0))
 
-    def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge | Le:
+    def __ge__(self, other: Term | Polynomial | sage.Integer | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Le(- lhs, 0)
         return Ge(lhs, 0)
 
-    def __gt__(self, other: Term | Polynomial | Integer | int) -> Gt | Lt:
+    def __gt__(self, other: Term | Polynomial | sage.Integer | int) -> Gt | Lt:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Lt(- lhs, 0)
@@ -199,12 +178,12 @@ class Term(firstorder.Term['Variable']):
     def __hash__(self) -> int:
         return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
 
-    def __init__(self, arg: Polynomial | Integer | int) -> None:
+    def __init__(self, arg: Polynomial | sage.Integer | int) -> None:
         match arg:
             case Polynomial():
                 self.poly = arg
-            case Integer() | int() | UnivariatePolynomial():
-                self.poly = self.wrapped_ring(arg)
+            case sage.Integer() | int() | UnivariatePolynomial():
+                self.poly = self.polynomial_ring(arg)
             case _:
                 raise ValueError(
                     f'arguments must be polynomial or integer; {arg} is {type(arg)}')
@@ -213,13 +192,13 @@ class Term(firstorder.Term['Variable']):
         for coefficient, power_product in self.poly:
             yield int(coefficient), Term(power_product)
 
-    def __le__(self, other: Term | Polynomial | Integer | int) -> Le | Ge:
+    def __le__(self, other: Term | Polynomial | sage.Integer | int) -> Le | Ge:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Ge(- lhs, 0)
         return Le(lhs, 0)
 
-    def __lt__(self, other: Term | Polynomial | Integer | int) -> Lt | Gt:
+    def __lt__(self, other: Term | Polynomial | sage.Integer | int) -> Lt | Gt:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Gt(- lhs, 0)
@@ -230,7 +209,7 @@ class Term(firstorder.Term['Variable']):
             return Term(self.poly * other.poly)
         return Term(self.poly * other)
 
-    def __ne__(self, other: Term | Polynomial | Integer | int) -> Ne:  # type: ignore[override]
+    def __ne__(self, other: Term | Polynomial | sage.Integer | int) -> Ne:  # type: ignore[override]
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             lhs = - lhs
@@ -276,7 +255,7 @@ class Term(firstorder.Term['Variable']):
         Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_Latex`.
         """
-        return str(latex(self.poly))
+        return str(sage.latex(self.poly))
 
     def coefficient(self, d: dict[Variable, int]) -> Term:
         """
@@ -414,13 +393,14 @@ class Term(firstorder.Term['Variable']):
 
 class Variable(Term, firstorder.Variable['Variable']):
 
+    VV: ClassVar[_VariableSet] = VV
+
     def fresh(self) -> Variable:
         """
         .. seealso::
             :meth:`logic1.firstorder.atomic.Term.fresh`
         """
-        assert self.is_variable()
-        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
+        return self.VV.fresh(suffix=f'_{str(self)}')
 
 
 @functools.total_ordering
@@ -483,11 +463,11 @@ class AtomicFormula(firstorder.AtomicFormula['Variable']):
     def rhs(self) -> Term:
         return self.args[1]
 
-    def __init__(self, lhs: Term | Polynomial | Integer | int,
-                 rhs: Term | Polynomial | Integer | int):
-        # Integer is a candidate for removal
-        assert not isinstance(lhs, Integer)
-        assert not isinstance(rhs, Integer)
+    def __init__(self, lhs: Term | Polynomial | sage.Integer | int,
+                 rhs: Term | Polynomial | sage.Integer | int):
+        # sage.Integer is a candidate for removal
+        assert not isinstance(lhs, sage.Integer)
+        assert not isinstance(rhs, sage.Integer)
         if not isinstance(lhs, Term):
             lhs = Term(lhs)
         if not isinstance(rhs, Term):

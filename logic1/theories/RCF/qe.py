@@ -20,13 +20,13 @@ import time
 from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
 
 from logic1.firstorder import (
-    All, And, F, _F, Formula, Not, Or, pnf, QuantifiedFormula, T, _T)
+    All, And, F, _F, Formula, Not, Or, QuantifiedFormula, T, _T)
 from logic1.support.excepthook import NoTraceException
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.atomic import (
-    AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, ring, Term, Variable)
+    AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable)
 
 # Create logger
 delta_time_formatter = DeltaTimeFormatter(
@@ -1346,7 +1346,7 @@ class VirtualSubstitution:
             # However, future introduction of variables by workers will cause
             # problems, and expect  reconstruction of the ring to be part of
             # the solution.
-            ring_vars = tuple(str(v) for v in ring.get_vars())
+            ring_vars = tuple(str(v) for v in polynomial_ring.get_vars())
             log_level = logger.getEffectiveLevel()
             reference_time = delta_time_formatter.get_reference_time()
             logger.debug(f'starting worker processes in {range(self.workers)}')
@@ -1468,7 +1468,7 @@ class VirtualSubstitution:
             multiprocessing_logger.setLevel(log_level)
             multiprocessing_formatter.set_reference_time(reference_time)
             multiprocessing_logger.debug(f'worker process {i} is running')
-            ring.ensure_vars(ring_vars)
+            polynomial_ring.ensure_vars(ring_vars)
             while found_t.value == 0 and not working_nodes.is_finished():
                 try:
                     node = working_nodes.pop()
