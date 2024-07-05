@@ -90,7 +90,7 @@ class _VariableSet(firstorder.atomic._VariableSet):
 
     _instance: ClassVar[Optional[_VariableSet]] = None
 
-    wrapped_ring: PolynomialRing
+    wrapped_ring: _Ring
 
     @property
     def stack(self) -> list[PolynomialRing]:
