@@ -133,7 +133,7 @@ class Formula(ABC):
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> (x + z == y + z) << (x == y)
-        Implies(x == y, x + z == y + z)
+        Implies(x - y == 0, x - y == 0)
         """
         return Implies(other, self)
 
@@ -149,7 +149,7 @@ class Formula(ABC):
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> (x == 0) | (x == y) | (x == z)
-        Or(x == 0, x == y, x == z)
+        Or(x == 0, x - y == 0, x - z == 0)
         """
         return Or(self, other)
 
@@ -174,7 +174,7 @@ class Formula(ABC):
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>>
         >>> (x == y) >> (x + z == y + z)
-        Implies(x == y, x + z == y + z)
+        Implies(x - y == 0, x - y == 0)
         """
         return Implies(self, other)
 
@@ -244,7 +244,7 @@ class Formula(ABC):
         >>> x, y = RCF.VV.get('x', 'y')
         >>> f = All(x, (x < 1) | (x - 1 == 0) | (x > 1))
         >>> f.as_latex()
-        '\\forall x \\, (x < 1 \\, \\vee \\, x - 1 = 0 \\, \\vee \\, x > 1)'
+        '\\forall x \\, (x - 1 < 0 \\, \\vee \\, x - 1 = 0 \\, \\vee \\, x - 1 > 0)'
 
         .. seealso:: :meth:`_repr_latex_` -- LaTeX representation for Jupyter notebooks
         """
@@ -295,7 +295,7 @@ class Formula(ABC):
         >>> x, y, z = RCF.VV.get('x', 'y', 'z')
         >>> f = ((x == 0) & (y == 0) & T) | ((x == 0) & (y == z) & (z != 0))
         >>> list(f.atoms())
-        [x == 0, y == 0, x == 0, y == z, z != 0]
+        [x == 0, y == 0, x == 0, y - z == 0, z != 0]
 
         The overall number of atoms:
 
@@ -307,7 +307,7 @@ class Formula(ABC):
 
         >>> from collections import Counter
         >>> Counter(f.atoms())
-        Counter({x == 0: 2, y == 0: 1, y == z: 1, z != 0: 1})
+        Counter({x == 0: 2, y == 0: 1, y - z == 0: 1, z != 0: 1})
 
         Recall the Python builtin :func:`next`:
 
@@ -445,7 +445,7 @@ class Formula(ABC):
         >>> a, b, c, x = RCF.VV.get('a', 'b', 'c', 'x')
         >>> f = All(x, (a < x) & (a + b + c < x))
         >>> f.ex(ignore={c})
-        Ex(b, Ex(a, All(x, And(a < x, a + b + c < x))))
+        Ex(b, Ex(a, All(x, And(a - x < 0, a + b + c - x < 0))))
 
         .. seealso:: :meth:`all` -- universal closure
         """
@@ -463,9 +463,9 @@ class Formula(ABC):
 
         >>> from logic1.theories import RCF
         >>> a, x, y, z = RCF.VV.get('a', 'x', 'y', 'z')
-        >>> f = All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x))
+        >>> f = All(y, Ex(x, a + x - y == 0) & Ex(z, x + y - a == 0))
         >>> list(f.fvars())
-        [a, x, a, x]
+         [a, a, x]
 
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
@@ -492,10 +492,10 @@ class Formula(ABC):
 
         >>> from logic1.theories import RCF
         >>> x, y, z = RCF.VV.get('x', 'y', 'z')
-        >>> f = All(x, All(y, Ex(z, x + z == y)))
+        >>> f = All(x, All(y, Ex(z, x - y + z == 0)))
         >>> m, B = f.matrix()
         >>> m
-        x + z == y
+        x - y + z == 0
         >>> B
         [(<class 'logic1.firstorder.quantified.All'>, [x, y]),
          (<class 'logic1.firstorder.quantified.Ex'>, [z])]
@@ -514,7 +514,7 @@ class Formula(ABC):
         >>> h = All(x, All(y, (x != 0) >> Ex(z, x * z == y)))
         >>> m, B = h.matrix()
         >>> m
-        Implies(x != 0, Ex(z, x*z == y))
+        Implies(x != 0, Ex(z, x*z - y == 0))
         >>> B
         [(<class 'logic1.firstorder.quantified.All'>, [x, y])]
 
@@ -732,14 +732,14 @@ class Formula(ABC):
         >>>
         >>> f = Ex(x, x == a)
         >>> f.subs({x: a})
-        Ex(x, x == a)
+        Ex(x, a - x == 0)
         >>>
         >>> f.subs({a: x})
-        Ex(G0001_x, G0001_x == x)
+        Ex(G0001_x, -G0001_x + x == 0)
         >>>
         >>> g = Ex(x, _ & (b == 0))
         >>> g.subs({b: x})
-        Ex(G0002_x, And(Ex(G0001_x, G0001_x == G0002_x), x == 0))
+        Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
         """
         match self:
             case All() | Ex():
@@ -802,7 +802,7 @@ class Formula(ABC):
         >>>
         >>> f = Equivalent(And(a == 0, T), Ex(y, Not(y == a)))
         >>> f.to_nnf()
-        And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
+        And(Or(a != 0, F, Ex(y, a - y != 0)), Or(All(y, a - y == 0), And(a == 0, T)))
         """
         nnf_op: type[Formula]
         rewrite: Formula
@@ -866,8 +866,8 @@ class Formula(ABC):
         ...                Ex(y, Or(y == a, a == 0)))
         >>> f.to_pnf()
         Ex(G0001_y, All(G0002_y,
-            And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
-                Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
+            And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
+                Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))
 
         .. [Burhenne90]
                Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur

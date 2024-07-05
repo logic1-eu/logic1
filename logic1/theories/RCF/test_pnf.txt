@@ -9,7 +9,7 @@
 ...         Ex(x, And(x == y, All(z, Ex(y, And(x == y,  y == z, Ex(x, T)))))))
 >>> pnf(f)
 Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
-    And(x == y, G0002_x == y, G0002_x == G0001_y, G0001_y == z, T)))))
+    And(x - y == 0, G0002_x - y == 0, -G0001_y + G0002_x == 0, G0001_y - z == 0, T)))))
 >>> VV.pop()
 
 # Example from p.88 in "K. Burhenne. Implementierung eines Algorithmus zur
@@ -34,8 +34,8 @@ All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
 >>> f2 = Ex(y, Or(y == a, a == 0))
 >>> pnf(Equivalent(f1, f2))
 Ex(G0001_y, All(G0002_y,
-    And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
-        Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
+    And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
+        Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))
 >>> VV.pop()
 >>> VV.push()
 >>> a, b, y = VV.get('a', 'b', 'y')
@@ -43,6 +43,6 @@ Ex(G0001_y, All(G0002_y,
 >>> f2 = Ex(y, Or(y == a, a == 0))
 >>> pnf(Equivalent(f1, f2), prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
-    And(Or(a != 0, b != 0, y != 0, G0001_y == a, a == 0),
-        Or(And(G0002_y != a, a != 0), And(a == 0, b == 0, y == 0)))))
+    And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
+        Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))
 >>> VV.pop()

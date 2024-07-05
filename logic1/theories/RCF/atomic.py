@@ -9,7 +9,7 @@ from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore
 from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
     Polynomial_generic_dense as UnivariatePolynomial)
 from types import BuiltinFunctionType
-from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self, TypeAlias
+from typing import Any, ClassVar, Final, Iterable, Iterator, Optional, Self
 
 from ... import firstorder
 from ...firstorder import Formula, T, F
@@ -86,7 +86,7 @@ class _Ring:
 ring = _Ring()
 
 
-class _VariableSet(firstorder.atomic._VariableSet):
+class _VariableSet(firstorder.atomic._VariableSet['Variable']):
 
     _instance: ClassVar[Optional[_VariableSet]] = None
 
@@ -130,7 +130,7 @@ class _VariableSet(firstorder.atomic._VariableSet):
             i += 1
             v = f'G{i:04d}{suffix}'
         self.wrapped_ring.add_var(v)
-        return Term(self.wrapped_ring(v))
+        return Variable(self.wrapped_ring(v))
 
     def pop(self) -> None:
         self.wrapped_ring.pop()
@@ -148,7 +148,7 @@ class TSQ(Enum):
     WEAK = auto()
 
 
-class Term(firstorder.Term):
+class Term(firstorder.Term['Variable']):
 
     wrapped_ring: _Ring = ring
     wrapped_variable_set: _VariableSet = VV
@@ -156,7 +156,7 @@ class Term(firstorder.Term):
     _poly: Polynomial
 
     @property
-    def poly(self):
+    def poly(self) -> Polynomial:
         """
         An instance of :class:`MPolynomial_libsingular
         <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
@@ -168,7 +168,7 @@ class Term(firstorder.Term):
         return self._poly
 
     @poly.setter
-    def poly(self, value):
+    def poly(self, value: Polynomial):
         self._poly = value
 
     def __add__(self, other: object) -> Term:
@@ -179,19 +179,22 @@ class Term(firstorder.Term):
     def __eq__(self, other: Term | Polynomial | Integer | int) -> Eq:  # type: ignore[override]
         # discuss: we have Eq.__bool__ but this way we cannot compare Terms
         # with arbitrary objects in a boolean context. Same for __ne__.
-        if isinstance(other, Term):
-            return Eq(self, other)
-        return Eq(self, Term(other))
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            lhs = - lhs
+        return Eq(lhs, Term(0))
 
-    def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge:
-        if isinstance(other, Term):
-            return Ge(self, other)
-        return Ge(self, Term(other))
+    def __ge__(self, other: Term | Polynomial | Integer | int) -> Ge | Le:
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            return Le(- lhs, 0)
+        return Ge(lhs, 0)
 
-    def __gt__(self, other: Term | Polynomial | Integer | int) -> Gt:
-        if isinstance(other, Term):
-            return Gt(self, other)
-        return Gt(self, Term(other))
+    def __gt__(self, other: Term | Polynomial | Integer | int) -> Gt | Lt:
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            return Lt(- lhs, 0)
+        return Gt(lhs, 0)
 
     def __hash__(self) -> int:
         return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
@@ -210,15 +213,17 @@ class Term(firstorder.Term):
         for coefficient, power_product in self.poly:
             yield int(coefficient), Term(power_product)
 
-    def __le__(self, other: Term | Polynomial | Integer | int) -> Le:
-        if isinstance(other, Term):
-            return Le(self, other)
-        return Le(self, Term(other))
+    def __le__(self, other: Term | Polynomial | Integer | int) -> Le | Ge:
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            return Ge(- lhs, 0)
+        return Le(lhs, 0)
 
-    def __lt__(self, other: Term | Polynomial | Integer | int) -> Lt:
-        if isinstance(other, Term):
-            return Lt(self, other)
-        return Lt(self, Term(other))
+    def __lt__(self, other: Term | Polynomial | Integer | int) -> Lt | Gt:
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            return Gt(- lhs, 0)
+        return Lt(lhs, 0)
 
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
@@ -226,9 +231,10 @@ class Term(firstorder.Term):
         return Term(self.poly * other)
 
     def __ne__(self, other: Term | Polynomial | Integer | int) -> Ne:  # type: ignore[override]
-        if isinstance(other, Term):
-            return Ne(self, other)
-        return Ne(self, Term(other))
+        lhs = self - (other if isinstance(other, Term) else Term(other))
+        if lhs.lc() < 0:
+            lhs = - lhs
+        return Ne(lhs, Term(0))
 
     def __neg__(self) -> Term:
         return Term(- self.poly)
@@ -322,14 +328,6 @@ class Term(firstorder.Term):
             D[Term(poly)] = multiplicity
         return unit, D
 
-    def fresh(self) -> Variable:
-        """
-        .. seealso::
-            :meth:`logic1.firstorder.atomic.Term.fresh`
-        """
-        assert self.is_variable()
-        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
-
     def is_constant(self) -> bool:
         """
         .. seealso::
@@ -411,14 +409,22 @@ class Term(firstorder.Term):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.variables>`
         """
         for g in self.poly.variables():
-            yield Term(g)
+            yield Variable(g)
 
 
-Variable: TypeAlias = Term
+class Variable(Term, firstorder.Variable['Variable']):
+
+    def fresh(self) -> Variable:
+        """
+        .. seealso::
+            :meth:`logic1.firstorder.atomic.Term.fresh`
+        """
+        assert self.is_variable()
+        return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
 
 @functools.total_ordering
-class AtomicFormula(firstorder.AtomicFormula):
+class AtomicFormula(firstorder.AtomicFormula['Variable']):
     """
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     | :data:`self`       | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |

@@ -3,14 +3,17 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import inspect
 from types import FrameType
-from typing import Any, Iterator, Self, Sequence, TypeAlias
+from typing import Any, Generic, Iterator, Self, Sequence, TypeVar
 
 from .formula import Formula
 
 from ..support.tracing import trace  # noqa
 
 
-class _VariableSet(ABC):
+V = TypeVar('V', bound='Variable')
+
+
+class _VariableSet(ABC, Generic[V]):
 
     @property
     @abstractmethod
@@ -18,10 +21,10 @@ class _VariableSet(ABC):
         ...
 
     @abstractmethod
-    def __getitem__(self, index: str) -> Variable:
+    def __getitem__(self, index: str) -> V:
         ...
 
-    def get(self, *args) -> tuple[Variable, ...]:
+    def get(self, *args) -> tuple[V, ...]:
         return tuple(self[name] for name in args)
 
     def imp(self, *args) -> None:
@@ -57,13 +60,7 @@ class _VariableSet(ABC):
         ...
 
 
-class Term(ABC):
-
-    @abstractmethod
-    def fresh(self) -> Variable:
-        """Returns a variable that has not been used so far.
-        """
-        ...
+class Term(ABC, Generic[V]):
 
     @abstractmethod
     def as_latex(self) -> str:
@@ -83,7 +80,7 @@ class Term(ABC):
         ...
 
     @abstractmethod
-    def vars(self) -> Iterator[Variable]:
+    def vars(self) -> Iterator[V]:
         """All variables occurring in self.
 
         .. seealso::
@@ -94,10 +91,16 @@ class Term(ABC):
         ...
 
 
-Variable: TypeAlias = Term
+class Variable(Term, Generic[V]):
+
+    @abstractmethod
+    def fresh(self) -> V:
+        """Returns a variable that has not been used so far.
+        """
+        ...
 
 
-class AtomicFormula(Formula):
+class AtomicFormula(Formula, Generic[V]):
 
     @classmethod
     @abstractmethod
@@ -125,11 +128,11 @@ class AtomicFormula(Formula):
         return f'\\verb!{repr(self)}!'
 
     @abstractmethod
-    def _bvars(self, quantified: set) -> Iterator[Variable]:
+    def _bvars(self, quantified: set) -> Iterator[V]:
         ...
 
     @abstractmethod
-    def _fvars(self, quantified: set) -> Iterator[Variable]:
+    def _fvars(self, quantified: set) -> Iterator[V]:
         ...
 
     def simplify(self) -> Formula:

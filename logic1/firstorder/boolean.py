@@ -82,7 +82,7 @@ class And(BooleanFormula):
     >>> And(x == 0)
     x == 0
     >>> And(x == 1, x == y, y == z)
-    And(x == 1, x == y, y == z)
+    And(x - 1 == 0, x - y == 0, y - z == 0)
     """
     @classmethod
     def dual(cls) -> type[Or]:
@@ -157,7 +157,7 @@ class Or(BooleanFormula):
     >>> Or(x == 0)
     x == 0
     >>> Or(x == 1, x == 2, x == 3)
-    Or(x == 1, x == 2, x == 3)
+    Or(x - 1 == 0, x - 2 == 0, x - 3 == 0)
     """
     @classmethod
     def dual(cls) -> type[And]:

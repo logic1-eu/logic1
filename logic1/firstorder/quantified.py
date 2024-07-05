@@ -41,7 +41,7 @@ class QuantifiedFormula(Formula):
         >>> x, y = VV.get('x', 'y')
         >>> f = All(x, Ex(y, x == y))
         >>> f.arg
-        Ex(y, x == y)
+        Ex(y, x - y == 0)
         """
         return self.args[1]
 
@@ -80,9 +80,9 @@ class Ex(QuantifiedFormula):
     >>> from logic1.theories.RCF import *
     >>> x, y, z = VV.get('x', 'y', 'z')
     >>> Ex(x, x**2 == y)
-    Ex(x, x^2 == y)
+    Ex(x, x^2 - y == 0)
     >>> Ex([x, y], And(x > 0, y > 0, z == x - y))
-    Ex(x, Ex(y, And(x > 0, y > 0, z == x - y)))
+    Ex(x, Ex(y, And(x > 0, y > 0, x - y - z == 0)))
     """
     @classmethod
     def dual(cls) -> type[All]:
@@ -103,8 +103,8 @@ class All(QuantifiedFormula):
     >>> x, y = VV.get('x', 'y')
     >>> All(x, x**2 >= 0)
     All(x, x^2 >= 0)
-    >>> All([x, y], (x + y)**2 == x**2 + 2*x*y + y**2)
-    All(x, All(y, x^2 + 2*x*y + y^2 == x^2 + 2*x*y + y^2))
+    >>> All([x, y], (x + y)**2 >= 0)
+    All(x, All(y, x^2 + 2*x*y + y^2 >= 0))
     """
     @classmethod
     def dual(cls) -> type[Ex]:

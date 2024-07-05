@@ -16,15 +16,15 @@ __le__:
 
 __lshift__:
 >>> (x + z == y + z) << (x == y)
-Implies(x == y, x + z == y + z)
+Implies(x - y == 0, x - y == 0)
 
 __or__:
 >>> (x == 0) | (x == y) | (x == z)
-Or(x == 0, x == y, x == z)
+Or(x == 0, x - y == 0, x - z == 0)
 
 __rshift__:
 >>> (x == y) >> (x + z == y + z)
-Implies(x == y, x + z == y + z)
+Implies(x - y == 0, x - y == 0)
 
 __eq__, __ne__, __hash__:
 >>> e1 = Ne(1, 0)
@@ -78,13 +78,13 @@ atoms:
 >>> type(f.atoms())
 <class 'generator'>
 >>> list(f.atoms())
-[3*x == 0, 3*x == 0, x == 0, x*y == 1]
+[3*x == 0, 3*x == 0, x == 0, x*y - 1 == 0]
 >>> set(f.atoms()) == {x == 0, 3*x == 0, x*y == 1}
 True
 >>> sum(1 for _ in f.atoms())
 4
 >>> Counter(f.atoms())
-Counter({3*x == 0: 2, x == 0: 1, x*y == 1: 1})
+Counter({3*x == 0: 2, x == 0: 1, x*y - 1 == 0: 1})
 >>> empty = (T & F).atoms()
 >>> next(empty)
 Traceback (most recent call last):
@@ -115,8 +115,8 @@ ex:
 Ex(b, Ex(a, a*x + b > 0))
 
 fvars:
->>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x)).fvars())
-[a, x, a, x]
+>>> list(All(y, Ex(x, a + x == y) & Ex(z, x + y == a)).fvars())
+[a, a, x]
 
 matrix:
 ...
@@ -128,7 +128,7 @@ qvars:
 simplify:
 >>> f1 = And(x == y, T, x == y, And(x == z, x == x + z))
 >>> f1.simplify()
-And(x - y == 0, x - z == 0, -z == 0)
+And(x - y == 0, x - z == 0, z == 0)
 >>>
 >>> f2 = Or(x == 0, Or(x == 1, x == 2), And(x == y, x == z))
 >>> f2.simplify()
@@ -139,12 +139,12 @@ subs:
 >>> a, b, x = VV.get('a', 'b', 'x')
 >>> f = Ex(x, x == a)
 >>> f.subs({x: a})
-Ex(x, x == a)
+Ex(x, a - x == 0)
 >>> f.subs({a: x})
-Ex(G0001_x, G0001_x == x)
+Ex(G0001_x, -G0001_x + x == 0)
 >>> g = Ex(x, _ & (b == 0))
 >>> g.subs({b: x})
-Ex(G0002_x, And(Ex(G0001_x, G0001_x == G0002_x), x == 0))
+Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
 >>> VV.pop()
 
 _sprint:
@@ -156,10 +156,10 @@ to_latex:
 to_nnf:
 >>> f = Equivalent(And(a == 0, T), Ex(y, Not(y == a)))
 >>> f.to_nnf()
-And(Or(a != 0, F, Ex(y, y != a)), Or(All(y, y == a), And(a == 0, T)))
+And(Or(a != 0, F, Ex(y, a - y != 0)), Or(All(y, a - y == 0), And(a == 0, T)))
 >>> f.to_nnf(to_positive=False)
-And(Or(Not(a == 0), Not(T), Ex(y, Not(y == a))),
-    Or(All(y, y == a), And(a == 0, T)))
+And(Or(Not(a == 0), Not(T), Ex(y, Not(a - y == 0))),
+    Or(All(y, a - y == 0), And(a == 0, T)))
 
 transform_atoms:
 >>> f = And(x == y, y < z)

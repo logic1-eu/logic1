@@ -3,8 +3,7 @@ import more_itertools
 from abc import ABC, abstractmethod
 from typing import Any, cast, Generic, Iterable, Optional, Self, TypeVar
 
-from ..firstorder import (All, And, AtomicFormula, Ex, _F, Formula, Or, pnf,
-                          _T, T)
+from ..firstorder import (All, And, AtomicFormula, Ex, _F, Formula, Or, _T, T)
 
 from ..support.tracing import trace  # noqa
 

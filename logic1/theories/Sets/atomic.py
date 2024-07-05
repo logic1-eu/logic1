@@ -3,7 +3,7 @@ from __future__ import annotations
 import functools
 import logging
 import string
-from typing import Any, ClassVar, Final, Iterator, Optional, Self, TypeAlias
+from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
 from ... import firstorder
 from ...firstorder import F, Formula, T
@@ -19,10 +19,10 @@ oo = float('Inf')
 Index: TypeAlias = int | float
 
 
-class _VariableSet(firstorder.atomic._VariableSet):
+class _VariableSet(firstorder.atomic._VariableSet['Variable']):
     """Instances of the singleton VariableSet register, store, and provide
-    variables, which are instances of Terms and suitable for building complex
-    instances of Terms using operators and methods defined in :class:`Term`.
+    variables, which are instances of Terms and suitable for building atoms
+    using operators and methods defined in :class:`Variable`.
     """
 
     _instance: ClassVar[Optional[_VariableSet]] = None
@@ -76,14 +76,14 @@ class _VariableSet(firstorder.atomic._VariableSet):
 VV = _VariableSet()
 
 
-class Term(firstorder.Term):
+class Variable(firstorder.Variable['Variable']):
 
     wrapped_variable_set: _VariableSet = VV
 
     string: str
 
-    def __eq__(self, other: Term) -> Eq:  # type: ignore[override]
-        if isinstance(other, Term):
+    def __eq__(self, other: Variable) -> Eq:  # type: ignore[override]
+        if isinstance(other, Variable):
             return Eq(self, other)
         raise ValueError(f'arguments must be terms - {other} is {type(other)}')
 
@@ -95,8 +95,8 @@ class Term(firstorder.Term):
             raise ValueError(f'argument must be a string; {arg} is {type(arg)}')
         self.string = arg
 
-    def __ne__(self, other: Term) -> Ne:  # type: ignore[override]
-        if isinstance(other, Term):
+    def __ne__(self, other: Variable) -> Ne:  # type: ignore[override]
+        if isinstance(other, Variable):
             return Ne(self, other)
         raise ValueError(f'arguments must be terms; {other} is {type(other)}')
 
@@ -119,10 +119,10 @@ class Term(firstorder.Term):
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     @staticmethod
-    def sort_key(term: Term) -> str:
+    def sort_key(term: Variable) -> str:
         return term.string
 
-    def subs(self, d: dict[Variable, Term]) -> Term:
+    def subs(self, d: dict[Variable, Variable]) -> Variable:
         return d.get(self, self)
 
     def vars(self) -> Iterator[Variable]:
@@ -132,9 +132,6 @@ class Term(firstorder.Term):
         :meth:`logic1.firstorder.atomic.Term.vars`.
         """
         yield self
-
-
-Variable: TypeAlias = Term
 
 
 @functools.total_ordering
@@ -163,9 +160,9 @@ class AtomicFormula(firstorder.AtomicFormula):
                         assert isinstance(other, (Eq, Ne))
                         if self.op != other.op:
                             return L.index(self.op) <= L.index(other.op)
-                        if Term.sort_key(self.lhs) != Term.sort_key(other.lhs):
-                            return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
-                        return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
+                        if Variable.sort_key(self.lhs) != Variable.sort_key(other.lhs):
+                            return Variable.sort_key(self.lhs) <= Variable.sort_key(other.lhs)
+                        return Variable.sort_key(self.rhs) <= Variable.sort_key(other.rhs)
                     case _:
                         assert False, f'{self}: {type(self)}'
             case _:
@@ -217,7 +214,7 @@ class AtomicFormula(firstorder.AtomicFormula):
             case _:
                 assert False, f'{self}: {type(self)}'
 
-    def subs(self, d: dict[Variable, Term]) -> AtomicFormula:
+    def subs(self, d: dict[Variable, Variable]) -> AtomicFormula:
         """Implements abstract :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         match self:
@@ -232,19 +229,19 @@ class AtomicFormula(firstorder.AtomicFormula):
 class Eq(AtomicFormula):
 
     @property
-    def lhs(self) -> Term:
+    def lhs(self) -> Variable:
         return self.args[0]
 
     @property
-    def rhs(self) -> Term:
+    def rhs(self) -> Variable:
         return self.args[1]
 
     def __bool__(self) -> bool:
         return self.lhs.string == self.rhs.string
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
+    def __init__(self, lhs: Variable, rhs: Variable) -> None:
         for arg in (lhs, rhs):
-            if not isinstance(arg, Term):
+            if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables; {arg} is {type(arg)}')
         super().__init__(lhs, rhs)
@@ -252,7 +249,7 @@ class Eq(AtomicFormula):
     def simplify(self) -> Formula:
         if self.lhs == self.rhs:
             return T
-        if Term.sort_key(self.lhs) > Term.sort_key(self.rhs):
+        if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
             return Eq(self.rhs, self.lhs)
         return self
 
@@ -260,19 +257,19 @@ class Eq(AtomicFormula):
 class Ne(AtomicFormula):
 
     @property
-    def lhs(self) -> Term:
+    def lhs(self) -> Variable:
         return self.args[0]
 
     @property
-    def rhs(self) -> Term:
+    def rhs(self) -> Variable:
         return self.args[1]
 
     def __bool__(self) -> bool:
         return self.lhs.string != self.rhs.string
 
-    def __init__(self, lhs: Term, rhs: Term) -> None:
+    def __init__(self, lhs: Variable, rhs: Variable) -> None:
         for arg in (lhs, rhs):
-            if not isinstance(arg, Term):
+            if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables - {arg} is {type(arg)}')
         super().__init__(lhs, rhs)
@@ -280,7 +277,7 @@ class Ne(AtomicFormula):
     def simplify(self) -> Formula:
         if self.lhs == self.rhs:
             return F
-        if Term.sort_key(self.lhs) > Term.sort_key(self.rhs):
+        if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
             return Ne(self.rhs, self.lhs)
         return self
 

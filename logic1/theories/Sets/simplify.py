@@ -3,7 +3,7 @@ from typing import Iterable, Optional, Self, TypeAlias
 from ... import abc
 
 from ...firstorder import And, AtomicFormula, Formula, Or
-from .atomic import C, C_, Eq, Index, Ne, oo, Term, Variable
+from .atomic import C, C_, Eq, Index, Ne, oo, Variable
 
 from ...support.tracing import trace  # noqa
 
@@ -12,12 +12,12 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
 
     _ref_min_card: Index
     _ref_max_card: Index
-    _ref_equations: list[set[Term]]
+    _ref_equations: list[set[Variable]]
     _ref_inequations: set[Ne]
 
     _cur_min_card: Index
     _cur_max_card: Index
-    _cur_equations: list[set[Term]]
+    _cur_equations: list[set[Variable]]
     _cur_inequations: set[Ne]
 
     def __init__(self) -> None:
@@ -74,7 +74,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             # # Create substitution from the equations
             # sigma = dict()
             # for P in self._cur_equations:
-            #     x = max(P, key=Term.sort_key)
+            #     x = max(P, key=Variable.sort_key)
             #     for y in P:
             #         if y is not x:
             #             sigma[y] = x
@@ -98,7 +98,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
         if self._cur_max_card < self._ref_max_card:
             L.append(C_(self._cur_max_card + 1))
         for P in self._cur_equations:
-            x = min(P, key=Term.sort_key)
+            x = min(P, key=Variable.sort_key)
             for y in P:
                 if x != y:
                     for Q in self._ref_equations:
@@ -130,7 +130,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
 
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
-    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Term, Term]
+    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Variable, Variable]
     SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
 
     @property
