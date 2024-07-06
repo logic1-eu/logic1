@@ -6,11 +6,11 @@ Terms and Atoms
 
 .. automodule:: logic1.theories.RCF.atomic
 
-  .. autoclass:: _Ring
+  .. autoclass:: PolynomialRing
     :members:
     :undoc-members:
 
-  .. autodata:: ring
+  .. autodata:: polynomial_ring
 
   .. autoclass:: _VariableSet
     :members:

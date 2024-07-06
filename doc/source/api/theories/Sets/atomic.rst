@@ -5,7 +5,7 @@
 Terms and Atoms
 ***************
 
-.. autoclass:: logic1.theories.Sets.atomic.Term
+.. autoclass:: logic1.theories.Sets.atomic.Variable
   :members:
   :undoc-members:
 

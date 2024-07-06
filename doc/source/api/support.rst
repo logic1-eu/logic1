@@ -4,13 +4,6 @@
 Support Modules
 ***************
 
-Module :mod:`decorators <logic1.support.decorators>`
-----------------------------------------------------
-
-.. automodule:: logic1.support.decorators
-  :members:
-  :undoc-members:
-
 Module :mod:`containers <logic1.support.excepthook>`
 ----------------------------------------------------
 

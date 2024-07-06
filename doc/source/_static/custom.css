@@ -16,11 +16,11 @@
 
 /* anything related to the dark theme */
 
+
 html[data-theme="dark"]  {
   --pst-color-background: color(srgb 0.15 0.17 0.2);
   --logic1-color-sidebar: color(srgb 0.12 0.15 0.18);
   --logic1-color-border: color(srgb 0.30 0.34 0.38);
-/*  --logic1-color-sidebar: var(--pst-color-background)*/
 }
 
 html[data-theme="dark"] .bd-sidebar-primary {

@@ -31,7 +31,7 @@ Formula Base Class
   .. autoclass:: Formula
     :members:
     :undoc-members:
-    :exclude-members: op, args, __init__
+    :exclude-members: op, args, __init__, to_pnf
 
     .. automethod:: __init__
 
@@ -123,54 +123,10 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`Or`, which implements
-      the dual operator :math:`\lor` or :math:`\land`.
-
-    .. property:: definite_element
-      :classmethod:
-
-      A class property yielding the class :class:`_F`, which implements the
-      definite operator :math:`\bot` of :math:`\wedge`. The definite operator is
-      the dual of the neutral. Note that the return value :class:`_F` is the
-      bare operator, in contrast to the formula :data:`F`.
-
-    .. property:: neutral_element
-      :classmethod:
-
-      A class property yielding the class :class:`_T`, which implements the
-      neutral operator :math:`\top` of :math:`\wedge.` Note that the return
-      value :class:`_T` is the bare operator, in contrast to the formula
-      :data:`T`.
-
   .. autoclass:: Or
     :members:
     :undoc-members:
     :exclude-members: __init__, __new__
-
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`And`, which implements
-      the dual operator :math:`\land` or :math:`\lor`.
-
-    .. property:: definite_element
-      :classmethod:
-
-      A class property yielding the class :class:`_T`, which implements the
-      definite operator :math:`\top` of :math:`\vee`. The definite operator is
-      the dual of the neutral. Note that the return value :class:`_T` is the
-      bare operator, in contrast to the formula :data:`T`.
-
-    .. property:: neutral_element
-      :classmethod:
-
-      A class property yielding the class :class:`_F`, which implements the
-      neutral operator :math:`\bot` of :math:`\vee.` Note that the return
-      value :class:`_F` is the bare operator, in contrast to the formula
-      :data:`F`.
 
   .. autoclass:: Not
     :members:
@@ -184,12 +140,6 @@ Boolean Formulas
     :undoc-members:
     :exclude-members: __init__, __new__
 
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`_F`, which implements the dual
-      operator :math:`\bot` of :math:`\top`.
-
   .. autodata:: T
     :annotation: = _T()
 
@@ -197,12 +147,6 @@ Boolean Formulas
     :members:
     :undoc-members:
     :exclude-members: __init__, __new__
-
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`_T`, which implements
-      the dual operator :math:`\top` of :math:`\bot`.
 
   .. autodata:: F
     :annotation: = _F()
@@ -214,26 +158,16 @@ Quantified Formulas
 .. automodule:: logic1.firstorder.quantified
 
   .. autoclass:: QuantifiedFormula
-    :special-members:
+    :members:
+    :undoc-members:
+    :exclude-members: __init__, __new__
 
   .. autoclass:: Ex
-    :members: var, arg
+    :members:
     :special-members:
-
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`All`, which implements the
-      dual operator :math:`\forall` of :math:`\exists`.
 
   .. autoclass:: All
-    :members: var, arg
+    :members:
     :special-members:
-
-    .. property:: dual
-      :classmethod:
-
-      A class property yielding the class :class:`Ex`, which implements the
-      dual operator :math:`\exists` of :math:`\forall`.
 
   .. autodata:: QuantifierBlock
