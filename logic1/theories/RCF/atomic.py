@@ -155,7 +155,8 @@ class Term(firstorder.Term['Variable']):
             return Term(self.poly + other.poly)
         return Term(self.poly + other)
 
-    def __eq__(self, other: Term | Polynomial | sage.Integer | int) -> Eq:  # type: ignore[override]
+    def __eq__(  # type: ignore[override]
+            self, other: Term | Polynomial | sage.Integer | int) -> Eq:
         # discuss: we have Eq.__bool__ but this way we cannot compare Terms
         # with arbitrary objects in a boolean context. Same for __ne__.
         lhs = self - (other if isinstance(other, Term) else Term(other))
@@ -209,7 +210,8 @@ class Term(firstorder.Term['Variable']):
             return Term(self.poly * other.poly)
         return Term(self.poly * other)
 
-    def __ne__(self, other: Term | Polynomial | sage.Integer | int) -> Ne:  # type: ignore[override]
+    def __ne__(  # type: ignore[override]
+            self, other: Term | Polynomial | sage.Integer | int) -> Ne:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             lhs = - lhs

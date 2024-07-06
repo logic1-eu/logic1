@@ -1,5 +1,5 @@
 >>> from logic1.firstorder import *
->>> from logic1.firstorder.pnf import pnf
+>>> from logic1.firstorder.pnf import prenex_normal_form
 >>> from logic1.theories.Sets import *
 
 >>> x = VV.get(*(f'x{i}' for i in range(9)))
@@ -12,7 +12,7 @@
 >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
 >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
 >>> f3 = Ex(x[7], x[0] == o)
->>> pnf(f1 & f2 & f3)
+>>> prenex_normal_form(f1 & f2 & f3)
 All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == o))))))))
 
 # Derived from the rlpnf test in redlog.tst at
@@ -21,14 +21,14 @@ All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == o))))))))
 >>> _ = VV.push()
 >>> f1 = And(a == o, b == o, y == o)
 >>> f2 = Ex(y, Or(y == a, a == o))
->>> pnf(Equivalent(f1, f2))
+>>> prenex_normal_form(Equivalent(f1, f2))
 Ex(G0001_y, All(G0002_y,
     And(Or(a != o, b != o, y != o, G0001_y == a, a == o),
         Or(And(G0002_y != a, a != o), And(a == o, b == o, y == o)))))
 >>> _ = VV.pop()
 
 >>> _ = VV.push()
->>> pnf(Equivalent(f1, f2), prefer_universal=True)
+>>> prenex_normal_form(Equivalent(f1, f2), prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
     And(Or(a != o, b != o, y != o, G0001_y == a, a == o),
         Or(And(G0002_y != a, a != o), And(a == o, b == o, y == o)))))

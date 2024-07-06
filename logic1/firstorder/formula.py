@@ -874,8 +874,8 @@ class Formula(ABC):
                Quantorenelimination für lineare reelle Probleme.
                Diploma Thesis, University of Passau, Germany, 1990
         """
-        from .pnf import pnf
-        return pnf(self, prefer_universal, is_nnf)
+        from .pnf import prenex_normal_form
+        return prenex_normal_form(self, prefer_universal, is_nnf)
 
     def transform_atoms(self, tr: Callable[[Any], Formula]) -> Formula:
         """Apply `tr` to all atomic formulas.

@@ -10,7 +10,7 @@ from . import firstorder
 
 from .firstorder import (Formula, AtomicFormula, Term, Variable,  # noqa
                          BooleanFormula, Equivalent, Implies, And, Or, Not,
-                         _T, T, _F, F, QuantifiedFormula, Ex, All, pnf)
+                         _T, T, _F, F, QuantifiedFormula, Ex, All)
 
 from . import theories
 

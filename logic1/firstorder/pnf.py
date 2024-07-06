@@ -145,4 +145,4 @@ class PrenexNormalForm:
                 assert False
 
 
-pnf = PrenexNormalForm()
+prenex_normal_form = PrenexNormalForm()
