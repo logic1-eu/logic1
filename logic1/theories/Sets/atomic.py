@@ -179,6 +179,12 @@ class AtomicFormula(firstorder.AtomicFormula):
             case _:
                 assert False, f'{self}: {type(self)}'
 
+    def __str__(self) -> str:
+        """Implements abstract method
+        :meth:`firstorder.atomic.AtomicFormula.__str__`.
+        """
+        return repr(self)
+
     def as_latex(self) -> str:
         match self:
             case C(index=index) if index == oo:
@@ -244,7 +250,7 @@ class Eq(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables; {arg} is {type(arg)}')
-        super().__init__(lhs, rhs)
+        self.args = (lhs, rhs)
 
     def simplify(self) -> Formula:
         if self.lhs == self.rhs:
@@ -272,7 +278,7 @@ class Ne(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables - {arg} is {type(arg)}')
-        super().__init__(lhs, rhs)
+        self.args = (lhs, rhs)
 
     def simplify(self) -> Formula:
         if self.lhs == self.rhs:
@@ -306,6 +312,12 @@ class C(AtomicFormula):
     def index(self) -> Index:
         return self.args[0]
 
+    def __init__(self, index: Index) -> None:
+        """Implements abstract method
+        :meth:`firstorder.formula.Formula.__init__`.
+        """
+        self.args = (index,)
+
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
@@ -313,6 +325,12 @@ class C(AtomicFormula):
         if index not in cls._instances:
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
+
+    def simplify(self):
+        """Implements abstract method
+        :meth:`firstorder.atomic.AtomicFormula.simplify`.
+        """
+        return self
 
 
 class C_(AtomicFormula):
@@ -340,6 +358,12 @@ class C_(AtomicFormula):
     def index(self) -> Index:
         return self.args[0]
 
+    def __init__(self, index: Index) -> None:
+        """Implements abstract method
+        :meth:`firstorder.formula.Formula.__init__`.
+        """
+        self.args = (index,)
+
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
@@ -347,3 +371,9 @@ class C_(AtomicFormula):
         if index not in cls._instances:
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
+
+    def simplify(self):
+        """Implements abstract method
+        :meth:`firstorder.atomic.AtomicFormula.simplify`.
+        """
+        return self

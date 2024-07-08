@@ -130,9 +130,6 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
 
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
-    AtomicSortKey: TypeAlias = tuple[int, int] | tuple[int, Variable, Variable]
-    SortKey: TypeAlias = tuple[int, int, int, tuple[AtomicSortKey, ...]]
-
     @property
     def class_AT(self) -> type[AtomicFormula]:
         return AtomicFormula

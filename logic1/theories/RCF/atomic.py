@@ -474,7 +474,7 @@ class AtomicFormula(firstorder.AtomicFormula['Variable']):
             lhs = Term(lhs)
         if not isinstance(rhs, Term):
             rhs = Term(rhs)
-        super().__init__(lhs, rhs)
+        self.args = (lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         match other:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import inspect
 from types import FrameType
-from typing import Any, Generic, Iterator, Self, Sequence, TypeVar
+from typing import Any, final, Generic, Iterator, Self, Sequence, TypeVar
 
 from .formula import Formula
 
@@ -109,23 +109,21 @@ class AtomicFormula(Formula, Generic[V]):
         """
         ...
 
-    def __init__(self, *args) -> None:
-        self.args = args
-
+    @abstractmethod
     def __str__(self) -> str:
         # Overloading __str__ here breaks an infinite recursion in the
         # inherited Formula.__str__. Nicer string representations are provided
         # by various theory modules.
-        return repr(self)
+        ...
 
+    @abstractmethod
     def as_latex(self) -> str:
-        """Provides verbatim output of :code:`repr(self)` as a default
-        implementation. This is expected to be overridden in subclasses.
+        """Latex representation.
 
         .. seealso::
             :meth:`.Formula.as_latex` -- LaTeX representation
         """
-        return f'\\verb!{repr(self)}!'
+        ...
 
     @abstractmethod
     def _bvars(self, quantified: set) -> Iterator[V]:
@@ -135,14 +133,9 @@ class AtomicFormula(Formula, Generic[V]):
     def _fvars(self, quantified: set) -> Iterator[V]:
         ...
 
+    @abstractmethod
     def simplify(self) -> Formula:
-        """Provides identity as a default implementation of simplification.
-        This is expected to be overridden in subclasses.
-
-        .. seealso::
-            :meth:`.Formula.simplify` -- simplification
-        """
-        return self
+        ...
 
     @abstractmethod
     def subs(self, substitution: dict) -> Self:
@@ -152,6 +145,7 @@ class AtomicFormula(Formula, Generic[V]):
         """
         ...
 
+    @final
     def to_complement(self) -> Self:
         """Returns an :class:`AtomicFormula` equivalent to ``Not(self)``.
 
