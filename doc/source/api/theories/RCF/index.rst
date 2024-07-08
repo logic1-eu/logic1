@@ -8,3 +8,5 @@ Real Closed Fields
    :hidden:
 
    atomic.rst
+   simplify.rst
+   qe.rst

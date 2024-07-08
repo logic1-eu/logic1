@@ -73,7 +73,7 @@ Negation Normal Form
 Prenex Normal Form
 ------------------
 .. autofunction:: logic1.firstorder.Formula.to_pnf
-   :noindex:
+  :noindex:
 
 
 .. index::

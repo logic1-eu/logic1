@@ -31,41 +31,36 @@ Formula Base Class
   .. autoclass:: Formula
     :members:
     :undoc-members:
-    :exclude-members: op, args, __init__, to_pnf
+    :exclude-members: op, args, __init__
+    :private-members: _repr_latex_
 
-    .. automethod:: __init__
-
-    .. automethod:: _repr_latex_
-
-    .. property:: op
-      :classmethod:
-
-      This class property is supposed to be used read-only on instances of
-      subclasses of :class:`Formula`. It yields the respective subclass.
+    .. autoproperty:: op
 
     .. autoproperty:: args
 
-    The properties :attr:`op` and :attr:`args` are useful for decomposing and
-    reconstructing formulas, using the invariant :code:`f = f.op(*f.args)`,
-    which holds for all formulas :code:`f`. This approach has been adopted from
-    the `SymPy <https://www.sympy.org/>`_ project:
+      The properties :attr:`op` and :attr:`args` are useful for decomposing and
+      reconstructing formulas, using the invariant :code:`f = f.op(*f.args)`,
+      which holds for all formulas :code:`f`. This approach has been adopted from
+      the `SymPy <https://www.sympy.org/>`_ project:
 
-    .. doctest::
+      .. doctest::
 
-      >>> from logic1.firstorder import *
-      >>> f = And(Implies(F, T), Or(T, Not(T)))
-      >>> # The class of f:
-      >>> f.op
-      <class 'logic1.firstorder.boolean.And'>
-      >>> # The argument tuple of f:
-      >>> f.args
-      (Implies(F, T), Or(T, Not(T)))
-      >>> # The invariant:
-      >>> f == f.op(*f.args)
-      True
-      >>> # Construction of a new formula using components of f:
-      >>> f.op(Equivalent(T, T), *f.args)
-      And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
+        >>> from logic1.firstorder import *
+        >>> f = And(Implies(F, T), Or(T, Not(T)))
+        >>> # The class of f:
+        >>> f.op
+        <class 'logic1.firstorder.boolean.And'>
+        >>> # The argument tuple of f:
+        >>> f.args
+        (Implies(F, T), Or(T, Not(T)))
+        >>> # The invariant:
+        >>> f == f.op(*f.args)
+        True
+        >>> # Construction of a new formula using components of f:
+        >>> f.op(Equivalent(T, T), *f.args)
+        And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
+
+    .. automethod:: __init__
 
     .. method:: ~, &, |, >>, <<
                 __invert__(other: Formula) -> Formula

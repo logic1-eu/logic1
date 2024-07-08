@@ -32,12 +32,22 @@ class Equivalent(BooleanFormula):
     """
     @property
     def lhs(self) -> Formula:
-        """The left-hand side of the equivalence."""
+        """The left-hand side of the equivalence.
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
+        """
         return self.args[0]
 
     @property
     def rhs(self) -> Formula:
-        """The right-hand side of the equivalence."""
+        """The right-hand side of the equivalence.
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
+        """
         return self.args[1]
 
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
@@ -47,22 +57,38 @@ class Equivalent(BooleanFormula):
 
 @final
 class Implies(BooleanFormula):
-    r"""A class whose instances are equivalences in the sense that their
-    toplevel operator represents the Boolean operator :math:`\longrightarrow`.
+    """A class whose instances are equivalences in the sense that their
+    toplevel operator represents the Boolean operator :math:`\\longrightarrow`.
 
     >>> from logic1.theories.RCF import *
     >>> x, = VV.get('x')
     >>> Implies(x == 0, x >= 0)
     Implies(x == 0, x >= 0)
-    """
+
+    .. seealso::
+        * :meth:`>>, __rshift__() <.formula.Formula.__rshift__>` -- \
+            infix notation of :class:`Implies`
+        * :meth:`\<\<, __lshift__() <.formula.Formula.__lshift__>` -- \
+            infix notation of converse :class:`Implies`
+    """  # noqa
     @property
     def lhs(self) -> Formula:
-        """The left-hand side of the implication."""
+        """The left-hand side of the implication.
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
+        """
         return self.args[0]
 
     @property
     def rhs(self) -> Formula:
-        """The right-hand side of the implication."""
+        """The right-hand side of the implication.
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
+        """
         return self.args[1]
 
     def __init__(self, lhs: Formula, rhs: Formula) -> None:
@@ -71,9 +97,9 @@ class Implies(BooleanFormula):
 
 @final
 class And(BooleanFormula):
-    r"""A class whose instances are conjunctions in the sense that their
+    """A class whose instances are conjunctions in the sense that their
     toplevel operator represents the Boolean operator
-    :math:`\wedge`.
+    :math:`\\wedge`.
 
     >>> from logic1.theories.RCF import *
     >>> x, y, z = VV.get('x', 'y', 'z')
@@ -83,6 +109,12 @@ class And(BooleanFormula):
     x == 0
     >>> And(x == 1, x == y, y == z)
     And(x - 1 == 0, x - y == 0, y - z == 0)
+
+    .. seealso::
+        * :meth:`&, __and__() <.formula.Formula.__and__>` -- \
+            infix notation of :class:`And`
+        * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+        * :attr:`op <.formula.Formula.op>` -- operator
     """
     @classmethod
     def dual(cls) -> type[Or]:
@@ -146,9 +178,9 @@ class And(BooleanFormula):
 
 @final
 class Or(BooleanFormula):
-    r"""A class whose instances are disjunctions in the sense that their
+    """A class whose instances are disjunctions in the sense that their
     toplevel operator represents the Boolean operator
-    :math:`\vee`.
+    :math:`\\vee`.
 
     >>> from logic1.theories.RCF import *
     >>> x, = VV.get('x')
@@ -158,6 +190,12 @@ class Or(BooleanFormula):
     x == 0
     >>> Or(x == 1, x == 2, x == 3)
     Or(x - 1 == 0, x - 2 == 0, x - 3 == 0)
+
+    .. seealso::
+        * :meth:`|, __or__() <.formula.Formula.__or__>` -- \
+            infix notation of :class:`Or`
+        * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+        * :attr:`op <.formula.Formula.op>` -- operator
     """
     @classmethod
     def dual(cls) -> type[And]:
@@ -221,18 +259,26 @@ class Or(BooleanFormula):
 
 @final
 class Not(BooleanFormula):
-    r"""A class whose instances are negated formulas in the sense that their
+    """A class whose instances are negated formulas in the sense that their
     toplevel operator is the Boolean operator
-    :math:`\neg`.
+    :math:`\\neg`.
 
     >>> from logic1.theories.RCF import *
     >>> a, = VV.get('a')
     >>> Not(a == 0)
     Not(a == 0)
+
+    .. seealso::
+        * :meth:`~, __invert__() <.formula.Formula.__invert__>` -- \
+            short notation of :class:`Not`
     """
     @property
     def arg(self) -> Formula:
-        r"""The one argument of the operator :math:`\neg`.
+        """The one argument of the operator :math:`\\neg`.
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
         """
         return self.args[0]
 

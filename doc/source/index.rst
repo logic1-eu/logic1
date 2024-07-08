@@ -78,6 +78,7 @@ T
    api/firstorder/index.rst
    api/theories/RCF/index.rst
    api/theories/Sets/index.rst
+   api/abc/index.rst
 
 .. toctree::
    :caption: Indices
@@ -87,15 +88,9 @@ T
    genindex.rst
 
 .. toctree::
-   :caption: API (IGNORE)
+   :caption: [IGNORE]
    :hidden:
 
-   api/abc.rst
    api/support.rst
-
-.. toctree::
-   :caption: Manual (IGNORE)
-   :hidden:
-
    manual/formulas.rst
    manual/methods.rst

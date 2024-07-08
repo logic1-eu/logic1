@@ -26,6 +26,10 @@ class QuantifiedFormula(Formula):
         >>> f = All(x, Ex(y, x == y))
         >>> f.var
         x
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
         """
         return self.args[0]
 
@@ -42,6 +46,10 @@ class QuantifiedFormula(Formula):
         >>> f = All(x, Ex(y, x == y))
         >>> f.arg
         Ex(y, x - y == 0)
+
+        .. seealso::
+            * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
+            * :attr:`op <.formula.Formula.op>` -- operator
         """
         return self.args[1]
 

@@ -1,10 +1,10 @@
-.. _api-abc:
+.. _api-abc-qe:
 
-*********************
-Abstract Base Classes
-*********************
+*Abstract Base Classes*
 
-.. automodule:: logic1.abc
+**********************
+Quantifier Elimination
+**********************
 
 Module :mod:`qe <logic1.abc.qe>`
 -----------------------------------------

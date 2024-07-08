@@ -8,3 +8,5 @@ Sets
    :hidden:
 
    atomic.rst
+   simplify.rst
+   qe.rst

@@ -1,5 +1,7 @@
 .. _api-RCF-atomic:
 
+*Real Closed Fields*
+
 ***************
 Terms and Atoms
 ***************

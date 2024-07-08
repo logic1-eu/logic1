@@ -36,14 +36,31 @@ class Formula(ABC):
 
     @property
     def op(self) -> type[Self]:
-        """This property is supposed to be used with instances of subclasses of
+        """Operator. This property can be used with instances of subclasses of
         :class:`Formula`. It yields the respective subclass.
         """
         return type(self)
 
     @property
     def args(self) -> tuple[Any, ...]:
-        """The argument tuple of the formula.
+        """The arguments of a formula as a tuple.
+
+        .. seealso::
+            * :attr:`Equivalent.lhs <.boolean.Equivalent.lhs>` \
+                -- left hand side of a logical :math:`\\longleftrightarrow`
+            * :attr:`Equivalent.rhs <.boolean.Equivalent.lhs>` \
+                -- right hand side of a logical :math:`\\longleftrightarrow`
+            * :attr:`Implies.lhs <.boolean.Equivalent.lhs>` \
+                -- left hand side of a logical :math:`\\longrightarrow`
+            * :attr:`Implies.rhs <.boolean.Equivalent.lhs>` \
+                -- right hand side of a logical :math:`\\longrightarrow`
+            * :attr:`Not.arg <.boolean.Not.arg>` \
+                -- argument formula of a logical :math:`\\neg`
+            * :attr:`QuantifiedFormula.arg <.quantified.QuantifiedFormula.arg>` \
+                -- argument formula of a quantifier :math:`\\exists` or \
+                :math:`\\forall`
+            * :attr:`QuantifiedFormula.var <.quantified.QuantifiedFormula.var>` \
+                -- variable of a quantifier :math:`\\exists` or :math:`\\forall`
         """
         return self._args
 
@@ -221,13 +238,15 @@ class Formula(ABC):
         """Universal closure. Universally quantifiy all variables occurring
         free in `self`, except the ones in `ignore`.
 
-        >>> from logic1.theories import RCF
-        >>> a, b, x = RCF.VV.get('a', 'b', 'x')
-        >>> f = Ex(x, (x >= 0) & (a*x + b == 0))
+        >>> from logic1.theories.RCF import *
+        >>> a, b, x = VV.get('a', 'b', 'x')
+        >>> f = Ex(x, And(x >= 0, a*x + b == 0))
         >>> f.all()
         All(b, All(a, Ex(x, And(x >= 0, a*x + b == 0))))
 
-        .. seealso:: :meth:`ex` -- existential closure
+        .. seealso::
+            * :class:`All <.quantified.All>` -- universal quantifier
+            * :meth:`ex` -- existential closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -238,11 +257,11 @@ class Formula(ABC):
         return f
 
     def as_latex(self) -> str:
-        r"""LaTeX representation.
+        r"""LaTeX representation as a string, which can be used elsewhere.
 
-        >>> from logic1.theories import RCF
-        >>> x, y = RCF.VV.get('x', 'y')
-        >>> f = All(x, (x < 1) | (x - 1 == 0) | (x > 1))
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> f = All(x, Or(x < 1, x - 1 == 0, x > 1))
         >>> f.as_latex()
         '\\forall x \\, (x - 1 < 0 \\, \\vee \\, x - 1 = 0 \\, \\vee \\, x - 1 > 0)'
 
@@ -291,9 +310,9 @@ class Formula(ABC):
         Recall that the truth values :data:`T <.boolean.T>` and :data:`F
         <.boolean.F>` are not atoms:
 
-        >>> from logic1.theories import RCF
-        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
-        >>> f = ((x == 0) & (y == 0) & T) | ((x == 0) & (y == z) & (z != 0))
+        >>> from logic1.theories.RCF import *
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> f = Or(And(x == 0, y == 0, T), And(x == 0, y == z, z != 0))
         >>> list(f.atoms())
         [x == 0, y == 0, x == 0, y - z == 0, z != 0]
 
@@ -334,9 +353,9 @@ class Formula(ABC):
         """An iterator over all bound occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories import RCF
-        >>> a, x, y, z = RCF.VV.get('a', 'x', 'y', 'z')
-        >>> f = All(y, Ex(x, a + x == y) & Ex(z, x + y == a + x))
+        >>> from logic1.theories.RCF import *
+        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
+        >>> f = All(y, And(Ex(x, a + x == y), Ex(z, x + y == a + x)))
         >>> list(f.bvars())
         [x, y, y]
 
@@ -414,9 +433,9 @@ class Formula(ABC):
         to a truth value or an :class:`AtomicFormula
         <.firstorder.atomic.AtomicFormula>` in the expression tree:
 
-        >>> from logic1.theories import RCF
-        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
-        >>> f = Ex(x, (x == y) & All(x, Ex(y, Ex(z, x == y + 1))))
+        >>> from logic1.theories.RCF import *
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> f = Ex(x, And(x == y, All(x, Ex(y, Ex(z, x == y + 1)))))
         >>> f.depth()
         5
 
@@ -441,13 +460,15 @@ class Formula(ABC):
         """Existential closure. Existentially quantifiy all variables occurring
         free in `self`, except the ones in `ignore`.
 
-        >>> from logic1.theories import RCF
-        >>> a, b, c, x = RCF.VV.get('a', 'b', 'c', 'x')
-        >>> f = All(x, (a < x) & (a + b + c < x))
+        >>> from logic1.theories.RCF import *
+        >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+        >>> f = All(x, And(a < x, x + a - b < 0))
         >>> f.ex(ignore={c})
-        Ex(b, Ex(a, All(x, And(a - x < 0, a + b + c - x < 0))))
+        Ex(b, Ex(a, All(x, And(a - x < 0, a - b + x < 0))))
 
-        .. seealso:: :meth:`all` -- universal closure
+        .. seealso::
+            * :class:`Ex <.quantified.Ex>` -- existential quantifier
+            * :meth:`all` -- universal closure
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
@@ -461,11 +482,11 @@ class Formula(ABC):
         """An iterator over all free occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
-        >>> from logic1.theories import RCF
-        >>> a, x, y, z = RCF.VV.get('a', 'x', 'y', 'z')
-        >>> f = All(y, Ex(x, a + x - y == 0) & Ex(z, x + y - a == 0))
+        >>> from logic1.theories.RCF import *
+        >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
+        >>> f = All(y, And(Ex(x, a + x - y == 0), Ex(z, x + y == a)))
         >>> list(f.fvars())
-         [a, a, x]
+        [a, a, x]
 
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
@@ -490,12 +511,12 @@ class Formula(ABC):
         """The matrix of a prenex formula is its quantifier free part. This
         method returns the matrix along with the leading quantifiers.
 
-        >>> from logic1.theories import RCF
-        >>> x, y, z = RCF.VV.get('x', 'y', 'z')
-        >>> f = All(x, All(y, Ex(z, x - y + z == 0)))
+        >>> from logic1.theories.RCF import *
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> f = All(x, All(y, Ex(z, x - y == z)))
         >>> m, B = f.matrix()
         >>> m
-        x - y + z == 0
+        x - y - z == 0
         >>> B
         [(<class 'logic1.firstorder.quantified.All'>, [x, y]),
          (<class 'logic1.firstorder.quantified.Ex'>, [z])]
@@ -504,14 +525,14 @@ class Formula(ABC):
 
         >>> g = m
         >>> for q, V in reversed(B):
-        ...     g= q(V, g)
+        ...     g = q(V, g)
         >>> g == f
         True
 
         If `self` is not prenex, then the leading quantifiers are considered
         and the matrix will not be quantifier-free:
 
-        >>> h = All(x, All(y, (x != 0) >> Ex(z, x * z == y)))
+        >>> h = All(x, All(y, Implies(x != 0, Ex(z, x * z == y))))
         >>> m, B = h.matrix()
         >>> m
         Implies(x != 0, Ex(z, x*z - y == 0))
@@ -519,11 +540,7 @@ class Formula(ABC):
         [(<class 'logic1.firstorder.quantified.All'>, [x, y])]
 
         .. seealso::
-            * :mod:`.firstorder`
-            * :mod:`.firstorder.boolean`
-            * :mod:`.firstorder.pnf`
-            * :mod:`.RCF`
-            * :class:`pnf() <.firstorder.pnf>` -- prenex normal form
+            * :meth:`to_pnf` -- prenex normal form
             * :data:`QuantifierBlock <.quantified.QuantifierBlock>` \
                 -- a type that holds a block of quantifiers
         """
@@ -545,9 +562,9 @@ class Formula(ABC):
         In the following example, ``z`` is a quantified variable but not a
         bound variable:
 
-        >>> from logic1.theories import RCF
-        >>> a, b, c, x, y, z = RCF.VV.get('a', 'b', 'c', 'x', 'y', 'z')
-        >>> f = All(y, Ex(x, a == y) & Ex(z, a == y))
+        >>> from logic1.theories.RCF import *
+        >>> a, b, c, x, y, z = VV.get('a', 'b', 'c', 'x', 'y', 'z')
+        >>> f = All(y, And(Ex(x, a == y), Ex(z, a == y)))
         >>> list(f.qvars())
         [y, x, z]
 
@@ -648,13 +665,29 @@ class Formula(ABC):
            `simplify` methods of classes derived from :class:`AtomicFormula
            <.firstorder.atomic.AtomicFormula>` within various theories:
 
-           * :meth:`logic1.theories.RCF.atomic.AtomicFormula.simplify`
-           * :meth:`logic1.theories.Sets.atomic.AtomicFormula.simplify`
+           * :meth:`RCF.atomic.Eq.simplify <logic1.theories.RCF.atomic.Eq.simplify>` \
+            -- real closed fields, equal
+           * :meth:`RCF.atomic.Ge.simplify <logic1.theories.RCF.atomic.Ge.simplify>` \
+            -- real closed fields, greater than or equal
+           * :meth:`RCF.atomic.Gt.simplify <logic1.theories.RCF.atomic.Gt.simplify>` \
+            -- real closed fields, greater than
+           * :meth:`RCF.atomic.Le.simplify <logic1.theories.RCF.atomic.Le.simplify>` \
+            -- real closed fields, less than or equal
+           * :meth:`RCF.atomic.Lt.simplify <logic1.theories.RCF.atomic.Lt.simplify>` \
+            -- real closed fields, less than
+           * :meth:`RCF.atomic.Ne.simplify <logic1.theories.RCF.atomic.Ne.simplify>` \
+            -- real closed fields, not equal
+           * :meth:`Sets.atomic.Eq.simplify <logic1.theories.Sets.atomic.Eq.simplify>` \
+            -- sets, equal
+           * :meth:`Sets.atomic.Ne.simplify <logic1.theories.Sets.atomic.Ne.simplify>` \
+            -- sets, not equal
 
            More powerful simplifiers provided by various theories:
 
-           * :func:`logic1.theories.RCF.simplify.simplify`
-           * :func:`logic1.theories.Sets.simplify.simplify`
+           * :func:`RCF.simplify.simplify <logic1.theories.RCF.simplify.simplify>`
+                -- real closed fields, standard simplifier based on implicit theories
+           * :func:`Sets.simplify.simplify <logic1.theories.Sets.simplify.simplify>`
+                -- sets, standard simplifier based on implicit theories
         """
         match self:
             case _F() | _T():
@@ -726,17 +759,13 @@ class Formula(ABC):
     def subs(self, substitution: dict) -> Self:
         """Substitution of terms for variables.
 
-        >>> from logic1 import Ex
-        >>> from logic1.theories.RCF import VV
+        >>> from logic1.theories.RCF import *
         >>> a, b, x = VV.get('a', 'b', 'x')
-        >>>
         >>> f = Ex(x, x == a)
         >>> f.subs({x: a})
         Ex(x, a - x == 0)
-        >>>
         >>> f.subs({a: x})
         Ex(G0001_x, -G0001_x + x == 0)
-        >>>
         >>> g = Ex(x, _ & (b == 0))
         >>> g.subs({b: x})
         Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
@@ -796,13 +825,12 @@ class Formula(ABC):
         relation symbols with their complements. The result is then even a
         Positive Normal Form.
 
-        >>> from logic1 import Ex, Equivalent, T
-        >>> from logic1.theories.RCF import Eq, VV
+        >>> from logic1.theories.RCF import *
         >>> a, y = VV.get('a', 'y')
-        >>>
         >>> f = Equivalent(And(a == 0, T), Ex(y, Not(y == a)))
         >>> f.to_nnf()
-        And(Or(a != 0, F, Ex(y, a - y != 0)), Or(All(y, a - y == 0), And(a == 0, T)))
+        And(Or(a != 0, F, Ex(y, a - y != 0)),
+            Or(All(y, a - y == 0), And(a == 0, T)))
         """
         nnf_op: type[Formula]
         rewrite: Formula
@@ -883,10 +911,8 @@ class Formula(ABC):
         Replaces each atomic subformula of `self` with the :class:`Formula`
         `tr(self)`.
 
-        >>> from logic1 import And
-        >>> from logic1.theories.RCF import Eq, Lt, VV
+        >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
-        >>>
         >>> f = And(x == y, y < z)
         >>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
         And(x - y == 0, y - z < 0)
