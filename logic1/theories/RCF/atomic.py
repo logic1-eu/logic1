@@ -12,7 +12,7 @@ from types import BuiltinFunctionType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Self
 
 from ... import firstorder
-from ...firstorder import Formula, T, F
+from ...firstorder import _T, _F
 
 from ...support.tracing import trace  # noqa
 
@@ -128,7 +128,7 @@ class TSQ(Enum):
     WEAK = auto()
 
 
-class Term(firstorder.Term['Variable']):
+class Term(firstorder.Term['Term', 'Variable']):
 
     polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
@@ -157,8 +157,10 @@ class Term(firstorder.Term['Variable']):
 
     def __eq__(  # type: ignore[override]
             self, other: Term | Polynomial | sage.Integer | int) -> Eq:
-        # discuss: we have Eq.__bool__ but this way we cannot compare Terms
-        # with arbitrary objects in a boolean context. Same for __ne__.
+        # MyPy requires "other: object". However, with our use a a constructor,
+        # it makes no sense to compare terms with general objects. We have
+        # Eq.__bool__, which supports some comparisons in boolean contexts.
+        # Same for __ne__.
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             lhs = - lhs
@@ -267,6 +269,9 @@ class Term(firstorder.Term['Variable']):
         """
         d_poly = {key.poly: value for key, value in d.items()}
         return Term(self.poly.coefficient(d_poly))
+
+    def constant_coefficient(self) -> int:
+        return int(self.poly.constant_coefficient())
 
     def content(self) -> int:
         """
@@ -406,7 +411,7 @@ class Variable(Term, firstorder.Variable['Variable']):
 
 
 @functools.total_ordering
-class AtomicFormula(firstorder.AtomicFormula['Variable']):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable']):
     """
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
     | :data:`self`       | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
@@ -449,7 +454,7 @@ class AtomicFormula(firstorder.AtomicFormula['Variable']):
         return D[cls]
 
     @classmethod
-    def strict_part(cls) -> type[Formula]:
+    def strict_part(cls) -> type[RCF_Formula]:
         """The strict part is the binary relation without the diagonal.
         """
         if cls in (Eq, Ne):
@@ -476,7 +481,7 @@ class AtomicFormula(firstorder.AtomicFormula['Variable']):
             rhs = Term(rhs)
         self.args = (lhs, rhs)
 
-    def __le__(self, other: Formula) -> bool:
+    def __le__(self, other: RCF_Formula) -> bool:
         match other:
             case AtomicFormula():
                 if self.lhs != other.lhs:
@@ -533,12 +538,12 @@ class Eq(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly == self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
-            return T
+            return _T()
         if lhs.is_constant():
-            return F
+            return _F()
         return Eq(Term(lhs), Term(0))
 
 
@@ -547,12 +552,12 @@ class Ne(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly != self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
-            return F
+            return _F()
         if lhs.is_constant():
-            return T
+            return _T()
         return Ne(Term(lhs), Term(0))
 
 
@@ -561,10 +566,10 @@ class Ge(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly >= self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
-            return T if lhs >= 0 else F
+            return _T() if lhs >= 0 else _F()
         return Ge(Term(lhs), Term(0))
 
 
@@ -573,10 +578,10 @@ class Le(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly <= self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
-            return T if lhs <= 0 else F
+            return _T() if lhs <= 0 else _F()
         return Le(Term(lhs), Term(0))
 
 
@@ -585,10 +590,10 @@ class Gt(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly > self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
-            return T if lhs > 0 else F
+            return _T() if lhs > 0 else _F()
         return Gt(Term(lhs), Term(0))
 
 
@@ -597,8 +602,26 @@ class Lt(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly < self.rhs.poly
 
-    def simplify(self, Theta=None) -> Formula:
+    def simplify(self) -> RCF_Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
-            return T if lhs < 0 else F
+            return _T() if lhs < 0 else _F()
         return Lt(Term(lhs), Term(0))
+
+
+from .typing import RCF_Formula
+
+
+# from typing import reveal_type, TYPE_CHECKING
+
+# if TYPE_CHECKING:
+
+#     def test() -> None:
+#         from .. import Sets
+#         x, y = VV.get('x', 'y')
+#         z1, z2 = Sets.VV.get('z1', 'z2')
+#         reveal_type(x == 0)
+#         f = firstorder.And(x == 0, z1 == z2)
+#         reveal_type(f)
+#         at = next(f.atoms())
+#         reveal_type(at)

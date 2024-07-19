@@ -6,7 +6,7 @@ import string
 from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
 
 from ... import firstorder
-from ...firstorder import F, Formula, T
+from ...firstorder import _F, _T
 
 
 logging.basicConfig(
@@ -135,14 +135,14 @@ class Variable(firstorder.Variable['Variable']):
 
 
 @functools.total_ordering
-class AtomicFormula(firstorder.AtomicFormula):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable']):
 
     @classmethod
     def complement(cls) -> type[AtomicFormula]:
         D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
         return D[cls]
 
-    def __le__(self, other: Formula) -> bool:
+    def __le__(self, other: Sets_Formula) -> bool:
         L: Final = [C, C_, Eq, Ne]
         match other:
             case AtomicFormula():
@@ -252,9 +252,9 @@ class Eq(AtomicFormula):
                     f'arguments must be variables; {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
+    def simplify(self) -> Sets_Formula:
         if self.lhs == self.rhs:
-            return T
+            return _T()
         if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
             return Eq(self.rhs, self.lhs)
         return self
@@ -280,9 +280,9 @@ class Ne(AtomicFormula):
                     f'arguments must be variables - {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
+    def simplify(self) -> Sets_Formula:
         if self.lhs == self.rhs:
-            return F
+            return _F()
         if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
             return Ne(self.rhs, self.lhs)
         return self
@@ -326,7 +326,7 @@ class C(AtomicFormula):
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
 
-    def simplify(self):
+    def simplify(self) -> Sets_Formula:
         """Implements abstract method
         :meth:`firstorder.atomic.AtomicFormula.simplify`.
         """
@@ -372,8 +372,11 @@ class C_(AtomicFormula):
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
 
-    def simplify(self):
+    def simplify(self) -> Sets_Formula:
         """Implements abstract method
         :meth:`firstorder.atomic.AtomicFormula.simplify`.
         """
         return self
+
+
+from .typing import Sets_Formula

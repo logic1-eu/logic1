@@ -12,21 +12,20 @@ import multiprocessing as mp
 import multiprocessing.managers
 import multiprocessing.queues
 import os
-
 import queue
 import sys
 import threading
 import time
 from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
 
-from logic1.firstorder import (
-    All, And, F, _F, Formula, Not, Or, QuantifiedFormula, T, _T)
+from logic1.firstorder import All, And, _F, Not, Or, _T
 from logic1.support.excepthook import NoTraceException
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.atomic import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable)
+from logic1.theories.RCF.typing import RCF_Formula, RCF_Prefix
 
 # Create logger
 delta_time_formatter = DeltaTimeFormatter(
@@ -99,12 +98,6 @@ class Timer:
 
     def reset(self) -> None:
         self._reference_time = time.time()
-
-
-class QuantifierBlocks(list[tuple[type[QuantifiedFormula], list[Variable]]]):
-
-    def __str__(self) -> str:
-        return '  '.join(q.__qualname__ + ' ' + str(v) for q, v in self)
 
 
 @dataclass
@@ -183,7 +176,7 @@ class RootSpec:
             case _:
                 assert False, (atom, left, right)
 
-    def guard(self, term: Term, x: Variable) -> Formula:
+    def guard(self, term: Term, x: Variable) -> RCF_Formula:
         match term.degree(x):
             case -1 | 0:
                 assert False, (self, term, x)
@@ -252,7 +245,7 @@ class Cluster:
         epsilons = set()
         tags = set()
         for root_spec in self.root_specs:
-            if simplify(root_spec.guard(atom.lhs, x), assume=theory.atoms) is F:
+            if simplify(root_spec.guard(atom.lhs, x), assume=theory.atoms) is _F():
                 continue
             with_epsilon, tag = root_spec.bound_type(atom)
             if tag is not None:
@@ -273,7 +266,7 @@ class Cluster:
             tag = TAG.ANY
         return (epsilon, tag)
 
-    def guard(self, term: Term, x: Variable) -> Formula:
+    def guard(self, term: Term, x: Variable) -> RCF_Formula:
         d = term.degree(x)
         match d, self:
             case 1, Cluster((RootSpec(signs=(-1, 0, 1), index=1),
@@ -300,13 +293,13 @@ class PRD:
     term: Term
     variable: Variable
     cluster: Cluster
-    xguard: Formula = field(default_factory=_T)
+    xguard: RCF_Formula = field(default_factory=_T)
 
-    def guard(self, theory: Theory) -> Formula:
+    def guard(self, theory: Theory) -> RCF_Formula:
         guard = self.cluster.guard(self.term, self.variable)
         return simplify(And(self.xguard, guard), assume=theory.atoms)
 
-    def vsubs(self, atom: AtomicFormula) -> Formula:
+    def vsubs(self, atom: AtomicFormula) -> RCF_Formula:
         """Virtually substitute self into atom yielding a quantifier-free
         formula
         """
@@ -318,7 +311,7 @@ class PRD:
             case _:
                 assert False, (self, atom)
 
-    def _vsubs(self, atom: AtomicFormula) -> Formula:
+    def _vsubs(self, atom: AtomicFormula) -> RCF_Formula:
         """Virtual substitution of PRD into atom.
         """
         x = self.variable
@@ -444,10 +437,10 @@ class TestPoint:
 
     def guard(self, theory: Theory):
         if self.prd is None:
-            return T
+            return _T()
         else:
             guard = self.prd.guard(theory)
-            assert guard is not F, self
+            assert guard is not _F(), self
             return guard
 
     def _translate(self) -> str:
@@ -484,7 +477,7 @@ class Node:
     # sequantial and parallel
 
     variables: list[Variable]
-    formula: Formula
+    formula: RCF_Formula
     answer: list
     outermost_block: bool
     options: Options
@@ -558,7 +551,7 @@ class Node:
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
                             for sign in (1, -1):
                                 prd = PRD(sign * lhs, x, cluster)
-                                if prd.guard(theory) is not F:
+                                if prd.guard(theory) is not _F():
                                     test_points.append(TestPoint(prd))
                         eset = EliminationSet(variable=x, test_points=test_points, method='g')
                         return eset
@@ -590,7 +583,7 @@ class Node:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
-            xguard: Formula = T
+            xguard: RCF_Formula = _T()
             while (d := atom.lhs.degree(x)) > 0:
                 clusters = Node.real_type_selection[self.options.clustering][d]
                 for cluster in clusters:
@@ -627,7 +620,7 @@ class Node:
                         assert False, atom
                     case 0 | 1 | 2:
                         for candidate in at_cs(atom, x):
-                            if candidate.prd.guard(theory) is not F:
+                            if candidate.prd.guard(theory) is not _F():
                                 candidates[candidate.tag].add(candidate)
                     case _:
                         raise DegreeViolation(atom, x, atom.lhs.degree(x))
@@ -656,7 +649,7 @@ class Node:
 
     def vsubs(self, eset: EliminationSet, theory: Theory) -> list[Node]:
 
-        def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> Formula:
+        def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> RCF_Formula:
             """Virtually substitute a test point into an atom.
             """
             match tp.nsp:
@@ -702,12 +695,12 @@ class Node:
             # simplifier takes care of this.
             return h
 
-        def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
+        def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> RCF_Formula:
             """Virtually substitute a parametric root description into an atom.
             """
             return prd.vsubs(atom)
 
-        def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> RCF_Formula:
             """Virtually substitute ±∞ into an atom
             """
             assert nsp in (NSP.PLUS_INFINITY, NSP.MINUS_INFINITY), nsp
@@ -716,7 +709,7 @@ class Node:
                     return tau(atom, x)
                 case Le() | Lt() | Ge() | Gt():
                     c = atom.lhs.coefficient({x: 0})
-                    mu: Formula = atom.op(c, 0)
+                    mu: RCF_Formula = atom.op(c, 0)
                     for e in range(1, atom.lhs.degree(x) + 1):
                         c = atom.lhs.coefficient({x: e})
                         if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
@@ -726,7 +719,7 @@ class Node:
                 case _:
                     assert False, atom
 
-        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> RCF_Formula:
             """Reduce virtual substitution of a parametric root description ±ε
             to virtual substituion of a parametric root description.
             """
@@ -739,7 +732,7 @@ class Node:
                 case _:
                     assert False, atom
 
-        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> RCF_Formula:
             """Recursion on the vanishing of derivatives
             """
             if atom.lhs.degree(x) <= 0:
@@ -751,7 +744,7 @@ class Node:
             atom_prime = atom.op(lhs_prime, 0)
             return Or(atom_strict, And(Eq(atom.lhs, 0), nu(atom_prime, nsp, x)))
 
-        def tau(atom: AtomicFormula, x: Variable) -> Formula:
+        def tau(atom: AtomicFormula, x: Variable) -> RCF_Formula:
             """Virtually substitute a transcendental element into an equation
             or inequation.
             """
@@ -763,7 +756,7 @@ class Node:
                         if c.is_zero():
                             continue
                         if c.is_constant():
-                            return F
+                            return _F()
                         args.append(Eq(c, 0))
                     return And(*args)
                 case Ne():
@@ -772,7 +765,7 @@ class Node:
                         if c.is_zero():
                             continue
                         if c.is_constant():
-                            return T
+                            return _T()
                         args.append(Ne(c, 0))
                     return Or(*args)
                 case _:
@@ -785,7 +778,7 @@ class Node:
             new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
             # requires discussion: guard will be simplified twice
             new_formula = simplify(And(tp.guard(theory), new_formula), assume=theory.atoms)
-            if new_formula is T:
+            if new_formula is _T():
                 raise FoundT()
             new_nodes.append(
                 Node(variables=variables.copy(),
@@ -801,7 +794,7 @@ class NodeList(Collection):
     # Sequantial only
 
     nodes: list[Node] = field(default_factory=list)
-    memory: set[Formula] = field(default_factory=set)
+    memory: set[RCF_Formula] = field(default_factory=set)
     hits: int = 0
     candidates: int = 0
 
@@ -919,7 +912,7 @@ class NodeListManager:
 
     nodes: list[Node] = field(default_factory=list)
     nodes_lock: threading.Lock = field(default_factory=threading.Lock)
-    memory: set[Formula] = field(default_factory=set)
+    memory: set[RCF_Formula] = field(default_factory=set)
     memory_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
     hits_candidates_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -929,7 +922,7 @@ class NodeListManager:
         with self.nodes_lock:
             return self.nodes.copy()
 
-    def get_memory(self) -> set[Formula]:
+    def get_memory(self) -> set[RCF_Formula]:
         with self.memory_lock:
             return self.memory.copy()
 
@@ -1036,7 +1029,7 @@ class _NodeListProxy(mp.managers.BaseProxy):
     def get_nodes(self) -> list[Node]:
         return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
 
-    def get_memory(self) -> set[Formula]:
+    def get_memory(self) -> set[RCF_Formula]:
         return self._callmethod('get_memory')  # type: ignore[func-returns-value]
 
     def get_candidates(self) -> int:
@@ -1217,15 +1210,15 @@ class VirtualSubstitution:
     """Quantifier elimination by virtual substitution.
     """
 
-    blocks: Optional[QuantifierBlocks] = None
-    matrix: Optional[Formula] = None
+    blocks: Optional[RCF_Prefix] = None
+    matrix: Optional[RCF_Formula] = None
     negated: Optional[bool] = None
     root_node: Optional[Node] = None
     working_nodes: Optional[WorkingNodeList] = None
     success_nodes: Optional[NodeList] = None
     failure_nodes: Optional[NodeList] = None
     theory: Optional[Theory] = None
-    result: Optional[Formula] = None
+    result: Optional[RCF_Formula] = None
 
     workers: int = 0
     log: int = logging.NOTSET
@@ -1247,9 +1240,9 @@ class VirtualSubstitution:
     def assume(self):
         return self.theory.atoms
 
-    def __call__(self, f: Formula, assume: Optional[Iterable[AtomicFormula]] = None,
+    def __call__(self, f: RCF_Formula, assume: Optional[Iterable[AtomicFormula]] = None,
                  workers: int = 0, log_level: int = logging.NOTSET,
-                 log_rate: float = 0.5, **options) -> Optional[Formula]:
+                 log_rate: float = 0.5, **options) -> Optional[RCF_Formula]:
         """Virtual substitution entry point.
 
         workers is the number of processes used for virtual substitution. The
@@ -1559,15 +1552,14 @@ class VirtualSubstitution:
         logger.info(self.success_nodes.final_statistics('success'))
         logger.info(self.failure_nodes.final_statistics('failure'))
 
-    def setup(self, f: Formula, workers: int) -> None:
+    def setup(self, f: RCF_Formula, workers: int) -> None:
         logger.debug(f'entering {self.setup.__name__}')
         if workers >= 0:
             self.workers = workers
         else:
             self.workers = os.cpu_count() + workers
         f = f.to_pnf()
-        self.matrix, blocks = f.matrix()
-        self.blocks = QuantifierBlocks(blocks)
+        self.matrix, self.blocks = f.matrix()
 
     def status(self, dump_nodes: bool = False) -> str:
 
@@ -1630,7 +1622,7 @@ class VirtualSubstitution:
                 print(f'{self.time_syncmanager_exit=:.{precision}f}')
                 print(f'{self.time_total=:.{precision}f}')
 
-    def virtual_substitution(self, f: Formula, workers: int):
+    def virtual_substitution(self, f: RCF_Formula, workers: int):
         """Virtual substitution main loop.
         """
         logger.debug(f'entering {self.virtual_substitution.__name__}')
@@ -1645,7 +1637,7 @@ class VirtualSubstitution:
                 self.working_nodes = None
                 self.success_nodes = NodeList(
                     nodes=[Node(variables=[],
-                                formula=T,
+                                formula=_T(),
                                 answer=[],
                                 outermost_block=False,
                                 options=self.options)])

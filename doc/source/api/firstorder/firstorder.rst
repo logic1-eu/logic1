@@ -28,6 +28,12 @@ Formula Base Class
 
 .. automodule:: logic1.firstorder.formula
 
+  .. autodata:: α
+
+  .. autodata:: τ
+
+  .. autodata:: χ
+
   .. autoclass:: Formula
     :members:
     :undoc-members:
@@ -165,4 +171,10 @@ Quantified Formulas
     :members:
     :special-members:
 
-  .. autodata:: QuantifierBlock
+  .. autoclass:: Prefix
+    :members:
+    :undoc-members:
+    :exclude-members: __init__
+
+    In addition to the following methods, Prefixes support iteration, len(),
+    reversed().

@@ -4,18 +4,16 @@ from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
 from typing import Iterable, Optional, Self
 
-from . import atomic  # need qualified names of relations for pattern matching
 from ... import abc
 
-from ...firstorder import And, F, Formula, Not, Or, T
-from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Polynomial, Term, TSQ, Variable
+from ...firstorder import And, _F, Not, Or, _T
+from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Term, TSQ, Variable
+from .typing import RCF_Formula
 
 from ...support.tracing import trace  # noqa
 
-# discuss: indirect import of Polynomial
 
-
-class Theory(abc.simplify.Theory['AtomicFormula']):
+class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
 
     class _Interval:
         # Non-empty real intervals. Raises Inconsistent when an empty interval
@@ -73,8 +71,8 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             right = ')' if self.ropen else ']'
             return f'{left}{self.start}, {self.end}{right}'
 
-    _reference: dict[Polynomial, tuple[_Interval, set]]
-    _current: dict[Polynomial, tuple[_Interval, set]]
+    _reference: dict[Term, tuple[_Interval, set]]
+    _current: dict[Term, tuple[_Interval, set]]
 
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
@@ -86,31 +84,27 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             rel, p, q = self._decompose_atom(atom)
             if gand is Or:
                 rel = rel.complement()
-            match rel:
-                # We model p in ivl \ exc.
-                #
-                # Compare https://stackoverflow.com/q/71441761/ which suggests
-                # the use of __qualname__ here.
-                case atomic.Eq:
-                    ivl = Theory._Interval(False, q, q, False)
-                    exc = set()
-                case atomic.Ne:
-                    ivl = Theory._Interval(True, -oo, oo, True)
-                    exc = {q}
-                case atomic.Ge:
-                    ivl = Theory._Interval(False, q, oo, True)
-                    exc = set()
-                case atomic.Le:
-                    ivl = Theory._Interval(True, -oo, q, False)
-                    exc = set()
-                case atomic.Gt:
-                    ivl = Theory._Interval(True, q, oo, True)
-                    exc = set()
-                case atomic.Lt:
-                    ivl = Theory._Interval(True, -oo, q, True)
-                    exc = set()
-                case _:
-                    assert False
+            # We model p in ivl \ exc.
+            if rel is Eq:
+                ivl = Theory._Interval(False, q, q, False)
+                exc = set()
+            elif rel is Ne:
+                ivl = Theory._Interval(True, -oo, oo, True)
+                exc = {q}
+            elif rel is Ge:
+                ivl = Theory._Interval(False, q, oo, True)
+                exc = set()
+            elif rel is Le:
+                ivl = Theory._Interval(True, -oo, q, False)
+                exc = set()
+            elif rel is Gt:
+                ivl = Theory._Interval(True, q, oo, True)
+                exc = set()
+            elif rel is Lt:
+                ivl = Theory._Interval(True, -oo, q, True)
+                exc = set()
+            else:
+                assert False, rel
             if p in self._current:
                 cur_ivl, cur_exc = self._current[p]
                 ivl = ivl.intersection(cur_ivl)
@@ -141,16 +135,16 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def _compose_atom(rel: type[AtomicFormula], p: Polynomial, q: Rational)\
+    def _compose_atom(rel: type[AtomicFormula], p: Term, q: Rational)\
             -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
-        return rel(Term(den * p - num), Term(0))
+        return rel(den * p - num, 0)
 
     @staticmethod
     @lru_cache(maxsize=None)
     def _decompose_atom(f: AtomicFormula)\
-            -> tuple[type[AtomicFormula], Polynomial, Rational]:
+            -> tuple[type[AtomicFormula], Term, Rational]:
         r"""Decompose into relation :math:`\rho`, term :math:`p` without
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
@@ -169,17 +163,16 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
         >>> (f.lhs.poly / g.lhs.poly)
         3
         """
-        lhs = f.lhs.poly
-        q = - lhs.constant_coefficient()
+        lhs = f.lhs
+        q = -lhs.constant_coefficient()
         p = lhs + q
         c = p.content()
-        p, _ = p.quo_rem(c)
-        # Given that _simpl_at has procuces a monic polynomial, q != 0 will not
-        # be divisible by c. This is relevant for the reconstruction in
+        p /= c
+        # Given that _simpl_at has procuced primitive polynomial, q != 0 will
+        # not be divisible by c. This is relevant for the reconstruction in
         # _compose_atom to work.
-        assert c == 1 or not c.divides(q), f'{c} divides {q}'
-        q = q / c
-        return f.op, p, q
+        assert c == 1 or not q % c == 0, f'{c} divides {q}'
+        return f.op, p, Rational(q) / Rational(c)
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
@@ -271,12 +264,12 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
             theory_next._reference = self._current
         else:
             theory_next._reference = {p: q for p, q in self._current.items()
-                                      if remove not in p.variables()}
+                                      if remove not in p.vars()}
         theory_next._current = theory_next._reference.copy()
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theory']):
 
     explode_always: bool = True
     prefer_order: bool = True
@@ -295,11 +288,11 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
         return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
 
     def __call__(self,
-                 f: Formula,
+                 f: RCF_Formula,
                  assume: Optional[list[AtomicFormula]] = None,
                  explode_always: bool = True,
                  prefer_order: bool = True,
-                 prefer_weak: bool = False) -> Formula:
+                 prefer_weak: bool = False) -> RCF_Formula:
         self.explode_always = explode_always
         self.prefer_order = prefer_order
         self.prefer_weak = prefer_weak
@@ -307,14 +300,16 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 
     def simpl_at(self,
                  atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> Formula:
-        return self._simpl_at(atom, context, self.explode_always)
+                 context: Optional[type[And] | type[Or]]) -> RCF_Formula:
+        # MyPy does not recognize that And[Any, Any, Any] is an instance of
+        # Hashable. https://github.com/python/mypy/issues/11470
+        return self._simpl_at(atom, context, self.explode_always)  # type: ignore[arg-type]
 
     @lru_cache(maxsize=None)
     def _simpl_at(self,
                   atom: AtomicFormula,
                   context: Optional[type[And] | type[Or]],
-                  explode_always: bool) -> Formula:
+                  explode_always: bool) -> RCF_Formula:
         """Simplify atomic formula.
 
         >>> from .atomic import VV
@@ -360,12 +355,12 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
                 return fac_junctor(*args)
             return rel(primitive_lhs, 0)
 
-        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[Formula]:
+        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[RCF_Formula]:
             if f.is_definite() in (TSQ.STRICT, TSQ.WEAK):
-                return T
-            neg_tsq = (- f).is_definite()
+                return _T()
+            neg_tsq = (-f).is_definite()
             if neg_tsq == TSQ.STRICT:
-                return F
+                return _F()
             if neg_tsq == TSQ.WEAK:
                 return _simpl_at_eq_ne(Eq, f, context)
             return None
@@ -390,7 +385,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
             signed_remaining_squarefree_part = odd_factor * even_factor
             # TSQ tests on factorization
             if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
-                return T
+                return _T()
             neg_tsq = (- odd_factor).is_definite()
             if neg_tsq == TSQ.STRICT:
                 return _simpl_at_eq_ne(Eq, even_factor, context)
@@ -415,7 +410,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
         if lhs.is_constant():
             # In the following if-condition, the __bool__ method of atom.op
             # will be called.
-            return T if atom.op(lhs, 0) else F
+            return _T() if atom.op(lhs, 0) else _F()
         lhs /= lhs.content()
         match atom:
             case Eq():
@@ -441,14 +436,14 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
 simplify = Simplify()
 
 
-class IsValid(abc.simplify.IsValid['AtomicFormula']):
+class IsValid(abc.simplify.IsValid['AtomicFormula', 'Term', 'Variable']):
 
     def __call__(self,
-                 f: Formula,
+                 f: RCF_Formula,
                  assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
         return self.is_valid(f, assume)
 
-    def _simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
+    def _simplify(self, f: RCF_Formula, assume: list[AtomicFormula]) -> RCF_Formula:
         return simplify(f, assume)
 
 

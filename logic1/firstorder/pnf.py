@@ -11,20 +11,26 @@ alternations in the prenex block [Burhenne90]_.
        Diploma Thesis, University of Passau, Germany, 1990
 """
 
-from typing import Any, TypeAlias
+from typing import Generic
 
-from . import (All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
-               QuantifiedFormula, _T)
+from . import (
+    All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
+    QuantifiedFormula, _T)
+from .formula import α, τ, χ
 
-Variable: TypeAlias = Any
 
+class PrenexNormalForm(Generic[α, τ, χ]):
 
-class PrenexNormalForm:
-
-    def __call__(self, f: Formula, prefer_universal: bool = False, is_nnf: bool = False):
+    def __call__(self,
+                 f: Formula[α, τ, χ],
+                 prefer_universal: bool = False,
+                 is_nnf: bool = False) -> Formula[α, τ, χ]:
         return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
-    def pnf(self, f: Formula, prefer_universal: bool, is_nnf: bool) -> Formula:
+    def pnf(self,
+            f: Formula[α, τ, χ],
+            prefer_universal: bool,
+            is_nnf: bool) -> Formula[α, τ, χ]:
         """If the minimal number of alternations in the result can be achieved
         with both :class:`Ex` and :class:`All` as the first quantifier in the
         result, then the former is preferred. This preference can be changed
@@ -39,7 +45,7 @@ class PrenexNormalForm:
         f = self.with_distinct_vars(f, set(f.fvars()))
         return self._pnf(f)[All if prefer_universal else Ex]
 
-    def _pnf(self, f) -> dict[type[All | Ex], Formula]:
+    def _pnf(self, f: Formula[α, τ, χ]) -> dict[type[All | Ex], Formula[α, τ, χ]]:
         """Private Prenex Normal Form.
 
         f must be in NNF. Both keys of the result dict are guaranteed to be
@@ -48,6 +54,8 @@ class PrenexNormalForm:
         existential quantifier and d[All] starts with a universal quantifier,
         or d[Ex] is d[All], i.e., identity is guaranteed.
         """
+        # All and Ex are not annotated in the return type, because they are not
+        # used as quantifiers but as dictionary keys.
         match f:
             case AtomicFormula() | _F() | _T():
                 return {Ex: f, All: f}
@@ -81,7 +89,9 @@ class PrenexNormalForm:
             case _:
                 assert False
 
-    def interchange(self, f: And | Or, q: type[Ex | All]) -> Formula:
+    def interchange(self, f: And[α, τ, χ] | Or[α, τ, χ], q: type[Ex | All]) -> Formula[α, τ, χ]:
+        # All and Ex are not annotated in the return type, because they are not
+        # used as quantifiers but as dictionary keys.
         quantifiers = []
         quantifier_positions = set()
         args = list(f.args)
@@ -114,7 +124,7 @@ class PrenexNormalForm:
             pnf = q(v, pnf)
         return pnf
 
-    def with_distinct_vars(self, f: Formula, badlist: set[Variable]) -> Formula:
+    def with_distinct_vars(self, f: Formula[α, τ, χ], badlist: set[χ]) -> Formula[α, τ, χ]:
         """Convert to equivalent formula with distinct variables.
 
         Bound variables are renamed such that that set of all bound variables
@@ -143,6 +153,3 @@ class PrenexNormalForm:
                 return f
             case _:
                 assert False
-
-
-prenex_normal_form = PrenexNormalForm()

@@ -5,12 +5,13 @@ from __future__ import annotations
 
 from typing import final, Optional
 
-from .formula import Formula
+from .atomic import AtomicFormula, Term, Variable
+from .formula import α, τ, χ, Formula
 
 from ..support.tracing import trace  # noqa
 
 
-class BooleanFormula(Formula):
+class BooleanFormula(Formula[α, τ, χ]):
     r"""A class whose instances are Boolean formulas in the sense that their
     toplevel operator is one of the Boolean operators :math:`\top`,
     :math:`\bot`, :math:`\lnot`, :math:`\wedge`, :math:`\vee`,
@@ -20,7 +21,7 @@ class BooleanFormula(Formula):
 
 
 @final
-class Equivalent(BooleanFormula):
+class Equivalent(BooleanFormula[α, τ, χ]):
     r"""A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\longleftrightarrow`.
@@ -31,7 +32,7 @@ class Equivalent(BooleanFormula):
     Equivalent(x >= 0, Or(x > 0, x == 0))
     """
     @property
-    def lhs(self) -> Formula:
+    def lhs(self) -> Formula[α, τ, χ]:
         """The left-hand side of the equivalence.
 
         .. seealso::
@@ -41,7 +42,7 @@ class Equivalent(BooleanFormula):
         return self.args[0]
 
     @property
-    def rhs(self) -> Formula:
+    def rhs(self) -> Formula[α, τ, χ]:
         """The right-hand side of the equivalence.
 
         .. seealso::
@@ -50,13 +51,12 @@ class Equivalent(BooleanFormula):
         """
         return self.args[1]
 
-    def __init__(self, lhs: Formula, rhs: Formula) -> None:
-        # discuss: To what extent does this check for 2 args?
+    def __init__(self, lhs: Formula[α, τ, χ], rhs: Formula[α, τ, χ]) -> None:
         self.args = (lhs, rhs)
 
 
 @final
-class Implies(BooleanFormula):
+class Implies(BooleanFormula[α, τ, χ]):
     """A class whose instances are equivalences in the sense that their
     toplevel operator represents the Boolean operator :math:`\\longrightarrow`.
 
@@ -68,11 +68,11 @@ class Implies(BooleanFormula):
     .. seealso::
         * :meth:`>>, __rshift__() <.formula.Formula.__rshift__>` -- \
             infix notation of :class:`Implies`
-        * :meth:`\<\<, __lshift__() <.formula.Formula.__lshift__>` -- \
+        * :meth:`\\<\\<, __lshift__() <.formula.Formula.__lshift__>` -- \
             infix notation of converse :class:`Implies`
     """  # noqa
     @property
-    def lhs(self) -> Formula:
+    def lhs(self) -> Formula[α, τ, χ]:
         """The left-hand side of the implication.
 
         .. seealso::
@@ -82,7 +82,7 @@ class Implies(BooleanFormula):
         return self.args[0]
 
     @property
-    def rhs(self) -> Formula:
+    def rhs(self) -> Formula[α, τ, χ]:
         """The right-hand side of the implication.
 
         .. seealso::
@@ -91,12 +91,12 @@ class Implies(BooleanFormula):
         """
         return self.args[1]
 
-    def __init__(self, lhs: Formula, rhs: Formula) -> None:
+    def __init__(self, lhs: Formula[α, τ, χ], rhs: Formula[α, τ, χ]) -> None:
         self.args = (lhs, rhs)
 
 
 @final
-class And(BooleanFormula):
+class And(BooleanFormula[α, τ, χ]):
     """A class whose instances are conjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\\wedge`.
@@ -117,14 +117,14 @@ class And(BooleanFormula):
         * :attr:`op <.formula.Formula.op>` -- operator
     """
     @classmethod
-    def dual(cls) -> type[Or]:
+    def dual(cls) -> type[Or[α, τ, χ]]:
         r"""A class method yielding the class :class:`Or`, which implements
         the dual operator :math:`\vee` of :math:`\wedge`.
         """
         return Or
 
     @classmethod
-    def definite(cls) -> type[_F]:
+    def definite(cls) -> type[_F[α, τ, χ]]:
         r"""A class method yielding the class :class:`_F`, which is the
         operator of the constant Formula :data:`F`. The definite is the dual of
         the neutral.
@@ -132,14 +132,14 @@ class And(BooleanFormula):
         return _F
 
     @classmethod
-    def definite_element(cls) -> _F:
+    def definite_element(cls) -> _F[α, τ, χ]:
         r"""A class method yielding the unique instance :data:`F` of the
         :class:`_F`.
         """
-        return F
+        return _F()
 
     @classmethod
-    def neutral(cls) -> type[_T]:
+    def neutral(cls) -> type[_T[α, τ, χ]]:
         r"""A class method yielding the class :class:`_T`, which is the
         operator of the constant Formula :data:`T`. The neutral is the dual of
         the definite.
@@ -147,20 +147,20 @@ class And(BooleanFormula):
         return _T
 
     @classmethod
-    def neutral_element(cls) -> _T:
+    def neutral_element(cls) -> _T[α, τ, χ]:
         r"""A class method yielding the unique instance :data:`T` of the
         :class:`_T`.
         """
-        return T
+        return _T()
 
-    def __new__(cls, *args: Formula):
+    def __new__(cls, *args: Formula[α, τ, χ]):
         if not args:
             return T
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
-    def __init__(self, *args: Formula) -> None:
+    def __init__(self, *args: Formula[α, τ, χ]) -> None:
         """
         >>> from logic1.theories.RCF import *
         >>> a, = VV.get('a')
@@ -177,7 +177,7 @@ class And(BooleanFormula):
 
 
 @final
-class Or(BooleanFormula):
+class Or(BooleanFormula[α, τ, χ]):
     """A class whose instances are disjunctions in the sense that their
     toplevel operator represents the Boolean operator
     :math:`\\vee`.
@@ -198,14 +198,14 @@ class Or(BooleanFormula):
         * :attr:`op <.formula.Formula.op>` -- operator
     """
     @classmethod
-    def dual(cls) -> type[And]:
+    def dual(cls) -> type[And[α, τ, χ]]:
         r"""A class method yielding the class :class:`And`, which implements
         the dual operator :math:`\wedge` of :math:`\vee`.
         """
         return And
 
     @classmethod
-    def definite(cls) -> type[_T]:
+    def definite(cls) -> type[_T[α, τ, χ]]:
         r"""A class method yielding the class :class:`_T`, which is the
         operator of the constant Formula :data:`T`. The definite is the dual of
         the neutral.
@@ -213,14 +213,14 @@ class Or(BooleanFormula):
         return _T
 
     @classmethod
-    def definite_element(cls) -> _T:
+    def definite_element(cls) -> _T[α, τ, χ]:
         r"""A class method yielding the unique instance :data:`T` of the
         :class:`_T`.
         """
-        return T
+        return _T()
 
     @classmethod
-    def neutral(cls) -> type[_F]:
+    def neutral(cls) -> type[_F[α, τ, χ]]:
         r"""A class method yielding the class :class:`_F`, which is the
         operator of the constant Formula :data:`F`. The neutral is the dual of
         the definite.
@@ -228,20 +228,20 @@ class Or(BooleanFormula):
         return _F
 
     @classmethod
-    def neutral_element(cls) -> _F:
+    def neutral_element(cls) -> _F[α, τ, χ]:
         r"""A class method yielding the unique instance :data:`F` of the
         :class:`_F`.
         """
-        return F
+        return _F()
 
-    def __new__(cls, *args):
+    def __new__(cls, *args: Formula[α, τ, χ]):
         if not args:
             return F
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
 
-    def __init__(self, *args) -> None:
+    def __init__(self, *args: Formula[α, τ, χ]) -> None:
         """
         >>> from logic1.theories.RCF import *
         >>> a, = VV.get('a')
@@ -258,7 +258,7 @@ class Or(BooleanFormula):
 
 
 @final
-class Not(BooleanFormula):
+class Not(BooleanFormula[α, τ, χ]):
     """A class whose instances are negated formulas in the sense that their
     toplevel operator is the Boolean operator
     :math:`\\neg`.
@@ -273,7 +273,7 @@ class Not(BooleanFormula):
             short notation of :class:`Not`
     """
     @property
-    def arg(self) -> Formula:
+    def arg(self) -> Formula[α, τ, χ]:
         """The one argument of the operator :math:`\\neg`.
 
         .. seealso::
@@ -282,7 +282,7 @@ class Not(BooleanFormula):
         """
         return self.args[0]
 
-    def __init__(self, arg: Formula) -> None:
+    def __init__(self, arg: Formula[α, τ, χ]) -> None:
         """
         >>> from logic1.theories.RCF import *
         >>> a, = VV.get('a')
@@ -292,7 +292,7 @@ class Not(BooleanFormula):
         self.args = (arg, )
 
 
-def involutive_not(arg: Formula) -> Formula:
+def involutive_not(arg: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
     """Construct a formula equivalent Not(arg) using the involutive law if
     applicable.
 
@@ -311,7 +311,7 @@ def involutive_not(arg: Formula) -> Formula:
 
 
 @final
-class _T(BooleanFormula):
+class _T(BooleanFormula[α, τ, χ]):
     """A singleton class whose sole instance represents the constant Formula
     that is always true.
 
@@ -326,13 +326,13 @@ class _T(BooleanFormula):
     # subclass itself.
 
     @classmethod
-    def dual(cls) -> type[_F]:
+    def dual(cls) -> type[_F[α, τ, χ]]:
         r"""A class method yielding the class :class:`_F`, which implements
         the dual operator :math:`\bot` of :math:`\top`.
         """
         return _F
 
-    _instance: Optional[_T] = None
+    _instance: Optional[_T[α, τ, χ]] = None
 
     def __init__(self) -> None:
         self.args = ()
@@ -346,8 +346,12 @@ class _T(BooleanFormula):
         return 'T'
 
 
-T = _T()
+T: _T['AtomicFormula', 'Term', 'Variable'] = _T()
 """Support use as a constant without parentheses.
+
+We instantiate type variables with their respective upper bounds, which is the
+best we can do at the module level. `T` cannot be generic. Therefore, _T()
+should be used within statically typed code instead.
 
     >>> T is _T()
     True
@@ -355,7 +359,7 @@ T = _T()
 
 
 @final
-class _F(BooleanFormula):
+class _F(BooleanFormula[α, τ, χ]):
     """A singleton class whose sole instance represents the constant Formula
     that is always false.
 
@@ -370,13 +374,13 @@ class _F(BooleanFormula):
     # subclass itself.
 
     @classmethod
-    def dual(cls) -> type[_T]:
+    def dual(cls) -> type[_T[α, τ, χ]]:
         r"""A class method yielding the class :class:`_T`, which implements
         the dual operator :math:`\top` of :math:`\bot`.
         """
         return _T
 
-    _instance: Optional[_F] = None
+    _instance: Optional[_F[α, τ, χ]] = None
 
     def __init__(self) -> None:
         self.args = ()
@@ -390,9 +394,13 @@ class _F(BooleanFormula):
         return 'F'
 
 
-F = _F()
+F: _F['AtomicFormula', 'Term', 'Variable'] = _F()
 """Support use as a constant without parentheses.
 
-    >>> F is _F()
-    True
+We instantiate type variables with their respective upper bounds, which is the
+best we can do at the module level. `F` cannot be generic. Therefore, _F()
+should be used within statically typed code instead.
+
+>>> F is _F()
+True
 """

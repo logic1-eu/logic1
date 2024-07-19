@@ -1,5 +1,4 @@
 >>> from logic1.firstorder import *
->>> from logic1.firstorder.pnf import prenex_normal_form
 >>> from logic1.theories.RCF import *
 
 # Test renaming to distinct variables:
@@ -7,7 +6,7 @@
 >>> x, y, z = VV.get('x', 'y', 'z')
 >>> f = And(x == y,
 ...         Ex(x, And(x == y, All(z, Ex(y, And(x == y,  y == z, Ex(x, T)))))))
->>> prenex_normal_form(f)
+>>> f.to_pnf()
 Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
     And(x - y == 0, G0002_x - y == 0, -G0001_y + G0002_x == 0, G0001_y - z == 0, T)))))
 >>> VV.pop()
@@ -21,7 +20,7 @@ Ex(G0002_x, All(z, Ex(G0001_y, Ex(G0001_x,
 >>> f1 = Ex(x[1], All(x[2], All(x[3], T)))
 >>> f2 = All(x[4], Ex(x[5], All(x[6], F)))
 >>> f3 = Ex(x[7], x[0] == 0)
->>> prenex_normal_form(f1 & f2 & f3)
+>>> (f1 & f2 & f3).to_pnf()
 All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
 >>> VV.pop()
 
@@ -32,7 +31,7 @@ All(x4, Ex(x1, Ex(x5, Ex(x7, All(x2, All(x3, All(x6, And(T, F, x0 == 0))))))))
 >>> a, b, y = VV.get('a', 'b', 'y')
 >>> f1 = And(a == 0, b == 0, y == 0)
 >>> f2 = Ex(y, Or(y == a, a == 0))
->>> prenex_normal_form(Equivalent(f1, f2))
+>>> Equivalent(f1, f2).to_pnf()
 Ex(G0001_y, All(G0002_y,
     And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
         Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))
@@ -41,7 +40,7 @@ Ex(G0001_y, All(G0002_y,
 >>> a, b, y = VV.get('a', 'b', 'y')
 >>> f1 = And(a == 0, b == 0, y == 0)
 >>> f2 = Ex(y, Or(y == a, a == 0))
->>> prenex_normal_form(Equivalent(f1, f2), prefer_universal=True)
+>>> Equivalent(f1, f2).to_pnf(prefer_universal=True)
 All(G0002_y, Ex(G0001_y,
     And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
         Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))

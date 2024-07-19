@@ -11,6 +11,10 @@ Terms and Atoms
     :members:
     :undoc-members:
 
+  .. autoclass:: Variable
+    :members:
+    :undoc-members:
+
 
   .. autoclass:: AtomicFormula
     :members:

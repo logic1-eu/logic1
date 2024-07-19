@@ -1,14 +1,15 @@
-from typing import Iterable, Optional, Self, TypeAlias
+from typing import Iterable, Optional, Self
 
 from ... import abc
 
-from ...firstorder import And, AtomicFormula, Formula, Or
-from .atomic import C, C_, Eq, Index, Ne, oo, Variable
+from ...firstorder import And, Or
+from .atomic import AtomicFormula, C, C_, Eq, Index, Ne, oo, Variable
+from .typing import Sets_Formula
 
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory['AtomicFormula']):
+class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable']):
 
     _ref_min_card: Index
     _ref_max_card: Index
@@ -128,7 +129,7 @@ class Theory(abc.simplify.Theory['AtomicFormula']):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'Theory']):
 
     @property
     def class_AT(self) -> type[AtomicFormula]:
@@ -142,12 +143,12 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Theory']):
     def TH_kwargs(self) -> dict[str, bool]:
         return dict()
 
-    def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
+    def __call__(self, f: Sets_Formula, assume: list[AtomicFormula] = []) -> Sets_Formula:
         return self.simplify(f, assume)
 
     def simpl_at(self,
                  atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> Formula:
+                 context: Optional[type[And] | type[Or]]) -> Sets_Formula:
         return atom.simplify()
 
 

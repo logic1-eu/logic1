@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import inspect
 from types import FrameType
-from typing import Any, final, Generic, Iterator, Self, Sequence, TypeVar
+from typing import Any, final, Generic, Iterator, Sequence
 
-from .formula import Formula
+from .formula import α, τ, χ, Formula
 
 from ..support.tracing import trace  # noqa
 
 
-V = TypeVar('V', bound='Variable')
-
-
-class _VariableSet(ABC, Generic[V]):
+class _VariableSet(Generic[χ]):
 
     @property
     @abstractmethod
@@ -21,13 +18,13 @@ class _VariableSet(ABC, Generic[V]):
         ...
 
     @abstractmethod
-    def __getitem__(self, index: str) -> V:
+    def __getitem__(self, index: str) -> χ:
         ...
 
-    def get(self, *args) -> tuple[V, ...]:
+    def get(self, *args: str) -> tuple[χ, ...]:
         return tuple(self[name] for name in args)
 
-    def imp(self, *args) -> None:
+    def imp(self, *args: str) -> None:
         """Import variables into global namespace.
         """
         vars_ = self.get(*args)
@@ -60,7 +57,7 @@ class _VariableSet(ABC, Generic[V]):
         ...
 
 
-class Term(ABC, Generic[V]):
+class Term(Generic[τ, χ]):
 
     @abstractmethod
     def as_latex(self) -> str:
@@ -73,14 +70,14 @@ class Term(ABC, Generic[V]):
 
     @staticmethod
     @abstractmethod
-    def sort_key(term: Any) -> Any:
+    def sort_key(term: τ) -> Any:
         """A sort key suitable for ordering terms. Note that ``<``, ``<=`` etc.
         are reserved as constructors for instances of :class:`.AtomicFormula`.
         """
         ...
 
     @abstractmethod
-    def vars(self) -> Iterator[V]:
+    def vars(self) -> Iterator[χ]:
         """All variables occurring in self.
 
         .. seealso::
@@ -91,22 +88,26 @@ class Term(ABC, Generic[V]):
         ...
 
 
-class Variable(Term, Generic[V]):
+class Variable(Term[χ, χ]):
 
     @abstractmethod
-    def fresh(self) -> V:
+    def fresh(self) -> χ:
         """Returns a variable that has not been used so far.
         """
         ...
 
 
-class AtomicFormula(Formula, Generic[V]):
+class AtomicFormula(Formula[α, τ, χ]):
 
     @classmethod
     @abstractmethod
-    def complement(cls):
+    def complement(cls) -> type[α]:
         """The complement operator of an atomic formula.
         """
+        ...
+
+    @abstractmethod
+    def __le__(self, other: Formula[α, τ, χ]) -> bool:
         ...
 
     @abstractmethod
@@ -125,20 +126,24 @@ class AtomicFormula(Formula, Generic[V]):
         """
         ...
 
+    @final
+    def atoms(self: α) -> Iterator[α]:
+        yield self
+
     @abstractmethod
-    def _bvars(self, quantified: set) -> Iterator[V]:
+    def _bvars(self, quantified: set[χ]) -> Iterator[χ]:
         ...
 
     @abstractmethod
-    def _fvars(self, quantified: set) -> Iterator[V]:
+    def _fvars(self, quantified: set[χ]) -> Iterator[χ]:
         ...
 
     @abstractmethod
-    def simplify(self) -> Formula:
+    def simplify(self) -> Formula[α, τ, χ]:
         ...
 
     @abstractmethod
-    def subs(self, substitution: dict) -> Self:
+    def subs(self, substitution: dict[χ, τ]) -> α:
         """
         .. seealso::
             :meth:`.Formula.subs` -- substitution
@@ -146,7 +151,7 @@ class AtomicFormula(Formula, Generic[V]):
         ...
 
     @final
-    def to_complement(self) -> Self:
+    def to_complement(self) -> α:
         """Returns an :class:`AtomicFormula` equivalent to ``Not(self)``.
 
         .. seealso::

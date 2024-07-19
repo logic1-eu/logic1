@@ -1,7 +1,9 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 import ast
+from typing import Generic
 
-from ..firstorder import All, And, Equivalent, Ex, F, Implies, Not, Or, T
+from ..firstorder import All, And, Equivalent, Ex, _F, Implies, Not, Or, _T
+from ..firstorder.formula import α, τ, χ, Formula
 from ..support.excepthook import NoTraceException
 
 from ..support.tracing import trace  # noqa
@@ -11,9 +13,9 @@ class ParserError(Exception):
     pass
 
 
-class L1Parser(ABC):
+class L1Parser(Generic[α, τ, χ]):
 
-    def process(self, s: str):
+    def process(self, s: str) -> Formula[α, τ, χ]:
         try:
             a = ast.parse(s, mode='eval')
             # print(ast.dump(a, indent=4))
@@ -22,7 +24,7 @@ class L1Parser(ABC):
         except (NameError, ParserError, SyntaxError, TypeError) as exc:
             raise NoTraceException(*exc.args)
 
-    def _process(self, a: ast.expr):
+    def _process(self, a: ast.expr) -> Formula[α, τ, χ]:
         match a:
             case ast.Call(func=func, args=args, keywords=keywords):
                 if keywords:
@@ -73,18 +75,18 @@ class L1Parser(ABC):
             case ast.Name(id=id):
                 match id:
                     case 'T' | 'true':
-                        return T
+                        return _T()
                     case 'F' | 'false':
-                        return F
+                        return _F()
                     case _:
                         raise ParserError(f'cannot parse {ast.unparse(a)}')
             case _:
                 return self.process_atom(a)
 
     @abstractmethod
-    def process_atom(self, a):
+    def process_atom(self, a: ast.expr) -> Formula[α, τ, χ]:
         ...
 
     @abstractmethod
-    def process_var(self, v):
+    def process_var(self, v: ast.expr) -> χ:
         ...

@@ -4,21 +4,24 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
-from typing import Any, final, Sequence, TypeAlias
+from collections import deque
+from dataclasses import dataclass
+from typing import final, Generic, Iterable, Iterator, Sequence
 
-from .formula import Formula
 from .atomic import Variable
+from .formula import α, τ, χ, Formula
+
 from ..support.tracing import trace  # noqa
 
 
-class QuantifiedFormula(Formula):
+class QuantifiedFormula(Formula[α, τ, χ]):
     r"""A class whose instances are quanitfied formulas in the sense that their
     toplevel operator is a one of the quantifiers :math:`\exists` or
     :math:`\forall`. Note that members of :class:`QuantifiedFormula` may have
     subformulas with other logical operators deeper in the expression tree.
     """
     @property
-    def var(self) -> Any:
+    def var(self) -> χ:
         """The variable of the quantifier.
 
         >>> from logic1.theories.RCF import *
@@ -34,11 +37,11 @@ class QuantifiedFormula(Formula):
         return self.args[0]
 
     @var.setter
-    def var(self, value: Any) -> None:
+    def var(self, value: χ) -> None:
         self.args = (value, *self.args[1:])
 
     @property
-    def arg(self) -> Formula:
+    def arg(self) -> Formula[α, τ, χ]:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
 
         >>> from logic1.theories.RCF import *
@@ -53,7 +56,7 @@ class QuantifiedFormula(Formula):
         """
         return self.args[1]
 
-    def __init__(self, vars_: Variable | Sequence[Variable], arg: Formula) -> None:
+    def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ]) -> None:
         """Construct a quantified formula.
 
         >>> from logic1.theories.RCF import VV
@@ -78,7 +81,7 @@ class QuantifiedFormula(Formula):
 
 
 @final
-class Ex(QuantifiedFormula):
+class Ex(QuantifiedFormula[α, τ, χ]):
     r"""A class whose instances are existentially quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\exists`. Besides variables, the quantifier accepts sequences of
@@ -93,7 +96,7 @@ class Ex(QuantifiedFormula):
     Ex(x, Ex(y, And(x > 0, y > 0, x - y - z == 0)))
     """
     @classmethod
-    def dual(cls) -> type[All]:
+    def dual(cls) -> type[All[α, τ, χ]]:
         r"""A class method yielding the class :class:`All`, which implements
         the dual operator :math:`\forall` of :math:`\exists`.
         """
@@ -101,7 +104,7 @@ class Ex(QuantifiedFormula):
 
 
 @final
-class All(QuantifiedFormula):
+class All(QuantifiedFormula[α, τ, χ]):
     r"""A class whose instances are universally quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\forall`. Besides variables, the quantifier accepts sequences of
@@ -115,14 +118,31 @@ class All(QuantifiedFormula):
     All(x, All(y, x^2 + 2*x*y + y^2 >= 0))
     """
     @classmethod
-    def dual(cls) -> type[Ex]:
+    def dual(cls) -> type[Ex[α, τ, χ]]:
         """A class method yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
 
 
-QuantifierBlock: TypeAlias = tuple[type[All | Ex], list]
-"""
-.. seealso::
-    :meth:`matrix <.Formula.matrix>` -- the matrix of a prenex formula
-"""
+class Prefix(deque[tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]]):
+    """Holds a quantifier prefix of a formula.
+
+    >>> from logic1.theories.RCF import *
+    >>> x, x0, epsilon, delta = VV.get('x', 'x0', 'epsilon', 'delta')
+    >>> Prefix((All, [x0, epsilon]), (Ex, [delta]), (All, [x]))
+    Prefix([(<class 'logic1.firstorder.quantified.All'>, [x0, epsilon]),
+            (<class 'logic1.firstorder.quantified.Ex'>, [delta]),
+            (<class 'logic1.firstorder.quantified.All'>, [x])])
+    >>> print(_)
+    All [x0, epsilon]  Ex [delta]  All [x]
+
+    .. seealso::
+        * :meth:`matrix <.Formula.matrix>` -- the matrix of a prenex formula
+        * :meth:`quantify <.Formula.quantify>` -- add quantifier prefix
+    """
+
+    def __init__(self, *blocks: tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]) -> None:
+        return super().__init__(blocks)
+
+    def __str__(self) -> str:
+        return '  '.join(q.__name__ + ' ' + str(vars_) for q, vars_ in self)

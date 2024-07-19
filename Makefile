@@ -1,8 +1,8 @@
 pytest:
-	pytest -n 5 --exitfirst --doctest-modules
+	pytest -n 8 --exitfirst --doctest-modules
 
 pytest-full:
-	pytest -n 5 --doctest-modules
+	pytest -n 8 --doctest-modules
 
 mypy:
 	mypy logic1

@@ -1,92 +1,79 @@
 # mypy: strict_optional = False
-
+from dataclasses import dataclass
 import more_itertools
 import logging
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from time import time
 from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
-from ..firstorder import All, And, AtomicFormula, F, Formula, Not, Or, QuantifiedFormula, T
+from ..firstorder import (
+    All, And, AtomicFormula, _F, Formula, Not, Or, Prefix, _T)
+from ..firstorder.formula import α, τ, χ
 
 Variable: TypeAlias = Any
 
-P = TypeVar('P', bound='Pool')
+π = TypeVar('π', bound='Pool')
 
 
 class FoundT(Exception):
     pass
 
 
-class Pool(ABC, list[tuple[list[Variable], Formula]]):
+class Pool(list[tuple[list[χ], Formula[α, τ, χ]]], Generic[α, τ, χ]):
 
-    def __init__(self, vars_: list[Variable], f: Formula) -> None:
+    def __init__(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
         self.push(vars_, f)
 
     @abstractmethod
-    def push(self, vars_: list[Variable], f: Formula) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
         ...
 
 
-class PoolOneExistential(Pool):
+class PoolOneExistential(Pool[α, τ, χ]):
 
-    def push(self, vars_: list[Variable], f: Formula) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
         logging.debug(f'res = {f}')
-        if f is not F:
+        if f is not _F():
             split_f = [*f.args] if f.op is Or else [f]
             self.extend([(vars_.copy(), mt) for mt in split_f])
 
 
-class PoolOnePrimitive(Pool):
+class PoolOnePrimitive(Pool[α, τ, χ]):
 
-    def push(self, vars_: list[Variable], f: Formula) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
         logging.debug(f'res = {f}')
         dnf = self.dnf(f)
-        if dnf is T:
+        if dnf is _T():
             raise FoundT
-        if dnf is not F:
+        if dnf is not _F():
             split_dnf = [*dnf.args] if dnf.op is Or else [dnf]
             self.extend([(vars_.copy(), mt) for mt in split_dnf])
 
     @abstractmethod
-    def dnf(self, f: Formula) -> Formula:
+    def dnf(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         ...
 
 
-class QuantifierElimination(ABC, Generic[P]):
+@dataclass
+class QuantifierElimination(Generic[α, τ, χ, π]):
 
-    # Types
-    Quantifier: TypeAlias = type[QuantifiedFormula]
-    QuantifierBlock: TypeAlias = tuple[Quantifier, list[Variable]]
-    Job: TypeAlias = tuple[list[Variable], Formula]
+    blocks: Optional[Prefix[α, τ, χ]] = None
+    matrix: Optional[Formula[α, τ, χ]] = None
+    negated: Optional[bool] = None
+    pool: Optional[π] = None
+    finished: Optional[list[Formula[α, τ, χ]]] = None
 
-    # Properties
-    blocks: Optional[list[QuantifierBlock]]
-    matrix: Optional[Formula]
-    negated: Optional[bool]
-    pool: Optional[P]
-    finished: Optional[list[Formula]]
-
-    def __init__(self, blocks=None, matrix=None, negated=None, pool=None,
-                 finished=None) -> None:
-        self.blocks = blocks
-        self.matrix = matrix
-        self.negated = negated
-        self.pool = pool
-        self.finished = finished
-
-    def __repr__(self):
+    def __repr__(self) -> str:
         return (f'QuantifierElimination(blocks={self.blocks!r}, '
                 f'matrix={self.matrix!r}, '
                 f'negated={self.negated!r}, '
                 f'pool={self.pool!r}, '
                 f'finished={self.finished!r})')
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.blocks is not None:
-            _h = [q.__qualname__ + ' ' + str(v) for q, v in self.blocks]
-            _h = '  '.join(_h)
-            blocks = f'[{_h}]'
+            blocks = f'[{self.blocks}]'
         else:
             blocks = None
         if self.negated is None:
@@ -97,14 +84,14 @@ class QuantifierElimination(ABC, Generic[P]):
             assert self.negated is True
             read_as = '  # read as Not All'
         if self.pool is not None:
-            _h = [f'({str(job[0])}, {str(job[1])})' for job in self.pool]
-            _h = ',\n                '.join(_h)
+            _h1 = [f'({str(job[0])}, {str(job[1])})' for job in self.pool]
+            _h = ',\n                '.join(_h1)
             pool = f'[{_h}]'
         else:
             pool = None
         if self.finished is not None:
-            _h = [f'{str(f)}' for f in self.finished]
-            _h = ',\n                '.join(_h)
+            _h1 = [f'{str(f)}' for f in self.finished]
+            _h = ',\n                '.join(_h1)
             finished = f'[{_h}]'
         else:
             finished = None
@@ -125,19 +112,15 @@ class QuantifierElimination(ABC, Generic[P]):
         self.finished = None
         logging.info(f'{self.collect_finished.__qualname__}: {self}')
 
-    def select_and_pop(self, vars_: list, f: Formula) -> Variable:
+    def select_and_pop(self, vars_: list[χ], f: Formula[α, τ, χ]) -> χ:
         return vars_.pop()
 
     @abstractmethod
-    def simplify(self, f: Formula) -> Formula:
+    def simplify(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         ...
 
     @abstractmethod
-    def pnf(self, f: Formula) -> Formula:
-        ...
-
-    @abstractmethod
-    def _Pool(self, vars_: list[Variable], f: Formula) -> P:
+    def _Pool(self, vars_: list[χ], f: Formula[α, τ, χ]) -> π:
         ...
 
     def pop_block(self) -> None:
@@ -168,7 +151,7 @@ class QuantifierElimination(ABC, Generic[P]):
                     other_args, v_args = more_itertools.partition(
                         lambda arg: v in arg.fvars(), args)
                     f_v: Formula = And(*v_args)
-                    if f_v is not T:
+                    if f_v is not _T():
                         f_v = self.qe1(v, f_v)
                     result = self.simplify(And(f_v, *other_args))
                 case _:
@@ -179,7 +162,7 @@ class QuantifierElimination(ABC, Generic[P]):
                 self.finished.append(result)
             logging.info(f'{self.process_pool.__qualname__}: {self}')
 
-    def qe(self, f: Formula) -> Formula:
+    def qe(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         # The following manipulation of a private property is dirty. There
         # seems to be no supported way to reset reference time.
         logging._startTime = time()  # type: ignore
@@ -190,12 +173,12 @@ class QuantifierElimination(ABC, Generic[P]):
                 self.process_pool()
             except FoundT:
                 self.pool = None
-                self.finished = [T]
+                self.finished = [_T()]
             self.collect_finished()
         return self.simplify(self.matrix.to_nnf())
 
     @abstractmethod
-    def qe1(self, v: Variable, f: Formula) -> Formula:
+    def qe1(self, v: χ, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         """Elimination of the existential quantifier from Ex(v, f).
 
         It is guaranteed that v occurs in f. :meth:`qe1` need not apply
@@ -203,17 +186,6 @@ class QuantifierElimination(ABC, Generic[P]):
         """
         ...
 
-    def setup(self, f: Formula) -> None:
-        f = self.pnf(f)
-        blocks = []
-        vars_ = []
-        while isinstance(f, QuantifiedFormula):
-            q = type(f)
-            while isinstance(f, q):
-                vars_.append(f.var)
-                f = f.arg
-            blocks.append((q, vars_))
-            vars_ = []
-        self.blocks = blocks
-        self.matrix = f
+    def setup(self, f: Formula[α, τ, χ]) -> None:
+        self.matrix, self.blocks = f.to_pnf().matrix()
         logging.info(f'{self.setup.__qualname__}: {self}')

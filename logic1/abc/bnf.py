@@ -1,21 +1,23 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from pyeda.boolalg import expr, minimization  # type: ignore
+from typing import Generic
 
 from ..firstorder import (
-    All, And, AtomicFormula, BooleanFormula, Equivalent, Ex, _F, F, Formula,
-    Implies, Not, Or, _T, T)
+    All, And, AtomicFormula, BooleanFormula, Equivalent, Ex, _F, Formula,
+    Implies, Not, Or, _T)
+from ..firstorder.formula import α, τ, χ
 
 from ..support.tracing import trace  # noqa
 
 
-class DisjunctiveNormalForm(ABC):
+class DisjunctiveNormalForm(Generic[α, τ, χ]):
 
-    def __call__(self, f: Formula) -> Formula:
+    def __call__(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         if self.dualize:
             return self.simplify(Not(self.dnf(Not(f))).to_nnf())
         return self.dnf(f)
 
-    def __init__(self, dualize: bool = False):
+    def __init__(self, dualize: bool = False) -> None:
         self.logic1_to_pyeda = {Equivalent: expr.Equal, Implies: expr.Implies,
                                 And: expr.And, Or: expr.Or, Not: expr.Not,
                                 _T: expr._Zero, _F: expr._One}
@@ -24,9 +26,8 @@ class DisjunctiveNormalForm(ABC):
         self.atoms_to_pyeda: dict[AtomicFormula, expr.Literal] = {}
         self.pyeda_to_atoms: dict[expr.Literal, AtomicFormula] = {}
 
-    def dnf(self, f: Formula) -> Formula:
-        f = self.pnf(f)
-        f = self.simplify(f)
+    def dnf(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+        f = self.simplify(f.to_pnf())
         quantifiers = []
         mtx = f
         while isinstance(mtx, (Ex, All)):
@@ -49,7 +50,8 @@ class DisjunctiveNormalForm(ABC):
         dnf = self.simplify(dnf)
         return dnf
 
-    def dnf_and_or(self, f: And | Or) -> AtomicFormula | BooleanFormula:
+    def dnf_and_or(self, f: And[α, τ, χ] | Or[α, τ, χ]) \
+            -> AtomicFormula[α, τ, χ] | BooleanFormula[α, τ, χ]:
         f_as_pyeda = self.to_pyeda(f)
         dnf_as_pyeda = f_as_pyeda.to_dnf()
         if not isinstance(dnf_as_pyeda, expr.Constant):
@@ -57,7 +59,7 @@ class DisjunctiveNormalForm(ABC):
         dnf = self.from_pyeda(dnf_as_pyeda)
         return dnf
 
-    def to_pyeda(self, f) -> expr:
+    def to_pyeda(self, f: AtomicFormula[α, τ, χ] | And[α, τ, χ] | Or[α, τ, χ]) -> expr:
         match f:
             case AtomicFormula():
                 if f in self.atoms_to_pyeda:
@@ -77,7 +79,7 @@ class DisjunctiveNormalForm(ABC):
             case _:
                 assert False
 
-    def from_pyeda(self, f: expr) -> AtomicFormula | BooleanFormula:
+    def from_pyeda(self, f: expr) -> AtomicFormula[α, τ, χ] | BooleanFormula[α, τ, χ]:
         xs: expr
         match f:
             case expr.Variable():
@@ -93,16 +95,12 @@ class DisjunctiveNormalForm(ABC):
                 args = (self.from_pyeda(x) for x in xs)
                 return Or(*args)
             case expr._Zero():
-                return F
+                return _F()
             case expr._One():
-                return T
+                return _T()
             case _:
                 assert False
 
     @abstractmethod
-    def pnf(self, f: Formula) -> Formula:
-        ...
-
-    @abstractmethod
-    def simplify(self, f: Formula) -> Formula:
+    def simplify(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
         ...

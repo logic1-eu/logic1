@@ -3,17 +3,18 @@ import logging
 from itertools import combinations
 
 from ... import abc
-from ...firstorder import And, Formula, Or
+from ...firstorder import And, Or
 from .atomic import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
 from .simplify import simplify as _simplify
+from .typing import Sets_Formula
 
 from ...support.tracing import trace  # noqa
 
 
 class Pool(abc.qe.PoolOnePrimitive):
 
-    def dnf(self, f: Formula) -> Formula:
+    def dnf(self, f: Sets_Formula) -> Sets_Formula:
         return _dnf(f)
 
 
@@ -39,7 +40,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
     Or(C_(2), C(4))
     """
 
-    def __call__(self, f, sism: bool = True, show_progress: bool = False) -> Formula:
+    def __call__(self, f, sism: bool = True, show_progress: bool = False) -> Sets_Formula:
         if show_progress:
             save_level = logging.getLogger().getEffectiveLevel()
             logging.getLogger().setLevel(logging.INFO)
@@ -49,7 +50,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
             logging.getLogger().setLevel(save_level)
         return result
 
-    def select_and_pop(self, vars_: list, f: Formula) -> Variable:
+    def select_and_pop(self, vars_: list, f: Sets_Formula) -> Variable:
         # revise: use a counter
         d = {v: 0 for v in vars_}
         args = f.args if f.op is And else (f,)
@@ -64,17 +65,14 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
         # print(d, v)
         return v
 
-    def pnf(self, f: Formula) -> Formula:
-        return f.to_pnf()
-
-    def _Pool(self, vars_: list[Variable], f: Formula) -> Pool:
+    def _Pool(self, vars_: list[Variable], f: Sets_Formula) -> Pool:
         return Pool(vars_, f)
 
-    def qe1(self, v: Variable, f: Formula) -> Formula:
-        def eta(Z: set, k: int) -> Formula:
+    def qe1(self, v: Variable, f: Sets_Formula) -> Sets_Formula:
+        def eta(Z: set, k: int) -> Sets_Formula:
             args = []
             for k_choice in combinations(Z, k):
-                args1 = []
+                args1: list[Sets_Formula] = []
                 for z in Z:
                     args_inner = []
                     for chosen_z in k_choice:
@@ -96,11 +94,12 @@ class QuantifierElimination(abc.qe.QuantifierElimination):
             return f.subs({v: solution})
         Z = set(And(*nes).fvars()) - {v}
         m = len(Z)
-        phi_prime = Or(*(And(eta(Z, k), C(k + 1)) for k in range(1, m + 1)))
+        args = (And(eta(Z, k), C(k + 1)) for k in range(1, m + 1))
+        phi_prime: Sets_Formula = Or(*args)
         logging.info(f'{self.qe1.__qualname__}: result is {phi_prime}')
         return phi_prime
 
-    def simplify(self, f: Formula) -> Formula:
+    def simplify(self, f: Sets_Formula) -> Sets_Formula:
         return _simplify(f) if self.sism else f.simplify()
 
     @staticmethod
