@@ -454,7 +454,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return D[cls]
 
     @classmethod
-    def strict_part(cls) -> type[RCF_Formula]:
+    def strict_part(cls) -> type[Formula]:
         """The strict part is the binary relation without the diagonal.
         """
         if cls in (Eq, Ne):
@@ -481,7 +481,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             rhs = Term(rhs)
         self.args = (lhs, rhs)
 
-    def __le__(self, other: RCF_Formula) -> bool:
+    def __le__(self, other: Formula) -> bool:
         match other:
             case AtomicFormula():
                 if self.lhs != other.lhs:
@@ -538,7 +538,7 @@ class Eq(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly == self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return _T()
@@ -552,7 +552,7 @@ class Ne(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly != self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_zero():
             return _F()
@@ -566,7 +566,7 @@ class Ge(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly >= self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return _T() if lhs >= 0 else _F()
@@ -578,7 +578,7 @@ class Le(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly <= self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return _T() if lhs <= 0 else _F()
@@ -590,7 +590,7 @@ class Gt(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly > self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return _T() if lhs > 0 else _F()
@@ -602,14 +602,14 @@ class Lt(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly < self.rhs.poly
 
-    def simplify(self) -> RCF_Formula:
+    def simplify(self) -> Formula:
         lhs = self.lhs.poly - self.rhs.poly
         if lhs.is_constant():
             return _T() if lhs < 0 else _F()
         return Lt(Term(lhs), Term(0))
 
 
-from .typing import RCF_Formula
+from .typing import Formula
 
 
 # from typing import reveal_type, TYPE_CHECKING

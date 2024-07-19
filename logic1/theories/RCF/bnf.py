@@ -1,12 +1,12 @@
 from ... import abc
 from .atomic import AtomicFormula, Term, Variable
 from .simplify import simplify as _simplify
-from .typing import RCF_Formula
+from .typing import Formula
 
 
 class DisjunctiveNormalForm(abc.bnf.DisjunctiveNormalForm[AtomicFormula, Term, Variable]):
 
-    def simplify(self, f: RCF_Formula) -> RCF_Formula:
+    def simplify(self, f: Formula) -> Formula:
         return _simplify(f)
 
 

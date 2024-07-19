@@ -4,7 +4,7 @@ from ... import abc
 
 from ...firstorder import And, Or
 from .atomic import AtomicFormula, C, C_, Eq, Index, Ne, oo, Variable
-from .typing import Sets_Formula
+from .typing import Formula
 
 from ...support.tracing import trace  # noqa
 
@@ -143,12 +143,12 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'T
     def TH_kwargs(self) -> dict[str, bool]:
         return dict()
 
-    def __call__(self, f: Sets_Formula, assume: list[AtomicFormula] = []) -> Sets_Formula:
+    def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
         return self.simplify(f, assume)
 
     def simpl_at(self,
                  atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> Sets_Formula:
+                 context: Optional[type[And] | type[Or]]) -> Formula:
         return atom.simplify()
 
 

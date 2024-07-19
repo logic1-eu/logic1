@@ -8,7 +8,7 @@ from ... import abc
 
 from ...firstorder import And, _F, Not, Or, _T
 from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Term, TSQ, Variable
-from .typing import RCF_Formula
+from .typing import Formula
 
 from ...support.tracing import trace  # noqa
 
@@ -288,11 +288,11 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
         return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
 
     def __call__(self,
-                 f: RCF_Formula,
+                 f: Formula,
                  assume: Optional[list[AtomicFormula]] = None,
                  explode_always: bool = True,
                  prefer_order: bool = True,
-                 prefer_weak: bool = False) -> RCF_Formula:
+                 prefer_weak: bool = False) -> Formula:
         self.explode_always = explode_always
         self.prefer_order = prefer_order
         self.prefer_weak = prefer_weak
@@ -300,7 +300,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
 
     def simpl_at(self,
                  atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> RCF_Formula:
+                 context: Optional[type[And] | type[Or]]) -> Formula:
         # MyPy does not recognize that And[Any, Any, Any] is an instance of
         # Hashable. https://github.com/python/mypy/issues/11470
         return self._simpl_at(atom, context, self.explode_always)  # type: ignore[arg-type]
@@ -309,7 +309,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
     def _simpl_at(self,
                   atom: AtomicFormula,
                   context: Optional[type[And] | type[Or]],
-                  explode_always: bool) -> RCF_Formula:
+                  explode_always: bool) -> Formula:
         """Simplify atomic formula.
 
         >>> from .atomic import VV
@@ -355,7 +355,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
                 return fac_junctor(*args)
             return rel(primitive_lhs, 0)
 
-        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[RCF_Formula]:
+        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[Formula]:
             if f.is_definite() in (TSQ.STRICT, TSQ.WEAK):
                 return _T()
             neg_tsq = (-f).is_definite()
@@ -439,11 +439,11 @@ simplify = Simplify()
 class IsValid(abc.simplify.IsValid['AtomicFormula', 'Term', 'Variable']):
 
     def __call__(self,
-                 f: RCF_Formula,
+                 f: Formula,
                  assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
         return self.is_valid(f, assume)
 
-    def _simplify(self, f: RCF_Formula, assume: list[AtomicFormula]) -> RCF_Formula:
+    def _simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
         return simplify(f, assume)
 
 

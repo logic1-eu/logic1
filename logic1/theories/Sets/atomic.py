@@ -142,7 +142,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
         D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
         return D[cls]
 
-    def __le__(self, other: Sets_Formula) -> bool:
+    def __le__(self, other: Formula) -> bool:
         L: Final = [C, C_, Eq, Ne]
         match other:
             case AtomicFormula():
@@ -252,7 +252,7 @@ class Eq(AtomicFormula):
                     f'arguments must be variables; {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Sets_Formula:
+    def simplify(self) -> Formula:
         if self.lhs == self.rhs:
             return _T()
         if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
@@ -280,7 +280,7 @@ class Ne(AtomicFormula):
                     f'arguments must be variables - {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Sets_Formula:
+    def simplify(self) -> Formula:
         if self.lhs == self.rhs:
             return _F()
         if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
@@ -326,7 +326,7 @@ class C(AtomicFormula):
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
 
-    def simplify(self) -> Sets_Formula:
+    def simplify(self) -> Formula:
         """Implements abstract method
         :meth:`firstorder.atomic.AtomicFormula.simplify`.
         """
@@ -372,11 +372,11 @@ class C_(AtomicFormula):
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
 
-    def simplify(self) -> Sets_Formula:
+    def simplify(self) -> Formula:
         """Implements abstract method
         :meth:`firstorder.atomic.AtomicFormula.simplify`.
         """
         return self
 
 
-from .typing import Sets_Formula
+from .typing import Formula
