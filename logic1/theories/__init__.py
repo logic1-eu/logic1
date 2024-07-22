@@ -1,3 +1,6 @@
+"""Theories
+"""
+
 from . import RCF  # noqa
 
 from . import Sets  # noqa

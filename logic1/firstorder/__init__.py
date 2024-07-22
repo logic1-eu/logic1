@@ -5,7 +5,7 @@ Throughout this documentation we use the term *theory* to refer to a choice of
 function and relation symbols along with their arities (signature) plus a
 choice of a semantics of those symbols.
 
-An abstract base class :class:`Formula` implements representations of and
+An abstract base class :class:`.Formula` implements representations of and
 methods on first-order formulas recursively built using first-order operators:
 
 1. Boolean operators:
@@ -23,24 +23,24 @@ methods on first-order formulas recursively built using first-order operators:
 2. Quantifiers :math:`\exists x` and :math:`\forall x`, where :math:`x` is a
    variable.
 
-As an abstract base class, :class:`Formula` cannot be instantiated.
+As an abstract base class, :class:`.Formula` cannot be instantiated.
 Nevertheless, it implements a number of properties and methods on first-order
 formulas. Those properties and methods are typically syntactic in the sense
 that they do not need to know the semantics of the underlying theories.
 
 Boolean operators are implemented as classes derived from another abstract
-class :class:`BooleanFormula` which is, in turn, derived from :class:`Formula`.
-Operators are mapped to classes as follows:
+class :class:`.BooleanFormula` which is, in turn, derived from
+:class:`.Formula`. Operators are mapped to classes as follows:
 
 +--------------+--------------+---------------+---------------+--------------+-------------------------+-----------------------------+
 | :math:`\top` | :math:`\bot` | :math:`\lnot` | :math:`\land` | :math:`\lor` | :math:`\longrightarrow` | :math:`\longleftrightarrow` |
 +--------------+--------------+---------------+---------------+--------------+-------------------------+-----------------------------+
-| :class:`_T`  | :class:`_F`  | :class:`Not`  | :class:`And`  | :class:`Or`  | :class:`Implies`        | :class:`Equivalent`         |
+| :class:`._T` | :class:`._F` | :class:`.Not` | :class:`.And` | :class:`.Or` | :class:`.Implies`       | :class:`.Equivalent`        |
 +--------------+--------------+---------------+---------------+--------------+-------------------------+-----------------------------+
 
 The truth values :math:`\top` and :math:`\bot` are operators of arity 0. As
-such, they are implemented as singleton classes :class:`_T` and :class:`_F`
-with unique instances :data:`T` and :data:`F`, respectively.
+such, they are implemented as singleton classes :class:`._T` and :class:`._F`
+with unique instances :data:`.T` and :data:`.F`, respectively.
 
 >>> T is _T()
 True
@@ -54,15 +54,17 @@ And(Implies(F, T), Or(T, Not(T)))
 
 More interesting formulas require atomic formulas as another basis of the
 recursive construction. This is implemented via another abstract subclass
-:class:`AtomicFormula` of :class:`Formula`, which provides an interface to
-various theories via further subclassing. For some of its methods,
-:class:`AtomicFormula` already provides implementations, which delegate
-theory-specific parts to an abstract class :class:`Term` for argument terms
-of atomic formulas.
+:class:`AtomicFormula <.firstorder.atomic.AtomicFormula>` of :class:`.Formula`,
+which provides an interface to various theories via further subclassing.
+For some of its methods, :class:`AtomicFormula
+<.firstorder.atomic.AtomicFormula>` already provides implementations, which
+delegate theory-specific parts to an abstract class
+:class:`Term <.firstorder.atomic.Term>` for argument terms of atomic formulas.
 
 We give an example using the theory RCF of Real Closed Fields, which is
-implemented outside :mod:`logic1.firstorder`. RCF is the first-order theory of
-the real numbers using the signature of ordered rings:
+implemented not in :mod:`.logic1.firstorder` but in
+:mod:`.logic1.theories.RCF`. RCF is the first-order theory of the real numbers
+using the signature of ordered rings:
 
 >>> from logic1.theories import RCF
 >>> # Assign RCF variables to Python identifiers:
@@ -73,14 +75,14 @@ And(x >= 0, a*x + b == 0)
 
 Having learned about variables, we can finally discuss first-order quantifiers
 and corresponding quantified formulas. Quantifiers are implemented as classes
-derived from another abstract class
-:class:`QuantifiedFormula` which is, in turn, derived from :class:`Formula`.
-Quantifiers are mapped to classes as follows:
+derived from another abstract class :class:`.QuantifiedFormula` which is, in
+turn, derived from :class:`.Formula`. Quantifiers are mapped to classes as
+follows:
 
 +-----------------+-----------------+
 | :math:`\exists` | :math:`\forall` |
 +-----------------+-----------------+
-| :class:`Ex`     | :class:`All`    |
+| :class:`.Ex`    | :class:`.All`   |
 +-----------------+-----------------+
 
 For details on the arguments of quantifiers see the documentation of the

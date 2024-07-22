@@ -1,5 +1,7 @@
 .. _api-firstorder-firstorder:
 
+*Generic*
+
 ********************
 First-order Formulas
 ********************
@@ -9,30 +11,67 @@ First-order Formulas
 The following picture summarizes the inheritance hierarchy. Next, we are going
 to describe the occurring classes starting at the top.
 
-.. graphviz::
+.. topic:: Inheritance hierarchy
 
-   digraph foo {
-      bgcolor="#f3f4f5";
-      edge [dir=back, arrowtail=empty];
-      node [shape=plaintext, fontname="monospace"];
-      "Formula" -> "QuantifiedFormula";
-      "Formula" -> "BooleanFormula" ;
-      "Formula" -> "AtomicFormula";
-      QuantifiedFormula -> "Ex | All";
-      "BooleanFormula" -> "Equivalent | Implies | And | Or | Not | _T | _F";
-      AtomicFormula -> "RCF.AtomicFormula | ...";
-   }
+  .. graphviz::
+    :class: only-light
 
-Formula Base Class
-******************
+     digraph foo {
+        bgcolor="transparent";
+        edge [dir=back, arrowtail=empty];
+        node [shape=plaintext, fontname="monospace"];
+        "Formula" -> "QuantifiedFormula";
+        "Formula" -> "BooleanFormula" ;
+        "Formula" -> "AtomicFormula";
+        QuantifiedFormula -> "Ex | All";
+        "BooleanFormula" -> "Equivalent | Implies | And | Or | Not | _T | _F";
+        AtomicFormula -> "RCF.AtomicFormula | ...";
+     }
+
+  .. graphviz::
+    :class: only-dark
+
+     digraph foo {
+        bgcolor="transparent";
+        edge [dir=back, arrowtail=empty, color="white"];
+        node [shape=plaintext, fontname="monospace", fontcolor="white"];
+        "Formula" -> "QuantifiedFormula";
+        "Formula" -> "BooleanFormula" ;
+        "Formula" -> "AtomicFormula";
+        QuantifiedFormula -> "Ex | All";
+        "BooleanFormula" -> "Equivalent | Implies | And | Or | Not | _T | _F";
+        AtomicFormula -> "RCF.AtomicFormula | ...";
+     }
+
+.. |blank| unicode:: U+0020
+
 
 .. automodule:: logic1.firstorder.formula
 
-  .. autodata:: α
+  Generic Types
+  *************
 
-  .. autodata:: τ
+  .. data:: logic1.firstorder.formula.α
+    :value: TypeVar('α', bound='AtomicFormula')
 
-  .. autodata:: χ
+    A type variable denoting a type of atomic formulas with upper bound
+    :class:`logic1.firstorder.atomic.AtomicFormula`.
+
+  .. data:: logic1.firstorder.formula.τ
+    :value: TypeVar('τ', bound='AtomicFormula')
+
+    A type variable denoting a type of terms with upper bound
+    :class:`logic1.firstorder.atomic.AtomicFormula`.
+
+  .. data:: logic1.firstorder.formula.χ
+    :value: TypeVar('χ', bound='AtomicFormula')
+
+    A type variable denoting a type of variables with upper bound
+    :class:`logic1.firstorder.atomic.AtomicFormula`.
+
+
+  Formula Base Class
+  ******************
 
   .. autoclass:: Formula
     :members:
@@ -175,6 +214,3 @@ Quantified Formulas
     :members:
     :undoc-members:
     :exclude-members: __init__
-
-    In addition to the following methods, Prefixes support iteration, len(),
-    reversed().

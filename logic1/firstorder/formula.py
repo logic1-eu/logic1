@@ -43,15 +43,18 @@ class Formula(Generic[α, τ, χ]):
     2. Quantifiers :math:`\exists x` and :math:`\forall x`, where :math:`x` is
        a variable.
 
-    :class:`Formula` depends on three type variables: the type :data:`α` of
-    ocurring atomic formulas, the type :data:`τ` of ocurring terms, and the
-    type :data:`χ` of ocurring variables. They occur in the type
-    annotations but are not relevant for the interactive use.
-
     As an abstract base class, :class:`Formula` cannot be instantiated.
-    Nevertheless, it implements a number of methods on first-order formulas.
+    Nevertheless, it implements a number of methods on first-order formualas.
     The methods implemented here  are typically syntactic in the sense that
     they do not need to know the semantics of the underlying theories.
+
+    .. note::
+
+        :class:`Formula` depends on three type variables :data:`α`, :data:`τ`,
+        :data:`χ` for the types ocurring atomic formula, terms, and variables,
+        respectively. They appear in type annotations used by static type
+        checkers but are not relevant for the either interactive use or use
+        as a library.
     """
 
     @property
@@ -374,7 +377,7 @@ class Formula(Generic[α, τ, χ]):
                 # AtomicFormula.atoms.
                 assert False, type(self)
 
-    def bvars(self) -> Iterator[χ]:
+    def bvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """An iterator over all bound occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
@@ -388,20 +391,20 @@ class Formula(Generic[α, τ, χ]):
         to the occurrence in a term. Appearances of variables as a quantified
         variables without use in any term are not considered.
 
+        The parameter `quantified` is used internally for keeping track of
+        bound variables of subformulas during recursion.
+
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
             * :meth:`qvars` -- all occurring quantified variables
             * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
-        return self._bvars(set())
-
-    def _bvars(self, quantified: set[χ]) -> Iterator[χ]:
         match self:
             case All() | Ex():
-                yield from self.arg._bvars(quantified.union({self.var}))
+                yield from self.arg.bvars(quantified.union({self.var}))
             case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
                 for arg in self.args:
-                    yield from arg._bvars(quantified)
+                    yield from arg.bvars(quantified)
             case _:
                 assert False, type(self)
 

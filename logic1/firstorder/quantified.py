@@ -137,6 +137,7 @@ class Prefix(deque[tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]]):
     All [x0, epsilon]  Ex [delta]  All [x]
 
     .. seealso::
+        * :external:class:`collections.deque` -- for mehods inherited from double-ended queues
         * :meth:`matrix <.Formula.matrix>` -- the matrix of a prenex formula
         * :meth:`quantify <.Formula.quantify>` -- add quantifier prefix
     """

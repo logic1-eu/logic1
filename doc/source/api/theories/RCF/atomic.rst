@@ -23,10 +23,12 @@ Terms and Atoms
   .. autoclass:: Term
     :members:
     :undoc-members:
+    :special-members: __lt__
 
   .. autoclass:: AtomicFormula
     :members:
     :undoc-members:
+    :special-members: __le__
 
   .. autoclass:: Eq
     :members:

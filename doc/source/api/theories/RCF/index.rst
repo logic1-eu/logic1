@@ -4,6 +4,8 @@
 Real Closed Fields
 ******************
 
+.. automodule:: logic1.theories.RCF
+
 .. toctree::
    :hidden:
 

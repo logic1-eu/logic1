@@ -410,7 +410,6 @@ class Variable(Term, firstorder.Variable['Variable']):
         return self.VV.fresh(suffix=f'_{str(self)}')
 
 
-@functools.total_ordering
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable']):
     """
     +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
@@ -511,7 +510,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
 
-    def _bvars(self, quantified: set) -> Iterator[Variable]:
+    def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         for v in self.lhs.vars():
             if v in quantified:
                 yield v

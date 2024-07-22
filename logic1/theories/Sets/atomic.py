@@ -134,7 +134,6 @@ class Variable(firstorder.Variable['Variable']):
         yield self
 
 
-@functools.total_ordering
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable']):
 
     @classmethod
@@ -202,7 +201,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
             case _:
                 assert False, f'{self}: {type(self)}'
 
-    def _bvars(self, quantified: set) -> Iterator[Variable]:
+    def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         match self:
             case Eq() | Ne():
                 yield from (v for v in (self.lhs, self.rhs) if v in quantified)
