@@ -156,6 +156,12 @@ class Formula(Generic[α, τ, χ]):
         return Not(self)
 
     def __le__(self, other: Formula[α, τ, χ]) -> bool:
+        """Returns :external:obj:`True` if `self` should be sorted before or is
+        equal to other.
+
+        .. seealso::
+          * :meth:`.AtomicFormula.__le__` -- comparison of atomic formulas
+        """
         L = (And, Or, Not, Implies, Equivalent, Ex, All, _T, _F)
         # The case "self: AtomicFormula" is caught by the implementation of the
         # abstract method AtomicFormula.__le__:
@@ -396,7 +402,7 @@ class Formula(Generic[α, τ, χ]):
 
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
-            * :meth:`qvars` -- all occurring quantified variables
+            * :meth:`qvars` -- all quantified variables
             * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
         match self:
@@ -508,7 +514,7 @@ class Formula(Generic[α, τ, χ]):
             f = Ex(v, f)
         return f
 
-    def fvars(self) -> Iterator[χ]:
+    def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """An iterator over all free occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
 
@@ -520,18 +526,15 @@ class Formula(Generic[α, τ, χ]):
 
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
-            * :meth:`qvars` -- all occurring quantified variables
+            * :meth:`qvars` -- all quantified variables
             * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
         """
-        return self._fvars(set())
-
-    def _fvars(self, quantified: set[χ]) -> Iterator[χ]:
         match self:
             case All() | Ex():
-                yield from self.arg._fvars(quantified.union({self.var}))
+                yield from self.arg.fvars(quantified.union({self.var}))
             case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
                 for arg in self.args:
-                    yield from arg._fvars(quantified)
+                    yield from arg.fvars(quantified)
             case _:
                 assert False, type(self)
 

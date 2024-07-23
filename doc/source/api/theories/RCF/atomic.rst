@@ -25,6 +25,10 @@ Terms and Atoms
     :undoc-members:
     :special-members: __lt__
 
+  .. autoclass:: Variable
+    :members:
+    :undoc-members:
+
   .. autoclass:: AtomicFormula
     :members:
     :undoc-members:

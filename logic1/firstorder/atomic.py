@@ -37,8 +37,8 @@ class _VariableSet(Generic[χ]):
         The :attr:`stack` can hold such internal states.
 
         .. seealso::
-          * :meth:`.push` -- push current state to :attr:`.stack`
-          * :meth:`.pop` -- pop current state from :attr:`.stack`
+          * :meth:`.push` -- push information to :attr:`.stack` and reset
+          * :meth:`.pop` -- restore information from :attr:`.stack`
         """
         ...
 
@@ -113,10 +113,47 @@ class _VariableSet(Generic[χ]):
 
     @abstractmethod
     def pop(self) -> None:
+        """Restore information about used variables from :attr:`stack`.
+        """
         ...
 
     @abstractmethod
     def push(self) -> None:
+        """Push information about used variables to :attr:`stack` and reset
+        that information.
+
+        .. caution::
+          :attr:`.stack`, :meth:`.push`, and :meth:`pop` are not recommended for
+          regular use.
+
+          They allow to temporarily forget all information about used
+          variables. This allows to obtain predictable variables from
+          :meth:`.fresh` within asychronous doctests. In the following example,
+          :meth:`.Formula.to_pnf` uses :meth:`.RCF.atomic.Variable.fresh`:
+
+          >>> from logic1.firstorder import *
+          >>> from logic1.theories.RCF import *
+          >>> x, a = VV.get('x', 'a')
+          >>> f = And(x == 0, Ex(x, x == a))
+          >>> f.to_pnf()
+          Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
+          >>> f.to_pnf()
+          Ex(G0002_x, And(x == 0, -G0002_x + a == 0))
+          >>> VV.push()
+          >>> x, a = VV.get('x', 'a')
+          >>> g = And(x == 0, Ex(x, x == a))
+          >>> g.to_pnf()
+          Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
+          >>> VV.pop()
+          >>> f.to_pnf()
+          Ex(G0003_x, And(x == 0, -G0003_x + a == 0))
+
+          Notice that we are not using any previously existing variables
+          between ``VV.push()`` and ``VV.pop()`` above.
+
+          See :file:`logic1/theories/RCF/test_pnf.txt` for a complete doctest
+          file using this approach
+        """
         ...
 
 
@@ -135,7 +172,8 @@ class Term(Generic[τ, χ]):
         """LaTeX representation as a string, which can be used elsewhere.
 
         .. seealso::
-          :meth:`.Formula.as_latex` -- LaTeX representation
+            :meth:`.AtomicFormula.as_latex`
+                -- the corresponding method for atomic formulas
         """
         ...
 
@@ -179,7 +217,7 @@ class Term(Generic[τ, χ]):
         .. seealso::
           * :meth:`.Formula.bvars` -- all occurring bound variables
           * :meth:`.Formula.fvars` -- all occurring free variables
-          * :meth:`.Formula.qvars` -- all occurring quantified variables
+          * :meth:`.Formula.qvars` -- all quantified variables
         """
         ...
 
@@ -218,10 +256,7 @@ class AtomicFormula(Formula[α, τ, χ]):
         equal to other.
 
         .. seealso::
-          * :meth:`.RCF.atomic.AtomicFormula.__le__` --
-                implementation for real closed fields
-          * :meth:`.Sets.atomic.AtomicFormula.__le__` --
-                implementation for the theory of Sets
+          * :meth:`.Formula.__le__` -- the corresponding first-order method
         """
         ...
 
@@ -240,12 +275,8 @@ class AtomicFormula(Formula[α, τ, χ]):
         :code:`Not(a.op(*a.args))`.
 
         .. seealso::
-          * :meth:`.RCF.atomic.AtomicFormula.complement` --
-                implementation for real closed fields
-          * :meth:`.Sets.atomic.AtomicFormula.complement` --
-                implementation for the theory of Sets
-          * :meth:`.to_complement` --
-                generalization from the class to instances
+          * :meth:`.to_complement` -- \
+                generalization from relations to atomic formulas
     """
         ...
 
@@ -265,14 +296,18 @@ class AtomicFormula(Formula[α, τ, χ]):
 
     @abstractmethod
     def bvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
-        """Iterate over occurrences of variables. Each variable is reported
-        once for each term that it occurs in, provided that the variable is in
-        the set `quantified`.
+        """Iterate over occurrences of variables that are elements of
+        `quantified`. Yield each such variable once for each term that it
+        occurs in.
         """
         ...
 
     @abstractmethod
-    def _fvars(self, quantified: set[χ]) -> Iterator[χ]:
+    def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
+        """Iterate over occurrences of variables that are *not* elements of
+        `quantified`. Yield each such variable once for each term that it
+        occurs in.
+        """
         ...
 
     @abstractmethod

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 import logging
 import string
 from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
@@ -210,7 +209,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
             case _:
                 assert False, f'{self}: {type(self)}'
 
-    def _fvars(self, quantified: set) -> Iterator[Variable]:
+    def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         match self:
             case Eq() | Ne():
                 yield from (v for v in (self.lhs, self.rhs) if v not in quantified)

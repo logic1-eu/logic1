@@ -19,6 +19,7 @@ import time
 from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
 
 from logic1.firstorder import All, And, _F, Not, Or, _T
+from logic1 import abc
 from logic1.support.excepthook import NoTraceException
 from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
@@ -49,6 +50,10 @@ multiprocessing_handler.setFormatter(multiprocessing_formatter)
 multiprocessing_logger = logging.getLogger('multiprocessing')
 multiprocessing_logger.propagate = False
 multiprocessing_logger.addHandler(multiprocessing_handler)
+
+
+NodeList: TypeAlias = abc.qe.NodeList['Formula', 'Node']
+WorkingNodeList: TypeAlias = abc.qe.WorkingNodeList['Formula', 'Node']
 
 
 class DegreeViolation(Exception):
@@ -473,11 +478,9 @@ class EliminationSet:
 
 
 @dataclass
-class Node:
+class Node(abc.qe.Node[Formula, Variable, Theory]):
     # sequantial and parallel
 
-    variables: list[Variable]
-    formula: Formula
     answer: list
     outermost_block: bool
     options: Options
@@ -505,7 +508,14 @@ class Node:
         return (f'Node({self.variables}, {self.formula}, {self.answer}, {self.outermost_block}, '
                 f'{self.options})')
 
-    def eset(self, theory=Theory) -> Optional[EliminationSet]:
+    def copy(self) -> Node:
+        return Node(variables=self.variables,
+                    formula=self.formula,
+                    answer=self.answer,
+                    outermost_block=self.outermost_block,
+                    options=self.options)
+
+    def eset(self, theory: Theory) -> Optional[EliminationSet]:
         return self.gauss_eset(theory) or self.regular_eset(theory)
 
     def gauss_eset(self, theory: Theory) -> Optional[EliminationSet]:
@@ -573,6 +583,11 @@ class Node:
                 return True
             case _:
                 assert False, self.options.generic
+
+    def process(self, theory: Theory) -> list[Node]:
+        eset = self.eset(theory)
+        nodes = self.vsubs(eset, theory)
+        return nodes
 
     def regular_eset(self, theory=Theory) -> EliminationSet:
 
@@ -787,124 +802,6 @@ class Node:
                      outermost_block=self.outermost_block,
                      options=self.options))
         return new_nodes
-
-
-@dataclass
-class NodeList(Collection):
-    # Sequantial only
-
-    nodes: list[Node] = field(default_factory=list)
-    memory: set[Formula] = field(default_factory=set)
-    hits: int = 0
-    candidates: int = 0
-
-    def __contains__(self, obj: object) -> bool:
-        return obj in self.nodes
-
-    def __iter__(self):
-        yield from self.nodes
-
-    def __len__(self) -> int:
-        return len(self.nodes)
-
-    def append(self, node: Node) -> bool:
-        is_new = node.formula not in self.memory
-        if is_new:
-            self.nodes.append(node)
-            self.memory.add(node.formula)
-        else:
-            self.hits += 1
-        self.candidates += 1
-        return is_new
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        for node in nodes:
-            self.append(node)
-
-    def final_statistics(self, key: str) -> str:
-        hits = self.hits
-        candidates = self.candidates
-        num_nodes = candidates - hits
-        if num_nodes == 0:
-            return ''
-        ratio = self.hit_ratio()
-        return (f'produced {num_nodes} {key} nodes, '
-                f'dropped {hits}/{candidates} = {ratio:.0%}')
-
-    def hit_ratio(self) -> float:
-        try:
-            return float(self.hits) / self.candidates
-        except ZeroDivisionError:
-            return float('nan')
-
-    def periodic_statistics(self, key: str) -> str:
-        num_nodes = self.candidates - self.hits
-        if num_nodes == 0:
-            return ''
-        ratio = self.hit_ratio()
-        return f'{key}={num_nodes}, H={ratio:.0%}'
-
-
-@dataclass
-class WorkingNodeList(NodeList):
-    # Sequantial only
-
-    node_counter: Counter[int] = field(default_factory=Counter)
-
-    def append(self, node: Node) -> bool:
-        is_new = super().append(node)
-        if is_new:
-            n = len(node.variables)
-            self.node_counter[n] += 1
-        return is_new
-
-    def final_statistics(self, key: Optional[str] = None) -> str:
-        if key:
-            return super().final_statistics(key)
-        hits = self.hits
-        candidates = self.candidates
-        num_nodes = candidates - hits
-        ratio = self.hit_ratio()
-        return (f'performed {num_nodes} elimination steps, '
-                f'skipped {hits}/{candidates} = {ratio:.0%}')
-
-    def periodic_statistics(self, key: str = 'W') -> str:
-        node_counter = self.node_counter
-        ratio = self.hit_ratio()
-        try:
-            num_variables = max(k for k, v in node_counter.items() if v != 0)
-            v = f'V={num_variables}'
-            nc = '.'.join(f'{node_counter[n]}'
-                          for n in reversed(range(1, num_variables + 1)))
-            w = f'{key}={nc}'
-            vw = f'{v}, {w}'
-        except ValueError:
-            vw = 'V=0'
-        return f'{vw}, H={ratio:.0%}'
-
-    def pop(self) -> Node:
-        node = self.nodes.pop()
-        n = len(node.variables)
-        self.node_counter[n] -= 1
-        return node
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        for node in nodes:
-            match node.formula:
-                case _F():
-                    continue
-                case Or(args=args):
-                    for arg in args:
-                        subnode = Node(variables=node.variables.copy(),
-                                       formula=arg,
-                                       answer=node.answer,
-                                       outermost_block=node.outermost_block,
-                                       options=node.options)
-                        self.append(subnode)
-                case And() | AtomicFormula():
-                    self.append(node)
-                case _:
-                    assert False, node
 
 
 @dataclass
@@ -1206,7 +1103,7 @@ class Options:
 
 
 @dataclass
-class VirtualSubstitution:
+class VirtualSubstitution(abc.qe.QuantifierElimination):
     """Quantifier elimination by virtual substitution.
     """
 
@@ -1408,7 +1305,7 @@ class VirtualSubstitution:
                 # which would cost significant time and space. We neither
                 # retreive the node_counter, which would be not consistent with
                 # our empty nodes.
-                self.working_nodes = WorkingNodeList(
+                self.working_nodes = abc.qe.WorkingNodeList(
                     hits=working_nodes.hits,
                     candidates=working_nodes.candidates)
                 # TODO: wipe self.success_nodes and self.failure_nodes
@@ -1421,7 +1318,7 @@ class VirtualSubstitution:
             # We do not retrieve the memory, which would cost significant time
             # and space. Same for success nodes and failure nodes below.
             timer.reset()
-            self.working_nodes = WorkingNodeList(
+            self.working_nodes = abc.qe.WorkingNodeList(
                 nodes=working_nodes.nodes,
                 hits=working_nodes.hits,
                 candidates=working_nodes.candidates,
@@ -1469,13 +1366,11 @@ class VirtualSubstitution:
                     time.sleep(0.001)
                     continue
                 try:
-                    eset = node.eset(theory)
+                    nodes = node.process(theory)
                 except DegreeViolation:
                     failure_nodes.append(node)
                     working_nodes.task_done()
                     continue
-                try:
-                    nodes = node.vsubs(eset, theory)
                 except FoundT:
                     with m_lock:
                         found_t.value += 1
@@ -1521,7 +1416,7 @@ class VirtualSubstitution:
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
-        self.working_nodes = WorkingNodeList()
+        self.working_nodes = abc.qe.WorkingNodeList()
         self.working_nodes.append(self.root_node)
         self.root_node = None
         self.success_nodes = NodeList()
@@ -1538,11 +1433,10 @@ class VirtualSubstitution:
                     last_log = t
             node = self.working_nodes.pop()
             try:
-                eset = node.eset(self.theory)
+                nodes = node.process(self.theory)
             except DegreeViolation:
                 self.failure_nodes.append(node)
                 continue
-            nodes = node.vsubs(eset, self.theory)
             if nodes:
                 if nodes[0].variables:
                     self.working_nodes.extend(nodes)

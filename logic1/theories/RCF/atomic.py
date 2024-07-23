@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import auto, Enum
-import functools
 import operator
 import sage.all as sage  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
@@ -518,7 +517,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             if v in quantified:
                 yield v
 
-    def _fvars(self, quantified: set) -> Iterator[Variable]:
+    def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         for v in self.lhs.vars():
             if v not in quantified:
                 yield v

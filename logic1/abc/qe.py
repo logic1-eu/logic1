@@ -1,191 +1,148 @@
-# mypy: strict_optional = False
-from dataclasses import dataclass
-import more_itertools
-import logging
-
 from abc import abstractmethod
-from time import time
-from typing import Any, Generic, Optional, TypeAlias, TypeVar
+from collections import Counter
+from dataclasses import dataclass, field
+from typing import (Collection, Generic, Iterable, Iterator, Optional, Self,
+                    TypeVar)
 
-from ..firstorder import (
-    All, And, AtomicFormula, _F, Formula, Not, Or, Prefix, _T)
-from ..firstorder.formula import α, τ, χ
+from ..firstorder import And, AtomicFormula, _F, Formula, Or, Variable
 
-Variable: TypeAlias = Any
-
-π = TypeVar('π', bound='Pool')
-
-
-class FoundT(Exception):
-    pass
+φ = TypeVar('φ', bound='Formula')
+ν = TypeVar('ν', bound='Node')
+χ = TypeVar('χ', bound='Variable')
+θ = TypeVar('θ')
 
 
-class Pool(list[tuple[list[χ], Formula[α, τ, χ]]], Generic[α, τ, χ]):
+@dataclass
+class Node(Generic[φ, χ, θ]):
+    # sequantial and parallel
 
-    def __init__(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
-        self.push(vars_, f)
+    variables: list[χ]
+    formula: φ
 
     @abstractmethod
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
+    def copy(self) -> Self:
         ...
 
-
-class PoolOneExistential(Pool[α, τ, χ]):
-
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
-        logging.debug(f'res = {f}')
-        if f is not _F():
-            split_f = [*f.args] if f.op is Or else [f]
-            self.extend([(vars_.copy(), mt) for mt in split_f])
-
-
-class PoolOnePrimitive(Pool[α, τ, χ]):
-
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
-        logging.debug(f'res = {f}')
-        dnf = self.dnf(f)
-        if dnf is _T():
-            raise FoundT
-        if dnf is not _F():
-            split_dnf = [*dnf.args] if dnf.op is Or else [dnf]
-            self.extend([(vars_.copy(), mt) for mt in split_dnf])
-
     @abstractmethod
-    def dnf(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def process(self, theory: θ) -> list[Self]:
         ...
 
 
 @dataclass
-class QuantifierElimination(Generic[α, τ, χ, π]):
+class NodeList(Collection[ν], Generic[φ, ν]):
+    # Sequantial only
 
-    blocks: Optional[Prefix[α, τ, χ]] = None
-    matrix: Optional[Formula[α, τ, χ]] = None
-    negated: Optional[bool] = None
-    pool: Optional[π] = None
-    finished: Optional[list[Formula[α, τ, χ]]] = None
+    nodes: list[ν] = field(default_factory=list)
+    memory: set[φ] = field(default_factory=set)
+    hits: int = 0
+    candidates: int = 0
 
-    def __repr__(self) -> str:
-        return (f'QuantifierElimination(blocks={self.blocks!r}, '
-                f'matrix={self.matrix!r}, '
-                f'negated={self.negated!r}, '
-                f'pool={self.pool!r}, '
-                f'finished={self.finished!r})')
+    def __contains__(self, obj: object) -> bool:
+        return obj in self.nodes
 
-    def __str__(self) -> str:
-        if self.blocks is not None:
-            blocks = f'[{self.blocks}]'
+    def __iter__(self) -> Iterator[ν]:
+        yield from self.nodes
+
+    def __len__(self) -> int:
+        return len(self.nodes)
+
+    def append(self, node: ν) -> bool:
+        is_new = node.formula not in self.memory
+        if is_new:
+            self.nodes.append(node)
+            self.memory.add(node.formula)
         else:
-            blocks = None
-        if self.negated is None:
-            read_as = ''
-        elif self.negated is False:
-            read_as = '  # read as Ex'
-        else:
-            assert self.negated is True
-            read_as = '  # read as Not All'
-        if self.pool is not None:
-            _h1 = [f'({str(job[0])}, {str(job[1])})' for job in self.pool]
-            _h = ',\n                '.join(_h1)
-            pool = f'[{_h}]'
-        else:
-            pool = None
-        if self.finished is not None:
-            _h1 = [f'{str(f)}' for f in self.finished]
-            _h = ',\n                '.join(_h1)
-            finished = f'[{_h}]'
-        else:
-            finished = None
-        return (f'{self.__class__} [\n'
-                f'    blocks   = {blocks},\n'
-                f'    matrix   = {self.matrix},\n'
-                f'    negated  = {self.negated},{read_as}\n'
-                f'    pool     = {str(pool)},\n'
-                f'    finished = {finished}\n'
-                f']')
+            self.hits += 1
+        self.candidates += 1
+        return is_new
 
-    def collect_finished(self) -> None:
-        self.matrix = Or(*self.finished)
-        if self.negated:
-            self.matrix = Not(self.matrix)
-        self.negated = None
-        self.pool = None
-        self.finished = None
-        logging.info(f'{self.collect_finished.__qualname__}: {self}')
+    def extend(self, nodes: Iterable[ν]) -> None:
+        for node in nodes:
+            self.append(node)
 
-    def select_and_pop(self, vars_: list[χ], f: Formula[α, τ, χ]) -> χ:
-        return vars_.pop()
+    def final_statistics(self, key: str) -> str:
+        hits = self.hits
+        candidates = self.candidates
+        num_nodes = candidates - hits
+        if num_nodes == 0:
+            return ''
+        ratio = self.hit_ratio()
+        return (f'produced {num_nodes} {key} nodes, '
+                f'dropped {hits}/{candidates} = {ratio:.0%}')
 
-    @abstractmethod
-    def simplify(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
-        ...
+    def hit_ratio(self) -> float:
+        try:
+            return float(self.hits) / self.candidates
+        except ZeroDivisionError:
+            return float('nan')
 
-    @abstractmethod
-    def _Pool(self, vars_: list[χ], f: Formula[α, τ, χ]) -> π:
-        ...
+    def periodic_statistics(self, key: str) -> str:
+        num_nodes = self.candidates - self.hits
+        if num_nodes == 0:
+            return ''
+        ratio = self.hit_ratio()
+        return f'{key}={num_nodes}, H={ratio:.0%}'
 
-    def pop_block(self) -> None:
-        assert self.matrix, "no matrix"
-        quantifier, vars_ = self.blocks.pop()
-        matrix = self.matrix
-        self.matrix = None
-        if quantifier is All:
-            self.negated = True
-            matrix = Not(matrix)
-        else:
-            self.negated = False
-        self.pool = self._Pool(vars_, self.simplify(matrix))
-        self.finished = []
-        logging.info(f'{self.pop_block.__qualname__}: {self}')
 
-    def process_pool(self) -> None:
-        while self.pool:
-            vars_, f = self.pool.pop()
-            v = self.select_and_pop(vars_, f)
-            match f:
-                case AtomicFormula():
-                    if v in f.fvars():
-                        result = self.simplify(self.qe1(v, f))
-                    else:
-                        result = f
-                case And(args=args):
-                    other_args, v_args = more_itertools.partition(
-                        lambda arg: v in arg.fvars(), args)
-                    f_v: Formula = And(*v_args)
-                    if f_v is not _T():
-                        f_v = self.qe1(v, f_v)
-                    result = self.simplify(And(f_v, *other_args))
+@dataclass
+class WorkingNodeList(NodeList[φ, ν]):
+    # Sequantial only
+
+    node_counter: Counter[int] = field(default_factory=Counter)
+
+    def append(self, node: ν) -> bool:
+        is_new = super().append(node)
+        if is_new:
+            n = len(node.variables)
+            self.node_counter[n] += 1
+        return is_new
+
+    def final_statistics(self, key: Optional[str] = None) -> str:
+        if key:
+            return super().final_statistics(key)
+        hits = self.hits
+        candidates = self.candidates
+        num_nodes = candidates - hits
+        ratio = self.hit_ratio()
+        return (f'performed {num_nodes} elimination steps, '
+                f'skipped {hits}/{candidates} = {ratio:.0%}')
+
+    def periodic_statistics(self, key: str = 'W') -> str:
+        node_counter = self.node_counter
+        ratio = self.hit_ratio()
+        try:
+            num_variables = max(k for k, v in node_counter.items() if v != 0)
+            v = f'V={num_variables}'
+            nc = '.'.join(f'{node_counter[n]}'
+                          for n in reversed(range(1, num_variables + 1)))
+            w = f'{key}={nc}'
+            vw = f'{v}, {w}'
+        except ValueError:
+            vw = 'V=0'
+        return f'{vw}, H={ratio:.0%}'
+
+    def pop(self) -> ν:
+        node = self.nodes.pop()
+        n = len(node.variables)
+        self.node_counter[n] -= 1
+        return node
+
+    def extend(self, nodes: Iterable[ν]) -> None:
+        for node in nodes:
+            match node.formula:
+                case _F():
+                    continue
+                case Or(args=args):
+                    for arg in args:
+                        subnode = node.copy()
+                        subnode.variables = subnode.variables.copy()
+                        subnode.formula = arg
+                        self.append(subnode)
+                case And() | AtomicFormula():
+                    self.append(node)
                 case _:
-                    assert False, f
-            if vars_:
-                self.pool.push(vars_, result)
-            else:
-                self.finished.append(result)
-            logging.info(f'{self.process_pool.__qualname__}: {self}')
+                    assert False, node
 
-    def qe(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
-        # The following manipulation of a private property is dirty. There
-        # seems to be no supported way to reset reference time.
-        logging._startTime = time()  # type: ignore
-        self.setup(f)
-        while self.blocks:
-            try:
-                self.pop_block()
-                self.process_pool()
-            except FoundT:
-                self.pool = None
-                self.finished = [_T()]
-            self.collect_finished()
-        return self.simplify(self.matrix.to_nnf())
 
-    @abstractmethod
-    def qe1(self, v: χ, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
-        """Elimination of the existential quantifier from Ex(v, f).
-
-        It is guaranteed that v occurs in f. :meth:`qe1` need not apply
-        :meth:`simplify`. Its result  will go through :meth:`simplify` soon.
-        """
-        ...
-
-    def setup(self, f: Formula[α, τ, χ]) -> None:
-        self.matrix, self.blocks = f.to_pnf().matrix()
-        logging.info(f'{self.setup.__qualname__}: {self}')
+class QuantifierElimination:
+    pass

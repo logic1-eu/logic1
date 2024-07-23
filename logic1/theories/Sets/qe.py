@@ -2,7 +2,7 @@ import logging
 
 from itertools import combinations
 
-from ... import abc
+from ... import depricated
 from ...firstorder import And, Or
 from .atomic import C, Eq, Ne, Variable
 from .bnf import dnf as _dnf
@@ -12,13 +12,13 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Pool(abc.qe.PoolOnePrimitive):
+class Pool(depricated.qe.PoolOnePrimitive):
 
     def dnf(self, f: Formula) -> Formula:
         return _dnf(f)
 
 
-class QuantifierElimination(abc.qe.QuantifierElimination):
+class QuantifierElimination(depricated.qe.QuantifierElimination):
     """Quantifier elimination for the theory of Sets.
 
     >>> from logic1.firstorder import *

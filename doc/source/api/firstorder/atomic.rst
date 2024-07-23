@@ -1,10 +1,5 @@
 .. _api-firstorder-atomic:
 
-.. attention::
-  This documentation page addresses advanced users who are interested in
-  implementing their own theories. For the documentation of terms, variables,
-  and atoms of specific existing theories see the corresponding section there.
-
 *Generic*
 
 ***************************
