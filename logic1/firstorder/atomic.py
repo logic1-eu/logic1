@@ -16,17 +16,17 @@ from .formula import α, τ, χ, Formula
 from ..support.tracing import trace  # noqa
 
 
-class _VariableSet(Generic[χ]):
+class VariableSet(Generic[χ]):
     """The infinite set of all variables of a theory. Variables are uniquely
     identified by their name, which is a :external:class:`str`. Subclasses
     within theories are singletons, and their unique instance is assigned to a
     module variable :data:`VV` there.
 
     .. seealso::
-      * :class:`.RCF.atomic._VariableSet`
-      * :class:`.Sets.atomic._VariableSet`
-      * :data:`.RCF.atomic.VV`
-      * :data:`.Sets.atomic.VV`
+      Derived classes in various theories and their unique instances:
+      :class:`.RCF.atomic.VariableSet`, :data:`.RCF.atomic.VV` for Real Closed
+      Fields and :class:`.Sets.atomic.VariableSet`, :data:`.Sets.atomic.VV`
+      for Sets.
     """
 
     @property
@@ -47,7 +47,7 @@ class _VariableSet(Generic[χ]):
         """Obtain the unique variable with name `index`.
 
         >>> from logic1.theories import RCF
-        >>> assert isinstance(RCF.VV, RCF.atomic._VariableSet)
+        >>> assert isinstance(RCF.VV, RCF.atomic.VariableSet)
         >>> x = RCF.VV['x']; x
         x
         >>> assert isinstance(x, RCF.atomic.Variable)
@@ -62,7 +62,7 @@ class _VariableSet(Generic[χ]):
         """Simultaneously obtain several variables by their names.
 
         >>> from logic1.theories import RCF
-        >>> assert isinstance(RCF.VV, RCF.atomic._VariableSet)
+        >>> assert isinstance(RCF.VV, RCF.atomic.VariableSet)
         >>> x, y = RCF.VV.get('x', 'y')
         >>> assert isinstance(x, RCF.atomic.Variable)
         >>> assert isinstance(y, RCF.atomic.Variable)
@@ -81,7 +81,7 @@ class _VariableSet(Generic[χ]):
 
         >>> if __name__ == '__main__':  # to prevent doctest failure
         ...     from logic1.theories import RCF
-        ...     assert isinstance(RCF.VV, RCF.atomic._VariableSet)
+        ...     assert isinstance(RCF.VV, RCF.atomic.VariableSet)
         ...     RCF.VV.imp('x', 'y')
         ...     assert isinstance(x, RCF.atomic.Variable)
         ...     assert isinstance(y, RCF.atomic.Variable)
@@ -122,7 +122,7 @@ class _VariableSet(Generic[χ]):
         """Push information about used variables to :attr:`stack` and reset
         that information.
 
-        .. caution::
+        .. attention::
           :attr:`.stack`, :meth:`.push`, and :meth:`pop` are not recommended for
           regular use.
 
@@ -163,17 +163,20 @@ class Term(Generic[τ, χ]):
     supposed to be implemented for the various theories.
 
     .. seealso::
-      * :class:`.RCF.atomic.Term`
-      * :class:`.Sets.atomic.Term`
+      Derived classes in various theories: :class:`.RCF.atomic.Term` for Real
+      Closed Fields.
+
+    .. note::
+      The theory :mod:`.logic1.theories.Sets` does not subclass :class:`.Term`.
+      Since it has no function symbols, it can use instances of
+      :class:`.Sets.atomic.Variable` as terms.
     """
 
     @abstractmethod
     def as_latex(self) -> str:
-        """LaTeX representation as a string, which can be used elsewhere.
-
-        .. seealso::
-            :meth:`.AtomicFormula.as_latex`
-                -- the corresponding method for atomic formulas
+        """LaTeX representation as a string. This is required by
+        :meth:`.Formula.as_latex` for the representation of quantified
+        variables.
         """
         ...
 
@@ -212,7 +215,8 @@ class Term(Generic[τ, χ]):
 
     @abstractmethod
     def vars(self) -> Iterator[χ]:
-        """An iterator over all variables occurring in self.
+        """An iterator over all occurring variables. Each occurring variable is
+        reported once.
 
         .. seealso::
           * :meth:`.Formula.bvars` -- all occurring bound variables
@@ -223,10 +227,13 @@ class Term(Generic[τ, χ]):
 
 
 class Variable(Term[χ, χ]):
-    """
+    """This abstract class specifies an interface via the definition of
+    abstract methods on variables required by Formula. The methods are supposed
+    to be implemented for the various theories.
+
     .. seealso::
-      * :class:`.RCF.atomic.Variable`
-      * :class:`.Sets.atomic.Variable`
+      Derived classes in various theories: :class:`.RCF.atomic.Variable` for
+      Real Closed Fields and :class:`.Sets.atomic.Variable` for Sets.
     """
 
     @abstractmethod
@@ -244,19 +251,15 @@ class AtomicFormula(Formula[α, τ, χ]):
     specific theory.
 
     .. seealso::
-        * :class:`.RCF.atomic.AtomicFormula` -- \
-            implementation for real closed fields
-        * :class:`.Sets.atomic.AtomicFormula` -- \
-            implementation for the theory of Sets
+      Derived classes in various theories: :class:`.RCF.atomic.AtomicFormula`
+      for Real Closed Fields and :class:`.Sets.atomic.AtomicFormula` for Sets.
     """
 
     @abstractmethod
     def __le__(self, other: Formula[α, τ, χ]) -> bool:
         """Returns :external:obj:`True` if `self` should be sorted before or is
-        equal to other.
-
-        .. seealso::
-          * :meth:`.Formula.__le__` -- the corresponding first-order method
+        equal to other. This method is required by the corresponding
+        first-order method :meth:`.Formula.__le__`.
         """
         ...
 
@@ -282,11 +285,8 @@ class AtomicFormula(Formula[α, τ, χ]):
 
     @abstractmethod
     def as_latex(self) -> str:
-        """Latex representation.
-
-        .. seealso::
-            :meth:`.Formula.as_latex` -- \
-                the corresponding recursive first-order method
+        """Latex representation as a string. This method is required by the
+        corresponding recursive first-order method :meth:`.Formula.as_latex`.
         """
         ...
 
@@ -298,7 +298,8 @@ class AtomicFormula(Formula[α, τ, χ]):
     def bvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """Iterate over occurrences of variables that are elements of
         `quantified`. Yield each such variable once for each term that it
-        occurs in.
+        occurs in. This method is required by the corresponding recursive
+        first-order method :meth:`.Formula.bvars`.
         """
         ...
 
@@ -306,25 +307,24 @@ class AtomicFormula(Formula[α, τ, χ]):
     def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """Iterate over occurrences of variables that are *not* elements of
         `quantified`. Yield each such variable once for each term that it
-        occurs in.
+        occurs in. This method is required by the corresponding recursive
+        first-order method :meth:`.Formula.fvars`.
         """
         ...
 
     @abstractmethod
     def simplify(self) -> Formula[α, τ, χ]:
-        """Fast basic simplification. The result is equivalent to self.
-
-        .. seealso::
-            :meth:`.Formula.simplify` -- \
-                the corresponding recursive first-order method
+        """Fast basic simplification. The result is equivalent to self. This
+        method is required by the corresponding recursive first-order method
+        :meth:`.Formula.simplify`.
         """
         ...
 
     @abstractmethod
     def subs(self, substitution: dict[χ, τ]) -> α:
-        """
-        .. seealso::
-            :meth:`.Formula.subs` -- substitution
+        """Substitution of terms from `τ` for variables from `χ`. This method
+        is required by the corresponding recursive first-order method
+        :meth:`.Formula.subs`.
         """
         ...
 

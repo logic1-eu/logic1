@@ -1,4 +1,4 @@
-"""A theory package for real closed fields.
+"""A theory package for Real Closed Fields.
 """
 
 from .atomic import VV, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable  # noqa

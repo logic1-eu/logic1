@@ -40,11 +40,55 @@ Terms, Variables, and Atoms
   Set of Variables
   ********************
 
-  .. autoclass:: _VariableSet
+  .. autoclass:: VariableSet
     :members:
-    :undoc-members:
+    :exclude-members: stack, push, pop
     :special-members: __getitem__
 
+    .. property:: stack
+      :type: Sequence[object]
+      :abstractmethod:
+    .. method::
+      pop() -> None
+      push() -> None
+      :abstractmethod:
+
+      :meth:`.push` pushes the current status regarding used variables to :attr:`stack`
+      and resets to the initial state where all variables are marked as
+      unused. :meth:`.pop` recovers the status from the stack and overwrites
+      the current status.
+
+      .. attention::
+        :attr:`.stack`, :meth:`.push`, and :meth:`pop` are recommended only for
+        special situations.
+
+        They allow to obtain predictable variables from :meth:`.fresh` (and
+        other methods using :meth:`.fresh`) within asychronous doctests. In the
+        following example, :meth:`.Formula.to_pnf` uses
+        :meth:`.RCF.atomic.Variable.fresh`:
+
+        >>> from logic1.firstorder import *
+        >>> from logic1.theories.RCF import *
+        >>> x, a = VV.get('x', 'a')
+        >>> f = And(x == 0, Ex(x, x == a))
+        >>> f.to_pnf()
+        Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
+        >>> f.to_pnf()
+        Ex(G0002_x, And(x == 0, -G0002_x + a == 0))
+        >>> VV.push()
+        >>> x, a = VV.get('x', 'a')
+        >>> g = And(x == 0, Ex(x, x == a))
+        >>> g.to_pnf()
+        Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
+        >>> VV.pop()
+        >>> f.to_pnf()
+        Ex(G0003_x, And(x == 0, -G0003_x + a == 0))
+
+        Notice that we are not using any previously existing variables
+        between ``VV.push()`` and ``VV.pop()`` above.
+
+        See :file:`logic1/theories/RCF/test_pnf.txt` for a complete doctest
+        file using this approach
 
   Terms
   *****

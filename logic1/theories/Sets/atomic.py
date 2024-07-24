@@ -18,13 +18,13 @@ oo = float('Inf')
 Index: TypeAlias = int | float
 
 
-class _VariableSet(firstorder.atomic._VariableSet['Variable']):
+class VariableSet(firstorder.atomic.VariableSet['Variable']):
     """Instances of the singleton VariableSet register, store, and provide
     variables, which are instances of Terms and suitable for building atoms
     using operators and methods defined in :class:`Variable`.
     """
 
-    _instance: ClassVar[Optional[_VariableSet]] = None
+    _instance: ClassVar[Optional[VariableSet]] = None
 
     @property
     def stack(self) -> list[set[str]]:
@@ -42,7 +42,7 @@ class _VariableSet(firstorder.atomic._VariableSet['Variable']):
         self._stack: list[set[str]] = []
         self._used: set[str] = set()
 
-    def __new__(cls) -> _VariableSet:
+    def __new__(cls) -> VariableSet:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -72,12 +72,12 @@ class _VariableSet(firstorder.atomic._VariableSet['Variable']):
         self._used = set()
 
 
-VV = _VariableSet()
+VV = VariableSet()
 
 
 class Variable(firstorder.Variable['Variable']):
 
-    wrapped_variable_set: _VariableSet = VV
+    wrapped_variable_set: VariableSet = VV
 
     string: str
 

@@ -1,22 +1,39 @@
 .. _api-Sets-atomic:
-.. _sets-index:
+
+*Sets*
 
 ***************
 Terms and Atoms
 ***************
 
-.. autoclass:: logic1.theories.Sets.atomic.Variable
-  :members:
-  :undoc-members:
+.. automodule:: logic1.theories.Sets.atomic
 
-.. autoclass:: logic1.theories.Sets.atomic.AtomicFormula
-  :members:
-  :undoc-members:
+  .. autoclass:: VariableSet
+    :members:
+    :undoc-members:
 
-.. autoclass:: logic1.theories.Sets.atomic.Eq
-  :members:
-  :undoc-members:
+  .. autodata:: VV
 
-.. autoclass:: logic1.theories.Sets.atomic.Ne
-  :members:
-  :undoc-members:
+  .. autoclass:: Variable
+    :members:
+    :undoc-members:
+
+  .. autoclass:: AtomicFormula
+    :members:
+    :undoc-members:
+
+  .. autoclass:: Eq
+    :members:
+    :undoc-members:
+
+  .. autoclass:: Ne
+    :members:
+    :undoc-members:
+
+  .. autoclass:: C
+    :members:
+    :undoc-members:
+
+  .. autoclass:: C_
+    :members:
+    :undoc-members:

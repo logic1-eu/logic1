@@ -4,6 +4,8 @@
 Sets
 ****
 
+.. automodule:: logic1.theories.Sets
+
 .. toctree::
    :hidden:
 

@@ -105,7 +105,7 @@ class Formula(Generic[α, τ, χ]):
     def __eq__(self, other: object) -> bool:
         """A recursive test for equality of the `self` and `other`.
 
-        Note that this is is not a logical operator for equality.
+        Note that this is not a logical operator for equality.
 
         >>> from logic1.theories.RCF import Ne
         >>>

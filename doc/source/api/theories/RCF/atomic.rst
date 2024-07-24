@@ -14,7 +14,7 @@ Terms and Atoms
 
   .. autodata:: polynomial_ring
 
-  .. autoclass:: _VariableSet
+  .. autoclass:: VariableSet
     :members:
     :undoc-members:
 

@@ -75,7 +75,7 @@ class PolynomialRing:
 polynomial_ring = PolynomialRing()
 
 
-class _VariableSet(firstorder.atomic._VariableSet['Variable']):
+class VariableSet(firstorder.atomic.VariableSet['Variable']):
 
     polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
@@ -118,7 +118,7 @@ class _VariableSet(firstorder.atomic._VariableSet['Variable']):
         self.polynomial_ring.push()
 
 
-VV = _VariableSet()
+VV = VariableSet()
 
 
 class TSQ(Enum):
@@ -399,7 +399,7 @@ class Term(firstorder.Term['Term', 'Variable']):
 
 class Variable(Term, firstorder.Variable['Variable']):
 
-    VV: ClassVar[_VariableSet] = VV
+    VV: ClassVar[VariableSet] = VV
 
     def fresh(self) -> Variable:
         """
