@@ -6,9 +6,6 @@
 Simplification
 **************
 
-Module :mod:`simplify <logic1.abc.simplify>`
---------------------------------------------
-
 .. automodule:: logic1.abc.simplify
   :members:
   :undoc-members:

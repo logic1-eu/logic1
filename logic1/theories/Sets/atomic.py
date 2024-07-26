@@ -21,7 +21,7 @@ Index: TypeAlias = int | float
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
     """Instances of the singleton VariableSet register, store, and provide
     variables, which are instances of Terms and suitable for building atoms
-    using operators and methods defined in :class:`Variable`.
+    using operators and methods defined in :class:`.Variable`.
     """
 
     _instance: ClassVar[Optional[VariableSet]] = None

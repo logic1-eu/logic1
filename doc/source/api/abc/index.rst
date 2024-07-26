@@ -4,10 +4,9 @@
 Abstract Base Classes
 *********************
 
+.. automodule:: logic1.abc
+
 .. toctree::
-   :hidden:
 
    simplify.rst
    qe.rst
-
-.. automodule:: logic1.abc

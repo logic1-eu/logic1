@@ -19,3 +19,8 @@ Quantifier Elimination
     .. automethod:: __call__
 
   .. autofunction:: qe
+
+.. discuss: autofunction qe gets its signature from
+.. VirtualSubstitution.__call__. However, it shows
+.. firstorder.atomic.AtomicFormula instead of RCF.atomic.AtomicFormula. This is
+.. also the origian of a Warning when building the documentation.

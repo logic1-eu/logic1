@@ -1,17 +1,17 @@
 .. _api-firstorder-firstorder:
 
+.. |blank| unicode:: U+0020
+
 *Generic*
 
 ********************
 First-order Formulas
 ********************
 
-.. automodule:: logic1.firstorder
-
 The following picture summarizes the inheritance hierarchy. Next, we are going
 to describe the occurring classes starting at the top.
 
-.. topic:: Inheritance hierarchy
+.. topic:: |blank|
 
   .. graphviz::
     :class: only-light
@@ -43,7 +43,6 @@ to describe the occurring classes starting at the top.
         AtomicFormula -> "RCF.AtomicFormula | ...";
      }
 
-.. |blank| unicode:: U+0020
 
 
 .. automodule:: logic1.firstorder.formula

@@ -17,21 +17,21 @@ Terms, Variables, and Atoms
 
   .. data:: α
     :value: TypeVar('α', bound='AtomicFormula')
-    :canonical: logic1.firstorder.formula.α
+    :canonical: logic1.firstorder.atomic.α
 
     A type variable denoting a type of atomic formulas with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
   .. data:: τ
     :value: TypeVar('τ', bound='AtomicFormula')
-    :canonical: logic1.firstorder.formula.τ
+    :canonical: logic1.firstorder.atomic.τ
 
     A type variable denoting a type of terms with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
   .. data:: χ
     :value: TypeVar('χ', bound='AtomicFormula')
-    :canonical: logic1.firstorder.formula.χ
+    :canonical: logic1.firstorder.atomic.χ
 
     A type variable denoting a type of variables with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
@@ -60,13 +60,14 @@ Terms, Variables, and Atoms
       thereby overwrites the current status.
 
       .. attention::
-        :attr:`.stack`, :meth:`.push`, and :meth:`pop` are recommended only for
-        special situations.
+        :attr:`.stack`, :meth:`.push`, and :meth:`pop` are reserved for special
+        situations.
 
-        They allow to obtain predictable variables from :meth:`.fresh` (and
-        other methods using :meth:`.fresh`) within asychronous doctests. In the
-        following example, :meth:`.Formula.to_pnf` uses
-        :meth:`.RCF.atomic.Variable.fresh`:
+        They allow to obtain variables from :meth:`fresh()
+        <.firstorder.atomic.VariableSet.fresh>` within asychronous doctests in a
+        reproducable way. In the following example,
+        :meth:`.Formula.to_pnf` indirectly uses
+        :meth:`.RCF.atomic.VariableSet.fresh`:
 
         >>> from logic1.firstorder import *
         >>> from logic1.theories.RCF import *

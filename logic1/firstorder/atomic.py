@@ -34,8 +34,8 @@ class VariableSet(Generic[χ]):
     @abstractmethod
     def stack(self) -> Sequence[object]:
         """The class internally keeps track of variables already used. This is
-        relevant when creating unused variables via :meth:`.Variable.fresh`.
-        The :attr:`stack` can hold such internal states.
+        relevant when creating unused variables via :meth:`.fresh`. The
+        :attr:`stack` can hold such internal states.
 
         .. seealso::
           * :meth:`.push` -- push information to :attr:`.stack` and reset
@@ -122,38 +122,6 @@ class VariableSet(Generic[χ]):
     def push(self) -> None:
         """Push information about used variables to :attr:`stack` and reset
         that information.
-
-        .. attention::
-          :attr:`.stack`, :meth:`.push`, and :meth:`pop` are not recommended for
-          regular use.
-
-          They allow to temporarily forget all information about used
-          variables. This allows to obtain predictable variables from
-          :meth:`.fresh` within asychronous doctests. In the following example,
-          :meth:`.Formula.to_pnf` uses :meth:`.RCF.atomic.Variable.fresh`:
-
-          >>> from logic1.firstorder import *
-          >>> from logic1.theories.RCF import *
-          >>> x, a = VV.get('x', 'a')
-          >>> f = And(x == 0, Ex(x, x == a))
-          >>> f.to_pnf()
-          Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
-          >>> f.to_pnf()
-          Ex(G0002_x, And(x == 0, -G0002_x + a == 0))
-          >>> VV.push()
-          >>> x, a = VV.get('x', 'a')
-          >>> g = And(x == 0, Ex(x, x == a))
-          >>> g.to_pnf()
-          Ex(G0001_x, And(x == 0, -G0001_x + a == 0))
-          >>> VV.pop()
-          >>> f.to_pnf()
-          Ex(G0003_x, And(x == 0, -G0003_x + a == 0))
-
-          Notice that we are not using any previously existing variables
-          between ``VV.push()`` and ``VV.pop()`` above.
-
-          See :file:`logic1/theories/RCF/test_pnf.txt` for a complete doctest
-          file using this approach
         """
         ...
 
@@ -184,7 +152,8 @@ class Term(Generic[τ, χ]):
     @staticmethod
     @abstractmethod
     def sort_key(term: τ) -> Any:
-        """A sort key suitable for ordering instances of :data:`.τ`.
+        """A sort key suitable for ordering instances of :data:`τ
+        <.firstorder.atomic.τ>`.
 
         .. note::
           We reserve Python's rich comparisons :external:obj:`__lt__

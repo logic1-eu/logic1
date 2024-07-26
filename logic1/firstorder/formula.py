@@ -160,7 +160,8 @@ class Formula(Generic[α, τ, χ]):
         equal to other.
 
         .. seealso::
-          * :meth:`.AtomicFormula.__le__` -- comparison of atomic formulas
+          * :meth:`AtomicFormula.__le__() <.firstorder.atomic.AtomicFormula.__le__>`\
+             -- comparison of atomic formulas
         """
         L = (And, Or, Not, Implies, Equivalent, Ex, All, _T, _F)
         # The case "self: AtomicFormula" is caught by the implementation of the

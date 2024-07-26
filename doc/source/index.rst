@@ -79,6 +79,7 @@ T
    api/theories/RCF/index.rst
    api/theories/Sets/index.rst
    api/abc/index.rst
+   api/support/index.rst
 
 .. toctree::
    :caption: Indices
@@ -86,11 +87,3 @@ T
 
    py-modindex.rst
    genindex.rst
-
-.. toctree::
-   :caption: [IGNORE]
-   :hidden:
-
-   api/support.rst
-   manual/formulas.rst
-   manual/methods.rst
