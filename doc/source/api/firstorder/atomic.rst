@@ -41,22 +41,23 @@ Terms, Variables, and Atoms
   ********************
 
   .. autoclass:: VariableSet
-    :members:
-    :exclude-members: stack, push, pop
-    :special-members: __getitem__
+    :special-members:
 
-    .. property:: stack
-      :type: Sequence[object]
-      :abstractmethod:
+    .. automethod:: __getitem__
+
+    .. automethod:: get
+
+    .. automethod:: imp
+
     .. method::
       pop() -> None
       push() -> None
       :abstractmethod:
 
-      :meth:`.push` pushes the current status regarding used variables to :attr:`stack`
-      and resets to the initial state where all variables are marked as
-      unused. :meth:`.pop` recovers the status from the stack and overwrites
-      the current status.
+      :meth:`.push` pushes the current status regarding used variables to a
+      private stack and resets to the initial state where all variables are
+      marked as unused. :meth:`.pop` recovers the status from the stack and
+      thereby overwrites the current status.
 
       .. attention::
         :attr:`.stack`, :meth:`.push`, and :meth:`pop` are recommended only for
@@ -110,7 +111,6 @@ Terms, Variables, and Atoms
 
   .. autoclass:: AtomicFormula
     :members:
-    :private-members: _bvars, _fvars
     :undoc-members:
     :exclude-members: atoms
-    :special-members: __le__
+    :special-members: __le__, __str__

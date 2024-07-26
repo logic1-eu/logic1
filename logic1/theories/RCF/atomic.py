@@ -16,7 +16,7 @@ from ...firstorder import _T, _F
 from ...support.tracing import trace  # noqa
 
 
-class PolynomialRing:
+class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
 
     sage_ring: sage.PolynomialRing
 
@@ -76,14 +76,33 @@ polynomial_ring = PolynomialRing()
 
 
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
+    """The infinite set of all variables belonging to the theory of Real Closed
+    Fields. Variables are uniquely identified by their name, which is a
+    :external:class:`.str`. This class is a singleton, whose only instance is
+    assigned to :data:`.VV`.
+
+    .. seealso::
+        Final methods inherited from parent class:
+
+        * :meth:`.firstorder.atomic.VariableSet.get`
+            -- obtain several variables simultaneously
+        * :meth:`.firstorder.atomic.VariableSet.imp`
+            -- import variables into global namespace
+    """
 
     polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
     @property
     def stack(self) -> list[sage.PolynomialRing]:
+        """Implements abstract property
+        :attr:`.firstorder.atomic.VariableSet.stack`.
+        """
         return self.polynomial_ring.stack
 
     def __getitem__(self, index: str) -> Variable:
+        """Implements abstract method
+        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        """
         match index:
             case str():
                 self.polynomial_ring.ensure_vars((index,))
@@ -119,12 +138,33 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 
 
 VV = VariableSet()
+"""
+The unique instance of :class:`.VariableSet`.
+"""
 
 
 class TSQ(Enum):
+    """Information whether a certain term is has a *trivial square sum*
+    property.
+
+    .. seealso:: :meth:`.Term.is_definite`
+    """
     NONE = auto()
+    """None of the other cases holds..
+    """
+
     STRICT = auto()
+    """All other integer coefficients, including the absolute summand, are
+    strictly positive. All exponents are even. This is sufficient for a term to
+    be positive definite, i.e., positive for all real choices of variables.
+    """
+
     WEAK = auto()
+    """The absolute summand is zero. All other integer coefficients are
+    strictly positive. All exponents are even. This is sufficient for a term to
+    be positive semi-definite, i.e., non-negative for all real choices of
+    variables.
+    """
 
 
 class Term(firstorder.Term['Term', 'Variable']):
@@ -133,6 +173,7 @@ class Term(firstorder.Term['Term', 'Variable']):
 
     _poly: Polynomial
 
+    # discuss: The property should be private
     @property
     def poly(self) -> Polynomial:
         """
@@ -154,6 +195,7 @@ class Term(firstorder.Term['Term', 'Variable']):
             return Term(self.poly + other.poly)
         return Term(self.poly + other)
 
+    # discuss: Doku unterschlägt Sage-Argumente
     def __eq__(  # type: ignore[override]
             self, other: Term | Polynomial | sage.Integer | int) -> Eq:
         # MyPy requires "other: object". However, with our use a a constructor,
@@ -191,16 +233,25 @@ class Term(firstorder.Term['Term', 'Variable']):
                     f'arguments must be polynomial or integer; {arg} is {type(arg)}')
 
     def __iter__(self) -> Iterator[tuple[int, Term]]:
+        """Iterate over the polynomial representation of the term, yielding
+        pairs of coefficients and power products.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> [(abs(coef), power_product) for coef, power_product in t]
+        [(1, x^2), (2, x*y), (1, y^2), (4, x), (4, y), (4, 1)]
+        """
         for coefficient, power_product in self.poly:
             yield int(coefficient), Term(power_product)
 
-    def __le__(self, other: Term | Polynomial | sage.Integer | int) -> Le | Ge:
+    def __le__(self, other: Term | Polynomial | sage.Integer | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Ge(- lhs, 0)
         return Le(lhs, 0)
 
-    def __lt__(self, other: Term | Polynomial | sage.Integer | int) -> Lt | Gt:
+    def __lt__(self, other: Term | Polynomial | sage.Integer | int) -> Gt | Lt:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Gt(- lhs, 0)
@@ -244,6 +295,9 @@ class Term(firstorder.Term['Term', 'Variable']):
             return self + (- other)
         return Term(self.poly - other)
 
+    # discuss: Was soll das machen? Ich kenne kein einziges Beispiel, das nicht
+    # kracht. Man könnte '/' und '%' als quotient und remainder machen, aber
+    # wir brauchen das nicht.
     def __truediv__(self, other: object) -> Term:
         return Term(self.poly / other)
 
@@ -253,27 +307,61 @@ class Term(firstorder.Term['Term', 'Variable']):
             "in Python, and has the wrong precedence")
 
     def as_latex(self) -> str:
-        """Convert `self` to LaTeX.
+        """LaTeX representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.Term.as_latex`.
 
-        Implements the abstract method
-        :meth:`.firstorder.atomic.Term.as_Latex`.
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.as_latex()
+        'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
         """
         return str(sage.latex(self.poly))
 
-    def coefficient(self, d: dict[Variable, int]) -> Term:
-        """
+    def coefficient(self, degrees: dict[Variable, int]) -> Term:
+        """Return the coefficient of the variables with the degrees specified
+        in the python dictionary `degrees`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.coefficient({x: 1, y: 1})
+        -2
+        >>> t.coefficient({x: 1})
+        -2*y + 4
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.coefficient()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.coefficient>`
         """
-        d_poly = {key.poly: value for key, value in d.items()}
+        d_poly = {key.poly: value for key, value in degrees.items()}
         return Term(self.poly.coefficient(d_poly))
 
     def constant_coefficient(self) -> int:
+        """Return the constant coefficient of this term.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.constant_coefficient()
+        4
+
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.constant_coefficient()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.constant_coefficient>`
+        """
         return int(self.poly.constant_coefficient())
 
     def content(self) -> int:
-        """
+        """Return the content of this term, which is defined as the gcd of its
+        integer coefficients.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2 - (x**2 + y**2)
+        >>> t.content()
+        2
+
         .. seealso::
             :external:meth:`MPolynomial.content()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.content>`
@@ -281,7 +369,14 @@ class Term(firstorder.Term['Term', 'Variable']):
         return int(self.poly.content())
 
     def degree(self, x: Variable) -> int:
-        """
+        """Return the degree in `x` of this term.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.degree(y)
+        2
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.degree()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.degree>`
@@ -289,15 +384,31 @@ class Term(firstorder.Term['Term', 'Variable']):
         return self.poly.degree(x.poly)
 
     def derivative(self, x: Variable, n: int = 1) -> Term:
-        """
+        """The `n`-th derivative of this term, with respect to `x`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.derivative(x)
+        2*x - 2*y + 4
+
         .. seealso::
             :external:meth:`MPolynomial.derivative()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
         """
         return Term(self.poly.derivative(x.poly, n))
 
+    # discuss bug:
+    # >>> (2*x).factor()
     def factor(self) -> tuple[Term, dict[Term, int]]:
-        """
+        """Return the factorization of this term.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = x**2 - y**2
+        >>> t.factor()
+        (1, {x - y: 1, x + y: 1})
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.factor()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.factor>`
@@ -314,14 +425,31 @@ class Term(firstorder.Term['Term', 'Variable']):
         return unit, D
 
     def is_constant(self) -> bool:
-        """
+        """Return :obj:`True` if this term is constant.
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.is_constant()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_constant>`
         """
         return self.poly.is_constant()
 
+    # discuss: Soll das is_* heißen?
     def is_definite(self) -> TSQ:
+        """A fast heuristic test whether this term is positive or non-negative
+        for all real choices of variables.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = x**2 + y**2
+        >>> f.is_definite()
+        <TSQ.WEAK: 3>
+        >>> g = x**2 + y**2 + 1
+        >>> g.is_definite()
+        <TSQ.STRICT: 2>
+        >>> h = (x + y) ** 2
+        >>> h.is_definite()
+        <TSQ.NONE: 1>
+        """
         for exponent, coefficient in self.poly.dict().items():
             if coefficient < 0:
                 return TSQ.NONE
@@ -332,11 +460,15 @@ class Term(firstorder.Term['Term', 'Variable']):
             return TSQ.WEAK
         return TSQ.STRICT
 
+    # discuss: Do we (still) need this?
     def is_variable(self) -> bool:
+        """Return :obj:`True` if this term is a variable.
+        """
         return self.poly in self.poly.parent().gens()
 
     def is_zero(self) -> bool:
-        """
+        """Return :obj:`True` if this term is a zero.
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.is_zero()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_zero>`
@@ -344,7 +476,16 @@ class Term(firstorder.Term['Term', 'Variable']):
         return self.poly.is_zero()
 
     def lc(self) -> int:
-        """
+        """Leading coefficient of this term with respect to the degree
+        lexicographical term order :mod:`deglex
+        <sage.rings.polynomial.term_order>`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = 2*x*y**2 + 3*x**2 + 1
+        >>> f.lc()
+        2
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.lc()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.lc>`
@@ -352,7 +493,15 @@ class Term(firstorder.Term['Term', 'Variable']):
         return int(self.poly.lc())
 
     def monomials(self) -> list[Term]:
-        """
+        """List of monomials of this term. A monomial is defined here as a
+        summand of a polynomial *without* the coefficient.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.monomials()
+        [x^2, x*y, y^2, x, y, 1]
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.monomials()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomials>`
@@ -360,7 +509,18 @@ class Term(firstorder.Term['Term', 'Variable']):
         return [Term(monomial) for monomial in self.poly.monomials()]
 
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
-        """
+        """Quotient and remainder of this term and `other`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = 2*y*x**2 + x + 1
+        >>> f.quo_rem(x)
+        (2*x*y + 1, 1)
+        >>> f.quo_rem(y)
+        (2*x^2, x + 1)
+        >>> f.quo_rem(3*x)
+        (0, 2*x^2*y + x + 1)
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.quo_rem()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
@@ -368,7 +528,22 @@ class Term(firstorder.Term['Term', 'Variable']):
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
 
-    def pseudo_quo_rem(self, other: Term, x: Variable):
+    def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
+        """Pseudo quotient and remainder of this term and other, both as
+        univariate polynomials in `x` with polynomial coefficients in all other
+        variables.
+
+        >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+        >>> f = a * x**2 + b*x + c
+        >>> g = c * x + b
+        >>> q, r = f.pseudo_quo_rem(g, x); q, r
+        (a*c*x - a*b + b*c, a*b^2 - b^2*c + c^3)
+        >>> assert c**(2 - 1 + 1) * f == q * g + r
+
+        .. seealso::
+            :meth:`Polynomial.pseudo_quo_rem()
+            <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
+        """
         self1 = self.poly.polynomial(x.poly)
         other1 = other.poly.polynomial(x.poly)
         quotient, remainder = self1.pseudo_quo_rem(other1)
@@ -376,10 +551,22 @@ class Term(firstorder.Term['Term', 'Variable']):
 
     @staticmethod
     def sort_key(term: Term) -> Polynomial:
+        """A sort key suitable for ordering instances of Term. Implements the
+        abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        """
         return term.poly
 
+    # discuss: Should also accept also int in place of Term. Same for Formula
+    # etc.
     def subs(self, d: dict[Variable, Term]) -> Term:
-        """
+        """Simultaneous substitution of terms for variables.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> f = 2*y*x**2 + x + 1
+        >>> f.subs({x: y, y: 2*z})
+        4*y^2*z + y + 1
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.subs()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
@@ -388,7 +575,8 @@ class Term(firstorder.Term['Term', 'Variable']):
         return Term(self.poly.subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
-        """
+        """An iterator that yields each variable of this term once.
+
         .. seealso::
             :external:meth:`MPolynomial_libsingular.variables()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.variables>`
@@ -402,70 +590,24 @@ class Variable(Term, firstorder.Variable['Variable']):
     VV: ClassVar[VariableSet] = VV
 
     def fresh(self) -> Variable:
-        """
-        .. seealso::
-            :meth:`logic1.firstorder.atomic.Term.fresh`
+        """Returns a variable that has not been used so far. Implements
+        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
         """
         return self.VV.fresh(suffix=f'_{str(self)}')
 
 
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable']):
-    """
-    +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :data:`self`       | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
-    +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :meth:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
-    +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :meth:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
-    +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    | :meth:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
-    +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-    """  # noqa
-    @classmethod
-    def complement(cls) -> type[AtomicFormula]:
-        """Complement relation.
-        """
-        D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
-        return D[cls]
-
-    @classmethod
-    def converse(cls) -> type[AtomicFormula]:
-        """Converse relation.
-        """
-        D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
-        return D[cls]
-
-    @classmethod
-    def dual(cls) -> type[AtomicFormula]:
-        """Dual relation.
-        """
-        return cls.complement().converse()
-
-    @classmethod
-    def python_operator(cls) -> BuiltinFunctionType:
-        """The operator correponding to `cls` for evaluation of constant
-        relations.
-        """
-        D: Any = {Eq: operator.eq, Ne: operator.ne,
-                  Le: operator.le, Lt: operator.lt,
-                  Ge: operator.ge, Gt: operator.gt}
-        return D[cls]
-
-    @classmethod
-    def strict_part(cls) -> type[Formula]:
-        """The strict part is the binary relation without the diagonal.
-        """
-        if cls in (Eq, Ne):
-            raise NotImplementedError()
-        D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
-        return D[cls]
 
     @property
     def lhs(self) -> Term:
+        """The left hand side term of an atomic formula.
+        """
         return self.args[0]
 
     @property
     def rhs(self) -> Term:
+        """The right hand side term of an atomic formula.
+        """
         return self.args[1]
 
     def __init__(self, lhs: Term | Polynomial | sage.Integer | int,
@@ -480,6 +622,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         self.args = (lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
+        """Returns `True` if this atomic formula should be sorted before or is
+        equal to other. Implements abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.__le__`.
+        """
         match other:
             case AtomicFormula():
                 if self.lhs != other.lhs:
@@ -499,6 +645,9 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return str(self)
 
     def __str__(self) -> str:
+        """String representation of this atomic formula. Implements the
+        abstract method :meth:`.firstorder.atomic.AtomicFormula.__str__`.
+        """
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
         return f'{self.lhs.poly}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.poly}'
@@ -510,14 +659,50 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
+        """Iterate over occurrences of variables that are elements of
+        `quantified`. Yield each such variable once for each term that it
+        occurs in. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.bvars`.
+        """
         for v in self.lhs.vars():
             if v in quantified:
                 yield v
         for v in self.rhs.vars():
             if v in quantified:
                 yield v
+
+    # discuss: If the following class methods were called on AtomicFormula
+    # itself, then the dictionary access would raise an exception, which is not
+    # caught at the moment.
+    @classmethod
+    def complement(cls) -> type[AtomicFormula]:
+        """Complement relation. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.complement`.
+        """
+        D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
+        return D[cls]
+
+    # discuss: firstorder.atomic.AtomicFormula defines to_complement(), which
+    # is used quite heavily. Should we define to_converse and to_dual here?
+    @classmethod
+    def converse(cls) -> type[AtomicFormula]:
+        """Converse relation.
+        """
+        D: Any = {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}
+        return D[cls]
+
+    @classmethod
+    def dual(cls) -> type[AtomicFormula]:
+        """Dual relation.
+        """
+        return cls.complement().converse()
 
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
+        """Iterate over occurrences of variables that are *not* elements of
+        `quantified`. Yield each such variable once for each term that it
+        occurs in. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.fvars`.
+        """
         for v in self.lhs.vars():
             if v not in quantified:
                 yield v
@@ -525,24 +710,52 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             if v not in quantified:
                 yield v
 
+    # discuss: not used. It had once been used by the simplify method.
+    @classmethod
+    def python_operator(cls) -> BuiltinFunctionType:
+        """The operator correponding to `cls` for evaluation of constant
+        relations.
+        """
+        D: Any = {Eq: operator.eq, Ne: operator.ne,
+                  Le: operator.le, Lt: operator.lt,
+                  Ge: operator.ge, Gt: operator.gt}
+        return D[cls]
+
+    def simplify(self) -> AtomicFormula | _F | _T:
+        """Fast basic simplification. The result is equivalent to self.
+        Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.
+        """
+        assert isinstance(self, (Eq, Ge, Gt, Le, Lt, Ne)), self  # discuss: required?
+        lhs = self.lhs - self.rhs
+        if lhs.is_constant():
+            return _T() if self.op(lhs, 0) else _F()
+        if lhs.lc() < 0:
+            return self.op.converse()(-lhs, 0)
+        return self.op(lhs, 0)
+
+    @classmethod
+    def strict_part(cls) -> type[Gt | Lt]:
+        """The strict part of a binary relation is the relation without the
+        diagonal. Raises :exc:`NotImplementedError` for :class:`Eq` and
+        :class:`Ne`.
+        """
+        if cls in (Eq, Ne):
+            raise NotImplementedError()
+        D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
+        return D[cls]
+
     def subs(self, d: dict[Variable, Term]) -> Self:
-        """Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        """Simultaneous substitution of terms for variables. Implements the
+        abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         return self.op(self.lhs.subs(d), self.rhs.subs(d))
 
 
 class Eq(AtomicFormula):
 
+    # discuss: should this be documented?
     def __bool__(self) -> bool:
         return self.lhs.poly == self.rhs.poly
-
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_zero():
-            return _T()
-        if lhs.is_constant():
-            return _F()
-        return Eq(Term(lhs), Term(0))
 
 
 class Ne(AtomicFormula):
@@ -550,25 +763,11 @@ class Ne(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly != self.rhs.poly
 
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_zero():
-            return _F()
-        if lhs.is_constant():
-            return _T()
-        return Ne(Term(lhs), Term(0))
-
 
 class Ge(AtomicFormula):
 
     def __bool__(self) -> bool:
         return self.lhs.poly >= self.rhs.poly
-
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_constant():
-            return _T() if lhs >= 0 else _F()
-        return Ge(Term(lhs), Term(0))
 
 
 class Le(AtomicFormula):
@@ -576,35 +775,17 @@ class Le(AtomicFormula):
     def __bool__(self) -> bool:
         return self.lhs.poly <= self.rhs.poly
 
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_constant():
-            return _T() if lhs <= 0 else _F()
-        return Le(Term(lhs), Term(0))
-
 
 class Gt(AtomicFormula):
 
     def __bool__(self) -> bool:
         return self.lhs.poly > self.rhs.poly
 
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_constant():
-            return _T() if lhs > 0 else _F()
-        return Gt(Term(lhs), Term(0))
-
 
 class Lt(AtomicFormula):
 
     def __bool__(self) -> bool:
         return self.lhs.poly < self.rhs.poly
-
-    def simplify(self) -> Formula:
-        lhs = self.lhs.poly - self.rhs.poly
-        if lhs.is_constant():
-            return _T() if lhs < 0 else _F()
-        return Lt(Term(lhs), Term(0))
 
 
 from .typing import Formula

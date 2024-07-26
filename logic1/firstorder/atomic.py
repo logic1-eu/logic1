@@ -29,6 +29,7 @@ class VariableSet(Generic[χ]):
       for Sets.
     """
 
+    # Discuss: should better be private. Rename to _stack.
     @property
     @abstractmethod
     def stack(self) -> Sequence[object]:
@@ -53,13 +54,13 @@ class VariableSet(Generic[χ]):
         >>> assert isinstance(x, RCF.atomic.Variable)
 
         .. seealso::
-          * :meth:`get` -- simultaneously obtain several variables
+          * :meth:`get` -- obtain several variables simultaneously
           * :meth:`imp` -- import variables into global namespace
         """
 
     @final
     def get(self, *args: str) -> tuple[χ, ...]:
-        """Simultaneously obtain several variables by their names.
+        """Obtain several variables simultaneously by their names.
 
         >>> from logic1.theories import RCF
         >>> assert isinstance(RCF.VV, RCF.atomic.VariableSet)
@@ -88,7 +89,7 @@ class VariableSet(Generic[χ]):
 
         .. seealso::
           * :meth:`__getitem__` -- obtain variable by its name
-          * :meth:`get` -- simultaneously obtain several variables
+          * :meth:`get` -- obtain several variables simultaneously
         """
         vars_ = self.get(*args)
         frame = inspect.currentframe()
@@ -183,7 +184,7 @@ class Term(Generic[τ, χ]):
     @staticmethod
     @abstractmethod
     def sort_key(term: τ) -> Any:
-        """A sort key suitable for ordering instances of terms :data:`.τ`.
+        """A sort key suitable for ordering instances of :data:`.τ`.
 
         .. note::
           We reserve Python's rich comparisons :external:obj:`__lt__
@@ -263,24 +264,17 @@ class AtomicFormula(Formula[α, τ, χ]):
         """
         ...
 
+    # discuss: To what extent should this be documented in the API reference?
+    # Mentioning __str__ here triggered mentioning its implementation in RCF
+    # and Sets as well as its parent in Formula.
     @abstractmethod
     def __str__(self) -> str:
-        # Overloading __str__ here breaks an infinite recursion in the
-        # inherited Formula.__str__. Nicer string representations are provided
-        # by various theory modules.
-        ...
-
-    @classmethod
-    @abstractmethod
-    def complement(cls) -> type[α]:
-        """The complement operator of an atomic formula, i.e.,
-        :code:`a.complement(*a.args)` is an atomic formula equivalent to
-        :code:`Not(a.op(*a.args))`.
-
-        .. seealso::
-          * :meth:`.to_complement` -- \
-                generalization from relations to atomic formulas
-    """
+        """Representation of this atomic formula used in printing. This method
+        is required by the corresponding recursive first-order method
+        :meth:`.firstorder.Formula.__str__`.
+        """
+        #  Overloading here breaks an infinite recursion in the inherited
+        #  method.
         ...
 
     @abstractmethod
@@ -303,6 +297,19 @@ class AtomicFormula(Formula[α, τ, χ]):
         """
         ...
 
+    @classmethod
+    @abstractmethod
+    def complement(cls) -> type[α]:
+        """The complement operator of an atomic formula, i.e.,
+        :code:`a.complement(*a.args)` is an atomic formula equivalent to
+        :code:`Not(a.op(*a.args))`.
+
+        .. seealso::
+          * :meth:`.to_complement` -- \
+                generalization from relations to atomic formulas
+        """
+        ...
+
     @abstractmethod
     def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """Iterate over occurrences of variables that are *not* elements of
@@ -322,9 +329,9 @@ class AtomicFormula(Formula[α, τ, χ]):
 
     @abstractmethod
     def subs(self, substitution: dict[χ, τ]) -> α:
-        """Substitution of terms from `τ` for variables from `χ`. This method
-        is required by the corresponding recursive first-order method
-        :meth:`.Formula.subs`.
+        """Simultaneous substitution of terms from `τ` for variables from `χ`.
+        This method is required by the corresponding recursive first-order
+        method :meth:`.Formula.subs`.
         """
         ...
 

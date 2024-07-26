@@ -78,7 +78,7 @@ to describe the occurring classes starting at the top.
     :undoc-members:
     :exclude-members: op, args, __init__
     :private-members: _repr_latex_
-    :special-members: __le__
+    :special-members: __le__, __str__
 
     .. autoproperty:: op
 
