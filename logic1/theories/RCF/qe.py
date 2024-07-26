@@ -4,12 +4,10 @@
 """
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass, field
 from enum import auto, Enum
 import logging
 import multiprocessing as mp
-import multiprocessing.managers
 import multiprocessing.queues
 import os
 import queue
@@ -18,6 +16,7 @@ import threading
 import time
 from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
 
+from logic1.abc.qe import NodeListProxy, WorkingNodeListProxy, SyncManager
 from logic1.firstorder import All, And, _F, Not, Or, _T
 from logic1 import abc
 from logic1.support.excepthook import NoTraceException
@@ -479,7 +478,7 @@ class EliminationSet:
 
 @dataclass
 class Node(abc.qe.Node[Formula, Variable, Theory]):
-    # sequantial and parallel
+    # sequential and parallel
 
     answer: list
     outermost_block: bool
@@ -706,7 +705,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                         h = - h
                     else:
                         h *= f_lc
-            # One could check for even powers of f_lc in h. Currently the
+            # One could check for even powers of f_lc in h. Currently, the
             # simplifier takes care of this.
             return h
 
@@ -736,7 +735,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 
         def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
             """Reduce virtual substitution of a parametric root description ±ε
-            to virtual substituion of a parametric root description.
+            to virtual substitution of a parametric root description.
             """
             assert nsp in (NSP.PLUS_EPSILON, NSP.MINUS_EPSILON), nsp
             match atom:
@@ -802,296 +801,6 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                      outermost_block=self.outermost_block,
                      options=self.options))
         return new_nodes
-
-
-@dataclass
-class NodeListManager:
-
-    nodes: list[Node] = field(default_factory=list)
-    nodes_lock: threading.Lock = field(default_factory=threading.Lock)
-    memory: set[Formula] = field(default_factory=set)
-    memory_lock: threading.Lock = field(default_factory=threading.Lock)
-    hits: int = 0
-    hits_candidates_lock: threading.Lock = field(default_factory=threading.Lock)
-    candidates: int = 0
-
-    def get_nodes(self) -> list[Node]:
-        with self.nodes_lock:
-            return self.nodes.copy()
-
-    def get_memory(self) -> set[Formula]:
-        with self.memory_lock:
-            return self.memory.copy()
-
-    def get_candidates(self) -> int:
-        return self.candidates
-
-    def get_hits(self) -> int:
-        return self.hits
-
-    def __len__(self):
-        with self.nodes_lock:
-            return len(self.nodes)
-
-    def append(self, node: Node) -> bool:
-        with self.memory_lock:
-            is_new = node.formula not in self.memory
-            if is_new:
-                self.memory.add(node.formula)
-        if is_new:
-            with self.nodes_lock:
-                self.nodes.append(node)
-        with self.hits_candidates_lock:
-            if not is_new:
-                self.hits += 1
-            self.candidates += 1
-        return is_new
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        for node in nodes:
-            self.append(node)
-
-    def statistics(self) -> tuple:
-        with self.hits_candidates_lock:
-            return (self.hits, self.candidates)
-
-
-class NodeListProxy(Collection):
-    # parallel
-
-    def __init__(self, proxy: _NodeListProxy):
-        self._proxy = proxy
-
-    @property
-    def nodes(self):
-        return self._proxy.get_nodes()
-
-    @property
-    def memory(self):
-        return self._proxy.get_memory()
-
-    @property
-    def candidates(self):
-        return self._proxy.get_candidates()
-
-    @property
-    def hits(self):
-        return self._proxy.get_hits()
-
-    def __contains__(self, obj: object) -> bool:
-        match obj:
-            case Node():
-                return obj in self._proxy.get_nodes()
-            case _:
-                return False
-
-    def __iter__(self):
-        yield from self._proxy.get_nodes()
-
-    def __len__(self):
-        return len(self._proxy)
-
-    def append(self, node: Node) -> bool:
-        return self._proxy.append(node)
-
-    def extend(self, nodes: list[Node]) -> None:
-        self._proxy.extend(nodes)
-
-    def final_statistics(self, key: str) -> str:
-        hits, candidates = self._proxy.statistics()
-        num_nodes = candidates - hits
-        if num_nodes == 0:
-            return ''
-        ratio = self.hit_ratio(hits, candidates)
-        return (f'produced {num_nodes} {key} nodes, '
-                f'dropped {hits}/{candidates} = {ratio:.0%}')
-
-    def hit_ratio(self, hits, candidates) -> float:
-        try:
-            return float(hits) / candidates
-        except ZeroDivisionError:
-            return float('nan')
-
-    def periodic_statistics(self, key: str) -> str:
-        hits, candidates = self._proxy.statistics()
-        num_nodes = candidates - hits
-        if num_nodes == 0:
-            return ''
-        ratio = self.hit_ratio(hits, candidates)
-        return f'{key}={num_nodes}, H={ratio:.0%}'
-
-
-class _NodeListProxy(mp.managers.BaseProxy):
-
-    def get_nodes(self) -> list[Node]:
-        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
-
-    def get_memory(self) -> set[Formula]:
-        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
-
-    def get_candidates(self) -> int:
-        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
-
-    def get_hits(self) -> int:
-        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
-
-    def __len__(self) -> int:
-        return self._callmethod('__len__')  # type: ignore[func-returns-value]
-
-    def append(self, node: Node) -> bool:
-        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
-
-    def statistics(self) -> tuple:
-        return self._callmethod('statistics')  # type: ignore[func-returns-value]
-
-
-@dataclass
-class WorkingNodeListManager(NodeListManager):
-
-    busy: int = 0
-    busy_lock: threading.Lock = field(default_factory=threading.Lock)
-    node_counter: Counter[int] = field(default_factory=Counter)
-    node_counter_lock: threading.Lock = field(default_factory=threading.Lock)
-
-    def get_node_counter(self):
-        with self.node_counter_lock:
-            return self.node_counter.copy()
-
-    def append(self, node: Node) -> bool:
-        is_new = super().append(node)
-        if is_new:
-            n = len(node.variables)
-            with self.node_counter_lock:
-                self.node_counter[n] += 1
-        return is_new
-
-    def is_finished(self) -> bool:
-        with self.nodes_lock, self.busy_lock:
-            return len(self.nodes) == 0 and self.busy == 0
-
-    def statistics(self) -> tuple:
-        # hits and candidates are always consistent. hits/candidates, busy,
-        # node_counter are three snapshots at different times, each of which is
-        # consistent.
-        with self.hits_candidates_lock, self.busy_lock, self.node_counter_lock:
-            return (self.hits, self.candidates, self.busy, self.node_counter)
-
-    def pop(self) -> Node:
-        with self.nodes_lock:
-            node = self.nodes.pop()
-        n = len(node.variables)
-        with self.node_counter_lock:
-            self.node_counter[n] -= 1
-        with self.busy_lock:
-            self.busy += 1
-        return node
-
-    def task_done(self) -> None:
-        with self.busy_lock:
-            self.busy -= 1
-
-
-class WorkingNodeListProxy(NodeListProxy):
-
-    def __init__(self, proxy: _WorkingNodeListProxy):
-        self._proxy: _WorkingNodeListProxy = proxy
-
-    @property
-    def node_counter(self):
-        return self._proxy.get_node_counter()
-
-    def extend(self, nodes: Iterable[Node]) -> None:
-        newnodes = []
-        for node in nodes:
-            match node.formula:
-                case _F():
-                    continue
-                case Or(args=args):
-                    for arg in args:
-                        subnode = Node(variables=node.variables.copy(),
-                                       formula=arg,
-                                       answer=node.answer,
-                                       outermost_block=node.outermost_block,
-                                       options=node.options)
-                        if subnode not in newnodes:
-                            newnodes.append(subnode)
-                case And() | AtomicFormula():
-                    if node not in newnodes:
-                        newnodes.append(node)
-                case _:
-                    assert False, node
-        self._proxy.extend(newnodes)
-
-    def final_statistics(self, key: Optional[str] = None) -> str:
-        if key:
-            return super().final_statistics(key)
-        hits, candidates, _, _ = self._proxy.statistics()
-        num_nodes = candidates - hits
-        ratio = self.hit_ratio(hits, candidates)
-        return (f'performed {num_nodes} elimination steps, '
-                f'skipped {hits}/{candidates} = {ratio:.0%}')
-
-    def is_finished(self):
-        return self._proxy.is_finished()
-
-    def periodic_statistics(self, key: str = 'W') -> str:
-        hits, candidates, busy, node_counter = self._callmethod('statistics')  # type: ignore
-        ratio = self.hit_ratio(hits, candidates)
-        try:
-            num_variables = max(k for k, v in node_counter.items() if v != 0)
-            v = f'V={num_variables}'
-            nc = '.'.join(f'{node_counter[n]}'
-                          for n in reversed(range(1, num_variables + 1)))
-            w = f'{key}={nc}'
-            vw = f'{v}, {w}'
-        except ValueError:
-            vw = 'V=0'
-        return f'{vw}, B={busy}, H={ratio:.0%}'
-
-    def pop(self) -> Node:
-        return self._proxy.pop()
-
-    def task_done(self) -> None:
-        self._proxy.task_done()
-
-
-class _WorkingNodeListProxy(_NodeListProxy):
-
-    def get_node_counter(self) -> int:
-        return self._callmethod('get_node_counter')  # type: ignore[func-returns-value]
-
-    def is_finished(self) -> bool:
-        return self._callmethod('is_finished')  # type: ignore[func-returns-value]
-
-    def pop(self) -> Node:
-        return self._callmethod('pop')  # type: ignore[func-returns-value]
-
-    def task_done(self) -> None:
-        return self._callmethod('task_done')  # type: ignore[func-returns-value]
-
-
-class SyncManager(mp.managers.SyncManager):
-
-    def NodeList(self) -> NodeListProxy:
-        proxy = self._NodeListProxy()  # type: ignore[attr-defined]
-        return NodeListProxy(proxy)
-
-    def WorkingNodeList(self) -> WorkingNodeListProxy:
-        proxy = self._WorkingNodeListProxy()  # type: ignore[attr-defined]
-        return WorkingNodeListProxy(proxy)
-
-
-SyncManager.register('_NodeListProxy', NodeListManager, _NodeListProxy,
-                     ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
-                      '__len__', 'append', 'extend', 'statistics'])
-
-SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNodeListProxy,
-                     ['get_nodes', 'get_memory', 'get_candidates', 'get_hits',
-                      'get_node_counter', '__len__', 'append', 'extend',
-                      'is_finished', 'pop', 'statistics', 'task_done'])
 
 
 @dataclass
@@ -1212,16 +921,17 @@ class VirtualSubstitution(abc.qe.QuantifierElimination):
                 logger.debug(f'{num_finished} worker process{pl} finished, '
                              f'{len(still_running)} running')
             # The following call joins all finished processes as a side effect.
-            # Otherwise they would remain in the process table as zombies.
+            # Otherwise, they would remain in the process table as zombies.
             mp.active_children()
 
         logger.debug('entering sync manager context')
         timer = Timer()
+        manager: SyncManager[Formula, Node]
         with SyncManager() as manager:
             self.time_syncmanager_enter = timer.get()
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            working_nodes = manager.WorkingNodeList()
+            working_nodes: WorkingNodeListProxy[Formula, Node] = manager.WorkingNodeList()
             working_nodes.append(self.root_node)
             self.root_node = None
             success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
@@ -1303,7 +1013,7 @@ class VirtualSubstitution(abc.qe.QuantifierElimination):
                 # The exception handler for FoundT in virtual_substitution will
                 # log final statistics. We do not retrieve nodes and memory,
                 # which would cost significant time and space. We neither
-                # retreive the node_counter, which would be not consistent with
+                # retrieve the node_counter, which would be not consistent with
                 # our empty nodes.
                 self.working_nodes = abc.qe.WorkingNodeList(
                     hits=working_nodes.hits,
@@ -1313,8 +1023,8 @@ class VirtualSubstitution(abc.qe.QuantifierElimination):
             logger.info(working_nodes.final_statistics())
             logger.info(self.success_nodes.final_statistics('success'))
             logger.info(failure_nodes.final_statistics('failure'))
-            logger.info('importing results from mananager')
-            logger.debug('importing working nodes from mananager')
+            logger.info('importing results from manager')
+            logger.debug('importing working nodes from manager')
             # We do not retrieve the memory, which would cost significant time
             # and space. Same for success nodes and failure nodes below.
             timer.reset()
@@ -1327,7 +1037,7 @@ class VirtualSubstitution(abc.qe.QuantifierElimination):
             logger.debug(f'{self.time_import_working_nodes=:.3f}')
             assert self.working_nodes.nodes == []
             assert self.working_nodes.node_counter.total() == 0
-            logger.debug('importing failure nodes from mananager')
+            logger.debug('importing failure nodes from manager')
             timer.reset()
             self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
                                           hits=failure_nodes.hits,
