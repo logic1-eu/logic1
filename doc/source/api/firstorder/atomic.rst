@@ -2,9 +2,9 @@
 
 *Generic*
 
-***************************
-Terms, Variables, and Atoms
-***************************
+***********************
+Variables, Terms, Atoms
+***********************
 
 .. automodule:: logic1.firstorder.atomic
 

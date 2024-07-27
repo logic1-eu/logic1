@@ -14,14 +14,29 @@ logging.basicConfig(
 
 
 oo = float('Inf')
+"""A symbolic name for the float `inf` as an :data:`.Index`
+"""
 
+# discuss: should be a class
 Index: TypeAlias = int | float
+"""An index, which is either a positive integer or the float `inf`, which is
+represented by :data:`oo`
+"""
 
 
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
-    """Instances of the singleton VariableSet register, store, and provide
-    variables, which are instances of Terms and suitable for building atoms
-    using operators and methods defined in :class:`.Variable`.
+    """The infinite set of all variables belonging to the theory of Sets.
+    Variables are uniquely identified by their name, which is a
+    :external:class:`.str`. This class is a singleton, whose single instance is
+    assigned to :data:`.VV`.
+
+    .. seealso::
+        Final methods inherited from parent class:
+
+        * :meth:`.firstorder.atomic.VariableSet.get`
+            -- obtain several variables simultaneously
+        * :meth:`.firstorder.atomic.VariableSet.imp`
+            -- import variables into global namespace
     """
 
     _instance: ClassVar[Optional[VariableSet]] = None
@@ -31,6 +46,9 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return self._stack
 
     def __getitem__(self, index: str) -> Variable:
+        """Implements abstract method
+        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        """
         match index:
             case str():
                 self._used.update((index,))
@@ -75,6 +93,9 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 VV = VariableSet()
 
 
+# discuss: Variable is also used as Term. What exactly is its status wrt. the
+# interface specified by the abstract class firstorder.atomic.Term? Should it
+# inherit from Term to make sure that the interface is implemented?
 class Variable(firstorder.Variable['Variable']):
 
     wrapped_variable_set: VariableSet = VV
@@ -103,10 +124,8 @@ class Variable(firstorder.Variable['Variable']):
         return self.string
 
     def as_latex(self) -> str:
-        """Convert `self` to LaTeX.
-
-        Implements the abstract method
-        :meth:`logic1.firstorder.atomic.Term.as_Latex`.
+        """LaTeX representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.Term.as_latex`.
         """
         base = self.string.rstrip(string.digits)
         index = self.string[len(base):]
@@ -115,32 +134,43 @@ class Variable(firstorder.Variable['Variable']):
         return base
 
     def fresh(self) -> Variable:
+        """Returns a variable that has not been used so far. Implements
+        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
+        """
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     @staticmethod
     def sort_key(term: Variable) -> str:
+        """A sort key suitable for ordering instances of this class. Implements
+        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        """
         return term.string
 
     def subs(self, d: dict[Variable, Variable]) -> Variable:
+        """Simultaneous substitution of variables for variables.
+
+        >>> from logic1.theories.Sets import VV
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> f = x
+        >>> f.subs({x: y, y: z})
+        y
+        """
         return d.get(self, self)
 
     def vars(self) -> Iterator[Variable]:
-        """Extract the set of variables occurring in `self`.
-
-        Implements the abstract method
-        :meth:`logic1.firstorder.atomic.Term.vars`.
+        """An iterator that yields this variable. Implements the abstract
+        method :meth:`.firstorder.atomic.Term.vars`.
         """
         yield self
 
 
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable']):
 
-    @classmethod
-    def complement(cls) -> type[AtomicFormula]:
-        D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
-        return D[cls]
-
     def __le__(self, other: Formula) -> bool:
+        """Returns `True` if this atomic formula should be sorted before or is
+        equal to other. Implements abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.__le__`.
+        """
         L: Final = [C, C_, Eq, Ne]
         match other:
             case AtomicFormula():
@@ -167,23 +197,28 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
                 return True
 
     def __repr__(self) -> str:
+        SYMBOL: Final = {Eq: '==', Ne: '!=', C: 'C', C_: 'C_'}
+        SPACING: Final = ' '
         match self:
             case C() | C_():
-                return super().__repr__()
+                if self.index is oo:
+                    return f'{SYMBOL[self.op]}(oo)'
+                return f'{SYMBOL[self.op]}({self.index})'
             case Eq() | Ne():
-                SYMBOL: Final = {Eq: '==', Ne: '!='}
-                SPACING: Final = ' '
                 return f'{self.lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs}'
             case _:
                 assert False, f'{self}: {type(self)}'
 
     def __str__(self) -> str:
-        """Implements abstract method
-        :meth:`firstorder.atomic.AtomicFormula.__str__`.
+        """String representation of this atomic formula. Implements the
+        abstract method :meth:`.firstorder.atomic.AtomicFormula.__str__`.
         """
         return repr(self)
 
     def as_latex(self) -> str:
+        """Latex representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+        """
         match self:
             case C(index=index) if index == oo:
                 return f'C_\\infty'
@@ -201,6 +236,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
                 assert False, f'{self}: {type(self)}'
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
+        """Iterate over occurrences of variables that are elements of
+        `quantified`. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.bvars`.
+        """
         match self:
             case Eq() | Ne():
                 yield from (v for v in (self.lhs, self.rhs) if v in quantified)
@@ -209,7 +248,22 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
             case _:
                 assert False, f'{self}: {type(self)}'
 
+    @classmethod
+    def complement(cls) -> type[AtomicFormula]:
+        """Complement relation. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.complement`.
+
+        .. seealso::
+          Inherited method :meth:`.firstorder.atomic.AtomicFormula.to_complement`
+        """
+        D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
+        return D[cls]
+
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
+        """Iterate over occurrences of variables that are *not* elements of
+        `quantified`. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.fvars`.
+        """
         match self:
             case Eq() | Ne():
                 yield from (v for v in (self.lhs, self.rhs) if v not in quantified)
@@ -218,8 +272,35 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
             case _:
                 assert False, f'{self}: {type(self)}'
 
+    # discuss: Generally, return "Formula" or "AtomicFormula | _T | _F"?
+    def simplify(self) -> Formula:
+        """Fast basic simplification. The result is equivalent to self.
+        Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.
+        """
+        match self:
+            case Eq(lhs=lhs, rhs=rhs):
+                if lhs == rhs:
+                    return _T()
+                if Variable.sort_key(lhs) > Variable.sort_key(rhs):
+                    return rhs == lhs
+            case Ne(lhs=lhs, rhs=rhs):
+                if lhs == rhs:
+                    return _F()
+                if Variable.sort_key(lhs) > Variable.sort_key(rhs):
+                    return rhs != lhs
+            case C():
+                if self.index == 1:
+                    return _T()
+            case C_():
+                if self.index == 1:
+                    return _F()
+            case _:
+                assert False, self
+        return self
+
     def subs(self, d: dict[Variable, Variable]) -> AtomicFormula:
-        """Implements abstract :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        """Simultaneous substitution of variables for variables. Implements the
+        abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         match self:
             case C() | C_():
@@ -250,13 +331,6 @@ class Eq(AtomicFormula):
                     f'arguments must be variables; {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        if self.lhs == self.rhs:
-            return _T()
-        if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
-            return Eq(self.rhs, self.lhs)
-        return self
-
 
 class Ne(AtomicFormula):
 
@@ -278,29 +352,31 @@ class Ne(AtomicFormula):
                     f'arguments must be variables - {arg} is {type(arg)}')
         self.args = (lhs, rhs)
 
-    def simplify(self) -> Formula:
-        if self.lhs == self.rhs:
-            return _F()
-        if Variable.sort_key(self.lhs) > Variable.sort_key(self.rhs):
-            return Ne(self.rhs, self.lhs)
-        return self
-
 
 class C(AtomicFormula):
-    r"""A class whose instances are cardinality constraints in the sense that
-    their toplevel operator represents a constant relation symbol :math:`C_n`
-    where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical interpretation in
-    a domain :math:`D` is that :math:`C_n` holds iff :math:`|D| \geq n`.
+    """Cardinality constraints. From a mathematical perspective, the instances
+    are constant relation symbols with an index, which is either a positive
+    integer or the float `inf`, represented as ``oo``. ``C(n)`` holds iff there
+    are at least ``n`` different elements in the universe. This is not a
+    statement about the index ``n`` but about a range of models where this
+    constant relation holds.
 
-    The class constructor takes one argument, which is the index `n`. It takes
-    care that instance with equal indices are identical.
+    In the following example, ``f`` states that there should be at least 2
+    elements but not 3 elements or more:
 
-    >>> c_1_1 = C(1)
-    >>> c_1_2 = C(1)
-    >>> c_oo = C(oo)
-    >>> c_1_1 is c_1_2
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> f = Ex([x, y], x != y) & All([x, y, z], Or(x == y, y == z, z == x))
+    >>> qe(f)  # quantifier elimination:
+    And(C(2), C_(3))
+
+    The class constructor takes care that instances with equal indices are
+    identical:
+
+    >>> C(1) is C(1)
     True
-    >>> c_1_1 == c_oo
+    >>> C(1) == C(2)
     False
     """
 
@@ -308,6 +384,8 @@ class C(AtomicFormula):
 
     @property
     def index(self) -> Index:
+        """The index of the constant relation symbol
+        """
         return self.args[0]
 
     def __init__(self, index: Index) -> None:
@@ -324,36 +402,19 @@ class C(AtomicFormula):
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
 
-    def simplify(self) -> Formula:
-        """Implements abstract method
-        :meth:`firstorder.atomic.AtomicFormula.simplify`.
-        """
-        return self
-
 
 class C_(AtomicFormula):
-    r"""A class whose instances are cardinality constraints in the sense that
-    their toplevel operator represents a constant relation symbol
-    :math:`\bar{C}_n` where :math:`n \in \mathbb{N} \cup \{\infty\}`. A typical
-    interpretation in a domain :math:`D` is that :math:`\bar{C}_n` holds iff
-    :math:`|D| < n`.
-
-    The class constructor takes one argument, which is the index `n`. It takes
-    care that instance with equal indices are identical.
-
-    >>> c_1_1 = C_(1)
-    >>> c_1_2 = C_(1)
-    >>> c_oo = C_(oo)
-    >>> c_1_1 is c_1_2
-    True
-    >>> c_1_1 == c_oo
-    False
+    """Cardinality constraints. The class :class:`C_` is dual to :class:`C`;
+    more precisely, for every index ``n``, we have that ``C_(n)`` is the dual
+    relation of ``C(n)``, and vice versa.
     """
 
     _instances: ClassVar[dict[Index, C_]] = dict()
 
     @property
     def index(self) -> Index:
+        """The index of the constant relation symbol
+        """
         return self.args[0]
 
     def __init__(self, index: Index) -> None:
@@ -369,12 +430,6 @@ class C_(AtomicFormula):
         if index not in cls._instances:
             cls._instances[index] = super().__new__(cls)
         return cls._instances[index]
-
-    def simplify(self) -> Formula:
-        """Implements abstract method
-        :meth:`firstorder.atomic.AtomicFormula.simplify`.
-        """
-        return self
 
 
 from .typing import Formula

@@ -35,7 +35,7 @@ autodoc_default_options = {
     'show-inheritance': True,
 }
 
-autodoc_type_aliases = {'tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]': 'QuantifierBlock'}
+autodoc_type_aliases = {}
 
 # _extra_footer = ''
 

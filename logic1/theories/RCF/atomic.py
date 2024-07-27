@@ -78,7 +78,7 @@ polynomial_ring = PolynomialRing()
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
-    :external:class:`.str`. This class is a singleton, whose only instance is
+    :external:class:`.str`. This class is a singleton, whose single instance is
     assigned to :data:`.VV`.
 
     .. seealso::
@@ -551,8 +551,8 @@ class Term(firstorder.Term['Term', 'Variable']):
 
     @staticmethod
     def sort_key(term: Term) -> Polynomial:
-        """A sort key suitable for ordering instances of Term. Implements the
-        abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        """A sort key suitable for ordering instances of this class. Implements
+        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
         return term.poly
 
@@ -575,7 +575,8 @@ class Term(firstorder.Term['Term', 'Variable']):
         return Term(self.poly.subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
-        """An iterator that yields each variable of this term once.
+        """An iterator that yields each variable of this term once. Implements
+        the abstract method :meth:`.firstorder.atomic.Term.vars`.
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.variables()
@@ -653,6 +654,9 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return f'{self.lhs.poly}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.poly}'
 
     def as_latex(self) -> str:
+        """Latex representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+        """
         SYMBOL: Final = {
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
@@ -678,7 +682,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
     def complement(cls) -> type[AtomicFormula]:
         """Complement relation. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.complement`.
-        """
+
+        .. seealso::
+          Inherited method :meth:`.firstorder.atomic.AtomicFormula.to_complement`
+          """
         D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
         return D[cls]
 

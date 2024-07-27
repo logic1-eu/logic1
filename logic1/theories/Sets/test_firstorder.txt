@@ -25,3 +25,29 @@ x == y
 >>> f = And(x == y, T, x == y, And(x == z, y == x))
 >>> ~ All(x, Ex(y, f)).simplify()
 Not(All(x, Ex(y, And(x == y, x == z))))
+
+atomic simplification
+>>> (x == x).simplify()
+T
+>>> (x == y).simplify()
+x == y
+>>> (y == x).simplify()
+x == y
+>>> (x != x).simplify()
+F
+>>> (x != y).simplify()
+x != y
+>>> (y != x).simplify()
+x != y
+>>> C(1).simplify()
+T
+>>> C(3).simplify()
+C(3)
+>>> C(oo).simplify()
+C(oo)
+>>> C_(1).simplify()
+F
+>>> C_(3).simplify()
+C_(3)
+>>> C_(oo).simplify()
+C_(oo)

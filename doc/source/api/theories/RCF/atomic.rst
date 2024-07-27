@@ -3,7 +3,7 @@
 *Real Closed Fields*
 
 ***********************
-Terms, Variables, Atoms
+Variables, Terms, Atoms
 ***********************
 
 .. automodule:: logic1.theories.RCF.atomic
@@ -118,6 +118,8 @@ Terms, Variables, Atoms
       The left hand side term and the right hand side term of an atomic formula.
 
     .. automethod:: __le__
+
+    .. automethod:: __str__
 
     .. automethod:: as_latex
 
