@@ -4,10 +4,15 @@ pytest:
 pytest-full:
 	pytest -n 8 --doctest-modules
 
+test-doc:
+	cd doc && make test
+
 mypy:
 	mypy logic1
 
 test: mypy pytest
+
+test-all: test test-doc
 
 pygount:
 	pygount -f summary logic1
