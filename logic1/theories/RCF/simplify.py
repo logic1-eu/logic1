@@ -276,15 +276,15 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
     prefer_weak: bool = False
 
     @property
-    def class_AT(self) -> type[AtomicFormula]:
+    def class_alpha(self) -> type[AtomicFormula]:
         return AtomicFormula
 
     @property
-    def class_TH(self) -> type[Theory]:
+    def class_theta(self) -> type[Theory]:
         return Theory
 
     @property
-    def TH_kwargs(self) -> dict[str, bool]:
+    def class_theta_kwargs(self) -> dict[str, bool]:
         return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
 
     def __call__(self,

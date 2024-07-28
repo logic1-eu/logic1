@@ -132,15 +132,15 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable']):
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'Theory']):
 
     @property
-    def class_AT(self) -> type[AtomicFormula]:
+    def class_alpha(self) -> type[AtomicFormula]:
         return AtomicFormula
 
     @property
-    def class_TH(self) -> type[Theory]:
+    def class_theta(self) -> type[Theory]:
         return Theory
 
     @property
-    def TH_kwargs(self) -> dict[str, bool]:
+    def class_theta_kwargs(self) -> dict[str, bool]:
         return dict()
 
     def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:

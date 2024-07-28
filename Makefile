@@ -1,3 +1,6 @@
+.PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
+		coverage coverage_html clean veryclean
+
 pytest:
 	pytest -n 8 --exitfirst --doctest-modules
 
@@ -13,6 +16,9 @@ mypy:
 test: mypy pytest
 
 test-all: test test-doc
+
+doc:
+	cd doc && make clean html
 
 pygount:
 	pygount -f summary logic1

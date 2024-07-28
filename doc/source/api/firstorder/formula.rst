@@ -8,8 +8,8 @@
 First-order Formulas
 ********************
 
-The following picture summarizes the inheritance hierarchy. Next, we are going
-to describe the occurring classes starting at the top.
+The following class diagram summarizes the inheritance hierarchy. Next, we are
+going to describe the occurring classes starting at the top.
 
 .. topic:: |blank|
 

@@ -1,7 +1,13 @@
+"""This Module provides a generic abstract implementation of simplifcication
+ based on generating and propagating internal theories during recursion. This
+ is the essentially the *standard simplifier*, which has been proposed for
+ ordered fields in [DS97]_.
+"""
+
 import more_itertools
 
 from abc import abstractmethod
-from typing import Any, cast, Generic, Iterable, Optional, Self, TypeVar
+from typing import cast, Generic, Iterable, Optional, Self, TypeVar
 
 from ..firstorder import All, And, AtomicFormula, Ex, _F, Formula, Or, _T
 from ..firstorder.formula import α, τ, χ
@@ -15,56 +21,104 @@ from ..support.tracing import trace  # noqa
 θ = TypeVar('θ', bound='Theory')
 
 
+# discuss: The two instances could be abstract properties. They are not
+# specified by the abstract class, because Simplify need not know about them.
+# Other techniques (namely labels) are possible but not expected.
 class Theory(Generic[α, τ, χ]):
+    """This abstract class serves as an upper bound for the type variable
+    :data:`θ` in :class:`.abc.simplify.Simplify`. It specifies an interface
+    comprising methods required there.
+
+    The principal idea is that a :class:`Theory` holds two instances of
+    information equivalent to a conjunction of atomic formulas. In the course
+    of recursive simplification in :class:`.abc.simplify.Simplify`, one of
+    those is inherited from above, and the other one is enrichted with
+    information from the toplevel of the subformula currently under
+    consideration.
+    """
 
     class Inconsistent(Exception):
         pass
 
+    # discuss: do we need __init__ here?
     @abstractmethod
     def __init__(self) -> None:
         ...
 
+    # discuss: Kann man das Or im Kommentar so schreiben? Du hattest mal
+    # gesagt, dass man da was verbessern könnte. __iter__?
     @abstractmethod
     def add(self, gand: type[And[α, τ, χ] | Or[α, τ, χ]], atoms: Iterable[α]) -> None:
+        """Add to this theory information originating from `atoms`. If `gand`
+        is :class:`.And`, consider ``And(*atoms)``. If `gand` is
+        :class:`.Or`, consider ``Or(Not(at) for at in atoms)``.
+        """
         ...
 
     @abstractmethod
     def extract(self, gand: type[And[α, τ, χ] | Or[α, τ, χ]]) -> Iterable[α]:
+        """Extract from this theory information that must be represented on the
+        toplevel of the subformula currently under consideration. If `gand` is
+        :class:`.And`, the result represents a conjunction.  If `gand` is
+        :class:`.Or`,  it represents a disjunction.
+        """
         ...
 
     @abstractmethod
-    def next_(self, remove: Any = None) -> Self:
+    def next_(self, remove: Optional[χ] = None) -> Self:
+        """Copy make the current information the inherited information, while
+        removing all information involving the variable `remove`. If not
+        :obj:`None`, the variable `remove` is quantified in the current
+        recursion step.
+        """
         ...
 
 
 class Simplify(Generic[α, τ, χ, θ]):
+    """Deep simplification following [DS97]_.
 
+    .. seealso::
+      Derived classes in various theories: :class:`.RCF.simplify.Simplify`,
+      :class:`.Sets.simplify.Simplify`
+    """
+
+    # Discuss: Polymorphie
     @property
     @abstractmethod
-    def class_AT(self) -> type[α]:
-        ...
-
-    @property
-    @abstractmethod
-    def class_TH(self) -> type[θ]:
-        ...
-
-    @property
-    @abstractmethod
-    def TH_kwargs(self) -> dict[str, bool]:
-        ...
-
-    def simplify(self, f: Formula[α, τ, χ], assume: Optional[list[α]]) -> Formula[α, τ, χ]:
+    def class_alpha(self) -> type[α]:
+        """The class used to instantiate :data:`.α`. This allows to generically
+        generate instances of that class within this abstract simplifier.
+        Furthermore, it finds use in structural pattern matching.
         """
-        Deep simplification according to [DS95].
+        ...
 
-        [DS95] A. Dolzmann, T. Sturm. Simplification of Quantifier-Free
-               Formulae over Ordered Fields J. Symb. Comput. 24(2):209–231,
-               1997. Open access at doi:10.1006/jsco.1997.0123
+    @property
+    @abstractmethod
+    def class_theta(self) -> type[θ]:
+        """The class used to instantiate :data:`.θ`. This allows to generically
+        generate instances of that class within this abstract simplifier.
+        Furthermore, it finds use in structural pattern matching.
+        """
+        ...
+
+    # discuss: Kann man die nicht irgendwie mit currying in class_theta packen?
+    # Ich wollte aus dem bool ein object machen, das schmeisst Typfehler.
+    @property
+    @abstractmethod
+    def class_theta_kwargs(self) -> dict[str, bool]:
+        """Keyword arguments to pass when using :attr:`class_theta` as a
+        constructor.
+        """
+        ...
+
+    # discsuss: rename to __call__?
+    def simplify(self, f: Formula[α, τ, χ], assume: Optional[list[α]]) -> Formula[α, τ, χ]:
+        """The main entry point to be used by the `__call__` method of
+        subclasses within theories.
         """
         if assume is None:
             assume = []
-        th = self.class_TH(**self.TH_kwargs)
+        th = self.class_theta(**self.class_theta_kwargs)
         try:
             th.add(And, assume)
         except th.Inconsistent:
@@ -89,7 +143,7 @@ class Simplify(Generic[α, τ, χ, θ]):
                 return self._simpl_and_or(f, th)
             case _F() | _T():
                 return f
-            case self.class_AT():
+            case self.class_alpha():
                 # Build a trivial binary And in order to apply th. Unary And
                 # does not exist.
                 return self._simpl_and_or(And(f, _T()), th)
@@ -107,7 +161,7 @@ class Simplify(Generic[α, τ, χ, θ]):
             :data:`args`, in that order.
             """
             def is_AT(f: Formula[α, τ, χ]) -> bool:
-                if isinstance(f, self.class_AT):
+                if isinstance(f, self.class_alpha):
                     return True
                 assert not isinstance(f, AtomicFormula), (type(f), f)
                 return False
@@ -135,7 +189,7 @@ class Simplify(Generic[α, τ, χ, θ]):
                 new_atoms: Iterable[α] = ()
             elif isinstance(simplified_arg, gand):
                 new_others, new_atoms = split(simplified_arg.args)
-            elif isinstance(simplified_arg, self.class_AT):
+            elif isinstance(simplified_arg, self.class_alpha):
                 new_others = set()
                 new_atoms = (simplified_arg,)
             elif isinstance(simplified_arg, gand.dual()):
@@ -161,14 +215,42 @@ class Simplify(Generic[α, τ, χ, θ]):
     @abstractmethod
     def simpl_at(self,
                  atom: α,
-                 context: Optional[type[And[α, τ, χ]] | type[Or[α, τ, χ]]]) -> Formula[α, τ, χ]:
+                 context: Optional[type[And[α, τ, χ]] | type[Or[α, τ, χ]]]) \
+            -> Formula[α, τ, χ]:
+        """Simplify the atomic formula `atom`. The `context` tells whether
+        `atom` occurs within a conjunction or a disjunction. This can be taken
+        into consideration for the inclusion of certain simplification
+        strategies. For instance, simplification of ``xy == 0`` to ``Or(x == 0,
+        y == 0)`` over the reals could be desirable within a disjunction but
+        not otherwise.
+        """
         # Does not receive the theory, by design.
         ...
 
 
+# discuss: This is parameterized with an instance of Simplify in a weird way.
+# Should is_valid better be a method of Simplify?
 class IsValid(Generic[α, τ, χ]):
+    """Simplification-based heuristic test for vailidity of a formula.
 
+    .. admonition:: Mathematical definition
+
+      A first-order formula is *valid* if it holds for all values all free
+      variables.
+
+    .. seealso::
+      Derived classes in various theories: :class:`.RCF.simplify.IsValid`,
+      :class:`.Sets.simplify.IsValid`
+    """
+
+    # discsuss: rename to __call__?
     def is_valid(self, f: Formula[α, τ, χ], assume: Optional[list[α]]) -> Optional[bool]:
+        """The main entry point to be used by the `__call__` method of
+        subclasses within theories. Returns :data:`True` or :data:`False` if
+        :meth:`_simplify` succeeds in heuristically simplifying `f` to ``_T()``
+        or ``_F()``, respectively. Returns :data:`None` in the sense of
+        "don't know" otherwise.
+        """
         if assume is None:
             assume = []
         match self._simplify(f, assume):
@@ -179,6 +261,10 @@ class IsValid(Generic[α, τ, χ]):
             case _:
                 return None
 
+    # discuss: _simplify ist das einzige was dokomentiert wird und hat einen
+    # Underscore.
     @abstractmethod
     def _simplify(self, f: Formula[α, τ, χ], assume: list[α]) -> Formula[α, τ, χ]:
+        """The simplifier to be used by :meth:`is_valid`.
+        """
         ...
