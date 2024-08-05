@@ -83,8 +83,6 @@ Variables, Terms, Atoms
 
     .. automethod:: is_definite
 
-    .. automethod:: is_variable
-
     .. automethod:: is_zero
 
     .. automethod:: lc

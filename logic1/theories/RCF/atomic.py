@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 from enum import auto, Enum
-import operator
 import sage.all as sage  # type: ignore[import-untyped]
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
 from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
     Polynomial_generic_dense as UnivariatePolynomial)
-from types import BuiltinFunctionType
 from typing import Any, ClassVar, Final, Iterable, Iterator, Self
 
 from ... import firstorder
 from ...firstorder import _T, _F
+from ...support.excepthook import NoTraceException
 
 from ...support.tracing import trace  # noqa
 
@@ -173,7 +172,7 @@ class Term(firstorder.Term['Term', 'Variable']):
 
     _poly: Polynomial
 
-    # discuss: The property should be private
+    # The property should be private. We might want a method to_sage()
     @property
     def poly(self) -> Polynomial:
         """
@@ -195,9 +194,7 @@ class Term(firstorder.Term['Term', 'Variable']):
             return Term(self.poly + other.poly)
         return Term(self.poly + other)
 
-    # discuss: Doku unterschlägt Sage-Argumente
-    def __eq__(  # type: ignore[override]
-            self, other: Term | Polynomial | sage.Integer | int) -> Eq:
+    def __eq__(self, other: Term | int) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
         # it makes no sense to compare terms with general objects. We have
         # Eq.__bool__, which supports some comparisons in boolean contexts.
@@ -207,13 +204,13 @@ class Term(firstorder.Term['Term', 'Variable']):
             lhs = - lhs
         return Eq(lhs, Term(0))
 
-    def __ge__(self, other: Term | Polynomial | sage.Integer | int) -> Ge | Le:
+    def __ge__(self, other: Term | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Le(- lhs, 0)
         return Ge(lhs, 0)
 
-    def __gt__(self, other: Term | Polynomial | sage.Integer | int) -> Gt | Lt:
+    def __gt__(self, other: Term | int) -> Gt | Lt:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Lt(- lhs, 0)
@@ -222,7 +219,7 @@ class Term(firstorder.Term['Term', 'Variable']):
     def __hash__(self) -> int:
         return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
 
-    def __init__(self, arg: Polynomial | sage.Integer | int) -> None:
+    def __init__(self, arg: Polynomial | sage.Integer | int | UnivariatePolynomial) -> None:
         match arg:
             case Polynomial():
                 self.poly = arg
@@ -245,13 +242,13 @@ class Term(firstorder.Term['Term', 'Variable']):
         for coefficient, power_product in self.poly:
             yield int(coefficient), Term(power_product)
 
-    def __le__(self, other: Term | Polynomial | sage.Integer | int) -> Ge | Le:
+    def __le__(self, other: Term | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Ge(- lhs, 0)
         return Le(lhs, 0)
 
-    def __lt__(self, other: Term | Polynomial | sage.Integer | int) -> Gt | Lt:
+    def __lt__(self, other: Term | int) -> Gt | Lt:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             return Gt(- lhs, 0)
@@ -263,7 +260,7 @@ class Term(firstorder.Term['Term', 'Variable']):
         return Term(self.poly * other)
 
     def __ne__(  # type: ignore[override]
-            self, other: Term | Polynomial | sage.Integer | int) -> Ne:
+            self, other: Term | int) -> Ne:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
             lhs = - lhs
@@ -295,10 +292,10 @@ class Term(firstorder.Term['Term', 'Variable']):
             return self + (- other)
         return Term(self.poly - other)
 
-    # discuss: Was soll das machen? Ich kenne kein einziges Beispiel, das nicht
-    # kracht. Man könnte '/' und '%' als quotient und remainder machen, aber
-    # wir brauchen das nicht.
     def __truediv__(self, other: object) -> Term:
+        # x*y / x yields y as a Sage rational function and throws here.
+        if isinstance(other, Term):
+            return Term(self.poly / other.poly)
         return Term(self.poly / other)
 
     def __xor__(self, other: object) -> Term:
@@ -433,7 +430,6 @@ class Term(firstorder.Term['Term', 'Variable']):
         """
         return self.poly.is_constant()
 
-    # discuss: Soll das is_* heißen?
     def is_definite(self) -> TSQ:
         """A fast heuristic test whether this term is positive or non-negative
         for all real choices of variables.
@@ -459,12 +455,6 @@ class Term(firstorder.Term['Term', 'Variable']):
         if self.poly.constant_coefficient() == 0:
             return TSQ.WEAK
         return TSQ.STRICT
-
-    # discuss: Do we (still) need this?
-    def is_variable(self) -> bool:
-        """Return :obj:`True` if this term is a variable.
-        """
-        return self.poly in self.poly.parent().gens()
 
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.
@@ -571,7 +561,15 @@ class Term(firstorder.Term['Term', 'Variable']):
             :external:meth:`MPolynomial_libsingular.subs()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
         """
-        sage_keywords = {str(v.poly): t.poly for v, t in d.items()}
+        sage_keywords = dict()
+        for variable, substitute in d.items():
+            match substitute:
+                case Term():
+                    sage_keywords[str(variable.poly)] = substitute.poly
+                case int():
+                    sage_keywords[str(variable.poly)] = substitute
+                case _:
+                    assert False, (self, d)
         return Term(self.poly.subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
@@ -611,11 +609,27 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """
         return self.args[1]
 
-    def __init__(self, lhs: Term | Polynomial | sage.Integer | int,
-                 rhs: Term | Polynomial | sage.Integer | int):
-        # sage.Integer is a candidate for removal
-        assert not isinstance(lhs, sage.Integer)
-        assert not isinstance(rhs, sage.Integer)
+    # discuss: document!
+    def __bool__(self) -> bool:
+        match self:
+            case Eq():
+                return self.lhs.poly == self.rhs.poly
+            case Ne():
+                return self.lhs.poly != self.rhs.poly
+            case Ge():
+                return self.lhs.poly >= self.rhs.poly
+            case Gt():
+                return self.lhs.poly > self.rhs.poly
+            case Le():
+                return self.lhs.poly <= self.rhs.poly
+            case Lt():
+                return self.lhs.poly < self.rhs.poly
+            case _:
+                assert False, self
+
+    def __init__(self, lhs: Term | int, rhs: Term | int):
+        if not isinstance(self, (Eq, Ne, Ge, Gt, Le, Lt)):
+            raise NoTraceException('Instantiate one of Eq, Ne, Ge, Gt, Le, Lt instead')
         if not isinstance(lhs, Term):
             lhs = Term(lhs)
         if not isinstance(rhs, Term):
@@ -675,9 +689,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             if v in quantified:
                 yield v
 
-    # discuss: If the following class methods were called on AtomicFormula
-    # itself, then the dictionary access would raise an exception, which is not
-    # caught at the moment.
     @classmethod
     def complement(cls) -> type[AtomicFormula]:
         """Complement relation. Implements the abstract method
@@ -689,8 +700,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         D: Any = {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}
         return D[cls]
 
-    # discuss: firstorder.atomic.AtomicFormula defines to_complement(), which
-    # is used quite heavily. Should we define to_converse and to_dual here?
     @classmethod
     def converse(cls) -> type[AtomicFormula]:
         """Converse relation.
@@ -717,22 +726,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             if v not in quantified:
                 yield v
 
-    # discuss: not used. It had once been used by the simplify method.
-    @classmethod
-    def python_operator(cls) -> BuiltinFunctionType:
-        """The operator correponding to `cls` for evaluation of constant
-        relations.
-        """
-        D: Any = {Eq: operator.eq, Ne: operator.ne,
-                  Le: operator.le, Lt: operator.lt,
-                  Ge: operator.ge, Gt: operator.gt}
-        return D[cls]
-
-    def simplify(self) -> AtomicFormula | _F | _T:
+    def simplify(self) -> Formula:
         """Fast basic simplification. The result is equivalent to self.
         Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.
         """
-        assert isinstance(self, (Eq, Ge, Gt, Le, Lt, Ne)), self  # discuss: required?
         lhs = self.lhs - self.rhs
         if lhs.is_constant():
             return _T() if self.op(lhs, 0) else _F()
@@ -759,55 +756,27 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
 
 
 class Eq(AtomicFormula):
-
-    # discuss: should this be documented?
-    def __bool__(self) -> bool:
-        return self.lhs.poly == self.rhs.poly
+    pass
 
 
 class Ne(AtomicFormula):
-
-    def __bool__(self) -> bool:
-        return self.lhs.poly != self.rhs.poly
+    pass
 
 
 class Ge(AtomicFormula):
-
-    def __bool__(self) -> bool:
-        return self.lhs.poly >= self.rhs.poly
+    pass
 
 
 class Le(AtomicFormula):
-
-    def __bool__(self) -> bool:
-        return self.lhs.poly <= self.rhs.poly
+    pass
 
 
 class Gt(AtomicFormula):
-
-    def __bool__(self) -> bool:
-        return self.lhs.poly > self.rhs.poly
+    pass
 
 
 class Lt(AtomicFormula):
-
-    def __bool__(self) -> bool:
-        return self.lhs.poly < self.rhs.poly
+    pass
 
 
 from .typing import Formula
-
-
-# from typing import reveal_type, TYPE_CHECKING
-
-# if TYPE_CHECKING:
-
-#     def test() -> None:
-#         from .. import Sets
-#         x, y = VV.get('x', 'y')
-#         z1, z2 = Sets.VV.get('z1', 'z2')
-#         reveal_type(x == 0)
-#         f = firstorder.And(x == 0, z1 == z2)
-#         reveal_type(f)
-#         at = next(f.atoms())
-#         reveal_type(at)

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from abc import abstractmethod
 import functools
-from typing import Any, Callable, Final, Generic, Iterable, Iterator, Self, TypeVar
+from typing import (Any, Callable, Final, Generic, Iterable, Iterator, Self,
+                    TypeGuard, TypeVar)
 
 from ..support.tracing import trace  # noqa
 
@@ -20,6 +21,12 @@ from ..support.tracing import trace  # noqa
 χ = TypeVar('χ', bound='Variable')
 """A type variable denoting a type of variables with upper bound
 :class:`logic1.firstorder.atomic.Variable`.
+"""
+
+σ = TypeVar('σ')
+"""A type variable denoting a type admissible as a dictionary entry in
+:meth:`.subs`, in addition to terms. A typical example is σ = int in real
+closed fields.
 """
 
 
@@ -50,11 +57,11 @@ class Formula(Generic[α, τ, χ]):
 
     .. note::
 
-        :class:`Formula` depends on three type variables :data:`α`, :data:`τ`,
-        :data:`χ` for the types ocurring atomic formula, terms, and variables,
-        respectively. They appear in type annotations used by static type
-        checkers but are not relevant for the either interactive use or use
-        as a library.
+        :class:`Formula` depends on three type variables :data:`.α`,
+        :data:`.τ`, :data:`.χ` for the types ocurring atomic formula, terms,
+        and variables, respectively. They appear in type annotations used
+        by static type checkers but are not relevant for the either
+        interactive use or use as a library.
     """
 
     @property
@@ -539,6 +546,14 @@ class Formula(Generic[α, τ, χ]):
             case _:
                 assert False, type(self)
 
+    @staticmethod
+    def is_atomic(f: Formula[α, τ, χ]) -> TypeGuard[α]:
+        return isinstance(f, AtomicFormula)
+
+    @staticmethod
+    def is_term(t: τ | σ) -> TypeGuard[τ]:
+        return isinstance(t, Term)
+
     def matrix(self) -> tuple[Formula[α, τ, χ], Prefix[α, τ, χ]]:
         """The matrix of a prenex formula is its quantifier free part. Its
         prefix is a double ended queue holding blocks of quantifiers.
@@ -710,28 +725,20 @@ class Formula(Generic[α, τ, χ]):
            `simplify` methods of classes derived from :class:`AtomicFormula
            <.firstorder.atomic.AtomicFormula>` within various theories:
 
-           * :meth:`RCF.atomic.Eq.simplify <logic1.theories.RCF.atomic.Eq.simplify>` \
-            -- real closed fields, equal
-           * :meth:`RCF.atomic.Ge.simplify <logic1.theories.RCF.atomic.Ge.simplify>` \
-            -- real closed fields, greater than or equal
-           * :meth:`RCF.atomic.Gt.simplify <logic1.theories.RCF.atomic.Gt.simplify>` \
-            -- real closed fields, greater than
-           * :meth:`RCF.atomic.Le.simplify <logic1.theories.RCF.atomic.Le.simplify>` \
-            -- real closed fields, less than or equal
-           * :meth:`RCF.atomic.Lt.simplify <logic1.theories.RCF.atomic.Lt.simplify>` \
-            -- real closed fields, less than
-           * :meth:`RCF.atomic.Ne.simplify <logic1.theories.RCF.atomic.Ne.simplify>` \
-            -- real closed fields, not equal
-           * :meth:`Sets.atomic.Eq.simplify <logic1.theories.Sets.atomic.Eq.simplify>` \
-            -- sets, equal
-           * :meth:`Sets.atomic.Ne.simplify <logic1.theories.Sets.atomic.Ne.simplify>` \
-            -- sets, not equal
+           * :meth:`RCF.atomic.AtomicFormula.simplify
+             <logic1.theories.RCF.atomic.AtomicFormula.simplify>` \
+            -- real closed fields
+           * :meth:`Sets.atomic.AtomicFormula.simplify
+             <logic1.theories.Sets.atomic.AtomicFormula.simplify>` \
+            -- theory of Sets
 
            More powerful simplifiers provided by various theories:
 
-           * :func:`RCF.simplify.simplify <logic1.theories.RCF.simplify.simplify>`
+           * :func:`RCF.simplify.simplify() \
+             <logic1.theories.RCF.simplify.simplify>`
                 -- real closed fields, standard simplifier based on implicit theories
-           * :func:`Sets.simplify.simplify <logic1.theories.Sets.simplify.simplify>`
+           * :func:`Sets.simplify.simplify() \
+              <logic1.theories.Sets.simplify.simplify>`
                 -- sets, standard simplifier based on implicit theories
         """
         match self:

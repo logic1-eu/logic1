@@ -1,3 +1,14 @@
+"""This module provides an implementation of *deep simplifcication* based on
+generating and propagating internal theories during recursion in Real Closed
+fields. This is essentially the *standard simplifier*, which has been proposed
+for Ordered Fields in [DS97]_.
+
+.. [DS97]
+  A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
+  Ordered Fields.  J. Symb. Comput. 24(2):209–231, 1997. Open access at
+  `doi:10.1006/ jsco.1997.0123 <https://doi.org/10.1006/jsco.1997.0123>`_
+"""
+
 from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
@@ -14,6 +25,9 @@ from ...support.tracing import trace  # noqa
 
 
 class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
+    """Implements :class:`.abc.simplify.Theory`. Required by
+    :class:`.RCF.simplify.Simplify`.
+    """
 
     class _Interval:
         # Non-empty real intervals. Raises Inconsistent when an empty interval
@@ -116,8 +130,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
                 # exc. We are going to use inf and sup in contrast to start and
                 # end, because ivl can be a FiniteSet.
                 if ivl.start in exc:
-                    # It follows that ivl is left-closed. Theory._Interval raises
-                    # Inconsonsitent if ivl gets empty.
+                    # It follows that ivl is left-closed. Theory._Interval
+                    # raises Inconsistent if ivl gets empty.
                     ivl = Theory._Interval(True, ivl.start, ivl.end, ivl.ropen)
                     exc = exc.difference({ivl.start})
                 if ivl.end in exc:
@@ -149,9 +163,9 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
         absolute summand, and rational :math:`q` such that :data:`f` is
         equivalent to :math:`p \rho q`.
 
-        We assume that :data:`f` has gone through :meth:`_simpl_at` so that its
-        right hand side is zero and its left hand side polynomial has gone
-        through SymPy's :meth:`expand`.
+        We assume that :data:`f` has gone through :meth:`_simpl_at` so that
+        its right hand side is zero and its left hand side polynomial has
+        gone through SymPy's :meth:`expand`.
 
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
@@ -168,10 +182,10 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
         p = lhs + q
         c = p.content()
         p /= c
-        # Given that _simpl_at has procuced primitive polynomial, q != 0 will
-        # not be divisible by c. This is relevant for the reconstruction in
-        # _compose_atom to work.
-        assert c == 1 or not q % c == 0, f'{c} divides {q}'
+        # Given that _simpl_at has produced a primitive polynomial, q != 0
+        # will not be divisible by c. This is relevant for the reconstruction
+        # in _compose_atom to work. assert c == 1 or not q % c == 0,
+        # f'{c} divides {q}'
         return f.op, p, Rational(q) / Rational(c)
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
@@ -270,29 +284,29 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
 
 
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theory']):
+    """Deep simplification following [DS97]_. Implements
+    :class:`.abc.simplify.Simplify`.
+    """
 
     explode_always: bool = True
     prefer_order: bool = True
     prefer_weak: bool = False
 
-    @property
-    def class_alpha(self) -> type[AtomicFormula]:
-        return AtomicFormula
-
-    @property
-    def class_theta(self) -> type[Theory]:
-        return Theory
-
-    @property
-    def class_theta_kwargs(self) -> dict[str, bool]:
-        return {'prefer_weak': self.prefer_weak, 'prefer_order': self.prefer_order}
+    def create_initial_theory(self) -> Theory:
+        """Implements the abstract method
+        :meth:`.abc.simplify.Simplify.create_initial_theory`.
+        """
+        return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
 
     def __call__(self,
                  f: Formula,
-                 assume: Optional[list[AtomicFormula]] = None,
+                 assume: Iterable[AtomicFormula] = [],
                  explode_always: bool = True,
                  prefer_order: bool = True,
                  prefer_weak: bool = False) -> Formula:
+        """Make instances of this class callable. For a documentation of the
+        parameters see the function :func:`.RCF.simplify.simplify` below.
+        """
         self.explode_always = explode_always
         self.prefer_order = prefer_order
         self.prefer_weak = prefer_weak
@@ -301,6 +315,9 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
     def simpl_at(self,
                  atom: AtomicFormula,
                  context: Optional[type[And] | type[Or]]) -> Formula:
+        """Implements the abstract method
+        :meth:`.abc.simplify.Simplify.simpl_at`.
+        """
         # MyPy does not recognize that And[Any, Any, Any] is an instance of
         # Hashable. https://github.com/python/mypy/issues/11470
         return self._simpl_at(atom, context, self.explode_always)  # type: ignore[arg-type]
@@ -434,17 +451,47 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
 
 
 simplify = Simplify()
+r"""This function establishes the user interface to the standard simplifier.
+Technically, it is an instance of the callable class
+:class:`.RCF.simplify.Simplify`.
 
+:param f:
+  The formula to be simplified
 
-class IsValid(abc.simplify.IsValid['AtomicFormula', 'Term', 'Variable']):
+:param assume:
+  A list of atomic formulas that are assumed to hold. The
+  simplification result is equivalent modulo those assumptions.
 
-    def __call__(self,
-                 f: Formula,
-                 assume: Optional[list[AtomicFormula]] = None) -> Optional[bool]:
-        return self.is_valid(f, assume)
+:param explode_always:
+  Simplification can split certain atomic formula built from products or square
+  sums:
 
-    def _simplify(self, f: Formula, assume: list[AtomicFormula]) -> Formula:
-        return simplify(f, assume)
+  .. admonition:: Example
 
+    1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0` and :math:`a^2 +
+       b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
 
-is_valid = IsValid()
+    2. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0` and
+       :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
+
+  If `explode_always` is :data:`False`, the splittings in "1." are only applied
+  within disjunctions and the ones in "2." are only applied within conjunctions.
+  This keeps terms more complex but the boolean structure simpler.
+
+:param prefer_order:
+
+:param prefer_weak:
+"""
+
+is_valid = simplify.is_valid
+"""This function establishes the user interface to the heuristic validity test.
+Technically, it is the corresponding method of an instance of the callable
+class :class:`.RCF.simplify.Simplify`.
+
+:param f:
+  The formula to be tested for validity
+
+:param assume:
+  A list of atomic formulas that are assumed to hold. The result of the
+  validity test is correct modulo those assumptions.
+"""

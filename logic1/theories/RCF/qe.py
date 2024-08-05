@@ -588,7 +588,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
         nodes = self.vsubs(eset, theory)
         return nodes
 
-    def regular_eset(self, theory=Theory) -> EliminationSet:
+    def regular_eset(self, theory: Theory) -> EliminationSet:
 
         def red(f: Term, x: Variable, d: int) -> Term:
             return f - f.coefficient({x: d}) * x ** d

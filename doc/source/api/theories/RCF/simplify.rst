@@ -8,12 +8,31 @@ Simplification
 
 .. automodule:: logic1.theories.RCF.simplify
 
+  Theories
+  ********
+
+  .. autoclass:: Theory
+    :special-members:
+
+  Simplification
+  **************
+
   .. autoclass:: Simplify
     :members:
     :undoc-members:
-    :exclude-members: __new__, class_AT, class_TH, TH_kwargs, simpl_at
+    :exclude-members: explode_always, prefer_order, prefer_weak
 
     .. automethod:: __call__
+
+  Validity
+  ********
+
+  .. autoclass:: IsValid
+    :private-members: _simplify
+    :special-members:
+
+  Interface Functions
+  *******************
 
   .. autofunction:: simplify
 

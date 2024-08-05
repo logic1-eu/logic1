@@ -5,8 +5,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass
-from typing import final, Generic, Iterable, Iterator, Sequence
+from typing import final, Sequence
 
 from .atomic import Variable
 from .formula import α, τ, χ, Formula

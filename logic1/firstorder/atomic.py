@@ -29,7 +29,6 @@ class VariableSet(Generic[χ]):
       for Sets.
     """
 
-    # Discuss: should better be private. Rename to _stack.
     @property
     @abstractmethod
     def stack(self) -> Sequence[object]:
@@ -129,7 +128,9 @@ class VariableSet(Generic[χ]):
 class Term(Generic[τ, χ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on terms required by :class:`.Formula`. The methods are
-    supposed to be implemented for the various theories.
+    supposed to be implemented for the various theories. We need a type
+    variable <.firstorder.atomic.τ>` for this class itself, because `Self`
+    cannot be used in the static method :meth:`.sort_key`.
 
     .. seealso::
       Derived classes in various theories: :class:`.RCF.atomic.Term` for Real
@@ -233,14 +234,10 @@ class AtomicFormula(Formula[α, τ, χ]):
         """
         ...
 
-    # discuss: To what extent should this be documented in the API reference?
-    # Mentioning __str__ here triggered mentioning its implementation in RCF
-    # and Sets as well as its parent in Formula.
     @abstractmethod
     def __str__(self) -> str:
         """Representation of this atomic formula used in printing. This method
-        is required by the corresponding recursive first-order method
-        :meth:`.firstorder.Formula.__str__`.
+        is required by the corresponding recursive first-order method.
         """
         #  Overloading here breaks an infinite recursion in the inherited
         #  method.

@@ -131,19 +131,13 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable']):
 
 class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'Theory']):
 
-    @property
-    def class_alpha(self) -> type[AtomicFormula]:
-        return AtomicFormula
+    def create_initial_theory(self) -> Theory:
+        """Implements the abstract method
+        :meth:`.abc.simplify.Simplify.create_initial_theory`.
+        """
+        return Theory()
 
-    @property
-    def class_theta(self) -> type[Theory]:
-        return Theory
-
-    @property
-    def class_theta_kwargs(self) -> dict[str, bool]:
-        return dict()
-
-    def __call__(self, f: Formula, assume: list[AtomicFormula] = []) -> Formula:
+    def __call__(self, f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
         return self.simplify(f, assume)
 
     def simpl_at(self,
@@ -153,3 +147,16 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'T
 
 
 simplify = Simplify()
+
+is_valid = simplify.is_valid
+"""This function establishes the user interface to the heuristic validity test.
+Technically, it is the corresponding method of an instance of the callable
+class :class:`.Sets.simplify.Simplify`.
+
+:param f:
+  The formula to be tested for validity
+
+:param assume:
+  A list of atomic formulas that are assumed to hold. The result of the
+  validity test is correct modulo those assumptions.
+"""

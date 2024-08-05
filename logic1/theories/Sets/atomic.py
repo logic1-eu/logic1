@@ -17,7 +17,6 @@ oo = float('Inf')
 """A symbolic name for the float `inf` as an :data:`.Index`
 """
 
-# discuss: should be a class
 Index: TypeAlias = int | float
 """An index, which is either a positive integer or the float `inf`, which is
 represented by :data:`oo`
@@ -93,9 +92,6 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 VV = VariableSet()
 
 
-# discuss: Variable is also used as Term. What exactly is its status wrt. the
-# interface specified by the abstract class firstorder.atomic.Term? Should it
-# inherit from Term to make sure that the interface is implemented?
 class Variable(firstorder.Variable['Variable']):
 
     wrapped_variable_set: VariableSet = VV
@@ -272,7 +268,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
             case _:
                 assert False, f'{self}: {type(self)}'
 
-    # discuss: Generally, return "Formula" or "AtomicFormula | _T | _F"?
     def simplify(self) -> Formula:
         """Fast basic simplification. The result is equivalent to self.
         Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.

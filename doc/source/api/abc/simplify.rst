@@ -15,10 +15,6 @@ Simplification
 
 .. automodule:: logic1.abc.simplify
 
-  .. [DS97]
-    A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
-    Ordered Fields.  J. Symb. Comput. 24(2):209–231, 1997. Open access at
-    `doi:10.1006/ jsco.1997.0123 <https://doi.org/10.1006/jsco.1997.0123>`_
 
   Generic Types
   *************
