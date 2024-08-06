@@ -61,27 +61,31 @@ going to describe the occurring classes starting at the top.
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
   .. data:: logic1.firstorder.formula.τ
-    :value: TypeVar('τ', bound='AtomicFormula')
+    :value: TypeVar('τ', bound='Term')
 
     A type variable denoting a type of terms with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
+    :class:`logic1.firstorder.atomic.Term`.
 
   .. data:: logic1.firstorder.formula.χ
-    :value: TypeVar('χ', bound='AtomicFormula')
+    :value: TypeVar('χ', bound='Variable')
 
     A type variable denoting a type of variables with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
+    :class:`logic1.firstorder.atomic.Variable`.
 
+  .. data:: logic1.firstorder.formula.σ
+    :value: TypeVar('σ')
+
+    A type variable denoting a type that is admissible in addition to terms as a
+    dictionary entry in :meth:`.Formula.subs`. Instances of type :data:`.σ` that
+    are passed to :meth:`.Formula.subs` must not contain any variables. A
+    typical example is setting :data:`σ` to :class:`int` in the theory of real
+    closed fields.
 
   Formula Base Class
   ******************
 
   .. autoclass:: Formula
-    :members:
-    :undoc-members:
-    :exclude-members: op, args, __init__
-    :private-members: _repr_latex_
-    :special-members: __le__, __str__
+    :special-members:
 
     .. autoproperty:: op
 
@@ -141,6 +145,69 @@ going to describe the occurring classes starting at the top.
       >>> f = Ex(x, (x >= 0) & (a*x + b == 0))
       >>> f
       Ex(x, And(x >= 0, a*x + b == 0))
+
+    .. automethod:: __le__
+
+    .. automethod:: __str__
+
+    .. automethod:: all
+
+    .. automethod:: as_latex
+
+    .. automethod:: atoms
+
+    .. automethod:: bvars
+
+    .. automethod:: count_alternations
+
+    .. automethod:: depth
+
+    .. automethod:: ex
+
+    .. automethod:: fvars
+
+    .. method:: is_all(f: Formula[α, τ, χ, σ]) -> TypeIs[All[α, τ, χ, σ]]
+                is_and(f: Formula[α, τ, χ, σ]) -> TypeIs[And[α, τ, χ, σ]]
+                is_atomic(f: Formula[α, τ, χ, σ]) -> TypeIs[α]
+                is_boolean_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[BooleanFormula[α, τ, χ, σ]]
+                is_equivalent(f: Formula[α, τ, χ, σ]) -> TypeIs[Equivalent[α, τ, χ, σ]]
+                is_ex(f: Formula[α, τ, χ, σ]) -> TypeIs[Ex[α, τ, χ, σ]]
+                is_false(f: Formula[α, τ, χ, σ]) -> TypeIs[_F[α, τ, χ, σ]]
+                is_implies(f: Formula[α, τ, χ, σ]) -> TypeIs[Implies[α, τ, χ, σ]]
+                is_not(f: Formula[α, τ, χ, σ]) -> TypeIs[Not[α, τ, χ, σ]]
+                is_or(f: Formula[α, τ, χ, σ]) -> TypeIs[Or[α, τ, χ, σ]]
+                is_quantified_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[QuantifiedFormula[α, τ, χ, σ]]
+                is_true(f: Formula[α, τ, χ, σ]) -> TypeIs[_T[α, τ, χ, σ]]
+      :staticmethod:
+
+      Type narrowing :func:`isinstance` tests for respective subclasses of
+      :class:`.Formula`.
+
+    .. method:: is_term(t: τ | σ) -> TypeIs[τ]
+                is_variable(x: object) -> TypeIs[χ]
+      :staticmethod:
+
+      Type narrowing :func:`isinstance` tests for
+      :class:`.firstorder.atomic.Term` and :class:`.firstorder.atomic.Variable`,
+      respectively,
+
+    .. automethod:: matrix
+
+    .. automethod:: quantify
+
+    .. automethod:: qvars
+
+    .. automethod:: _repr_latex_
+
+    .. automethod:: simplify
+
+    .. automethod:: subs
+
+    .. automethod:: to_nnf
+
+    .. automethod:: to_pnf
+
+    .. automethod:: transform_atoms
 
 
 Boolean Formulas

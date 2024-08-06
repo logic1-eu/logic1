@@ -23,18 +23,28 @@ Variables, Terms, Atoms
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
   .. data:: τ
-    :value: TypeVar('τ', bound='AtomicFormula')
+    :value: TypeVar('τ', bound='Term')
     :canonical: logic1.firstorder.atomic.τ
 
     A type variable denoting a type of terms with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
+    :class:`logic1.firstorder.atomic.Term`.
 
   .. data:: χ
-    :value: TypeVar('χ', bound='AtomicFormula')
+    :value: TypeVar('χ', bound='Variable')
     :canonical: logic1.firstorder.atomic.χ
 
     A type variable denoting a type of variables with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
+    :class:`logic1.firstorder.atomic.Variable`.
+
+  .. data:: σ
+    :value: TypeVar('σ')
+    :canonical: logic1.firstorder.atomic.σ
+
+    A type variable denoting a type that is admissible in addition to terms as a
+    dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
+    :data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
+    any variables. A typical example is setting :data:`σ` to :class:`int` in the
+    theory of real closed fields.
 
 
   Set of Variables

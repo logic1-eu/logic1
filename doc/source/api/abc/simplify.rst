@@ -44,6 +44,16 @@ Simplification
     A type variable denoting a type of variables with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
+  .. data:: σ
+    :value: TypeVar('σ')
+    :canonical: logic1.abc.simplify.σ
+
+    A type variable denoting a type that is admissible in addition to terms as a
+    dictionary entry in :meth:`.formula.subs`. Instances of type :data:`.σ` that
+    are passed to :meth:`.formula.subs` must not contain any variables. A
+    typical example is setting :data:`σ` to :class:`int` in the theory of real
+    closed fields.
+
   Additionally, we introduce a type variable :data:`θ` for theories internally
   used by the simplifier.
 
@@ -63,17 +73,8 @@ Simplification
     :special-members:
 
 
-  Simplification
-  **************
+  Simplification and Validity
+  ***************************
 
   .. autoclass:: Simplify
     :members:
-
-
-  Validity
-  ********
-
-  .. autoclass:: IsValid
-    :members:
-    :private-members: _simplify
-    :undoc-members:

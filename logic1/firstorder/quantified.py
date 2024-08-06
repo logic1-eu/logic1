@@ -8,12 +8,12 @@ from collections import deque
 from typing import final, Sequence
 
 from .atomic import Variable
-from .formula import α, τ, χ, Formula
+from .formula import α, τ, χ, σ, Formula
 
 from ..support.tracing import trace  # noqa
 
 
-class QuantifiedFormula(Formula[α, τ, χ]):
+class QuantifiedFormula(Formula[α, τ, χ, σ]):
     r"""A class whose instances are quanitfied formulas in the sense that their
     toplevel operator is a one of the quantifiers :math:`\exists` or
     :math:`\forall`. Note that members of :class:`QuantifiedFormula` may have
@@ -40,7 +40,7 @@ class QuantifiedFormula(Formula[α, τ, χ]):
         self.args = (value, *self.args[1:])
 
     @property
-    def arg(self) -> Formula[α, τ, χ]:
+    def arg(self) -> Formula[α, τ, χ, σ]:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
 
         >>> from logic1.theories.RCF import *
@@ -55,7 +55,7 @@ class QuantifiedFormula(Formula[α, τ, χ]):
         """
         return self.args[1]
 
-    def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ]) -> None:
+    def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ, σ]) -> None:
         """Construct a quantified formula.
 
         >>> from logic1.theories.RCF import VV
@@ -80,7 +80,7 @@ class QuantifiedFormula(Formula[α, τ, χ]):
 
 
 @final
-class Ex(QuantifiedFormula[α, τ, χ]):
+class Ex(QuantifiedFormula[α, τ, χ, σ]):
     r"""A class whose instances are existentially quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\exists`. Besides variables, the quantifier accepts sequences of
@@ -95,7 +95,7 @@ class Ex(QuantifiedFormula[α, τ, χ]):
     Ex(x, Ex(y, And(x > 0, y > 0, x - y - z == 0)))
     """
     @classmethod
-    def dual(cls) -> type[All[α, τ, χ]]:
+    def dual(cls) -> type[All[α, τ, χ, σ]]:
         r"""A class method yielding the class :class:`All`, which implements
         the dual operator :math:`\forall` of :math:`\exists`.
         """
@@ -103,7 +103,7 @@ class Ex(QuantifiedFormula[α, τ, χ]):
 
 
 @final
-class All(QuantifiedFormula[α, τ, χ]):
+class All(QuantifiedFormula[α, τ, χ, σ]):
     r"""A class whose instances are universally quanitfied formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\forall`. Besides variables, the quantifier accepts sequences of
@@ -117,13 +117,13 @@ class All(QuantifiedFormula[α, τ, χ]):
     All(x, All(y, x^2 + 2*x*y + y^2 >= 0))
     """
     @classmethod
-    def dual(cls) -> type[Ex[α, τ, χ]]:
+    def dual(cls) -> type[Ex[α, τ, χ, σ]]:
         """A class method yielding the dual class :class:`Ex` of class:`All`.
         """
         return Ex
 
 
-class Prefix(deque[tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]]):
+class Prefix(deque[tuple[type[All[α, τ, χ, σ] | Ex[α, τ, χ, σ]], list[χ]]]):
     """Holds a quantifier prefix of a formula.
 
     >>> from logic1.theories.RCF import *
@@ -141,7 +141,7 @@ class Prefix(deque[tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]]):
         * :meth:`quantify <.Formula.quantify>` -- add quantifier prefix
     """
 
-    def __init__(self, *blocks: tuple[type[All[α, τ, χ] | Ex[α, τ, χ]], list[χ]]) -> None:
+    def __init__(self, *blocks: tuple[type[All[α, τ, χ, σ] | Ex[α, τ, χ, σ]], list[χ]]) -> None:
         return super().__init__(blocks)
 
     def __str__(self) -> str:

@@ -15,7 +15,7 @@ from abc import abstractmethod
 from typing import cast, Generic, Iterable, Optional, Self, TypeVar
 
 from ..firstorder import All, And, AtomicFormula, Ex, _F, Formula, Or, _T
-from ..firstorder.formula import α, τ, χ
+from ..firstorder.formula import α, τ, χ, σ
 
 from ..support.tracing import trace  # noqa
 
@@ -26,7 +26,7 @@ from ..support.tracing import trace  # noqa
 θ = TypeVar('θ', bound='Theory')
 
 
-class Theory(Generic[α, τ, χ]):
+class Theory(Generic[α, τ, χ, σ]):
     """This abstract class serves as an upper bound for the type variable
     :data:`θ` in :class:`.abc.simplify.Simplify`. It specifies an interface
     comprising methods required there.
@@ -45,7 +45,7 @@ class Theory(Generic[α, τ, χ]):
         pass
 
     @abstractmethod
-    def add(self, gand: type[And[α, τ, χ] | Or[α, τ, χ]], atoms: Iterable[α]) -> None:
+    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> None:
         """Add to this theory's *current* information originating from `atoms`.
         If `gand` is :class:`.And`, consider ``atoms``. If `gand` is
         :class:`.Or`, consider ``(Not(at) for at in atoms)``. This is where
@@ -54,7 +54,7 @@ class Theory(Generic[α, τ, χ]):
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And[α, τ, χ] | Or[α, τ, χ]]) -> Iterable[α]:
+    def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]]) -> Iterable[α]:
         """Comapare *current* and *reference* to identify and extract from this
         theory information that must be represented on the toplevel of the
         subformula currently under consideration. If `gand` is :class:`.And`,
@@ -72,7 +72,7 @@ class Theory(Generic[α, τ, χ]):
         ...
 
 
-class Simplify(Generic[α, τ, χ, θ]):
+class Simplify(Generic[α, τ, χ, σ, θ]):
     """Deep simplification following [DS97]_.
 
     .. seealso::
@@ -82,11 +82,11 @@ class Simplify(Generic[α, τ, χ, θ]):
 
     @abstractmethod
     def create_initial_theory(self) -> θ:
-        """Create initial theory.
+        """Create a fresh instance of :class:`θ`.
         """
         ...
 
-    def is_valid(self, f: Formula[α, τ, χ], assume: Iterable[α] = []) \
+    def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
             -> Optional[bool]:
         """Simplification-based heuristic test for vailidity of a formula.
 
@@ -95,9 +95,10 @@ class Simplify(Generic[α, τ, χ, θ]):
           A first-order formula is *valid* if it holds for all values all free
           variables.
 
-        Returns :data:`True` or :data:`False` if :meth:`.simplify` succeeds in
-        heuristically simplifying `f` to ``_T()`` or ``_F()``, respectively.
-        Returns :data:`None` in the sense of "don't know" otherwise.
+        Returns :data:`True` or :data:`False` if :meth:`.abc.simplify` succeeds
+        in heuristically simplifying `f` to :obj:`._T()` or :obj:`._F()`,
+        respectively. Returns :data:`None` in the sense of "don't know"
+        otherwise.
         """
         match self.simplify(f, assume):
             case _T():
@@ -110,8 +111,8 @@ class Simplify(Generic[α, τ, χ, θ]):
     @abstractmethod
     def simpl_at(self,
                  atom: α,
-                 context: Optional[type[And[α, τ, χ]] | type[Or[α, τ, χ]]]) \
-            -> Formula[α, τ, χ]:
+                 context: Optional[type[And[α, τ, χ, σ]] | type[Or[α, τ, χ, σ]]]) \
+            -> Formula[α, τ, χ, σ]:
         """Simplify the atomic formula `atom`. The `context` tells whether
         `atom` occurs within a conjunction or a disjunction. This can be taken
         into consideration for the inclusion of certain simplification
@@ -122,7 +123,7 @@ class Simplify(Generic[α, τ, χ, θ]):
         # Does not receive the theory, by design.
         ...
 
-    def simplify(self, f: Formula[α, τ, χ], assume: Iterable[α]) -> Formula[α, τ, χ]:
+    def simplify(self, f: Formula[α, τ, χ, σ], assume: Iterable[α]) -> Formula[α, τ, χ, σ]:
         """The main entry point to be used by the `__call__` method of
         subclasses within theories.
         """
@@ -145,7 +146,7 @@ class Simplify(Generic[α, τ, χ, θ]):
                 f = Q(var, f)
         return f
 
-    def _simpl_nnf(self, f: Formula[α, τ, χ], th: θ) -> Formula[α, τ, χ]:
+    def _simpl_nnf(self, f: Formula[α, τ, χ, σ], th: θ) -> Formula[α, τ, χ, σ]:
         match f:
             case And() | Or():
                 return self._simpl_and_or(f, th)
@@ -158,12 +159,12 @@ class Simplify(Generic[α, τ, χ, θ]):
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.op!r}')
 
-    def _simpl_and_or(self, f: And[α, τ, χ] | Or[α, τ, χ], th: θ) -> Formula[α, τ, χ]:
+    def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], th: θ) -> Formula[α, τ, χ, σ]:
         """
         `f` must be in negation normal form (NNF).
         """
 
-        def split(args: Iterable[Formula[α, τ, χ]]) -> tuple[set[Formula[α, τ, χ]], set[α]]:
+        def split(args: Iterable[Formula[α, τ, χ, σ]]) -> tuple[set[Formula[α, τ, χ, σ]], set[α]]:
             """
             Returns the set of non-atoms and an iterator of atoms contained in
             :data:`args`, in that order.
@@ -180,7 +181,7 @@ class Simplify(Generic[α, τ, χ, θ]):
             th.add(gand, atoms)
         except th.Inconsistent:
             return gand.definite_element()
-        simplified_others: set[Formula[α, τ, χ]] = set()
+        simplified_others: set[Formula[α, τ, χ, σ]] = set()
         while others:
             arg = others.pop()
             simplified_arg = self._simpl_nnf(arg, th.next_())

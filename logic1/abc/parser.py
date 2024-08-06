@@ -3,7 +3,7 @@ import ast
 from typing import Generic
 
 from ..firstorder import All, And, Equivalent, Ex, _F, Implies, Not, Or, _T
-from ..firstorder.formula import α, τ, χ, Formula
+from ..firstorder.formula import α, τ, χ, σ, Formula
 from ..support.excepthook import NoTraceException
 
 from ..support.tracing import trace  # noqa
@@ -13,9 +13,9 @@ class ParserError(Exception):
     pass
 
 
-class L1Parser(Generic[α, τ, χ]):
+class L1Parser(Generic[α, τ, χ, σ]):
 
-    def process(self, s: str) -> Formula[α, τ, χ]:
+    def process(self, s: str) -> Formula[α, τ, χ, σ]:
         try:
             a = ast.parse(s, mode='eval')
             # print(ast.dump(a, indent=4))
@@ -24,7 +24,7 @@ class L1Parser(Generic[α, τ, χ]):
         except (NameError, ParserError, SyntaxError, TypeError) as exc:
             raise NoTraceException(*exc.args)
 
-    def _process(self, a: ast.expr) -> Formula[α, τ, χ]:
+    def _process(self, a: ast.expr) -> Formula[α, τ, χ, σ]:
         match a:
             case ast.Call(func=func, args=args, keywords=keywords):
                 if keywords:
@@ -84,7 +84,7 @@ class L1Parser(Generic[α, τ, χ]):
                 return self.process_atom(a)
 
     @abstractmethod
-    def process_atom(self, a: ast.expr) -> Formula[α, τ, χ]:
+    def process_atom(self, a: ast.expr) -> Formula[α, τ, χ, σ]:
         ...
 
     @abstractmethod

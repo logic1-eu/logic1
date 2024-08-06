@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import string
-from typing import Any, ClassVar, Final, Iterator, Optional, TypeAlias
+from typing import Any, ClassVar, Final, Iterator, Never, Optional, TypeAlias
 
 from ... import firstorder
 from ...firstorder import _F, _T
@@ -92,7 +92,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 VV = VariableSet()
 
 
-class Variable(firstorder.Variable['Variable']):
+class Variable(firstorder.Variable['Variable', Never]):
 
     wrapped_variable_set: VariableSet = VV
 
@@ -160,7 +160,7 @@ class Variable(firstorder.Variable['Variable']):
         yield self
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable']):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable', Never]):
 
     def __le__(self, other: Formula) -> bool:
         """Returns `True` if this atomic formula should be sorted before or is

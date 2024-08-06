@@ -6,7 +6,7 @@ from ...firstorder import And, Formula
 from .atomic import Eq, Ne, Le, Lt, Gt, Ge, Term, AtomicFormula, Variable, VV
 
 
-class L1Parser(abc.parser.L1Parser[AtomicFormula, Term, Variable]):
+class L1Parser(abc.parser.L1Parser[AtomicFormula, Term, Variable, int]):
 
     def __call__(self, s: str) -> Formula:
         self.globals: dict[str, Variable] = dict()

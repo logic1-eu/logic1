@@ -115,6 +115,8 @@ Variables, Terms, Atoms
 
       The left hand side term and the right hand side term of an atomic formula.
 
+    .. automethod:: __bool__
+
     .. automethod:: __le__
 
     .. automethod:: __str__

@@ -16,21 +16,21 @@ from typing import Generic
 from . import (
     All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
     QuantifiedFormula, _T)
-from .formula import α, τ, χ
+from .formula import α, τ, χ, σ
 
 
-class PrenexNormalForm(Generic[α, τ, χ]):
+class PrenexNormalForm(Generic[α, τ, χ, σ]):
 
     def __call__(self,
-                 f: Formula[α, τ, χ],
+                 f: Formula[α, τ, χ, σ],
                  prefer_universal: bool = False,
-                 is_nnf: bool = False) -> Formula[α, τ, χ]:
+                 is_nnf: bool = False) -> Formula[α, τ, χ, σ]:
         return self.pnf(f, prefer_universal=prefer_universal, is_nnf=is_nnf)
 
     def pnf(self,
-            f: Formula[α, τ, χ],
+            f: Formula[α, τ, χ, σ],
             prefer_universal: bool,
-            is_nnf: bool) -> Formula[α, τ, χ]:
+            is_nnf: bool) -> Formula[α, τ, χ, σ]:
         """If the minimal number of alternations in the result can be achieved
         with both :class:`Ex` and :class:`All` as the first quantifier in the
         result, then the former is preferred. This preference can be changed
@@ -45,7 +45,7 @@ class PrenexNormalForm(Generic[α, τ, χ]):
         f = self.with_distinct_vars(f, set(f.fvars()))
         return self._pnf(f)[All if prefer_universal else Ex]
 
-    def _pnf(self, f: Formula[α, τ, χ]) -> dict[type[All | Ex], Formula[α, τ, χ]]:
+    def _pnf(self, f: Formula[α, τ, χ, σ]) -> dict[type[All | Ex], Formula[α, τ, χ, σ]]:
         """Private Prenex Normal Form.
 
         f must be in NNF. Both keys of the result dict are guaranteed to be
@@ -89,7 +89,7 @@ class PrenexNormalForm(Generic[α, τ, χ]):
             case _:
                 assert False
 
-    def interchange(self, f: And[α, τ, χ] | Or[α, τ, χ], q: type[Ex | All]) -> Formula[α, τ, χ]:
+    def interchange(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], q: type[Ex | All]) -> Formula[α, τ, χ, σ]:
         # All and Ex are not annotated in the return type, because they are not
         # used as quantifiers but as dictionary keys.
         quantifiers = []
@@ -124,7 +124,7 @@ class PrenexNormalForm(Generic[α, τ, χ]):
             pnf = q(v, pnf)
         return pnf
 
-    def with_distinct_vars(self, f: Formula[α, τ, χ], badlist: set[χ]) -> Formula[α, τ, χ]:
+    def with_distinct_vars(self, f: Formula[α, τ, χ, σ], badlist: set[χ]) -> Formula[α, τ, χ, σ]:
         """Convert to equivalent formula with distinct variables.
 
         Bound variables are renamed such that that set of all bound variables

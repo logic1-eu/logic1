@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from abc import abstractmethod
 import functools
-from typing import (Any, Callable, Final, Generic, Iterable, Iterator, Self,
-                    TypeGuard, TypeVar)
+from typing import (Any, Callable, Final, Generic, Iterable, Iterator, Self, TypeVar)
+from typing_extensions import TypeIs
 
 from ..support.tracing import trace  # noqa
 
@@ -25,13 +25,14 @@ from ..support.tracing import trace  # noqa
 
 σ = TypeVar('σ')
 """A type variable denoting a type admissible as a dictionary entry in
-:meth:`.subs`, in addition to terms. A typical example is σ = int in real
-closed fields.
+:meth:`.subs`, in addition to terms. Instances of type :data:`.σ` that are
+passed to :meth:`.subs` must not contain any variables. A typical example
+is :data:`σ` == :class:`int` in the theory of real closed fields.
 """
 
 
 @functools.total_ordering
-class Formula(Generic[α, τ, χ]):
+class Formula(Generic[α, τ, χ, σ]):
     r"""This abstract base class implements representations of and methods on
     first-order formulas recursively built using first-order operators:
 
@@ -98,7 +99,7 @@ class Formula(Generic[α, τ, χ]):
     def args(self, args: tuple[Any, ...]) -> None:
         self._args = args
 
-    def __and__(self, other: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def __and__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`& <object.__and__>` operator to apply
         :class:`.boolean.And`.
 
@@ -151,7 +152,7 @@ class Formula(Generic[α, τ, χ]):
         """
         ...
 
-    def __invert__(self) -> Formula[α, τ, χ]:
+    def __invert__(self) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`~ <object.__invert__>` operator to apply
         :class:`Not`.
 
@@ -162,7 +163,7 @@ class Formula(Generic[α, τ, χ]):
         """
         return Not(self)
 
-    def __le__(self, other: Formula[α, τ, χ]) -> bool:
+    def __le__(self, other: Formula[α, τ, χ, σ]) -> bool:
         """Returns :external:obj:`True` if `self` should be sorted before or is
         equal to other.
 
@@ -183,7 +184,7 @@ class Formula(Generic[α, τ, χ]):
         assert isinstance(other, AtomicFormula)
         return False
 
-    def __lshift__(self, other: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def __lshift__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         r"""Override the :obj:`\<\< <object.__lshift__>` operator to apply
         :class:`Implies` with reversed sides.
 
@@ -200,7 +201,7 @@ class Formula(Generic[α, τ, χ]):
         """
         return not self == other
 
-    def __or__(self, other: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def __or__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
 
         >>> from logic1.theories.RCF import *
@@ -224,7 +225,7 @@ class Formula(Generic[α, τ, χ]):
         r += ')'
         return r
 
-    def __rshift__(self, other: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def __rshift__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`>> <object.__rshift__>` operator to apply
         :class:`Implies`.
 
@@ -275,7 +276,7 @@ class Formula(Generic[α, τ, χ]):
                 # abstract method AtomicFormula.__str__.
                 assert False, repr(self)
 
-    def all(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ]:
+    def all(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
         """Universal closure. Universally quantifiy all variables occurring
         free in `self`, except the ones in `ignore`.
 
@@ -454,7 +455,7 @@ class Formula(Generic[α, τ, χ]):
                 return (count, quantifiers)
             case And() | Or() | Not() | Implies() | Equivalent():
                 highest_count = -1
-                highest_count_quantifiers = {All, Ex}
+                highest_count_quantifiers: set[type[Ex | All]] = {All, Ex}
                 for arg in self.args:
                     count, quantifiers = arg._count_alternations()
                     if count > highest_count:
@@ -499,7 +500,7 @@ class Formula(Generic[α, τ, χ]):
             case _:
                 assert False, type(self)
 
-    def ex(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ]:
+    def ex(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
         """Existential closure. Existentially quantifiy all variables occurring
         free in `self`, except the ones in `ignore`.
 
@@ -547,14 +548,90 @@ class Formula(Generic[α, τ, χ]):
                 assert False, type(self)
 
     @staticmethod
-    def is_atomic(f: Formula[α, τ, χ]) -> TypeGuard[α]:
+    def is_all(f: Formula[α, τ, χ, σ]) -> TypeIs[All[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.quantified.All`.
+        """
+        return isinstance(f, All)
+
+    @staticmethod
+    def is_and(f: Formula[α, τ, χ, σ]) -> TypeIs[And[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.boolean.And`.
+        """
+        return isinstance(f, And)
+
+    @staticmethod
+    def is_atomic(f: Formula[α, τ, χ, σ]) -> TypeIs[α]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.first-order.atomic.AtomicFormula`.
+        """
         return isinstance(f, AtomicFormula)
 
     @staticmethod
-    def is_term(t: τ | σ) -> TypeGuard[τ]:
+    def is_boolean_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[BooleanFormula[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.boolean.BooleanFormula`.
+        """
+        return isinstance(f, BooleanFormula)
+
+    @staticmethod
+    def is_equivalent(f: Formula[α, τ, χ, σ]) -> TypeIs[Equivalent[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.boolean.Equivalent`.
+        """
+        return isinstance(f, Equivalent)
+
+    @staticmethod
+    def is_ex(f: Formula[α, τ, χ, σ]) -> TypeIs[Ex[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.quantified.Ex`.
+        """
+        return isinstance(f, Ex)
+
+    @staticmethod
+    def is_false(f: Formula[α, τ, χ, σ]) -> TypeIs[_F[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.boolean._F`.
+        """
+        return isinstance(f, _F)
+
+    @staticmethod
+    def is_implies(f: Formula[α, τ, χ, σ]) -> TypeIs[Implies[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.boolean.Implies`.
+        """
+        return isinstance(f, Implies)
+
+    @staticmethod
+    def is_not(f: Formula[α, τ, χ, σ]) -> TypeIs[Not[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.boolean.Not`.
+        """
+        return isinstance(f, Not)
+
+    @staticmethod
+    def is_or(f: Formula[α, τ, χ, σ]) -> TypeIs[Or[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.boolean.Or`.
+        """
+        return isinstance(f, Or)
+
+    @staticmethod
+    def is_quantified_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[QuantifiedFormula[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.quantified.QuantifiedFormula`.
+        """
+        return isinstance(f, QuantifiedFormula)
+
+    @staticmethod
+    def is_true(f: Formula[α, τ, χ, σ]) -> TypeIs[_T[α, τ, χ, σ]]:
+        """Type narrowing :func:`isinstance` test for :class:`.boolean._T`.
+        """
+        return isinstance(f, _T)
+
+    @staticmethod
+    def is_term(t: τ | σ) -> TypeIs[τ]:
+        """Type narrowing :func:`isinstance` test for
+        :class:`.firstorder.atomic.Term`.
+        """
         return isinstance(t, Term)
 
-    def matrix(self) -> tuple[Formula[α, τ, χ], Prefix[α, τ, χ]]:
+    def matrix(self) -> tuple[Formula[α, τ, χ, σ], Prefix[α, τ, χ, σ]]:
         """The matrix of a prenex formula is its quantifier free part. Its
         prefix is a double ended queue holding blocks of quantifiers.
 
@@ -585,7 +662,7 @@ class Formula(Generic[α, τ, χ]):
         """
         block_vars = []
         mat = self
-        pre: Prefix[α, τ, χ] = Prefix()
+        pre: Prefix[α, τ, χ, σ] = Prefix()
         while isinstance(mat, (Ex, All)):
             block_quantifier = type(mat)
             while isinstance(mat, block_quantifier):
@@ -595,7 +672,7 @@ class Formula(Generic[α, τ, χ]):
             block_vars = []
         return mat, pre
 
-    def quantify(self, prefix: Prefix[α, τ, χ]) -> Formula[α, τ, χ]:
+    def quantify(self, prefix: Prefix[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Add quantifier prefix.
 
         >>> from logic1.theories.RCF import *
@@ -676,7 +753,7 @@ class Formula(Generic[α, τ, χ]):
             as_latex += '{}\\dots'
         return f'$\\displaystyle {as_latex}$'
 
-    def simplify(self) -> Formula[α, τ, χ]:
+    def simplify(self) -> Formula[α, τ, χ, σ]:
         """Fast basic simplification. The result is equivalent to `self`. The
         following first-order simplifications are applied:
 
@@ -808,7 +885,7 @@ class Formula(Generic[α, τ, χ]):
                 # abstract method AtomicFormula.simplify.
                 assert False, type(self)
 
-    def subs(self, substitution: dict[χ, τ]) -> Self:
+    def subs(self, substitution: dict[χ, τ | σ]) -> Self:
         """Substitution of terms for variables.
 
         >>> from logic1.theories.RCF import *
@@ -822,46 +899,46 @@ class Formula(Generic[α, τ, χ]):
         >>> g.subs({b: x})
         Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
         """
-        match self:
-            case All() | Ex():
-                # A copy of the mutable could be avoided by keeping track of
-                # the changes and undoing them at the end.
-                substitution = substitution.copy()
-                # (1) Remove substitution for the quantified variable. In
-                # principle, this is covered by (2) below, but deleting here
-                # preserves the name.
-                if self.var in substitution:
-                    del substitution[self.var]
-                # Collect all variables on the right hand sides of
-                # substitutions:
-                substituted_vars: set[Variable] = set()
-                for term in substitution.values():
+        if Formula.is_quantified_formula(self):
+            # A copy of the mutable could be avoided by keeping track of
+            # the changes and undoing them at the end.
+            substitution = substitution.copy()
+            # (1) Remove substitution for the quantified variable. In
+            # principle, this is covered by (2) below, but deleting here
+            # preserves the name.
+            if self.var in substitution:
+                del substitution[self.var]
+            # Collect all variables on the right hand sides of
+            # substitutions:
+            substituted_vars: set[Variable] = set()
+            for term in substitution.values():
+                if self.is_term(term):
                     substituted_vars.update(tuple(term.vars()))
-                # (2) Make sure the quantified variable is not a key and does
-                # not occur in a value of substitution:
-                if self.var in substituted_vars or self.var in substitution:
-                    var = self.var.fresh()
-                    # We now know the following:
-                    #   (i) var is not a key,
-                    #  (ii) var does not occur in the values,
-                    # (iii) self.var is not a key.
-                    # We do *not* know whether self.var occurs in the values.
-                    substitution[self.var] = var
-                    # All free occurrences of self.var in self.arg will be
-                    # renamed to var. In case of (iv) above, substitution will
-                    # introduce new free occurrences of self.var, which do not
-                    # clash with the new quantified variable var:
-                    return self.op(var, self.arg.subs(substitution))  # type: ignore[return-value]
-                return self.op(self.var, self.arg.subs(substitution))  # type: ignore[return-value]
-            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
-                return_value = self.op(*(arg.subs(substitution) for arg in self.args))
-                return return_value  # type: ignore[return-value]
-            case _:
-                # Atomic formulas are caught by the implementation of the
-                # abstract method AtomicFormula.subs.
-                assert False, type(self)
+            # (2) Make sure the quantified variable is not a key and does
+            # not occur in a value of substitution:
+            if self.var in substituted_vars or self.var in substitution:
+                var = self.var.fresh()
+                # We now know the following:
+                #   (i) var is not a key,
+                #  (ii) var does not occur in the values,
+                # (iii) self.var is not a key.
+                # We do *not* know whether self.var occurs in the values.
+                substitution[self.var] = var
+                # All free occurrences of self.var in self.arg will be
+                # renamed to var. In case of (iv) above, substitution will
+                # introduce new free occurrences of self.var, which do not
+                # clash with the new quantified variable var:
+                return self.op(var, self.arg.subs(substitution))  # type: ignore[return-value]
+            return self.op(self.var, self.arg.subs(substitution))  # type: ignore[return-value]
+        elif Formula.is_boolean_formula(self):
+            return_value = self.op(*(arg.subs(substitution) for arg in self.args))
+            return return_value  # type: ignore[return-value]
+        else:
+            # Atomic formulas are caught by the implementation of the
+            # abstract method AtomicFormula.subs.
+            assert False, type(self)
 
-    def to_nnf(self, to_positive: bool = True, _not: bool = False) -> Formula[α, τ, χ]:
+    def to_nnf(self, to_positive: bool = True, _not: bool = False) -> Formula[α, τ, χ, σ]:
         """Convert to Negation Normal Form.
 
         A Negation Normal Form (NNF) is an equivalent formula within which the
@@ -886,11 +963,11 @@ class Formula(Generic[α, τ, χ]):
         """
         match self:
             case All() | Ex():
-                nnf_op: type[Formula[α, τ, χ]] = self.dual() if _not else self.op
+                nnf_op: type[Formula[α, τ, χ, σ]] = self.dual() if _not else self.op
                 nnf_arg = self.arg.to_nnf(to_positive=to_positive, _not=_not)
                 return nnf_op(self.var, nnf_arg)
             case Equivalent():
-                rewrite: Formula[α, τ, χ] = And(Implies(*self.args), Implies(self.rhs, self.lhs))
+                rewrite: Formula[α, τ, χ, σ] = And(Implies(*self.args), Implies(self.rhs, self.lhs))
                 return rewrite.to_nnf(to_positive=to_positive, _not=_not)
             case Implies():
                 if isinstance(self.rhs, Or):
@@ -923,7 +1000,7 @@ class Formula(Generic[α, τ, χ]):
             case _:
                 assert False, type(self)
 
-    def to_pnf(self, prefer_universal: bool = False, is_nnf: bool = False) -> Formula[α, τ, χ]:
+    def to_pnf(self, prefer_universal: bool = False, is_nnf: bool = False) -> Formula[α, τ, χ, σ]:
         """Convert to Prenex Normal Form.
 
         A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
@@ -955,10 +1032,10 @@ class Formula(Generic[α, τ, χ]):
                Diploma Thesis, University of Passau, Germany, 1990
         """
         from .pnf import PrenexNormalForm
-        prenex_normal_form: PrenexNormalForm[α, τ, χ] = PrenexNormalForm()
+        prenex_normal_form: PrenexNormalForm[α, τ, χ, σ] = PrenexNormalForm()
         return prenex_normal_form(self, prefer_universal, is_nnf)
 
-    def transform_atoms(self, tr: Callable[..., Formula[α, τ, χ]]) -> Formula[α, τ, χ]:
+    def transform_atoms(self, tr: Callable[..., Formula[α, τ, χ, σ]]) -> Formula[α, τ, χ, σ]:
         """Apply `tr` to all atomic formulas.
 
         Replaces each atomic subformula of `self` with the :class:`Formula`
@@ -989,6 +1066,6 @@ class Formula(Generic[α, τ, χ]):
 
 # The following imports are intentionally late to avoid circularity.
 from .atomic import AtomicFormula, Term, Variable
-from .boolean import And, Equivalent, Implies, involutive_not, Not, Or, _F, _T
+from .boolean import And, BooleanFormula, Equivalent, Implies, involutive_not, Not, Or, _F, _T
 from .boolean import T  # noqa, used in doctests only
-from .quantified import All, Ex, Prefix
+from .quantified import All, Ex, Prefix, QuantifiedFormula

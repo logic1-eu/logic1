@@ -24,7 +24,7 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
+class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
     """Implements :class:`.abc.simplify.Theory`. Required by
     :class:`.RCF.simplify.Simplify`.
     """
@@ -283,7 +283,7 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable']):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', int, 'Theory']):
     """Deep simplification following [DS97]_. Implements
     :class:`.abc.simplify.Simplify`.
     """
@@ -355,7 +355,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
             tsq = lhs.is_definite()
             if tsq == TSQ.STRICT:
                 return tsq_junctor.definite_element()
-            unit, factors = lhs.factor()
+            unit, _, factors = lhs.factor()
             primitive_lhs = Term(1)
             for factor in factors:
                 # Square-free part
@@ -388,7 +388,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
             if hit is not None:
                 return hit
             # Factorize
-            unit, factors = lhs.factor()
+            unit, _, factors = lhs.factor()
             even_factors = []
             odd_factor = unit
             for factor, multiplicity in factors.items():
@@ -403,7 +403,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', 'Theor
             # TSQ tests on factorization
             if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
                 return _T()
-            neg_tsq = (- odd_factor).is_definite()
+            neg_tsq = (-odd_factor).is_definite()
             if neg_tsq == TSQ.STRICT:
                 return _simpl_at_eq_ne(Eq, even_factor, context)
             if neg_tsq == TSQ.WEAK:
@@ -483,7 +483,7 @@ Technically, it is an instance of the callable class
 :param prefer_weak:
 """
 
-is_valid = simplify.is_valid
+is_valid = Simplify().is_valid
 """This function establishes the user interface to the heuristic validity test.
 Technically, it is the corresponding method of an instance of the callable
 class :class:`.RCF.simplify.Simplify`.

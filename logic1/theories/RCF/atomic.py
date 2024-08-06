@@ -166,7 +166,7 @@ class TSQ(Enum):
     """
 
 
-class Term(firstorder.Term['Term', 'Variable']):
+class Term(firstorder.Term['Term', 'Variable', int]):
 
     polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
@@ -397,14 +397,14 @@ class Term(firstorder.Term['Term', 'Variable']):
 
     # discuss bug:
     # >>> (2*x).factor()
-    def factor(self) -> tuple[Term, dict[Term, int]]:
+    def factor(self) -> tuple[Term, Term, dict[Term, int]]:
         """Return the factorization of this term.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
         >>> t = x**2 - y**2
         >>> t.factor()
-        (1, {x - y: 1, x + y: 1})
+        (1, 1, {x - y: 1, x + y: 1})
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.factor()
@@ -412,14 +412,19 @@ class Term(firstorder.Term['Term', 'Variable']):
         """
         F = self.poly.factor()
         unit = Term(F.unit())
+        content = Term(1)
         assert unit in (-1, 1), (self, F, unit)
         D = dict()
         for poly, multiplicity in F:
-            if poly.lc() < 0:
-                poly = - poly
-                unit = - unit
-            D[Term(poly)] = multiplicity
-        return unit, D
+            term = Term(poly)
+            if term.lc() < 0:
+                term = -term
+                unit = -unit
+            if term.is_constant():
+                content *= term
+            else:
+                D[term] = multiplicity
+        return unit, content, D
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
@@ -546,9 +551,7 @@ class Term(firstorder.Term['Term', 'Variable']):
         """
         return term.poly
 
-    # discuss: Should also accept also int in place of Term. Same for Formula
-    # etc.
-    def subs(self, d: dict[Variable, Term]) -> Term:
+    def subs(self, d: dict[Variable, Term | int]) -> Term:
         """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import VV
@@ -584,7 +587,7 @@ class Term(firstorder.Term['Term', 'Variable']):
             yield Variable(g)
 
 
-class Variable(Term, firstorder.Variable['Variable']):
+class Variable(Term, firstorder.Variable['Variable', int]):
 
     VV: ClassVar[VariableSet] = VV
 
@@ -595,7 +598,7 @@ class Variable(Term, firstorder.Variable['Variable']):
         return self.VV.fresh(suffix=f'_{str(self)}')
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable']):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int]):
 
     @property
     def lhs(self) -> Term:
@@ -609,8 +612,13 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """
         return self.args[1]
 
-    # discuss: document!
     def __bool__(self) -> bool:
+        """In boolean contexts atomic formulas are evaluated via corresponding
+        comparisons with respect to the degree lexicographical term order
+        :mod:`deglex <sage.rings.polynomial.term_order>`. In particular,
+        comparisons between terms representing integers follow the natural
+        order.
+        """
         match self:
             case Eq():
                 return self.lhs.poly == self.rhs.poly
@@ -748,7 +756,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
         return D[cls]
 
-    def subs(self, d: dict[Variable, Term]) -> Self:
+    def subs(self, d: dict[Variable, Term | int]) -> Self:
         """Simultaneous substitution of terms for variables. Implements the
         abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """

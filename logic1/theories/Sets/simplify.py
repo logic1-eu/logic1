@@ -1,4 +1,4 @@
-from typing import Iterable, Optional, Self
+from typing import Iterable, Never, Optional, Self
 
 from ... import abc
 
@@ -9,7 +9,7 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable']):
+class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]):
 
     _ref_min_card: Index
     _ref_max_card: Index
@@ -129,7 +129,7 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable']):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'Theory']):
+class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', Never, 'Theory']):
 
     def create_initial_theory(self) -> Theory:
         """Implements the abstract method
@@ -148,7 +148,7 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', 'T
 
 simplify = Simplify()
 
-is_valid = simplify.is_valid
+is_valid = Simplify().is_valid
 """This function establishes the user interface to the heuristic validity test.
 Technically, it is the corresponding method of an instance of the callable
 class :class:`.Sets.simplify.Simplify`.

@@ -11,7 +11,7 @@ import inspect
 from types import FrameType
 from typing import Any, final, Generic, Iterator, Sequence
 
-from .formula import α, τ, χ, Formula
+from .formula import α, τ, χ, σ, Formula
 
 from ..support.tracing import trace  # noqa
 
@@ -125,7 +125,7 @@ class VariableSet(Generic[χ]):
         ...
 
 
-class Term(Generic[τ, χ]):
+class Term(Generic[τ, χ, σ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on terms required by :class:`.Formula`. The methods are
     supposed to be implemented for the various theories. We need a type
@@ -197,7 +197,7 @@ class Term(Generic[τ, χ]):
         ...
 
 
-class Variable(Term[χ, χ]):
+class Variable(Term[χ, χ, σ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on variables required by Formula. The methods are supposed
     to be implemented for the various theories.
@@ -214,7 +214,7 @@ class Variable(Term[χ, χ]):
         ...
 
 
-class AtomicFormula(Formula[α, τ, χ]):
+class AtomicFormula(Formula[α, τ, χ, σ]):
     """This abstract class primarily specifies an interface via the
     definition of abstract methods on atomic formulas that are required by
     :class:`.Formula`. In addition, it provides some final implementations of
@@ -227,7 +227,7 @@ class AtomicFormula(Formula[α, τ, χ]):
     """
 
     @abstractmethod
-    def __le__(self, other: Formula[α, τ, χ]) -> bool:
+    def __le__(self, other: Formula[α, τ, χ, σ]) -> bool:
         """Returns :external:obj:`True` if `self` should be sorted before or is
         equal to other. This method is required by the corresponding
         first-order method :meth:`.Formula.__le__`.
@@ -286,7 +286,7 @@ class AtomicFormula(Formula[α, τ, χ]):
         ...
 
     @abstractmethod
-    def simplify(self) -> Formula[α, τ, χ]:
+    def simplify(self) -> Formula[α, τ, χ, σ]:
         """Fast basic simplification. The result is equivalent to self. This
         method is required by the corresponding recursive first-order method
         :meth:`.Formula.simplify`.
@@ -294,10 +294,10 @@ class AtomicFormula(Formula[α, τ, χ]):
         ...
 
     @abstractmethod
-    def subs(self, substitution: dict[χ, τ]) -> α:
-        """Simultaneous substitution of terms from `τ` for variables from `χ`.
-        This method is required by the corresponding recursive first-order
-        method :meth:`.Formula.subs`.
+    def subs(self, substitution: dict[χ, τ | σ]) -> α:
+        """Simultaneous substitution of terms from `τ` or constants from `σ`
+        for variables from `χ`. This method is required by the corresponding
+        recursive first-order method :meth:`.Formula.subs`.
         """
         ...
 

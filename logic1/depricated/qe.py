@@ -9,7 +9,7 @@ from typing import Any, Generic, Optional, TypeAlias, TypeVar
 
 from ..firstorder import (
     All, And, AtomicFormula, _F, Formula, Not, Or, Prefix, _T)
-from ..firstorder.formula import α, τ, χ
+from ..firstorder.formula import α, τ, χ, σ
 
 Variable: TypeAlias = Any
 
@@ -20,28 +20,28 @@ class FoundT(Exception):
     pass
 
 
-class Pool(list[tuple[list[χ], Formula[α, τ, χ]]], Generic[α, τ, χ]):
+class Pool(list[tuple[list[χ], Formula[α, τ, χ, σ]]], Generic[α, τ, χ, σ]):
 
-    def __init__(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
+    def __init__(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> None:
         self.push(vars_, f)
 
     @abstractmethod
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> None:
         ...
 
 
-class PoolOneExistential(Pool[α, τ, χ]):
+class PoolOneExistential(Pool[α, τ, χ, σ]):
 
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> None:
         logging.debug(f'res = {f}')
         if f is not _F():
             split_f = [*f.args] if f.op is Or else [f]
             self.extend([(vars_.copy(), mt) for mt in split_f])
 
 
-class PoolOnePrimitive(Pool[α, τ, χ]):
+class PoolOnePrimitive(Pool[α, τ, χ, σ]):
 
-    def push(self, vars_: list[χ], f: Formula[α, τ, χ]) -> None:
+    def push(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> None:
         logging.debug(f'res = {f}')
         dnf = self.dnf(f)
         if dnf is _T():
@@ -51,18 +51,18 @@ class PoolOnePrimitive(Pool[α, τ, χ]):
             self.extend([(vars_.copy(), mt) for mt in split_dnf])
 
     @abstractmethod
-    def dnf(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         ...
 
 
 @dataclass
-class QuantifierElimination(Generic[α, τ, χ, π]):
+class QuantifierElimination(Generic[α, τ, χ, σ, π]):
 
-    blocks: Optional[Prefix[α, τ, χ]] = None
-    matrix: Optional[Formula[α, τ, χ]] = None
+    blocks: Optional[Prefix[α, τ, χ, σ]] = None
+    matrix: Optional[Formula[α, τ, χ, σ]] = None
     negated: Optional[bool] = None
     pool: Optional[π] = None
-    finished: Optional[list[Formula[α, τ, χ]]] = None
+    finished: Optional[list[Formula[α, τ, χ, σ]]] = None
 
     def __repr__(self) -> str:
         return (f'QuantifierElimination(blocks={self.blocks!r}, '
@@ -112,15 +112,15 @@ class QuantifierElimination(Generic[α, τ, χ, π]):
         self.finished = None
         logging.info(f'{self.collect_finished.__qualname__}: {self}')
 
-    def select_and_pop(self, vars_: list[χ], f: Formula[α, τ, χ]) -> χ:
+    def select_and_pop(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> χ:
         return vars_.pop()
 
     @abstractmethod
-    def simplify(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         ...
 
     @abstractmethod
-    def _Pool(self, vars_: list[χ], f: Formula[α, τ, χ]) -> π:
+    def _Pool(self, vars_: list[χ], f: Formula[α, τ, χ, σ]) -> π:
         ...
 
     def pop_block(self) -> None:
@@ -162,7 +162,7 @@ class QuantifierElimination(Generic[α, τ, χ, π]):
                 self.finished.append(result)
             logging.info(f'{self.process_pool.__qualname__}: {self}')
 
-    def qe(self, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def qe(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         # The following manipulation of a private property is dirty. There
         # seems to be no supported way to reset reference time.
         logging._startTime = time()  # type: ignore
@@ -178,7 +178,7 @@ class QuantifierElimination(Generic[α, τ, χ, π]):
         return self.simplify(self.matrix.to_nnf())
 
     @abstractmethod
-    def qe1(self, v: χ, f: Formula[α, τ, χ]) -> Formula[α, τ, χ]:
+    def qe1(self, v: χ, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Elimination of the existential quantifier from Ex(v, f).
 
         It is guaranteed that v occurs in f. :meth:`qe1` need not apply
@@ -186,6 +186,6 @@ class QuantifierElimination(Generic[α, τ, χ, π]):
         """
         ...
 
-    def setup(self, f: Formula[α, τ, χ]) -> None:
+    def setup(self, f: Formula[α, τ, χ, σ]) -> None:
         self.matrix, self.blocks = f.to_pnf().matrix()
         logging.info(f'{self.setup.__qualname__}: {self}')

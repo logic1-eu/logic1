@@ -6,6 +6,12 @@
 Quantifier Elimination
 **********************
 
+.. automodule:: logic1.theories.RCF.typing
+
+  .. type:: Formula
+    :canonical: logic1.firstorder.formula.Formula[AtomicFormula, Term, Variable, int]
+
+
 .. automodule:: logic1.theories.RCF.qe
 
   .. autoclass:: VirtualSubstitution
