@@ -123,7 +123,7 @@ class All(QuantifiedFormula[α, τ, χ, σ]):
         return Ex
 
 
-class Prefix(deque[tuple[type[All[α, τ, χ, σ] | Ex[α, τ, χ, σ]], list[χ]]]):
+class Prefix(deque[tuple[type[All | Ex], list[χ]]]):
     """Holds a quantifier prefix of a formula.
 
     >>> from logic1.theories.RCF import *

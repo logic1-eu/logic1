@@ -587,6 +587,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             yield Variable(g)
 
 
+# discuss: Variable inherits __init__, and we can create Variable(3), Variable(term.poly), etc.
 class Variable(Term, firstorder.Variable['Variable', int]):
 
     VV: ClassVar[VariableSet] = VV

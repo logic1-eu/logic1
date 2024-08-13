@@ -631,7 +631,7 @@ class Formula(Generic[α, τ, χ, σ]):
         """
         return isinstance(t, Term)
 
-    def matrix(self) -> tuple[Formula[α, τ, χ, σ], Prefix[α, τ, χ, σ]]:
+    def matrix(self) -> tuple[Formula[α, τ, χ, σ], Prefix[χ]]:
         """The matrix of a prenex formula is its quantifier free part. Its
         prefix is a double ended queue holding blocks of quantifiers.
 
@@ -662,7 +662,7 @@ class Formula(Generic[α, τ, χ, σ]):
         """
         block_vars = []
         mat = self
-        pre: Prefix[α, τ, χ, σ] = Prefix()
+        pre: Prefix[χ] = Prefix()
         while isinstance(mat, (Ex, All)):
             block_quantifier = type(mat)
             while isinstance(mat, block_quantifier):
@@ -672,7 +672,7 @@ class Formula(Generic[α, τ, χ, σ]):
             block_vars = []
         return mat, pre
 
-    def quantify(self, prefix: Prefix[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
+    def quantify(self, prefix: Prefix[χ]) -> Formula[α, τ, χ, σ]:
         """Add quantifier prefix.
 
         >>> from logic1.theories.RCF import *

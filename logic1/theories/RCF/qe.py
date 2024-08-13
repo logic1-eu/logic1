@@ -1,61 +1,24 @@
-# mypy: strict_optional = False
-
 """Real quantifier elimination by virtual substitution.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import auto, Enum
-import logging
-import multiprocessing as mp
-import multiprocessing.queues
-import os
-import queue
-import sys
-import threading
-import time
-from typing import (ClassVar, Collection, Iterable, Iterator, Literal, Optional, TypeAlias)
+from typing import (ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias)
+from typing import reveal_type  # noqa
 
-from logic1.abc.qe import NodeListProxy, WorkingNodeListProxy, SyncManager
-from logic1.firstorder import All, And, _F, Not, Or, _T
+from logic1.firstorder import And, _F, Not, Or, _T
 from logic1 import abc
-from logic1.support.excepthook import NoTraceException
-from logic1.support.logging import DeltaTimeFormatter
 from logic1.support.tracing import trace  # noqa
 from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.atomic import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable)
-from logic1.theories.RCF.typing import Formula, Prefix
+from logic1.theories.RCF.typing import Formula
 
-# Create logger
-delta_time_formatter = DeltaTimeFormatter(
-    f'%(asctime)s - %(name)s - %(levelname)-5s - %(delta)s: %(message)s')
-
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(delta_time_formatter)
-
-logger = logging.getLogger(__name__)
-logger.propagate = False
-logger.addHandler(stream_handler)
-logger.addFilter(lambda record: record.msg.strip() != '')
-logger.setLevel(logging.WARNING)
-
-# Create multiprocessing logger
-multiprocessing_formatter = DeltaTimeFormatter(
-    f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s - %(delta)s: %(message)s')
-
-multiprocessing_handler = logging.StreamHandler()
-multiprocessing_handler.setFormatter(multiprocessing_formatter)
-multiprocessing_logger = logging.getLogger('multiprocessing')
-multiprocessing_logger.propagate = False
-multiprocessing_logger.addHandler(multiprocessing_handler)
+from logic1.abc.qe import FoundT, logger
 
 
-NodeList: TypeAlias = abc.qe.NodeList['Formula', 'Node']
-WorkingNodeList: TypeAlias = abc.qe.WorkingNodeList['Formula', 'Node']
-
-
-class DegreeViolation(Exception):
+class DegreeViolation(abc.qe.NodeProcessFailure):
     pass
 
 
@@ -63,8 +26,10 @@ class Failed(Exception):
     pass
 
 
-class FoundT(Exception):
-    pass
+class Theory(abc.qe.Theory[AtomicFormula, Term, Variable, int]):
+
+    def simplify(self, f: Formula) -> Formula:
+        return simplify(f, explode_always=False, prefer_order=False, prefer_weak=True)
 
 
 class CLUSTERING(Enum):
@@ -90,46 +55,6 @@ class TAG(Enum):
     XLB = auto()
     XUB = auto()
     ANY = auto()
-
-
-class Timer:
-
-    def __init__(self):
-        self.reset()
-
-    def get(self) -> float:
-        return time.time() - self._reference_time
-
-    def reset(self) -> None:
-        self._reference_time = time.time()
-
-
-@dataclass
-class Theory:
-
-    class Inconsistent(Exception):
-        pass
-
-    atoms: list[AtomicFormula]
-
-    def append(self, new_atom: AtomicFormula) -> None:
-        self.extend([new_atom])
-
-    def extend(self, new_atoms: Iterable[AtomicFormula]) -> None:
-        self.atoms.extend(new_atoms)
-        theta = simplify(And(*self.atoms),
-                         explode_always=False, prefer_order=False, prefer_weak=True)
-        match theta:
-            case AtomicFormula():
-                self.atoms = [theta]
-            case And():
-                self.atoms = [*theta.args]
-            case _T():
-                self.atoms = []
-            case _F():
-                raise self.Inconsistent(f'{self=}, {new_atoms=}, {theta=}')
-            case _:
-                assert False, (self, new_atoms, theta)
 
 
 SignSequence: TypeAlias = tuple[Literal[-1, 0, 1], ...]
@@ -448,6 +373,7 @@ class TestPoint:
             return guard
 
     def _translate(self) -> str:
+        assert self.prd is not None
         match self.nsp:
             case NSP.NONE:
                 return self.prd._translate()
@@ -514,7 +440,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                     outermost_block=self.outermost_block,
                     options=self.options)
 
-    def eset(self, theory: Theory) -> Optional[EliminationSet]:
+    def eset(self, theory: Theory) -> EliminationSet:
         return self.gauss_eset(theory) or self.regular_eset(theory)
 
     def gauss_eset(self, theory: Theory) -> Optional[EliminationSet]:
@@ -668,6 +594,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
             """
             match tp.nsp:
                 case NSP.NONE:
+                    assert tp.prd is not None
                     h = pseudo_sgn_rem(atom.lhs, tp.prd, x)
                     return vs_prd_at(atom.op(h, 0), tp.prd, x)
                 case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
@@ -812,447 +739,45 @@ class Options:
 
 
 @dataclass
-class VirtualSubstitution(abc.qe.QuantifierElimination):
+class VirtualSubstitution(abc.qe.QuantifierElimination[
+        Node, Theory, list[str], Options, AtomicFormula, Term, Variable, int]):
     """Quantifier elimination by virtual substitution.
     """
 
-    blocks: Optional[Prefix] = None
-    matrix: Optional[Formula] = None
-    negated: Optional[bool] = None
-    root_node: Optional[Node] = None
-    working_nodes: Optional[WorkingNodeList] = None
-    success_nodes: Optional[NodeList] = None
-    failure_nodes: Optional[NodeList] = None
-    theory: Optional[Theory] = None
-    result: Optional[Formula] = None
+    def create_options(self, **kwargs) -> Options:
+        return Options(**kwargs)
 
-    workers: int = 0
-    log: int = logging.NOTSET
-    log_rate: float = 0.5
-    options: Optional[Options] = None
+    def create_root_node(self, vars_: list[Variable], matrix: Formula) -> Node:
+        assert self.options is not None
+        assert self.theory is not None
+        return Node(variables=vars_,
+                    formula=simplify(matrix, assume=self.theory.atoms),
+                    answer=[],
+                    outermost_block=not self.blocks,
+                    options=self.options)
 
-    time_final_simplification: Optional[float] = None
-    time_import_failure_nodes: Optional[float] = None
-    time_import_success_nodes: Optional[float] = None
-    time_import_working_nodes: Optional[float] = None
-    time_multiprocessing: Optional[float] = None
-    time_start_first_worker: Optional[float] = None
-    time_start_all_workers: Optional[float] = None
-    time_syncmanager_enter: Optional[float] = None
-    time_syncmanager_exit: Optional[float] = None
-    time_total: Optional[float] = None
+    def create_theory(self, assume: Optional[Iterable[AtomicFormula]]) -> Theory:
+        return Theory([] if assume is None else list(assume))
 
-    @property
-    def assume(self):
-        return self.theory.atoms
+    def create_true_node(self) -> Node:
+        assert self.options is not None
+        return Node(variables=[],
+                    formula=_T(),
+                    answer=[],
+                    outermost_block=False,
+                    options=self.options)
 
-    def __call__(self, f: Formula, assume: Optional[Iterable[AtomicFormula]] = None,
-                 workers: int = 0, log_level: int = logging.NOTSET,
-                 log_rate: float = 0.5, **options) -> Optional[Formula]:
-        """Virtual substitution entry point.
+    @classmethod
+    def init_env(cls, ring_vars: list[str]):
+        polynomial_ring.ensure_vars(ring_vars)
 
-        workers is the number of processes used for virtual substitution. The
-        default value workers=0 uses a sequential implementation, avoiding
-        overhead when input problems are small. For all other values of
-        workers, there are additional processes started. In particular,
-        workers=1 uses the parallel implementation with one worker process,
-        which is interesting mostly for testing and debugging. A negative value
-        workers = z < 0 selects os.num_cpu() - abs(z) many workers. When there
-        are n > 0 many workers selected, then the overall number of processes
-        running will be n + 2, i.e., the workers plus the master process plus a
-        manager processes providing proxy objects for shared data. It follows
-        that workers=-2 matches the number of CPUs of the machine. For hard
-        computations, workers=-3 is an interesting choice, which leaves one CPU
-        free for smooth interaction with the machine.
-        """
-        timer = Timer()
-        VirtualSubstitution.__init__(self)
-        try:
-            self.theory = Theory([] if assume is None else list(assume))
-            self.log_level = log_level
-            self.log_rate = log_rate
-            save_level = logger.getEffectiveLevel()
-            logger.setLevel(self.log_level)
-            delta_time_formatter.set_reference_time(time.time())
-            self.options = Options(**options)
-            logger.info(f'{self.options}')
-            result = self.virtual_substitution(f, workers)
-        except KeyboardInterrupt:
-            print('KeyboardInterrupt', file=sys.stderr, flush=True)
-            return None
-        finally:
-            logger.info('finished')
-            logger.setLevel(save_level)
-        self.time_total = timer.get()
-        return result
+    def init_env_arg(self) -> list[str]:
+        # We pass the ring variables to the workers. The workers
+        # reconstruct the ring.
+        return [str(v) for v in polynomial_ring.get_vars()]
 
-    def collect_success_nodes(self) -> None:
-        logger.debug(f'entering {self.collect_success_nodes.__name__}')
-        self.matrix = Or(*(node.formula for node in self.success_nodes))
-        if self.negated:
-            self.matrix = Not(self.matrix)
-        self.negated = None
-        self.working_nodes = None
-        self.success_nodes = None
-
-    def final_simplification(self):
-        logger.debug(f'entering {self.final_simplification.__name__}')
-        if logger.isEnabledFor(logging.DEBUG):
-            num_atoms = sum(1 for _ in self.matrix.atoms())
-            logger.debug(f'found {num_atoms} atoms')
-        logger.info('final simplification')
-        timer = Timer()
-        self.result = simplify(self.matrix, assume=self.theory.atoms)
-        self.time_final_simplification = timer.get()
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f'{self.time_final_simplification=:.3f}')
-            num_atoms = sum(1 for _ in self.result.atoms())
-            logger.debug(f'produced {num_atoms} atoms')
-
-    def parallel_process_block(self) -> None:
-
-        def wait_for_processes_to_finish():
-            still_running = sentinels.copy()
-            while still_running:
-                for sentinel in mp.connection.wait(still_running):
-                    still_running.remove(sentinel)
-                num_finished = self.workers - len(still_running)
-                pl = 'es' if num_finished > 1 else ''
-                logger.debug(f'{num_finished} worker process{pl} finished, '
-                             f'{len(still_running)} running')
-            # The following call joins all finished processes as a side effect.
-            # Otherwise, they would remain in the process table as zombies.
-            mp.active_children()
-
-        logger.debug('entering sync manager context')
-        timer = Timer()
-        manager: SyncManager[Formula, Node]
-        with SyncManager() as manager:
-            self.time_syncmanager_enter = timer.get()
-            logger.debug(f'{self.time_syncmanager_enter=:.3f}')
-            m_lock = manager.Lock()
-            working_nodes: WorkingNodeListProxy[Formula, Node] = manager.WorkingNodeList()
-            working_nodes.append(self.root_node)
-            self.root_node = None
-            success_nodes: multiprocessing.Queue[Optional[list[Node]]] = multiprocessing.Queue()
-            self.success_nodes = NodeList()
-            failure_nodes = manager.NodeList()  # type: ignore
-            final_theories: multiprocessing.Queue[Theory] = multiprocessing.Queue()
-            found_t = manager.Value('i', 0)
-            processes: list[Optional[mp.Process]] = [None] * self.workers
-            sentinels: list[Optional[int]] = [None] * self.workers
-            # We pass the ring variables to the workers. The workers
-            # reconstruct the ring. This is not really necessary at the moment.
-            # However, future introduction of variables by workers will cause
-            # problems, and expect  reconstruction of the ring to be part of
-            # the solution.
-            ring_vars = tuple(str(v) for v in polynomial_ring.get_vars())
-            log_level = logger.getEffectiveLevel()
-            reference_time = delta_time_formatter.get_reference_time()
-            logger.debug(f'starting worker processes in {range(self.workers)}')
-            born_processes = manager.Value('i', 0)
-            timer.reset()
-            for i in range(self.workers):
-                processes[i] = mp.Process(
-                    target=self.parallel_process_block_worker,
-                    args=(working_nodes, success_nodes, failure_nodes,
-                          self.theory, final_theories, m_lock, found_t,
-                          ring_vars, i, log_level, reference_time,
-                          born_processes))
-                processes[i].start()
-                sentinels[i] = processes[i].sentinel
-            try:
-                born = 0
-                while born < 1:
-                    time.sleep(0.0001)
-                    with m_lock:
-                        born = born_processes.value
-                self.time_start_first_worker = timer.get()
-                logger.debug(f'{self.time_start_first_worker=:.3f}')
-                if self.workers > 1:
-                    while born < self.workers:
-                        time.sleep(0.0001)
-                        with m_lock:
-                            born = born_processes.value
-                    self.time_start_all_workers = timer.get()
-                else:
-                    self.time_start_all_workers = self.time_start_first_worker
-                logger.debug(f'{self.time_start_all_workers=:.3f}')
-                workers_running = self.workers
-                log_timer = Timer()
-                while workers_running > 0:
-                    if logger.isEnabledFor(logging.INFO):
-                        t = log_timer.get()
-                        if t >= self.log_rate:
-                            logger.info(working_nodes.periodic_statistics())
-                            logger.info(self.success_nodes.periodic_statistics('S'))
-                            logger.info(failure_nodes.periodic_statistics('F'))
-                            log_timer.reset()
-                    try:
-                        nodes = success_nodes.get(timeout=0.001)
-                    except queue.Empty:
-                        continue
-                    if nodes is not None:
-                        self.success_nodes.extend(nodes)
-                    else:
-                        workers_running -= 1
-            except KeyboardInterrupt:
-                logger.debug('KeyboardInterrupt, waiting for processes to finish')
-                wait_for_processes_to_finish()
-                raise
-            wait_for_processes_to_finish()
-            self.time_multiprocessing = timer.get() - self.time_start_first_worker
-            logger.debug(f'{self.time_multiprocessing=:.3f}')
-            new_assumptions = []
-            for i in range(self.workers):
-                new_assumptions.extend(final_theories.get().atoms)
-            self.theory.extend(new_assumptions)
-            if found_t.value > 0:
-                pl = 's' if found_t.value > 1 else ''
-                logger.debug(f'{found_t.value} worker{pl} found T')
-                # The exception handler for FoundT in virtual_substitution will
-                # log final statistics. We do not retrieve nodes and memory,
-                # which would cost significant time and space. We neither
-                # retrieve the node_counter, which would be not consistent with
-                # our empty nodes.
-                self.working_nodes = abc.qe.WorkingNodeList(
-                    hits=working_nodes.hits,
-                    candidates=working_nodes.candidates)
-                # TODO: wipe self.success_nodes and self.failure_nodes
-                raise FoundT()
-            logger.info(working_nodes.final_statistics())
-            logger.info(self.success_nodes.final_statistics('success'))
-            logger.info(failure_nodes.final_statistics('failure'))
-            logger.info('importing results from manager')
-            logger.debug('importing working nodes from manager')
-            # We do not retrieve the memory, which would cost significant time
-            # and space. Same for success nodes and failure nodes below.
-            timer.reset()
-            self.working_nodes = abc.qe.WorkingNodeList(
-                nodes=working_nodes.nodes,
-                hits=working_nodes.hits,
-                candidates=working_nodes.candidates,
-                node_counter=working_nodes.node_counter)
-            self.time_import_working_nodes = timer.get()
-            logger.debug(f'{self.time_import_working_nodes=:.3f}')
-            assert self.working_nodes.nodes == []
-            assert self.working_nodes.node_counter.total() == 0
-            logger.debug('importing failure nodes from manager')
-            timer.reset()
-            self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
-                                          hits=failure_nodes.hits,
-                                          candidates=failure_nodes.candidates)
-            self.time_import_failure_nodes = timer.get()
-            logger.debug(f'{self.time_import_failure_nodes=:.3f}')
-            logger.debug('leaving sync manager context')
-            timer.reset()
-        self.time_syncmanager_exit = timer.get()
-        logger.debug(f'{self.time_syncmanager_exit=:.3f}')
-
-    @staticmethod
-    def parallel_process_block_worker(working_nodes: WorkingNodeListProxy,
-                                      success_nodes: multiprocessing.Queue[Optional[list[Node]]],
-                                      failure_nodes: NodeListProxy,
-                                      theory: Theory,
-                                      final_theories: multiprocessing.Queue[Theory],
-                                      m_lock: threading.Lock,
-                                      found_t: mp.sharedctypes.Synchronized,
-                                      ring_vars: list[str],
-                                      i: int,
-                                      log_level: int,
-                                      reference_time: float,
-                                      born_processes: mp.sharedctypes.Synchronized) -> None:
-        try:
-            with m_lock:
-                born_processes.value += 1
-            multiprocessing_logger.setLevel(log_level)
-            multiprocessing_formatter.set_reference_time(reference_time)
-            multiprocessing_logger.debug(f'worker process {i} is running')
-            polynomial_ring.ensure_vars(ring_vars)
-            while found_t.value == 0 and not working_nodes.is_finished():
-                try:
-                    node = working_nodes.pop()
-                except IndexError:
-                    time.sleep(0.001)
-                    continue
-                try:
-                    nodes = node.process(theory)
-                except DegreeViolation:
-                    failure_nodes.append(node)
-                    working_nodes.task_done()
-                    continue
-                except FoundT:
-                    with m_lock:
-                        found_t.value += 1
-                    break
-                if nodes:
-                    if nodes[0].variables:
-                        working_nodes.extend(nodes)
-                    else:
-                        success_nodes.put(nodes)
-                working_nodes.task_done()
-        except KeyboardInterrupt:
-            multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
-        success_nodes.put(None)
-        multiprocessing_logger.debug(f'sending {theory=}')
-        final_theories.put(theory)
-        multiprocessing_logger.debug(f'worker process {i} exiting')
-
-    def pop_block(self) -> None:
-        logger.debug(f'entering {self.pop_block.__name__}')
-        assert self.matrix is not None, self.matrix
-        logger.info(str(self.blocks))
-        if logger.isEnabledFor(logging.DEBUG):
-            s = str(self.matrix)
-            logger.debug(s[:50] + '...' if len(s) > 53 else s)
-        quantifier, vars_ = self.blocks.pop()
-        matrix = self.matrix
-        self.matrix = None
-        if quantifier is All:
-            self.negated = True
-            matrix = Not(matrix)
-        else:
-            self.negated = False
-        self.root_node = Node(variables=vars_,
-                              formula=simplify(matrix, assume=self.theory.atoms),
-                              answer=[],
-                              outermost_block=not self.blocks,
-                              options=self.options)
-
-    def process_block(self) -> None:
-        logger.debug(f'entering {self.process_block.__name__}')
-        if self.workers > 0:
-            return self.parallel_process_block()
-        return self.sequential_process_block()
-
-    def sequential_process_block(self) -> None:
-        self.working_nodes = abc.qe.WorkingNodeList()
-        self.working_nodes.append(self.root_node)
-        self.root_node = None
-        self.success_nodes = NodeList()
-        self.failure_nodes = NodeList()
-        if logger.isEnabledFor(logging.INFO):
-            last_log = time.time()
-        while self.working_nodes.nodes:
-            if logger.isEnabledFor(logging.INFO):
-                t = time.time()
-                if t - last_log >= self.log_rate:
-                    logger.info(self.working_nodes.periodic_statistics())
-                    logger.info(self.success_nodes.periodic_statistics('S'))
-                    logger.info(self.failure_nodes.periodic_statistics('F'))
-                    last_log = t
-            node = self.working_nodes.pop()
-            try:
-                nodes = node.process(self.theory)
-            except DegreeViolation:
-                self.failure_nodes.append(node)
-                continue
-            if nodes:
-                if nodes[0].variables:
-                    self.working_nodes.extend(nodes)
-                else:
-                    self.success_nodes.extend(nodes)
-        logger.info(self.working_nodes.final_statistics())
-        logger.info(self.success_nodes.final_statistics('success'))
-        logger.info(self.failure_nodes.final_statistics('failure'))
-
-    def setup(self, f: Formula, workers: int) -> None:
-        logger.debug(f'entering {self.setup.__name__}')
-        if workers >= 0:
-            self.workers = workers
-        else:
-            self.workers = os.cpu_count() + workers
-        f = f.to_pnf()
-        self.matrix, self.blocks = f.matrix()
-
-    def status(self, dump_nodes: bool = False) -> str:
-
-        def negated_as_str() -> str:
-            match self.negated:
-                case None:
-                    read_as = ''
-                case False:
-                    read_as = '  # read as Ex'
-                case True:
-                    read_as = '  # read as Not All'
-                case _:
-                    assert False, self.negated
-            return f'{self.negated},{read_as}'
-
-        def nodes_as_str(nodes: Optional[Collection[Node]]) -> Optional[str]:
-            if nodes is None:
-                return None
-            match dump_nodes:
-                case True:
-                    h = ',\n                '.join(f'{node}' for node in nodes)
-                    return f'[{h}]'
-                case False:
-                    return f'{len(nodes)}'
-
-        return (f'{self.__class__.__qualname__}(\n'
-                f'    blocks        = {self.blocks},\n'
-                f'    matrix        = {self.matrix},\n'
-                f'    negated       = {negated_as_str()}\n'
-                f'    root_node     = {self.root_node}\n'
-                f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
-                f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
-                f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
-                f'    result        = {self.result}'
-                f')')
-
-    def timings(self, precision: int = 7) -> None:
-        match self.workers:
-            case 0:
-                print(f'{self.workers=}')
-                print(f'{self.time_syncmanager_enter=}')
-                print(f'{self.time_start_first_worker=}')
-                print(f'{self.time_start_all_workers=}')
-                print(f'{self.time_multiprocessing=}')
-                print(f'{self.time_import_working_nodes=}')
-                print(f'{self.time_import_success_nodes=}')
-                print(f'{self.time_import_failure_nodes=}')
-                print(f'{self.time_final_simplification=:.{precision}f}')
-                print(f'{self.time_syncmanager_exit=}')
-                print(f'{self.time_total=:.{precision}}')
-            case _:
-                print(f'{self.workers=}')
-                print(f'{self.time_syncmanager_enter=:.{precision}f}')
-                print(f'{self.time_start_first_worker=:.{precision}f}')
-                print(f'{self.time_start_all_workers=:.{precision}f}')
-                print(f'{self.time_multiprocessing=:.{precision}f}')
-                print(f'{self.time_import_working_nodes=:.{precision}f}')
-                print(f'{self.time_import_failure_nodes=:.{precision}f}')
-                print(f'{self.time_final_simplification=:.{precision}f}')
-                print(f'{self.time_syncmanager_exit=:.{precision}f}')
-                print(f'{self.time_total=:.{precision}f}')
-
-    def virtual_substitution(self, f: Formula, workers: int):
-        """Virtual substitution main loop.
-        """
-        logger.debug(f'entering {self.virtual_substitution.__name__}')
-        self.setup(f, workers)
-        while self.blocks:
-            try:
-                self.pop_block()
-                self.process_block()
-            except FoundT:
-                logger.info('found T')
-                logger.info(self.working_nodes.final_statistics())
-                self.working_nodes = None
-                self.success_nodes = NodeList(
-                    nodes=[Node(variables=[],
-                                formula=_T(),
-                                answer=[],
-                                outermost_block=False,
-                                options=self.options)])
-            self.collect_success_nodes()
-            if self.failure_nodes:
-                raise NoTraceException(f'Degree violation - '
-                                       f'{len(self.failure_nodes.nodes)} failure nodes')
-                # raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
-        self.final_simplification()
-        logger.debug(f'leaving {self.virtual_substitution.__name__}')
-        return self.result
+    def simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+        return simplify(formula, assume)
 
 
 qe = virtual_substitution = VirtualSubstitution()

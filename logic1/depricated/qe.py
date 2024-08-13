@@ -58,7 +58,7 @@ class PoolOnePrimitive(Pool[α, τ, χ, σ]):
 @dataclass
 class QuantifierElimination(Generic[α, τ, χ, σ, π]):
 
-    blocks: Optional[Prefix[α, τ, χ, σ]] = None
+    blocks: Optional[Prefix[χ]] = None
     matrix: Optional[Formula[α, τ, χ, σ]] = None
     negated: Optional[bool] = None
     pool: Optional[π] = None

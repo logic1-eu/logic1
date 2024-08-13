@@ -1,19 +1,78 @@
 from __future__ import annotations
 
-import multiprocessing as mp
-import multiprocessing.managers
-import threading
 from abc import abstractmethod
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Any, Collection, Generic, Iterable, Iterator, Optional, Self, TypeVar
+import logging
+import multiprocessing as mp
+import multiprocessing.managers
+import multiprocessing.queues
+import queue
+import os
+import sys
+import threading
+import time
+from typing import (Any, Collection, Generic, Iterable, Iterator, Optional,
+                    Self, TypeVar)
+from typing import reveal_type  # noqa
 
-from ..firstorder import And, AtomicFormula, _F, Formula, Or, Variable
+from logic1.support.excepthook import NoTraceException
+from logic1.firstorder import (All, And, AtomicFormula, _F, Formula, Not, Or,
+                               Prefix, Term, Variable)
+from logic1.support.logging import DeltaTimeFormatter
 
+# Create logger
+delta_time_formatter = DeltaTimeFormatter(
+    f'%(asctime)s - %(name)s - %(levelname)-5s - %(delta)s: %(message)s')
+
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(delta_time_formatter)
+
+logger = logging.getLogger(__name__)
+logger.propagate = False
+logger.addHandler(stream_handler)
+logger.addFilter(lambda record: record.msg.strip() != '')
+logger.setLevel(logging.WARNING)
+
+# Create multiprocessing logger
+multiprocessing_formatter = DeltaTimeFormatter(
+    f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s - %(delta)s: %(message)s')
+
+multiprocessing_handler = logging.StreamHandler()
+multiprocessing_handler.setFormatter(multiprocessing_formatter)
+multiprocessing_logger = logging.getLogger('multiprocessing')
+multiprocessing_logger.propagate = False
+multiprocessing_logger.addHandler(multiprocessing_handler)
+
+α = TypeVar('α', bound=AtomicFormula)
 φ = TypeVar('φ', bound=Formula)
 ν = TypeVar('ν', bound='Node')
+ι = TypeVar('ι')
+σ = TypeVar('σ')
+τ = TypeVar('τ', bound='Term')
 χ = TypeVar('χ', bound=Variable)
-θ = TypeVar('θ')
+θ = TypeVar('θ', bound='Theory')
+ω = TypeVar('ω')
+
+
+class FoundT(Exception):
+    pass
+
+
+class NodeProcessFailure(Exception):
+    pass
+
+
+class Timer:
+
+    def __init__(self):
+        self.reset()
+
+    def get(self) -> float:
+        return time.time() - self._reference_time
+
+    def reset(self) -> None:
+        self._reference_time = time.time()
 
 
 @dataclass
@@ -380,7 +439,7 @@ class WorkingNodeListProxy(NodeListProxy[φ, ν]):
         return self._proxy.is_finished()
 
     def periodic_statistics(self, key: str = 'W') -> str:
-        hits, candidates, busy, node_counter = self._callmethod('statistics')  # type: ignore
+        hits, candidates, busy, node_counter = self._proxy.statistics()
         ratio = self.hit_ratio(hits, candidates)
         try:
             num_variables = max(k for k, v in node_counter.items() if v != 0)
@@ -436,5 +495,507 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
                       'is_finished', 'pop', 'statistics', 'task_done'])
 
 
-class QuantifierElimination:
-    pass
+@dataclass
+class Theory(Generic[α, τ, χ, σ]):
+
+    class Inconsistent(Exception):
+        pass
+
+    atoms: list[α]
+
+    def append(self, new_atom: α) -> None:
+        self.extend([new_atom])
+
+    def extend(self, new_atoms: Iterable[α]) -> None:
+        self.atoms.extend(new_atoms)
+        # NF nörgelt
+        theta = self.simplify(And(*self.atoms))
+        if Formula.is_atomic(theta):
+            self.atoms = [theta]
+        elif Formula.is_and(theta):
+            self.atoms = [*theta.args]
+        elif Formula.is_true(theta):
+            self.atoms = []
+        elif Formula.is_false(theta):
+            raise self.Inconsistent(f'{self=}, {new_atoms=}, {theta=}')
+        else:
+            assert False, (self, new_atoms, theta)
+
+    @abstractmethod
+    def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
+        ...
+
+
+@dataclass
+class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
+
+    blocks: Optional[Prefix[χ]] = None
+    matrix: Optional[Formula[α, τ, χ, σ]] = None
+    negated: Optional[bool] = None
+    root_node: Optional[ν] = None
+    working_nodes: Optional[WorkingNodeList[Formula[α, τ, χ, σ], ν]] = None
+    success_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    failure_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    theory: Optional[θ] = None
+    result: Optional[Formula[α, τ, χ, σ]] = None
+
+    workers: int = 0
+    log_level: int = logging.NOTSET
+    log_rate: float = 0.5
+    options: Optional[ω] = None
+
+    time_final_simplification: Optional[float] = None
+    time_import_failure_nodes: Optional[float] = None
+    time_import_success_nodes: Optional[float] = None
+    time_import_working_nodes: Optional[float] = None
+    time_multiprocessing: Optional[float] = None
+    time_start_first_worker: Optional[float] = None
+    time_start_all_workers: Optional[float] = None
+    time_syncmanager_enter: Optional[float] = None
+    time_syncmanager_exit: Optional[float] = None
+    time_total: Optional[float] = None
+
+    def __call__(self, f: Formula[α, τ, χ, σ], assume: Optional[Iterable[α]] = None,
+                 workers: int = 0, log_level: int = logging.NOTSET,
+                 log_rate: float = 0.5, **options) -> Optional[Formula[α, τ, χ, σ]]:
+        """Quantifier elimination entry point.
+
+        workers is the number of processes used for virtual substitution. The
+        default value workers=0 uses a sequential implementation, avoiding
+        overhead when input problems are small. For all other values of
+        workers, there are additional processes started. In particular,
+        workers=1 uses the parallel implementation with one worker process,
+        which is interesting mostly for testing and debugging. A negative value
+        workers = z < 0 selects os.num_cpu() - abs(z) many workers. When there
+        are n > 0 many workers selected, then the overall number of processes
+        running will be n + 2, i.e., the workers plus the master process plus a
+        manager processes providing proxy objects for shared data. It follows
+        that workers=-2 matches the number of CPUs of the machine. For hard
+        computations, workers=-3 is an interesting choice, which leaves one CPU
+        free for smooth interaction with the machine.
+        """
+        timer = Timer()
+        # We call __init__ in order to reset all attributes of the data class
+        # also within __call__. This is not really nice, but it does the job
+        # and saves some code.
+        QuantifierElimination.__init__(self)
+        try:
+            self.theory = self.create_theory(assume)
+            self.log_level = log_level
+            self.log_rate = log_rate
+            save_level = logger.getEffectiveLevel()
+            logger.setLevel(self.log_level)
+            delta_time_formatter.set_reference_time(time.time())
+            self.options = self.create_options(**options)
+            logger.info(f'{self.options}')
+            result = self.quantifier_eliminiation(f, workers)
+        except KeyboardInterrupt:
+            print('KeyboardInterrupt', file=sys.stderr, flush=True)
+            return None
+        finally:
+            logger.info('finished')
+            logger.setLevel(save_level)
+        self.time_total = timer.get()
+        return result
+
+    @property
+    def assume(self) -> list[α]:
+        assert self.theory is not None
+        return self.theory.atoms
+
+    def collect_success_nodes(self) -> None:
+        assert self.success_nodes is not None
+        logger.debug(f'entering {self.collect_success_nodes.__name__}')
+        self.matrix = Or(*(node.formula for node in self.success_nodes))
+        if self.negated:
+            self.matrix = Not(self.matrix)
+        self.negated = None
+        self.working_nodes = None
+        self.success_nodes = None
+
+    @abstractmethod
+    def create_options(self, **kwargs) -> ω:
+        ...
+
+    @abstractmethod
+    def create_root_node(self, vars_: list[χ], matrix: Formula[α, τ, χ, σ]) -> ν:
+        ...
+
+    @abstractmethod
+    def create_theory(self, assume: Optional[Iterable[α]]) -> θ:
+        ...
+
+    @abstractmethod
+    def create_true_node(self) -> ν:
+        ...
+
+    def pop_block(self) -> None:
+        assert self.blocks is not None
+        logger.debug(f'entering {self.pop_block.__name__}')
+        assert self.matrix is not None, self.matrix
+        logger.info(str(self.blocks))
+        if logger.isEnabledFor(logging.DEBUG):
+            s = str(self.matrix)
+            logger.debug(s[:50] + '...' if len(s) > 53 else s)
+        quantifier, vars_ = self.blocks.pop()
+        matrix = self.matrix
+        self.matrix = None
+        if quantifier is All:
+            self.negated = True
+            matrix = Not(matrix)
+        else:
+            self.negated = False
+        self.root_node = self.create_root_node(vars_, matrix)
+
+    def final_simplification(self):
+        logger.debug(f'entering {self.final_simplification.__name__}')
+        if logger.isEnabledFor(logging.DEBUG):
+            num_atoms = sum(1 for _ in self.matrix.atoms())
+            logger.debug(f'found {num_atoms} atoms')
+        logger.info('final simplification')
+        timer = Timer()
+        self.result = self.simplify(self.matrix, assume=self.theory.atoms)
+        self.time_final_simplification = timer.get()
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(f'{self.time_final_simplification=:.3f}')
+            num_atoms = sum(1 for _ in self.result.atoms())
+            logger.debug(f'produced {num_atoms} atoms')
+
+    @classmethod
+    @abstractmethod
+    def init_env(cls, arg: ι) -> None:
+        ...
+
+    @abstractmethod
+    def init_env_arg(self) -> ι:
+        ...
+
+    def parallel_process_block(self) -> None:
+
+        def wait_for_processes_to_finish():
+            still_running = sentinels.copy()
+            while still_running:
+                for sentinel in mp.connection.wait(still_running):
+                    still_running.remove(sentinel)
+                num_finished = self.workers - len(still_running)
+                pl = 'es' if num_finished > 1 else ''
+                logger.debug(f'{num_finished} worker process{pl} finished, '
+                             f'{len(still_running)} running')
+            # The following call joins all finished processes as a side effect.
+            # Otherwise, they would remain in the process table as zombies.
+            mp.active_children()
+
+        assert self.root_node is not None
+        assert self.theory is not None
+        logger.debug('entering sync manager context')
+        timer = Timer()
+        manager: SyncManager[Formula[α, τ, χ, σ], ν]
+        with SyncManager() as manager:
+            self.time_syncmanager_enter = timer.get()
+            logger.debug(f'{self.time_syncmanager_enter=:.3f}')
+            m_lock = manager.Lock()
+            working_nodes: WorkingNodeListProxy[Formula[α, τ, χ, σ], ν] = manager.WorkingNodeList()
+            working_nodes.append(self.root_node)
+            self.root_node = None
+            success_nodes: multiprocessing.Queue[Optional[list[ν]]] = multiprocessing.Queue()
+            self.success_nodes = NodeList()
+            failure_nodes = manager.NodeList()  # type: ignore
+            final_theories: multiprocessing.Queue[θ] = multiprocessing.Queue()
+            found_t = manager.Value('i', 0)
+            processes: list[mp.Process] = []
+            sentinels: list[int] = []
+            log_level = logger.getEffectiveLevel()
+            reference_time = delta_time_formatter.get_reference_time()
+            logger.debug(f'starting worker processes in {range(self.workers)}')
+            born_processes = manager.Value('i', 0)
+            timer.reset()
+            for i in range(self.workers):
+                process = mp.Process(
+                    target=self.parallel_process_block_worker,
+                    args=(working_nodes, success_nodes, failure_nodes,
+                          self.theory, final_theories, m_lock, found_t,
+                          i, log_level, reference_time,
+                          born_processes, self.init_env_arg()))
+                process.start()
+                processes.append(process)
+                sentinels.append(process.sentinel)
+            try:
+                born = 0
+                while born < 1:
+                    time.sleep(0.0001)
+                    with m_lock:
+                        born = born_processes.value
+                self.time_start_first_worker = timer.get()
+                logger.debug(f'{self.time_start_first_worker=:.3f}')
+                if self.workers > 1:
+                    while born < self.workers:
+                        time.sleep(0.0001)
+                        with m_lock:
+                            born = born_processes.value
+                    self.time_start_all_workers = timer.get()
+                else:
+                    self.time_start_all_workers = self.time_start_first_worker
+                logger.debug(f'{self.time_start_all_workers=:.3f}')
+                workers_running = self.workers
+                log_timer = Timer()
+                while workers_running > 0:
+                    if logger.isEnabledFor(logging.INFO):
+                        t = log_timer.get()
+                        if t >= self.log_rate:
+                            logger.info(working_nodes.periodic_statistics())
+                            logger.info(self.success_nodes.periodic_statistics('S'))
+                            logger.info(failure_nodes.periodic_statistics('F'))
+                            log_timer.reset()
+                    try:
+                        nodes = success_nodes.get(timeout=0.001)
+                    except queue.Empty:
+                        continue
+                    if nodes is not None:
+                        self.success_nodes.extend(nodes)
+                    else:
+                        workers_running -= 1
+            except KeyboardInterrupt:
+                logger.debug('KeyboardInterrupt, waiting for processes to finish')
+                wait_for_processes_to_finish()
+                raise
+            wait_for_processes_to_finish()
+            self.time_multiprocessing = timer.get() - self.time_start_first_worker
+            logger.debug(f'{self.time_multiprocessing=:.3f}')
+            new_assumptions = []
+            for i in range(self.workers):
+                new_assumptions.extend(final_theories.get().atoms)
+            self.theory.extend(new_assumptions)
+            if found_t.value > 0:
+                pl = 's' if found_t.value > 1 else ''
+                logger.debug(f'{found_t.value} worker{pl} found T')
+                # The exception handler for FoundT in virtual_substitution will
+                # log final statistics. We do not retrieve nodes and memory,
+                # which would cost significant time and space. We neither
+                # retrieve the node_counter, which would be not consistent with
+                # our empty nodes.
+                self.working_nodes = WorkingNodeList(
+                    hits=working_nodes.hits,
+                    candidates=working_nodes.candidates)
+                # TODO: wipe self.success_nodes and self.failure_nodes
+                raise FoundT()
+            logger.info(working_nodes.final_statistics())
+            logger.info(self.success_nodes.final_statistics('success'))
+            logger.info(failure_nodes.final_statistics('failure'))
+            logger.info('importing results from manager')
+            logger.debug('importing working nodes from manager')
+            # We do not retrieve the memory, which would cost significant time
+            # and space. Same for success nodes and failure nodes below.
+            timer.reset()
+            self.working_nodes = WorkingNodeList(
+                nodes=working_nodes.nodes,
+                hits=working_nodes.hits,
+                candidates=working_nodes.candidates,
+                node_counter=working_nodes.node_counter)
+            self.time_import_working_nodes = timer.get()
+            logger.debug(f'{self.time_import_working_nodes=:.3f}')
+            assert self.working_nodes.nodes == []
+            assert self.working_nodes.node_counter.total() == 0
+            logger.debug('importing failure nodes from manager')
+            timer.reset()
+            self.failure_nodes = NodeList(nodes=failure_nodes.nodes,
+                                          hits=failure_nodes.hits,
+                                          candidates=failure_nodes.candidates)
+            self.time_import_failure_nodes = timer.get()
+            logger.debug(f'{self.time_import_failure_nodes=:.3f}')
+            logger.debug('leaving sync manager context')
+            timer.reset()
+        self.time_syncmanager_exit = timer.get()
+        logger.debug(f'{self.time_syncmanager_exit=:.3f}')
+
+    @classmethod
+    def parallel_process_block_worker(cls,
+                                      working_nodes: WorkingNodeListProxy,
+                                      success_nodes: multiprocessing.Queue[Optional[list[Node]]],
+                                      failure_nodes: NodeListProxy,
+                                      theory: Theory,
+                                      final_theories: multiprocessing.Queue[Theory],
+                                      m_lock: threading.Lock,
+                                      found_t: mp.sharedctypes.Synchronized,
+                                      i: int,
+                                      log_level: int,
+                                      reference_time: float,
+                                      born_processes: mp.sharedctypes.Synchronized,
+                                      init_env_arg: ι) -> None:
+        try:
+            with m_lock:
+                born_processes.value += 1
+            multiprocessing_logger.setLevel(log_level)
+            multiprocessing_formatter.set_reference_time(reference_time)
+            multiprocessing_logger.debug(f'worker process {i} is running')
+            cls.init_env(init_env_arg)
+            while found_t.value == 0 and not working_nodes.is_finished():
+                try:
+                    node = working_nodes.pop()
+                except IndexError:
+                    time.sleep(0.001)
+                    continue
+                try:
+                    nodes = node.process(theory)
+                except NodeProcessFailure:
+                    failure_nodes.append(node)
+                    working_nodes.task_done()
+                    continue
+                except FoundT:
+                    with m_lock:
+                        found_t.value += 1
+                    break
+                if nodes:
+                    if nodes[0].variables:
+                        working_nodes.extend(nodes)
+                    else:
+                        success_nodes.put(nodes)
+                working_nodes.task_done()
+        except KeyboardInterrupt:
+            multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
+        success_nodes.put(None)
+        multiprocessing_logger.debug(f'sending {theory=}')
+        final_theories.put(theory)
+        multiprocessing_logger.debug(f'worker process {i} exiting')
+
+    def process_block(self) -> None:
+        logger.debug(f'entering {self.process_block.__name__}')
+        if self.workers > 0:
+            return self.parallel_process_block()
+        return self.sequential_process_block()
+
+    def sequential_process_block(self) -> None:
+        assert self.root_node is not None
+        self.working_nodes = WorkingNodeList()
+        self.working_nodes.append(self.root_node)
+        self.root_node = None
+        self.success_nodes = NodeList()
+        self.failure_nodes = NodeList()
+        if logger.isEnabledFor(logging.INFO):
+            last_log = time.time()
+        while self.working_nodes.nodes:
+            if logger.isEnabledFor(logging.INFO):
+                t = time.time()
+                if t - last_log >= self.log_rate:
+                    logger.info(self.working_nodes.periodic_statistics())
+                    logger.info(self.success_nodes.periodic_statistics('S'))
+                    logger.info(self.failure_nodes.periodic_statistics('F'))
+                    last_log = t
+            node = self.working_nodes.pop()
+            try:
+                nodes = node.process(self.theory)
+            except NodeProcessFailure:
+                self.failure_nodes.append(node)
+                continue
+            if nodes:
+                if nodes[0].variables:
+                    self.working_nodes.extend(nodes)
+                else:
+                    self.success_nodes.extend(nodes)
+        logger.info(self.working_nodes.final_statistics())
+        logger.info(self.success_nodes.final_statistics('success'))
+        logger.info(self.failure_nodes.final_statistics('failure'))
+
+    @abstractmethod
+    def simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
+            -> Formula[α, τ, χ, σ]:
+        ...
+
+    def setup(self, f: Formula[α, τ, χ, σ], workers: int) -> None:
+        logger.debug(f'entering {self.setup.__name__}')
+        if workers >= 0:
+            self.workers = workers
+        else:
+            cpu_count = os.cpu_count()
+            if cpu_count is None:
+                raise ValueError(f'{os.cpu_count()=}, i.e. undetermined')
+            if cpu_count + workers < 1:
+                raise ValueError(f'negative number of workers')
+            self.workers = cpu_count + workers
+        f = f.to_pnf()
+        self.matrix, self.blocks = f.matrix()
+
+    def status(self, dump_nodes: bool = False) -> str:
+
+        def negated_as_str() -> str:
+            match self.negated:
+                case None:
+                    read_as = ''
+                case False:
+                    read_as = '  # read as Ex'
+                case True:
+                    read_as = '  # read as Not All'
+                case _:
+                    assert False, self.negated
+            return f'{self.negated},{read_as}'
+
+        def nodes_as_str(nodes: Optional[Collection[Node]]) -> Optional[str]:
+            if nodes is None:
+                return None
+            match dump_nodes:
+                case True:
+                    h = ',\n                '.join(f'{node}' for node in nodes)
+                    return f'[{h}]'
+                case False:
+                    return f'{len(nodes)}'
+
+        return (f'{self.__class__.__qualname__}(\n'
+                f'    blocks        = {self.blocks},\n'
+                f'    matrix        = {self.matrix},\n'
+                f'    negated       = {negated_as_str()}\n'
+                f'    root_node     = {self.root_node}\n'
+                f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
+                f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
+                f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
+                f'    result        = {self.result}'
+                f')')
+
+    # discuss: We probably do not want to print
+    def timings(self, precision: int = 7) -> None:
+        match self.workers:
+            case 0:
+                print(f'{self.workers=}')
+                print(f'{self.time_syncmanager_enter=}')
+                print(f'{self.time_start_first_worker=}')
+                print(f'{self.time_start_all_workers=}')
+                print(f'{self.time_multiprocessing=}')
+                print(f'{self.time_import_working_nodes=}')
+                print(f'{self.time_import_success_nodes=}')
+                print(f'{self.time_import_failure_nodes=}')
+                print(f'{self.time_final_simplification=:.{precision}f}')
+                print(f'{self.time_syncmanager_exit=}')
+                print(f'{self.time_total=:.{precision}}')
+            case _:
+                print(f'{self.workers=}')
+                print(f'{self.time_syncmanager_enter=:.{precision}f}')
+                print(f'{self.time_start_first_worker=:.{precision}f}')
+                print(f'{self.time_start_all_workers=:.{precision}f}')
+                print(f'{self.time_multiprocessing=:.{precision}f}')
+                print(f'{self.time_import_working_nodes=:.{precision}f}')
+                print(f'{self.time_import_failure_nodes=:.{precision}f}')
+                print(f'{self.time_final_simplification=:.{precision}f}')
+                print(f'{self.time_syncmanager_exit=:.{precision}f}')
+                print(f'{self.time_total=:.{precision}f}')
+
+    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ], workers: int):
+        """Virtual substitution main loop.
+        """
+        logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
+        self.setup(f, workers)
+        while self.blocks:
+            try:
+                self.pop_block()
+                self.process_block()
+            except FoundT:
+                assert self.working_nodes is not None
+                logger.info('found T')
+                logger.info(self.working_nodes.final_statistics())
+                self.working_nodes = None
+                self.success_nodes = NodeList(nodes=[self.create_true_node()])
+            self.collect_success_nodes()
+            if self.failure_nodes:
+                raise NoTraceException(f'Degree violation - '
+                                       f'{len(self.failure_nodes.nodes)} failure nodes')
+                # raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
+        self.final_simplification()
+        logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
+        return self.result
