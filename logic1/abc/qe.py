@@ -9,7 +9,6 @@ import multiprocessing.managers
 import multiprocessing.queues
 import queue
 import os
-import sys
 import threading
 import time
 from typing import (Any, Collection, Generic, Iterable, Iterator, Optional,
@@ -52,7 +51,7 @@ multiprocessing_logger.addHandler(multiprocessing_handler)
 τ = TypeVar('τ', bound='Term')
 χ = TypeVar('χ', bound=Variable)
 θ = TypeVar('θ', bound='Theory')
-ω = TypeVar('ω')
+ω = TypeVar('ω', bound='Options')
 
 
 class FoundT(Exception):
@@ -503,6 +502,9 @@ class Theory(Generic[α, τ, χ, σ]):
 
     atoms: list[α]
 
+    def __init__(self, atoms: Iterable[α]) -> None:
+        self.atoms = list(atoms)
+
     def append(self, new_atom: α) -> None:
         self.extend([new_atom])
 
@@ -527,12 +529,19 @@ class Theory(Generic[α, τ, χ, σ]):
 
 
 @dataclass
+class Options:
+
+    log_level: int = logging.NOTSET
+    log_rate: float = 0.5
+
+
+@dataclass
 class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
 
     blocks: Optional[Prefix[χ]] = None
     matrix: Optional[Formula[α, τ, χ, σ]] = None
     negated: Optional[bool] = None
-    root_node: Optional[ν] = None
+    root_nodes: Optional[list[ν]] = None
     working_nodes: Optional[WorkingNodeList[Formula[α, τ, χ, σ], ν]] = None
     success_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
     failure_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
@@ -540,8 +549,6 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
     result: Optional[Formula[α, τ, χ, σ]] = None
 
     workers: int = 0
-    log_level: int = logging.NOTSET
-    log_rate: float = 0.5
     options: Optional[ω] = None
 
     time_final_simplification: Optional[float] = None
@@ -555,9 +562,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
     time_syncmanager_exit: Optional[float] = None
     time_total: Optional[float] = None
 
-    def __call__(self, f: Formula[α, τ, χ, σ], assume: Optional[Iterable[α]] = None,
-                 workers: int = 0, log_level: int = logging.NOTSET,
-                 log_rate: float = 0.5, **options) -> Optional[Formula[α, τ, χ, σ]]:
+    def __call__(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = [],
+                 workers: int = 0, **options) -> Optional[Formula[α, τ, χ, σ]]:
         """Quantifier elimination entry point.
 
         workers is the number of processes used for virtual substitution. The
@@ -575,25 +581,32 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         free for smooth interaction with the machine.
         """
         timer = Timer()
+        delta_time_formatter.set_reference_time(time.time())
         # We call __init__ in order to reset all attributes of the data class
         # also within __call__. This is not really nice, but it does the job
         # and saves some code.
-        QuantifierElimination.__init__(self)
+        QuantifierElimination.__init__(self)  # dicuss: NF is :-(
+        self.theory = self.create_theory(assume)
+        if workers >= 0:
+            self.workers = workers
+        else:
+            cpu_count = os.cpu_count()
+            if cpu_count is None:
+                raise ValueError(f'{os.cpu_count()=}, i.e. undetermined')
+            if cpu_count + workers < 1:
+                raise ValueError(f'negative number of workers')
+            self.workers = cpu_count + workers
+        self.options = self.create_options(**options)
+        save_level = logger.getEffectiveLevel()
         try:
-            self.theory = self.create_theory(assume)
-            self.log_level = log_level
-            self.log_rate = log_rate
-            save_level = logger.getEffectiveLevel()
-            logger.setLevel(self.log_level)
-            delta_time_formatter.set_reference_time(time.time())
-            self.options = self.create_options(**options)
+            logger.setLevel(self.options.log_level)
             logger.info(f'{self.options}')
             result = self.quantifier_eliminiation(f, workers)
-        except KeyboardInterrupt:
-            print('KeyboardInterrupt', file=sys.stderr, flush=True)
-            return None
-        finally:
             logger.info('finished')
+        except KeyboardInterrupt:
+            logger.info('keyboard interrupt')
+            raise NoTraceException('KeyboardInterrupt')
+        finally:
             logger.setLevel(save_level)
         self.time_total = timer.get()
         return result
@@ -618,11 +631,11 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         ...
 
     @abstractmethod
-    def create_root_node(self, vars_: list[χ], matrix: Formula[α, τ, χ, σ]) -> ν:
+    def create_root_nodes(self, variables: Iterable[χ], matrix: Formula[α, τ, χ, σ]) -> list[ν]:
         ...
 
     @abstractmethod
-    def create_theory(self, assume: Optional[Iterable[α]]) -> θ:
+    def create_theory(self, assume: Iterable[α]) -> θ:
         ...
 
     @abstractmethod
@@ -645,7 +658,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             matrix = Not(matrix)
         else:
             self.negated = False
-        self.root_node = self.create_root_node(vars_, matrix)
+        self.root_nodes = self.create_root_nodes(vars_, matrix)
 
     def final_simplification(self):
         logger.debug(f'entering {self.final_simplification.__name__}')
@@ -654,12 +667,17 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             logger.debug(f'found {num_atoms} atoms')
         logger.info('final simplification')
         timer = Timer()
-        self.result = self.simplify(self.matrix, assume=self.theory.atoms)
+        self.result = self.final_simplify(self.matrix, assume=self.theory.atoms)
         self.time_final_simplification = timer.get()
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f'{self.time_final_simplification=:.3f}')
             num_atoms = sum(1 for _ in self.result.atoms())
             logger.debug(f'produced {num_atoms} atoms')
+
+    @abstractmethod
+    def final_simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
+            -> Formula[α, τ, χ, σ]:
+        ...
 
     @classmethod
     @abstractmethod
@@ -685,7 +703,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             # Otherwise, they would remain in the process table as zombies.
             mp.active_children()
 
-        assert self.root_node is not None
+        assert self.options is not None
+        assert self.root_nodes is not None
         assert self.theory is not None
         logger.debug('entering sync manager context')
         timer = Timer()
@@ -695,8 +714,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
             working_nodes: WorkingNodeListProxy[Formula[α, τ, χ, σ], ν] = manager.WorkingNodeList()
-            working_nodes.append(self.root_node)
-            self.root_node = None
+            working_nodes.extend(self.root_nodes)
+            self.root_nodes = None
             success_nodes: multiprocessing.Queue[Optional[list[ν]]] = multiprocessing.Queue()
             self.success_nodes = NodeList()
             failure_nodes = manager.NodeList()  # type: ignore
@@ -741,7 +760,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                 while workers_running > 0:
                     if logger.isEnabledFor(logging.INFO):
                         t = log_timer.get()
-                        if t >= self.log_rate:
+                        if t >= self.options.log_rate:
                             logger.info(working_nodes.periodic_statistics())
                             logger.info(self.success_nodes.periodic_statistics('S'))
                             logger.info(failure_nodes.periodic_statistics('F'))
@@ -864,10 +883,11 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         return self.sequential_process_block()
 
     def sequential_process_block(self) -> None:
-        assert self.root_node is not None
+        assert self.options is not None
+        assert self.root_nodes is not None
         self.working_nodes = WorkingNodeList()
-        self.working_nodes.append(self.root_node)
-        self.root_node = None
+        self.working_nodes.extend(self.root_nodes)
+        self.root_nodes = None
         self.success_nodes = NodeList()
         self.failure_nodes = NodeList()
         if logger.isEnabledFor(logging.INFO):
@@ -875,7 +895,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         while self.working_nodes.nodes:
             if logger.isEnabledFor(logging.INFO):
                 t = time.time()
-                if t - last_log >= self.log_rate:
+                if t - last_log >= self.options.log_rate:
                     logger.info(self.working_nodes.periodic_statistics())
                     logger.info(self.success_nodes.periodic_statistics('S'))
                     logger.info(self.failure_nodes.periodic_statistics('F'))
@@ -894,25 +914,6 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         logger.info(self.working_nodes.final_statistics())
         logger.info(self.success_nodes.final_statistics('success'))
         logger.info(self.failure_nodes.final_statistics('failure'))
-
-    @abstractmethod
-    def simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
-            -> Formula[α, τ, χ, σ]:
-        ...
-
-    def setup(self, f: Formula[α, τ, χ, σ], workers: int) -> None:
-        logger.debug(f'entering {self.setup.__name__}')
-        if workers >= 0:
-            self.workers = workers
-        else:
-            cpu_count = os.cpu_count()
-            if cpu_count is None:
-                raise ValueError(f'{os.cpu_count()=}, i.e. undetermined')
-            if cpu_count + workers < 1:
-                raise ValueError(f'negative number of workers')
-            self.workers = cpu_count + workers
-        f = f.to_pnf()
-        self.matrix, self.blocks = f.matrix()
 
     def status(self, dump_nodes: bool = False) -> str:
 
@@ -942,7 +943,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                 f'    blocks        = {self.blocks},\n'
                 f'    matrix        = {self.matrix},\n'
                 f'    negated       = {negated_as_str()}\n'
-                f'    root_node     = {self.root_node}\n'
+                f'    root_nodes    = {self.root_nodes}\n'
                 f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
                 f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
                 f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
@@ -977,25 +978,28 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                 print(f'{self.time_total=:.{precision}f}')
 
     def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ], workers: int):
-        """Virtual substitution main loop.
+        """Quantifier elimination main loop.
         """
         logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
-        self.setup(f, workers)
+        f = f.to_pnf()
+        self.matrix, self.blocks = f.matrix()
         while self.blocks:
             try:
                 self.pop_block()
                 self.process_block()
             except FoundT:
-                assert self.working_nodes is not None
                 logger.info('found T')
-                logger.info(self.working_nodes.final_statistics())
-                self.working_nodes = None
+                if self.working_nodes is None:
+                    logger.info(WorkingNodeList().final_statistics())
+                else:
+                    logger.info(self.working_nodes.final_statistics())
+                    self.working_nodes = None
                 self.success_nodes = NodeList(nodes=[self.create_true_node()])
+            else:
+                if self.failure_nodes:
+                    n = len(self.failure_nodes.nodes)
+                    raise NoTraceException(f'Failed - {n} failure nodes')
             self.collect_success_nodes()
-            if self.failure_nodes:
-                raise NoTraceException(f'Degree violation - '
-                                       f'{len(self.failure_nodes.nodes)} failure nodes')
-                # raise NotImplementedError(f'failure_nodes = {self.failure_nodes}')
         self.final_simplification()
         logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
         return self.result

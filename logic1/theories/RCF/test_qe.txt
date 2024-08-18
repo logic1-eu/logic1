@@ -106,13 +106,13 @@ Degree violations with traditional guards:
 >>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE).atoms())
 Traceback (most recent call last):
 ...
-logic1.support.excepthook.NoTraceException: Degree violation - 2 failure nodes
+logic1.support.excepthook.NoTraceException: Failed - 2 failure nodes
 
 Same with full clustering:
 >>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL).atoms())
 Traceback (most recent call last):
 ...
-logic1.support.excepthook.NoTraceException: Degree violation - 2 failure nodes
+logic1.support.excepthook.NoTraceException: Failed - 2 failure nodes
 
 No degree violations with when turning traditional guards off:
 >>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE, traditional_guards=False).atoms())

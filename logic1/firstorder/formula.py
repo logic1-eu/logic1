@@ -406,8 +406,8 @@ class Formula(Generic[α, τ, χ, σ]):
         to the occurrence in a term. Appearances of variables as a quantified
         variables without use in any term are not considered.
 
-        The parameter `quantified` is used internally for keeping track of
-        bound variables of subformulas during recursion.
+        The parameter `quantified` specifies variable to be considered bound in
+        addition to those that are explicitly quantified in `self`.
 
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
@@ -526,6 +526,9 @@ class Formula(Generic[α, τ, χ, σ]):
     def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
         """An iterator over all free occurrences of variables in `self`. Each
         variable is reported once for each term that it occurs in.
+
+        The parameter `quantified` specifies variable to be considered bound in
+        addition to those that are explicitly quantified in `self`.
 
         >>> from logic1.theories.RCF import *
         >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')

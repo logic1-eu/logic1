@@ -3,7 +3,7 @@
 
 from .atomic import C, C_, Eq, Ne, oo, Variable, VV  # noqa
 from .bnf import cnf, dnf  # noqa
-from .qe import quantifier_elimination, qe  # noqa
+from .qe import old_qe, quantifier_elimination, qe  # noqa
 from .simplify import simplify  # noqa
 
 __all__ = [
@@ -11,7 +11,7 @@ __all__ = [
 
     'cnf', 'dnf',
 
-    'qe',
+    'old_qe', 'qe',
 
     'simplify'
 ]

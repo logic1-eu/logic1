@@ -4,18 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import auto, Enum
-from typing import (ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias)
+from typing import ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias
 from typing import reveal_type  # noqa
 
-from logic1.firstorder import And, _F, Not, Or, _T
 from logic1 import abc
+from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.support.tracing import trace  # noqa
-from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.atomic import (
     AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable)
+from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.typing import Formula
-
-from logic1.abc.qe import FoundT, logger
 
 
 class DegreeViolation(abc.qe.NodeProcessFailure):
@@ -468,19 +466,19 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                             case GENERIC.NONE:
                                 if not is_valid(a != 0, theory.atoms):
                                     continue
-                                logger.debug(f'{degree}-Gauss')
+                                abc.qe.logger.debug(f'{degree}-Gauss')
                             case GENERIC.MONOMIAL:
                                 if len(a.monomials()) > 1:
                                     continue
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 theory.append(a != 0)
-                                logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
                             case GENERIC.FULL:
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 theory.append(a != 0)
-                                logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
                         self.variables.remove(x)
                         test_points = []
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
@@ -720,7 +718,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
             # requires discussion: guard will be simplified twice
             new_formula = simplify(And(tp.guard(theory), new_formula), assume=theory.atoms)
             if new_formula is _T():
-                raise FoundT()
+                raise abc.qe.FoundT()
             new_nodes.append(
                 Node(variables=variables.copy(),
                      formula=new_formula,
@@ -731,7 +729,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 
 
 @dataclass
-class Options:
+class Options(abc.qe.Options):
 
     clustering: CLUSTERING = CLUSTERING.FULL
     generic: GENERIC = GENERIC.NONE
@@ -747,17 +745,17 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
     def create_options(self, **kwargs) -> Options:
         return Options(**kwargs)
 
-    def create_root_node(self, vars_: list[Variable], matrix: Formula) -> Node:
+    def create_root_nodes(self, variables: Iterable[Variable], matrix: Formula) -> list[Node]:
         assert self.options is not None
         assert self.theory is not None
-        return Node(variables=vars_,
-                    formula=simplify(matrix, assume=self.theory.atoms),
-                    answer=[],
-                    outermost_block=not self.blocks,
-                    options=self.options)
+        return [Node(variables=list(variables),
+                     formula=simplify(matrix, assume=self.theory.atoms),
+                     answer=[],
+                     outermost_block=not self.blocks,
+                     options=self.options)]
 
-    def create_theory(self, assume: Optional[Iterable[AtomicFormula]]) -> Theory:
-        return Theory([] if assume is None else list(assume))
+    def create_theory(self, assume: Iterable[AtomicFormula]) -> Theory:
+        return Theory(assume)
 
     def create_true_node(self) -> Node:
         assert self.options is not None
@@ -767,6 +765,9 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
                     outermost_block=False,
                     options=self.options)
 
+    def final_simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+        return simplify(formula, assume)
+
     @classmethod
     def init_env(cls, ring_vars: list[str]):
         polynomial_ring.ensure_vars(ring_vars)
@@ -775,9 +776,6 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
         # We pass the ring variables to the workers. The workers
         # reconstruct the ring.
         return [str(v) for v in polynomial_ring.get_vars()]
-
-    def simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
-        return simplify(formula, assume)
 
 
 qe = virtual_substitution = VirtualSubstitution()
