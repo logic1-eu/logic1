@@ -1,3 +1,7 @@
+"""This module :mod:`logic1.abc.qe` provides generic classes for effective
+quantifier elimination, which can used by various theories via subclassing.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -44,14 +48,32 @@ multiprocessing_logger.propagate = False
 multiprocessing_logger.addHandler(multiprocessing_handler)
 
 α = TypeVar('α', bound=AtomicFormula)
-φ = TypeVar('φ', bound=Formula)
-ν = TypeVar('ν', bound='Node')
-ι = TypeVar('ι')
-σ = TypeVar('σ')
 τ = TypeVar('τ', bound='Term')
 χ = TypeVar('χ', bound=Variable)
+σ = TypeVar('σ')
+
+φ = TypeVar('φ', bound=Formula)
+"""A type variable denoting a formula with upper bound
+:class:`logic1.firstorder.formula.Formula`.
+"""
+
+ν = TypeVar('ν', bound='Node')
+"""A type variable denoting a node with upper bound
+:class:`logic1.abc.qe.Node`.
+"""
+
+ι = TypeVar('ι')
+"""A type variable denoting the type of the principal argument of the
+abstract method :meth:`.QuantifierElimination.init_env`."""
+
 θ = TypeVar('θ', bound='Theory')
+"""A type variable denoting a assumptions with upper bound :class:`.Theory`.
+"""
+
 ω = TypeVar('ω', bound='Options')
+"""A type variable denoting a options for
+:meth:`.QuantifierElimination.__call__` with upper bound :class:`.Options`.
+"""
 
 
 class FoundT(Exception):
@@ -76,17 +98,41 @@ class Timer:
 
 @dataclass
 class Node(Generic[φ, χ, θ]):
-    # sequential and parallel
+    """Holds a subproblem for existential quantifier elimination. Theories
+    implementing the interface can put restrictions on the existing fields and
+    add further fields.
+    """
+
+    # This is used in both the sequential and the parallel code.
 
     variables: list[χ]
+    """A list of variables.
+    """
+
     formula: φ
+    """A quantifier-free formula.
+    """
 
     @abstractmethod
     def copy(self) -> Self:
+        """Create a copy of this node.
+        """
         ...
 
     @abstractmethod
     def process(self, theory: θ) -> list[Self]:
+        """This `node` describes a formula ``Ex(node.variables,
+        node.formula)``. Select a `variable` from ``node.variables`` and
+        compute a list `S` of successor nodes such that:
+
+        1. `variable` is not in ``successor.variables`` for `successor` in `S`;
+
+        2. `variable` does not occur in ``successor.formula`` for `successor`
+           in `S`;
+
+        3. ``Or(*(Ex(successor.variables, successor.formula) for s in S))`` is
+           logically equivalent to ``Ex(node.variables, node.formula)``.
+        """
         ...
 
 
@@ -496,19 +542,37 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 
 @dataclass
 class Theory(Generic[α, τ, χ, σ]):
+    """Holds the currently valid assumptions. This starts with user assumptions
+    explicitly provided by the user. Certain variants of quantified elimination
+    may add further assumptions in the course of the elimination.
+
+    .. seealso::
+        * The argument `assume` of :meth:`.QuantifierElimination.__call__`.
+        * Generic quantifier elimination in :mod:`.RCF.qe`.
+
+    This is an upper bound for the type variable :data:`.θ`.
+    """
 
     class Inconsistent(Exception):
+        """Raised when the assumptions made become inconsistent.
+        """
         pass
 
     atoms: list[α]
+    """A list of atoms holding the current set of assumptions.
+    """
 
     def __init__(self, atoms: Iterable[α]) -> None:
         self.atoms = list(atoms)
 
     def append(self, new_atom: α) -> None:
+        """Add `new_atom` as another assumption and simplify.
+        """
         self.extend([new_atom])
 
     def extend(self, new_atoms: Iterable[α]) -> None:
+        """Add `new_atoms` as further assumptions and simplify.
+        """
         self.atoms.extend(new_atoms)
         # NF nörgelt
         theta = self.simplify(And(*self.atoms))
@@ -525,60 +589,206 @@ class Theory(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
+        """`f` is a (possibly unary or trivial) conjunction of atoms. Simplifes
+        `f` in such a way that the result is again a (possibly unary or
+        trivial) conjunction of atoms. Raises :class:`.Inconsistent` if `f` is
+        simplified to :data:`.F`.
+        """
         ...
 
 
 @dataclass
 class Options:
+    """This class holds options that can be provided to
+    :meth:`.QuantifierElimination.__call__`. Theories subclassing
+    :class:`.QuantifierElimination` can add further options by subclassing
+    :class:`.Options`.
+
+    This is an upper bound for the type variable :data:`.ω`.
+    """
 
     log_level: int = logging.NOTSET
+    """The `log_level` of the logger used by :class:`.QuantifierElimination`.
+    """
+
     log_rate: float = 0.5
+    """The minimal timespan (in s) between to log outputs in certain loops.
+    """
 
 
 @dataclass
 class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
+    """A generic callable class that implements quantifier elimination.
+    """
+
+    # Attribute group 1 - arguments of :meth:`.__call__`:
+    workers: int = 0
+    """The number of worker processes used. For more information see the
+    documentation of the parameter `workers` of :meth:`.__call__`.
+    """
+
+    options: Optional[ω] = None
+    """The options that have been passed to :meth:`.__call__`.
+    """
+
+    # Attribute group 2 - arguments state of the computation:
+    theory: Optional[θ] = None
+    """Wraps a list of atoms, which serve as external assumptions. This
+    includes the assumptions passed via the `assume` parameter of
+    :meth:`__call__`. Some theories have an option for *generic quantifier
+    elimination*, which adds additional assumptions on parameters in the course
+    of the elimination.
+    """
 
     blocks: Optional[Prefix[χ]] = None
+    """Remaining quantifier blocks, to be processed after the current block.
+    """
+
     matrix: Optional[Formula[α, τ, χ, σ]] = None
+    """The quantifier-free formula associated with :attr:`.blocks`. This is
+    :obj:`None` while there is a block being processed.
+    """
+
     negated: Optional[bool] = None
+    """Indicates whether or not the block currently processed has been
+    logically negated in order to equivalently transform universal quantifiers
+    into existential quanitifers.
+    """
+
     root_nodes: Optional[list[ν]] = None
+    """The root nodes of the next block to be processed. Logically, the list
+    describes a disjunction, and each `node` in `root_nodes` describes a
+    quantifier elimination subproblem ``Ex(node.variables, node.formula)``.
+    This is an intermediate object for moving the innermost block with and the
+    matrix into the :attr:`.working_nodes`.
+    """
+
     working_nodes: Optional[WorkingNodeList[Formula[α, τ, χ, σ], ν]] = None
+    """Subproblems left for the current block. Element nodes of
+    :attr:`.working_nodes` have the same shape as element nodes of
+    :attr:`.root_nodes`
+    """
+
     success_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    """Finished subproblems of the current block. For each `node` in
+    `success_nodes` we have ``node.variables == []``.
+    """
+
     failure_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
-    theory: Optional[θ] = None
+    """Failed subproblems of the current block, which can occur with incomplete
+    quantifier elimination procedures. An element nodes of
+    :attr:`.failure_nodes` have the same shape as an element node of
+    :attr:`.working_nodes`, but quantifier elimination procedure could not
+    eliminate any variable from the node.
+    """
+
     result: Optional[Formula[α, τ, χ, σ]] = None
+    """The final result as returned by :meth:`.__call__`.
+    """
 
-    workers: int = 0
-    options: Optional[ω] = None
-
+    # Attribute group 3 - timings; all times are wall times in seconds:
     time_final_simplification: Optional[float] = None
+    """The time spent for finally simplifying the disjunction over all
+    :attr:`.success_nodes` imported from the workers. This yields the final
+    :attr:`.result`, which is also the return value of :meth:`.__call__`.
+    """
+
     time_import_failure_nodes: Optional[float] = None
+    """The time spent for importing all :attr:`.failure_nodes` from the
+    :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
+    process after all workers have terminated.
+    """
+
     time_import_success_nodes: Optional[float] = None
+    """The time spent for importing all :attr:`.success_nodes` from the
+    :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
+    process after all workers have terminated.
+    """
+
     time_import_working_nodes: Optional[float] = None
+    """The time spent for importing all :attr:`.working_nodes` from the
+    :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
+    process after all workers have terminated.
+    """
+
     time_multiprocessing: Optional[float] = None
+    """The time spent in :mod:`multiprocessing` after the first worker process
+    has been started and until the last worker process has terminated.
+    """
+
     time_start_first_worker: Optional[float] = None
+    """The time spent for starting the first worker process in
+    :mod:`multiprocessing`.
+    """
+
     time_start_all_workers: Optional[float] = None
+    """The time spent for starting all worker processes in
+    :mod:`multiprocessing`.
+    """
+
     time_syncmanager_enter: Optional[float] = None
+    """The time spent for starting the :class:`SyncManager
+    <multiprocessing.managers.SyncManager>`, which is a proxy process that
+    manages shared data in :mod:`multiprocessing`.
+    """
+
     time_syncmanager_exit: Optional[float] = None
+    """The time spent for exiting the :class:`SyncManager
+    <multiprocessing.managers.SyncManager>`.
+    """
+
     time_total: Optional[float] = None
+    """The total time spent in :meth:`.__call__`.
+    """
 
     def __call__(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = [],
                  workers: int = 0, **options) -> Optional[Formula[α, τ, χ, σ]]:
-        """Quantifier elimination entry point.
+        """The entry point of the callable class
+        :class:`.QuantifierElimination`.
 
-        workers is the number of processes used for virtual substitution. The
-        default value workers=0 uses a sequential implementation, avoiding
-        overhead when input problems are small. For all other values of
-        workers, there are additional processes started. In particular,
-        workers=1 uses the parallel implementation with one worker process,
-        which is interesting mostly for testing and debugging. A negative value
-        workers = z < 0 selects os.num_cpu() - abs(z) many workers. When there
-        are n > 0 many workers selected, then the overall number of processes
-        running will be n + 2, i.e., the workers plus the master process plus a
-        manager processes providing proxy objects for shared data. It follows
-        that workers=-2 matches the number of CPUs of the machine. For hard
-        computations, workers=-3 is an interesting choice, which leaves one CPU
-        free for smooth interaction with the machine.
+        :param f:
+          The input formula to which quantifier elimination will be applied.
+
+        :param assume:
+          A list of atomic formulas that are assumed to hold. The return value
+          is equivalent modulo those assumptions.
+
+        :param workers:
+          Specifies the number of processes used:
+
+          * The default value `workers=0` uses a sequential implementation,
+            which avoids overhead when input problems are small. For all other
+            values, there are additional processes started.
+
+          * A positive value `workers=n > 0` uses `n + 2` processes: the master
+            process, `n` worker processes, and a proxy processes that manages
+            shared data.
+
+            .. note::
+              `workers=1` uses the parallel implementation with only one
+              worker. Algorithmically this is similar to the sequential version
+              with `workers=0` but comes at the cost of 2 additional processes.
+
+          * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
+            many workers.  It follows that `workers=-2` exactly allocates all
+            of CPUs of the machine, and workers=-3 is an interesting choice,
+            which leaves one CPU free for smooth interaction with the machine.
+
+        :param **options:
+          Keyword arguments with keywords corresponding to attributes of the
+          generic type :data:`.ω`, which extends :class:`.Options`.
+
+        :returns:
+          A quantifier-free equivalent of `f` modulo certain assumptions. A
+          simplified equivalent of all relevant assumptions are available as
+          :attr:`.theory`.
+
+          * Regularly, the assumptions are exactly those passed as the `assume`
+            parameter.
+
+          * Some theories have an option for *generic quantifier elimination*,
+            which adds additional assumptions in the course of the elimination.
+
         """
         timer = Timer()
         delta_time_formatter.set_reference_time(time.time())
@@ -628,18 +838,35 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
 
     @abstractmethod
     def create_options(self, **kwargs) -> ω:
+        """Create an instance of :data:`.ω` that holds `**kwargs`. The
+        `**kwargs` arriving here are the `**options` that have been passed to
+        :meth:`__call__`.
+        """
         ...
 
     @abstractmethod
     def create_root_nodes(self, variables: Iterable[χ], matrix: Formula[α, τ, χ, σ]) -> list[ν]:
+        """If `matrix` is not a disjunction, create a list containing one
+        instance `node` of :data:`.ν` with ``node.variables == variables``
+        and ``node.formula == matrix``. If `matrix` is a disjunction
+        ``Or(*args)``, create a list containing one such node for each `arg` in
+        `args`.
+        """
         ...
 
     @abstractmethod
     def create_theory(self, assume: Iterable[α]) -> θ:
+        """Create in instance of :data:`.θ` that holds `assume`. Those
+        assumptions `assume` are the corresponding parameter of
+        :meth:`.__call__`.
+        """
         ...
 
     @abstractmethod
     def create_true_node(self) -> ν:
+        """Create an instance `node` of :data:`.ν` with ``node.variables ==
+        []`` and ``node.formula == _T()``.
+        """
         ...
 
     def pop_block(self) -> None:
@@ -677,15 +904,26 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
     @abstractmethod
     def final_simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
             -> Formula[α, τ, χ, σ]:
+        """Used for simplifying the disjunction of all :attr:`.success_nodes`.
+        The return value yields :attr:`result`, which is then used as the
+        return value of :meth:`.__call__`.
+        """
         ...
 
     @classmethod
     @abstractmethod
     def init_env(cls, arg: ι) -> None:
+        """A hook for initialization of worker process. This is used, e.g., in
+        :ref:`Real Closed Fields <api-RCF-qe>` for reconstructing within the
+        worker the Sage polynomial ring of the master.
+        """
         ...
 
     @abstractmethod
     def init_env_arg(self) -> ι:
+        """Create an instance of :data:`.ι` to be used as an argument for a
+        subsequent call of :meth:`.init_env()`.
+        """
         ...
 
     def parallel_process_block(self) -> None:

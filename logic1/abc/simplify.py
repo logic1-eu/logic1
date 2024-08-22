@@ -1,7 +1,7 @@
-"""This module provides a generic abstract implementation of *deep
-simplifcication* based on generating and propagating internal theories during
-recursion. This is essentially the *standard simplifier*, which has been
-proposed for Ordered Fields in [DS97]_.
+"""This module :mod:`logic1.abc.simplify` provides a generic abstract
+implementation of *deep simplifcication* based on generating and propagating
+internal theories during recursion. This is essentially the *standard
+simplifier*, which has been proposed for Ordered Fields in [DS97]_.
 
 .. [DS97]
   A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
@@ -14,14 +14,19 @@ import more_itertools
 from abc import abstractmethod
 from typing import cast, Generic, Iterable, Optional, Self, TypeVar
 
-from ..firstorder import All, And, AtomicFormula, Ex, _F, Formula, Or, _T
-from ..firstorder.formula import α, τ, χ, σ
+from ..firstorder import (
+    All, And, AtomicFormula, Ex, _F, Formula, Or, _T, Term, Variable)
 
 from ..support.tracing import trace  # noqa
 
 # About Generic:
 # https://stackoverflow.com/q/74103528/
 # https://peps.python.org/pep-0484/
+
+α = TypeVar('α', bound='AtomicFormula')
+τ = TypeVar('τ', bound='Term')
+χ = TypeVar('χ', bound='Variable')
+σ = TypeVar('σ')
 
 θ = TypeVar('θ', bound='Theory')
 

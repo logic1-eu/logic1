@@ -6,13 +6,16 @@
 Quantifier Elimination
 **********************
 
-.. automodule:: logic1.theories.RCF.typing
-
-  .. type:: Formula
-    :canonical: logic1.firstorder.formula.Formula[AtomicFormula, Term, Variable, int]
-
-
 .. automodule:: logic1.theories.RCF.qe
+
+  .. autoclass:: Node
+    :special-members:
+
+  .. autoclass:: Theory
+    :special-members:
+
+  .. autoclass:: Options
+    :special-members:
 
   .. autoclass:: VirtualSubstitution
     :members:
@@ -29,4 +32,4 @@ Quantifier Elimination
 .. discuss: autofunction qe gets its signature from
 .. VirtualSubstitution.__call__. However, it shows
 .. firstorder.atomic.AtomicFormula instead of RCF.atomic.AtomicFormula. This is
-.. also the origian of a Warning when building the documentation.
+.. also the origin of a Warning when building the documentation.
