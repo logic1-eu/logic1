@@ -22,7 +22,7 @@ from typing import reveal_type  # noqa
 from logic1.support.excepthook import NoTraceException
 from logic1.firstorder import (All, And, AtomicFormula, _F, Formula, Not, Or,
                                Prefix, Term, Variable)
-from logic1.support.logging import DeltaTimeFormatter
+from logic1.support.logging import DeltaTimeFormatter, Timer
 
 # Create logger
 delta_time_formatter = DeltaTimeFormatter(
@@ -82,18 +82,6 @@ class FoundT(Exception):
 
 class NodeProcessFailure(Exception):
     pass
-
-
-class Timer:
-
-    def __init__(self):
-        self.reset()
-
-    def get(self) -> float:
-        return time.time() - self._reference_time
-
-    def reset(self) -> None:
-        self._reference_time = time.time()
 
 
 @dataclass

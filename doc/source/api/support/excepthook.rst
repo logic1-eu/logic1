@@ -5,5 +5,6 @@ Exception Hook
 **************
 
 .. automodule:: logic1.support.excepthook
-  :members:
-  :undoc-members:
+
+  .. autoexception:: NoTraceException
+    :exclude-members: __new__, __init__

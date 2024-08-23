@@ -4,6 +4,13 @@ from types import TracebackType
 
 
 class NoTraceException(Exception):
+    """An exception that prints an error message and exists without a
+    traceback. This can be used in situation that do not require inspection of
+    the code. Examples are incorrect user input or failure of quantifier
+    elimination procedures due to their mathematical incompletess. Both are
+    considerd normal situations during interactive use. This exception
+    typically comes with a short but informative error message for the user.
+    """
     pass
 
 

@@ -6,5 +6,5 @@ Support Modules
 
 .. toctree::
 
-   exceptionhook.rst
+   excepthook.rst
    logging.rst

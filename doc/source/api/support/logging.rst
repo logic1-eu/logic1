@@ -5,5 +5,15 @@ Logging
 *******
 
 .. automodule:: logic1.support.logging
-  :members:
-  :undoc-members:
+
+  .. autoclass:: DeltaTimeFormatter
+    :members: get_reference_time, set_reference_time
+    :exclude-members: __new__, __init__
+
+  .. autoclass:: RateFilter
+    :members: off, on, set_rate
+    :exclude-members: __new__, __init__
+
+  .. autoclass:: Timer
+    :members:
+    :exclude-members: __init__
