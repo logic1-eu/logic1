@@ -8,7 +8,9 @@ Simplification
 
 .. attention::
 
-  This documentation page addresses implementors rather than users. Concrete implemtations of the abstract classes described here are documented in the corresponding sections of the various domains:
+  This documentation page addresses implementers rather than users. Concrete
+  implemtations of the abstract classes described here are documented in the
+  corresponding sections of the various domains:
 
   * :ref:`Simplification in Real Closed Fields <api-RCF-simplify>`
   * :ref:`Simplification in the theory of Sets <api-Sets-simplify>`

@@ -24,9 +24,11 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
-    """Implements :class:`.abc.simplify.Theory`. Required by
-    :class:`.RCF.simplify.Simplify`.
+class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
+    """Implements the abstract methods :meth:`add <.abc.simplify.Theory.add>`,
+    :meth:`extract <.abc.simplify.Theory.extract>`, and :meth:`next_
+    <.abc.simplify.Theory.next_>` of it super class
+    :class:`.abc.simplify.Theory`. Required by :class:`.RCF.simplify.Simplify`.
     """
 
     class _Interval:
@@ -92,6 +94,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
         return f'Theory({self._reference}, {self._current})'
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.add`.
+        """
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
@@ -189,6 +193,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
         return f.op, p, Rational(q) / Rational(c)
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.extract`.
+        """
         L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
@@ -273,6 +279,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.next_`.
+        """
         theory_next = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
             theory_next._reference = self._current
@@ -283,9 +291,12 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Term', 'Variable', int]):
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', int, 'Theory']):
-    """Deep simplification following [DS97]_. Implements
-    :class:`.abc.simplify.Simplify`.
+class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]):
+    """Deep simplification following [DS97]_. Implements the abstract methods
+    :meth:`create_initial_theory <.abc.simplify.Simplify.create_initial_theory>`
+    and :meth:`simpl_at <.abc.simplify.Simplify.simpl_at>` of its super class
+    :class:`.abc.simplify.Simplify`. Note that this class inherits
+    :meth:`.abc.simplify.Simplify.is_valid`.
     """
 
     explode_always: bool = True
@@ -304,8 +315,9 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Term', 'Variable', int, '
                  explode_always: bool = True,
                  prefer_order: bool = True,
                  prefer_weak: bool = False) -> Formula:
-        """Make instances of this class callable. For a documentation of the
-        parameters see the function :func:`.RCF.simplify.simplify` below.
+        """The entry point of the callable class :class:`.Simplify`. For a
+        documentation of the parameters see the user interface function
+        :func:`.RCF.simplify.simplify` below.
         """
         self.explode_always = explode_always
         self.prefer_order = prefer_order
@@ -458,9 +470,15 @@ Technically, it is an instance of the callable class
 :param f:
   The formula to be simplified
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The
-  simplification result is equivalent modulo those assumptions.
+:param assume: A list of atomic formulas that are assumed to hold. The
+  simplification result is equivalent modulo those assumptions. Note that
+  assumptions do not affect bound variables.
+
+  >>> from logic1.firstorder import *
+  >>> from logic1.theories.RCF import *
+  >>> a, b = VV.get('a', 'b')
+  >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
+  Ex(a, a - 5 > 0)
 
 :param explode_always:
   Simplification can split certain atomic formula built from products or square
@@ -468,30 +486,119 @@ Technically, it is an instance of the callable class
 
   .. admonition:: Example
 
-    1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0` and :math:`a^2 +
-       b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
+    1.
+      1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
+      2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
 
-    2. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0` and
-       :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
+    2.
+      1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
+      2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
 
   If `explode_always` is :data:`False`, the splittings in "1." are only applied
   within disjunctions and the ones in "2." are only applied within conjunctions.
   This keeps terms more complex but the boolean structure simpler.
 
+  >>> from logic1.firstorder import *
+  >>> from logic1.theories.RCF import *
+  >>> a, b, c = VV.get('a', 'b', 'c')
+  >>> simplify(And(a * b == 0, c == 0))
+  And(c == 0, Or(b == 0, a == 0))
+  >>> simplify(And(a * b == 0, c == 0), explode_always=False)
+  And(c == 0, a*b == 0)
+  >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
+  Or(c == 0, b == 0, a == 0)
+
 :param prefer_order:
+  One can sometimes equivalently choose between order inequalities and
+  (in)equations.
+
+  .. admonition:: Example
+
+    1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
+       :math:`a > 0 \lor (b = 0 \land a \neq 0)`
+    2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
+       :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
+
+  By default, the left hand sides in the Example are preferred. If
+  `prefer_order` is :data:`False`, then the right hand sides are preferred.
+
+  >>> from logic1.firstorder import *
+  >>> from logic1.theories.RCF import *
+  >>> a, b = VV.get('a', 'b')
+  >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
+  And(a >= 0, Or(b == 0, a > 0))
+  >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
+  And(a >= 0, Or(b == 0, a > 0))
+  >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+  And(a >= 0, Or(b == 0, a != 0))
+  >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+  And(a >= 0, Or(b == 0, a != 0))
 
 :param prefer_weak:
+  One can sometimes equivalently choose between strict and weak inequalities.
+
+  .. admonition:: Example
+
+    1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
+       :math:`a = 0 \lor (b = 0 \land a > 0)`
+    2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
+       :math:`a \neq 0 \land (b = 0 \lor a > 0)`
+
+  By default, the right hand sides in the Example are preferred. If
+  `prefer_weak` is :data:`True`, then the left hand sides  are preferred.
+
+  >>> from logic1.firstorder import *
+  >>> from logic1.theories.RCF import *
+  >>> a, b = VV.get('a', 'b')
+  >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
+  And(a != 0, Or(b == 0, a > 0))
+  >>> simplify(And(a != 0, Or(b == 0, a > 0)))
+  And(a != 0, Or(b == 0, a > 0))
+  >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+  And(a != 0, Or(b == 0, a >= 0))
+  >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+  And(a != 0, Or(b == 0, a >= 0))
+
+:returns:
+  A simplified equivalent of `f` modulo `assume`.
 """
 
-is_valid = Simplify().is_valid
-"""This function establishes the user interface to the heuristic validity test.
-Technically, it is the corresponding method of an instance of the callable
-class :class:`.RCF.simplify.Simplify`.
 
-:param f:
-  The formula to be tested for validity
+# An assignment ``is_valid = Simplify().is_valid`` would not allow to override
+# the docstring of :class:`.abc.simplify.Simplify.is_valid`.
+#
+def is_valid(f: Formula, assume: Iterable[AtomicFormula] = []) -> Optional[bool]:
+    """This function establishes the user interface to the heuristic validity
+    test :meth:`.Simplify.is_valid` inherited from :class:`.abc.simplify.Simplify`.
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The result of the
-  validity test is correct modulo those assumptions.
-"""
+    .. admonition:: Mathematical definition
+
+      A first-order formula is *valid* if it holds for all values all free
+      variables.
+
+    :param f:
+      The formula to be tested for validity
+
+    :param assume:
+      A list of atomic formulas that are assumed to hold. The result of the
+      validity test is correct modulo these assumptions.
+
+    :returns:
+      Returns :data:`True` or :data:`False` if :func:`.simplify` succeeds
+      in heuristically simplifying `f` to :data:`.T` or :data:`.F`,
+      respectively. Returns :data:`None` in the sense of "don't know"
+      otherwise.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c = VV.get('a', 'b', 'c')
+    >>> is_valid(3 * b**2 + c**2 >= 0)
+    True
+    >>> is_valid(3 * b**2 + c**2 < 0)
+    False
+    >>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])  # returns None
+
+    The last test returns :data:`None` because the simplifier is not strong
+    enough to deduce :data:`.T`.
+    """
+    return simplify.is_valid(f, assume)
