@@ -100,10 +100,18 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
           A first-order formula is *valid* if it holds for all values all free
           variables.
 
-        Returns :data:`True` or :data:`False` if :meth:`.abc.simplify` succeeds
-        in heuristically simplifying `f` to :obj:`._T()` or :obj:`._F()`,
-        respectively. Returns :data:`None` in the sense of "don't know"
-        otherwise.
+        :param f:
+          The formula to be tested for validity
+
+        :param assume:
+          A list of atomic formulas that are assumed to hold. The result of the
+          validity test is correct modulo these assumptions.
+
+        :returns:
+          Returns :data:`True` or :data:`False` if :func:`.simplify` succeeds
+          in heuristically simplifying `f` to :data:`.T` or :data:`.F`,
+          respectively. Returns :data:`None` in the sense of "don't know"
+          otherwise.
         """
         match self.simplify(f, assume):
             case _T():

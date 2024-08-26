@@ -4,7 +4,7 @@
 from .atomic import C, C_, Eq, Ne, oo, Variable, VV  # noqa
 from .bnf import cnf, dnf  # noqa
 from .qe import old_qe, quantifier_elimination, qe  # noqa
-from .simplify import simplify  # noqa
+from .simplify import is_valid, simplify  # noqa
 
 __all__ = [
     'C', 'C_', 'Eq', 'Ne', 'oo', 'VV',
@@ -13,5 +13,5 @@ __all__ = [
 
     'old_qe', 'qe',
 
-    'simplify'
+    'is_valid', 'simplify'
 ]

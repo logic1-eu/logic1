@@ -9,8 +9,12 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]):
-
+class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
+    """Implements the abstract methods :meth:`add <.abc.simplify.Theory.add>`,
+    :meth:`extract <.abc.simplify.Theory.extract>`, and :meth:`next_
+    <.abc.simplify.Theory.next_>` of it super class
+    :class:`.abc.simplify.Theory`. Required by :class:`.Sets.simplify.Simplify`.
+    """
     _ref_min_card: Index
     _ref_max_card: Index
     _ref_equations: list[set[Variable]]
@@ -38,6 +42,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]
                 f'{self._cur_equations}, {self._cur_inequations})')
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.add`.
+        """
         for atom in atoms:
             if gand is Or:
                 atom = atom.to_complement()
@@ -93,6 +99,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]
             # self._cur_inequations = inequations
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.extract`.
+        """
         L: list[AtomicFormula] = []
         if self._cur_min_card > self._ref_min_card:
             L.append(C(self._cur_min_card))
@@ -115,6 +123,8 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
+        """Implements the abstract method :meth:`.abc.simplify.Theory.next_`.
+        """
         if remove is not None:
             raise NotImplementedError
         theory_next = self.__class__()
@@ -129,7 +139,18 @@ class Theory(abc.simplify.Theory['AtomicFormula', 'Variable', 'Variable', Never]
         return theory_next
 
 
-class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', Never, 'Theory']):
+class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, Theory]):
+    """Implements the abstract methods :meth:`create_initial_theory
+    <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
+    <.abc.simplify.Simplify.simpl_at>` of its super class
+    :class:`.abc.simplify.Simplify`. This class is callable so that any
+    instance gives access to the actual simplifier.
+
+    The canonical way to call the simplifier is via :func:`.simplify`, as
+    described below. In addition, this class inherits
+    :meth:`.abc.simplify.Simplify.is_valid`, which is available  via
+    :func:`.is_valid`, as described below.
+    """
 
     def create_initial_theory(self) -> Theory:
         """Implements the abstract method
@@ -138,25 +159,41 @@ class Simplify(abc.simplify.Simplify['AtomicFormula', 'Variable', 'Variable', Ne
         return Theory()
 
     def __call__(self, f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+        """The entry point of the callable class :class:`.Simplify`. For a
+        documentation of the parameters see the user interface function
+        :func:`.Sets.simplify.simplify` below.
+        """
         return self.simplify(f, assume)
 
     def simpl_at(self,
                  atom: AtomicFormula,
                  context: Optional[type[And] | type[Or]]) -> Formula:
+        """Implements the abstract method
+        :meth:`.abc.simplify.Simplify.simpl_at`.
+        """
         return atom.simplify()
 
 
 simplify = Simplify()
-
-is_valid = Simplify().is_valid
-"""This function establishes the user interface to the heuristic validity test.
-Technically, it is the corresponding method of an instance of the callable
-class :class:`.Sets.simplify.Simplify`.
+r"""This function establishes the user interface to the standard simplifier.
+Technically, it is an instance of the callable class
+:class:`.RCF.simplify.Simplify`.
 
 :param f:
-  The formula to be tested for validity
+  The formula to be simplified
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The result of the
-  validity test is correct modulo those assumptions.
+:param assume: A list of atomic formulas that are assumed to hold. The
+  simplification result is equivalent modulo those assumptions.
+
+  >>> from logic1.firstorder import *
+  >>> from logic1.theories.Sets import *
+  >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+  >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
+  And(a == c, a == d)
+
+:returns:
+  A simplified equivalent of `f` modulo `assume`.
 """
+
+
+is_valid = Simplify().is_valid

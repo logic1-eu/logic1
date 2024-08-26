@@ -18,27 +18,20 @@ Simplification
   ***************************
 
   .. autoclass:: Simplify
-    :members:
-    :undoc-members:
-    :exclude-members: __new__,  simpl_at,
-      AtomicSortKey, SortKey
+    :special-members:
 
-    .. automethod:: __call__
-
-  Interface Functions
-  *******************
+  User Interface
+  **************
 
   .. autofunction:: simplify
 
   .. autofunction:: is_valid
 
-    This function establishes the user interface to a heuristic validity test.
-    Technically, it is the method :meth:`.is_valid` of an instance of the
-    callable class :class:`.Sets.simplify.Simplify`.
-
-    :param f:
-      The formula to be tested for validity
-
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The result of the
-      validity test is correct modulo those assumptions.
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    >>> is_valid(a == d, assume=[a == b, b == c, c == d])
+    True
+    >>> is_valid(a == d, assume=[a == b, b != c, c == d])
+    False
+    >>> is_valid(a == d, assume=[a != b, b != c, c != d])  # Returns None

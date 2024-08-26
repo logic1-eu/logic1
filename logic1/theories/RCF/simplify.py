@@ -90,6 +90,12 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
     _reference: dict[Term, tuple[_Interval, set]]
     _current: dict[Term, tuple[_Interval, set]]
 
+    def __init__(self, prefer_weak: bool, prefer_order: bool) -> None:
+        self.prefer_weak = prefer_weak
+        self.prefer_order = prefer_order
+        self._reference = dict()
+        self._current = dict()
+
     def __repr__(self):
         return f'Theory({self._reference}, {self._current})'
 
@@ -144,12 +150,6 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
                     ivl = Theory._Interval(ivl.lopen, ivl.start, ivl.end, True)
                     exc = exc.difference(ivl.end)
             self._current[p] = (ivl, exc)
-
-    def __init__(self, prefer_weak: bool, prefer_order: bool) -> None:
-        self.prefer_weak = prefer_weak
-        self.prefer_order = prefer_order
-        self._reference = dict()
-        self._current = dict()
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -295,8 +295,13 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
     """Deep simplification following [DS97]_. Implements the abstract methods
     :meth:`create_initial_theory <.abc.simplify.Simplify.create_initial_theory>`
     and :meth:`simpl_at <.abc.simplify.Simplify.simpl_at>` of its super class
-    :class:`.abc.simplify.Simplify`. Note that this class inherits
-    :meth:`.abc.simplify.Simplify.is_valid`.
+    :class:`.abc.simplify.Simplify`. This class is callable so that any
+    instance gives access to the actual simplifier.
+
+    The canonical way to call the simplifier is via :func:`.simplify`, as
+    described below. In addition, this class inherits
+    :meth:`.abc.simplify.Simplify.is_valid`, which is available  via
+    :func:`.is_valid`, as described below.
     """
 
     explode_always: bool = True
@@ -564,41 +569,4 @@ Technically, it is an instance of the callable class
 """
 
 
-# An assignment ``is_valid = Simplify().is_valid`` would not allow to override
-# the docstring of :class:`.abc.simplify.Simplify.is_valid`.
-#
-def is_valid(f: Formula, assume: Iterable[AtomicFormula] = []) -> Optional[bool]:
-    """This function establishes the user interface to the heuristic validity
-    test :meth:`.Simplify.is_valid` inherited from :class:`.abc.simplify.Simplify`.
-
-    .. admonition:: Mathematical definition
-
-      A first-order formula is *valid* if it holds for all values all free
-      variables.
-
-    :param f:
-      The formula to be tested for validity
-
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The result of the
-      validity test is correct modulo these assumptions.
-
-    :returns:
-      Returns :data:`True` or :data:`False` if :func:`.simplify` succeeds
-      in heuristically simplifying `f` to :data:`.T` or :data:`.F`,
-      respectively. Returns :data:`None` in the sense of "don't know"
-      otherwise.
-
-    >>> from logic1.firstorder import *
-    >>> from logic1.theories.RCF import *
-    >>> a, b, c = VV.get('a', 'b', 'c')
-    >>> is_valid(3 * b**2 + c**2 >= 0)
-    True
-    >>> is_valid(3 * b**2 + c**2 < 0)
-    False
-    >>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])  # returns None
-
-    The last test returns :data:`None` because the simplifier is not strong
-    enough to deduce :data:`.T`.
-    """
-    return simplify.is_valid(f, assume)
+is_valid = Simplify().is_valid
