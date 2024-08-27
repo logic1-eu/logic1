@@ -78,14 +78,6 @@ Quantifier Elimination
       :meth:`.QuantifierElimination.__call__` with upper bound
       :class:`.Options`.
 
-    Nodes
-    *****
-
-    .. autoclass:: Node
-      :members: variables, formula, copy, process
-      :undoc-members:
-      :special-members:
-
     Theories
     ********
 
@@ -95,6 +87,14 @@ Quantifier Elimination
 
       .. autoclass:: logic1.abc.qe.Theory.Inconsistent
         :special-members:
+
+    Nodes
+    *****
+
+    .. autoclass:: Node
+      :members: variables, formula, copy, process
+      :undoc-members:
+      :special-members:
 
     Options
     *******

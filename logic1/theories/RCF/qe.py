@@ -25,20 +25,46 @@ class Failed(Exception):
 
 
 class Theory(abc.qe.Theory[AtomicFormula, Term, Variable, int]):
+    """Implements the abstract method :meth:`simplify()
+    <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
+    Required by :class:`.Node` and :class:`.VirtualSubstitution`.
+    """
 
     def simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.Theory.simplify`.
+        """
         return simplify(f, explode_always=False, prefer_order=False, prefer_weak=True)
 
 
 class CLUSTERING(Enum):
+    """Available clustering strategies. Required by :class:`.Options`.
+    """
     NONE = auto()
+    """No clustering at all.
+    """
+
     FULL = auto()
+    """Full clustering.
+    """
 
 
 class GENERIC(Enum):
+    """Available degrees of genericity. Required by :class:`.Options`.
+    """
     NONE = auto()
+    """Regular quantifier elimination, not making any assumptions.
+    """
+
     MONOMIAL = auto()
+    """Admit assumptions on parameters by adding atomic formulas to
+    :attr:`.abc.qe.QuantifierElimination.theory`, where the left hand side of those
+    atomic formulas is a monomial (and the right hand side is zero).
+    """
+
     FULL = auto()
+    """Admit assumptions on parameters by adding atomic formulas to
+    :attr:`.abc.qe.QuantifierElimination.theory`.
+    """
 
 
 class NSP(Enum):
@@ -402,7 +428,10 @@ class EliminationSet:
 
 @dataclass
 class Node(abc.qe.Node[Formula, Variable, Theory]):
-    # sequential and parallel
+    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
+    :meth:`process() <.abc.qe.Node.process>` of its super class
+    :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution`.
+    """
 
     answer: list
     outermost_block: bool
@@ -432,6 +461,8 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                 f'{self.options})')
 
     def copy(self) -> Node:
+        """Implements the abstract method :meth:`.abc.qe.Node.copy`.
+        """
         return Node(variables=self.variables,
                     formula=self.formula,
                     answer=self.answer,
@@ -508,6 +539,8 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                 assert False, self.options.generic
 
     def process(self, theory: Theory) -> list[Node]:
+        """Implements the abstract method :meth:`.abc.qe.Node.process`.
+        """
         eset = self.eset(theory)
         nodes = self.vsubs(eset, theory)
         return nodes
@@ -730,22 +763,46 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 
 @dataclass
 class Options(abc.qe.Options):
+    """Adds further options to those specified by its super class
+    :class:`.abc.qe.Options`. The whole set of options can be provided to
+    :func:`.qe`. Required by :class:`.VirtualSubstitution`.
+    """
 
     clustering: CLUSTERING = CLUSTERING.FULL
+    """The clustering strategy used by :class:`.VirtualSubstitution`.
+    """
+
     generic: GENERIC = GENERIC.NONE
+    """The degree of genericity used by :class:`.VirtualSubstitution`.
+    """
+
     traditional_guards: bool = True
+    """
+    """
 
 
 @dataclass
 class VirtualSubstitution(abc.qe.QuantifierElimination[
         Node, Theory, list[str], Options, AtomicFormula, Term, Variable, int]):
-    """Quantifier elimination by virtual substitution.
+    """Quantifier elimination by virtual substitution. Implements the abstract methods
+    :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
+    :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
+    :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
+    :meth:`create_true_node() <.abc.qe.QuantifierElimination.create_true_node>`,
+    :meth:`final_simplify() <.abc.qe.QuantifierElimination.final_simplify>`,
+    :meth:`init_env() <.abc.qe.QuantifierElimination.init_env>`,
+    :meth:`init_env_arg() <.abc.qe.QuantifierElimination.init_env_arg>` of its
+    super class :class:`.abc.qe.QuantifierElimination`.
     """
 
     def create_options(self, **kwargs) -> Options:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_options`.
+        """
         return Options(**kwargs)
 
     def create_root_nodes(self, variables: Iterable[Variable], matrix: Formula) -> list[Node]:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_root_nodes`.
+        """
         assert self.options is not None
         assert self.theory is not None
         return [Node(variables=list(variables),
@@ -755,9 +812,13 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
                      options=self.options)]
 
     def create_theory(self, assume: Iterable[AtomicFormula]) -> Theory:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_theory`.
+        """
         return Theory(assume)
 
     def create_true_node(self) -> Node:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_true_node`.
+        """
         assert self.options is not None
         return Node(variables=[],
                     formula=_T(),
@@ -766,13 +827,19 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
                     options=self.options)
 
     def final_simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.final_simplify`.
+        """
         return simplify(formula, assume)
 
     @classmethod
     def init_env(cls, ring_vars: list[str]):
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
+        """
         polynomial_ring.ensure_vars(ring_vars)
 
     def init_env_arg(self) -> list[str]:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.
+        """
         # We pass the ring variables to the workers. The workers
         # reconstruct the ring.
         return [str(v) for v in polynomial_ring.get_vars()]

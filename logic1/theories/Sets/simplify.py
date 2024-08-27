@@ -10,10 +10,10 @@ from ...support.tracing import trace  # noqa
 
 
 class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
-    """Implements the abstract methods :meth:`add <.abc.simplify.Theory.add>`,
-    :meth:`extract <.abc.simplify.Theory.extract>`, and :meth:`next_
-    <.abc.simplify.Theory.next_>` of it super class
-    :class:`.abc.simplify.Theory`. Required by :class:`.Sets.simplify.Simplify`.
+    """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
+    :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
+    <.abc.simplify.Theory.next_>` of it super class :class:`.abc.simplify.Theory`.
+    Required by :class:`.Sets.simplify.Simplify`.
     """
     _ref_min_card: Index
     _ref_max_card: Index

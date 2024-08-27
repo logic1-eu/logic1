@@ -25,10 +25,10 @@ from ...support.tracing import trace  # noqa
 
 
 class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
-    """Implements the abstract methods :meth:`add <.abc.simplify.Theory.add>`,
-    :meth:`extract <.abc.simplify.Theory.extract>`, and :meth:`next_
-    <.abc.simplify.Theory.next_>` of it super class
-    :class:`.abc.simplify.Theory`. Required by :class:`.RCF.simplify.Simplify`.
+    """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
+    :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
+    <.abc.simplify.Theory.next_>` of it super class :class:`.abc.simplify.Theory`.
+    Required by :class:`.RCF.simplify.Simplify`.
     """
 
     class _Interval:

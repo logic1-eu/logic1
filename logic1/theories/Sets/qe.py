@@ -124,20 +124,34 @@ old_qe = DepricatedQuantifierElimination()
 
 
 class Theory(abc.qe.Theory[AtomicFormula, Variable, Variable, Never]):
+    """Implements the abstract method :meth:`simplify()
+    <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
+    Required by :class:`.Node` and :class:`.QuantifierElimination`.
+    """
 
     def simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.Theory.simplify`.
+        """
         return simplify(f)
 
 
 @dataclass
 class Node(abc.qe.Node[Formula, Variable, Theory]):
+    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
+    :meth:`process() <.abc.qe.Node.process>` of its super class
+    :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination`.
+    """
 
     options: abc.qe.Options
 
     def copy(self) -> Node:
+        """Implements the abstract method :meth:`.abc.qe.Node.copy`.
+        """
         return Node(variables=self.variables, formula=self.formula, options=self.options)
 
     def process(self, theory: Theory) -> list[Node]:
+        """Implements the abstract method :meth:`.abc.qe.Node.process`.
+        """
         # We assume that that atoms of the form v == v or v != v have been
         # removed by simplification. This is similar to the assumption in RCF
         # that right hand sides are zero. Both are not asserted anywhere at the
@@ -220,13 +234,25 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 @dataclass
 class QuantifierElimination(abc.qe.QuantifierElimination[
         Node, Theory, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
-    """Quantifier elimination.
+    """Implements the abstract methods
+    :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
+    :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
+    :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
+    :meth:`create_true_node() <.abc.qe.QuantifierElimination.create_true_node>`,
+    :meth:`final_simplify() <.abc.qe.QuantifierElimination.final_simplify>`,
+    :meth:`init_env() <.abc.qe.QuantifierElimination.init_env>`,
+    :meth:`init_env_arg() <.abc.qe.QuantifierElimination.init_env_arg>` of its
+    super class :class:`.abc.qe.QuantifierElimination`.
     """
 
     def create_options(self, **kwargs) -> abc.qe.Options:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_options`.
+        """
         return abc.qe.Options(**kwargs)
 
     def create_root_nodes(self, variables: Iterable[Variable], matrix: Formula) -> list[Node]:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_root_nodes`.
+        """
         assert self.options is not None
         assert self.theory is not None
         formula = simplify(matrix, assume=self.theory.atoms)
@@ -251,20 +277,30 @@ class QuantifierElimination(abc.qe.QuantifierElimination[
                 return [node]
 
     def create_theory(self, assume: Iterable[AtomicFormula]) -> Theory:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_theory`.
+        """
         return Theory(assume)
 
     def create_true_node(self) -> Node:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_true_node`.
+        """
         assert self.options is not None
         return Node(variables=[], formula=_T(), options=self.options)
 
     def final_simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.final_simplify`.
+        """
         return simplify(formula, assume)
 
     @classmethod
     def init_env(cls, none: None) -> None:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
+        """
         pass
 
     def init_env_arg(self) -> None:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.
+        """
         return None
 
 

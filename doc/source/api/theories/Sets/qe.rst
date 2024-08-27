@@ -8,11 +8,25 @@ Quantifier Elimination
 
 .. automodule:: logic1.theories.Sets.qe
 
-  .. autoclass:: QuantifierElimination
-    :members:
-    :undoc-members:
-    :exclude-members: select_and_pop, pnf, qe1, simplify
+  Theories
+  ********
 
-    .. automethod:: __call__
+  .. autoclass:: Theory
+    :special-members:
+
+  Nodes
+  *****
+
+  .. autoclass:: Node
+    :special-members:
+
+  Quantifier Elimination
+  **********************
+
+  .. autoclass:: QuantifierElimination
+    :special-members:
+
+  User Interface
+  **************
 
   .. autofunction:: qe
