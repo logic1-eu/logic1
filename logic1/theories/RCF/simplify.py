@@ -314,20 +314,115 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
         """
         return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
 
-    def __call__(self,
+    def simplify(self,
                  f: Formula,
                  assume: Iterable[AtomicFormula] = [],
                  explode_always: bool = True,
                  prefer_order: bool = True,
                  prefer_weak: bool = False) -> Formula:
-        """The entry point of the callable class :class:`.Simplify`. For a
-        documentation of the parameters see the user interface function
-        :func:`.RCF.simplify.simplify` below.
+        r"""This function establishes the user interface to the standard
+        simplifier. Technically, it is an instance of the callable class
+        :class:`.RCF.simplify.Simplify`.
+
+        :param f:
+          The formula to be simplified
+
+        :param assume: A list of atomic formulas that are assumed to hold. The
+          simplification result is equivalent modulo those assumptions. Note that
+          assumptions do not affect bound variables.
+
+          >>> from logic1.firstorder import *
+          >>> from logic1.theories.RCF import *
+          >>> a, b = VV.get('a', 'b')
+          >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
+          Ex(a, a - 5 > 0)
+
+        :param explode_always:
+          Simplification can split certain atomic formula built from products or square
+          sums:
+
+          .. admonition:: Example
+
+            1.
+              1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
+              2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
+
+            2.
+              1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
+              2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
+
+          If `explode_always` is :data:`False`, the splittings in "1." are only applied
+          within disjunctions and the ones in "2." are only applied within conjunctions.
+          This keeps terms more complex but the boolean structure simpler.
+
+          >>> from logic1.firstorder import *
+          >>> from logic1.theories.RCF import *
+          >>> a, b, c = VV.get('a', 'b', 'c')
+          >>> simplify(And(a * b == 0, c == 0))
+          And(c == 0, Or(b == 0, a == 0))
+          >>> simplify(And(a * b == 0, c == 0), explode_always=False)
+          And(c == 0, a*b == 0)
+          >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
+          Or(c == 0, b == 0, a == 0)
+
+        :param prefer_order:
+          One can sometimes equivalently choose between order inequalities and
+          (in)equations.
+
+          .. admonition:: Example
+
+            1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
+               :math:`a > 0 \lor (b = 0 \land a \neq 0)`
+            2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
+               :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
+
+          By default, the left hand sides in the Example are preferred. If
+          `prefer_order` is :data:`False`, then the right hand sides are preferred.
+
+          >>> from logic1.firstorder import *
+          >>> from logic1.theories.RCF import *
+          >>> a, b = VV.get('a', 'b')
+          >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
+          And(a >= 0, Or(b == 0, a > 0))
+          >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
+          And(a >= 0, Or(b == 0, a > 0))
+          >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+          And(a >= 0, Or(b == 0, a != 0))
+          >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+          And(a >= 0, Or(b == 0, a != 0))
+
+        :param prefer_weak:
+          One can sometimes equivalently choose between strict and weak inequalities.
+
+          .. admonition:: Example
+
+            1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
+               :math:`a = 0 \lor (b = 0 \land a > 0)`
+            2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
+               :math:`a \neq 0 \land (b = 0 \lor a > 0)`
+
+          By default, the right hand sides in the Example are preferred. If
+          `prefer_weak` is :data:`True`, then the left hand sides  are preferred.
+
+          >>> from logic1.firstorder import *
+          >>> from logic1.theories.RCF import *
+          >>> a, b = VV.get('a', 'b')
+          >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
+          And(a != 0, Or(b == 0, a > 0))
+          >>> simplify(And(a != 0, Or(b == 0, a > 0)))
+          And(a != 0, Or(b == 0, a > 0))
+          >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+          And(a != 0, Or(b == 0, a >= 0))
+          >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+          And(a != 0, Or(b == 0, a >= 0))
+
+        :returns:
+          A simplified equivalent of `f` modulo `assume`.
         """
         self.explode_always = explode_always
         self.prefer_order = prefer_order
         self.prefer_weak = prefer_weak
-        return self.simplify(f, assume)
+        return super().simplify(f, assume)
 
     def simpl_at(self,
                  atom: AtomicFormula,
@@ -467,106 +562,7 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
                 assert False
 
 
-simplify = Simplify()
-r"""This function establishes the user interface to the standard simplifier.
-Technically, it is an instance of the callable class
-:class:`.RCF.simplify.Simplify`.
-
-:param f:
-  The formula to be simplified
-
-:param assume: A list of atomic formulas that are assumed to hold. The
-  simplification result is equivalent modulo those assumptions. Note that
-  assumptions do not affect bound variables.
-
-  >>> from logic1.firstorder import *
-  >>> from logic1.theories.RCF import *
-  >>> a, b = VV.get('a', 'b')
-  >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
-  Ex(a, a - 5 > 0)
-
-:param explode_always:
-  Simplification can split certain atomic formula built from products or square
-  sums:
-
-  .. admonition:: Example
-
-    1.
-      1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
-      2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
-
-    2.
-      1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
-      2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
-
-  If `explode_always` is :data:`False`, the splittings in "1." are only applied
-  within disjunctions and the ones in "2." are only applied within conjunctions.
-  This keeps terms more complex but the boolean structure simpler.
-
-  >>> from logic1.firstorder import *
-  >>> from logic1.theories.RCF import *
-  >>> a, b, c = VV.get('a', 'b', 'c')
-  >>> simplify(And(a * b == 0, c == 0))
-  And(c == 0, Or(b == 0, a == 0))
-  >>> simplify(And(a * b == 0, c == 0), explode_always=False)
-  And(c == 0, a*b == 0)
-  >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
-  Or(c == 0, b == 0, a == 0)
-
-:param prefer_order:
-  One can sometimes equivalently choose between order inequalities and
-  (in)equations.
-
-  .. admonition:: Example
-
-    1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
-       :math:`a > 0 \lor (b = 0 \land a \neq 0)`
-    2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
-       :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
-
-  By default, the left hand sides in the Example are preferred. If
-  `prefer_order` is :data:`False`, then the right hand sides are preferred.
-
-  >>> from logic1.firstorder import *
-  >>> from logic1.theories.RCF import *
-  >>> a, b = VV.get('a', 'b')
-  >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
-  And(a >= 0, Or(b == 0, a > 0))
-  >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
-  And(a >= 0, Or(b == 0, a > 0))
-  >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
-  And(a >= 0, Or(b == 0, a != 0))
-  >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
-  And(a >= 0, Or(b == 0, a != 0))
-
-:param prefer_weak:
-  One can sometimes equivalently choose between strict and weak inequalities.
-
-  .. admonition:: Example
-
-    1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
-       :math:`a = 0 \lor (b = 0 \land a > 0)`
-    2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
-       :math:`a \neq 0 \land (b = 0 \lor a > 0)`
-
-  By default, the right hand sides in the Example are preferred. If
-  `prefer_weak` is :data:`True`, then the left hand sides  are preferred.
-
-  >>> from logic1.firstorder import *
-  >>> from logic1.theories.RCF import *
-  >>> a, b = VV.get('a', 'b')
-  >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
-  And(a != 0, Or(b == 0, a > 0))
-  >>> simplify(And(a != 0, Or(b == 0, a > 0)))
-  And(a != 0, Or(b == 0, a > 0))
-  >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
-  And(a != 0, Or(b == 0, a >= 0))
-  >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
-  And(a != 0, Or(b == 0, a >= 0))
-
-:returns:
-  A simplified equivalent of `f` modulo `assume`.
-"""
+simplify = Simplify().simplify
 
 
 is_valid = Simplify().is_valid

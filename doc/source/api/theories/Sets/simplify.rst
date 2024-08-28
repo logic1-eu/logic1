@@ -25,6 +25,12 @@ Simplification
 
   .. autofunction:: simplify
 
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
+    And(a == c, a == d)
+
   .. autofunction:: is_valid
 
     >>> from logic1.firstorder import *

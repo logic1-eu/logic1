@@ -136,9 +136,17 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
         # Does not receive the theory, by design.
         ...
 
-    def simplify(self, f: Formula[α, τ, χ, σ], assume: Iterable[α]) -> Formula[α, τ, χ, σ]:
-        """The main entry point to be used by the `__call__` method of
-        subclasses within theories.
+    def simplify(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Formula[α, τ, χ, σ]:
+        """Simplify `f` modulo `assume`.
+
+        :param f:
+          The formula to be simplified
+
+        :param assume: A list of atomic formulas that are assumed to hold. The
+          simplification result is equivalent modulo those assumptions.
+
+        :returns:
+          A simplified equivalent of `f` modulo `assume`.
         """
         th = self.create_initial_theory()
         try:

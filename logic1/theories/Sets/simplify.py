@@ -143,13 +143,10 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, T
     """Implements the abstract methods :meth:`create_initial_theory
     <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
     <.abc.simplify.Simplify.simpl_at>` of its super class
-    :class:`.abc.simplify.Simplify`. This class is callable so that any
-    instance gives access to the actual simplifier.
+    :class:`.abc.simplify.Simplify`.
 
-    The canonical way to call the simplifier is via :func:`.simplify`, as
-    described below. In addition, this class inherits
-    :meth:`.abc.simplify.Simplify.is_valid`, which is available  via
-    :func:`.is_valid`, as described below.
+    The canonical way to use available methods is via :func:`.is_valid` and
+    :func:`.simplify` as described below.
     """
 
     def create_initial_theory(self) -> Theory:
@@ -157,13 +154,6 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, T
         :meth:`.abc.simplify.Simplify.create_initial_theory`.
         """
         return Theory()
-
-    def __call__(self, f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
-        """The entry point of the callable class :class:`.Simplify`. For a
-        documentation of the parameters see the user interface function
-        :func:`.Sets.simplify.simplify` below.
-        """
-        return self.simplify(f, assume)
 
     def simpl_at(self,
                  atom: AtomicFormula,
@@ -174,26 +164,7 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, T
         return atom.simplify()
 
 
-simplify = Simplify()
-r"""This function establishes the user interface to the standard simplifier.
-Technically, it is an instance of the callable class
-:class:`.RCF.simplify.Simplify`.
-
-:param f:
-  The formula to be simplified
-
-:param assume: A list of atomic formulas that are assumed to hold. The
-  simplification result is equivalent modulo those assumptions.
-
-  >>> from logic1.firstorder import *
-  >>> from logic1.theories.Sets import *
-  >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
-  >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
-  And(a == c, a == d)
-
-:returns:
-  A simplified equivalent of `f` modulo `assume`.
-"""
+simplify = Simplify().simplify
 
 
 is_valid = Simplify().is_valid
