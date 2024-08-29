@@ -1009,7 +1009,7 @@ class Formula(Generic[α, τ, χ, σ]):
         A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
         quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
         formula. The method used here minimizes the number of quantifier
-        alternations in the prenex block [Burhenne90]_.
+        alternations in the prenex block [Burhenne-1990]_.
 
         If the minimal number of alternations in the result can be achieved
         with both :class:`Ex` and :class:`All` as the first quantifier in the
@@ -1028,11 +1028,6 @@ class Formula(Generic[α, τ, χ, σ]):
         Ex(G0001_y, All(G0002_y,
             And(Or(a != 0, b != 0, y != 0, -G0001_y + a == 0, a == 0),
                 Or(And(-G0002_y + a != 0, a != 0), And(a == 0, b == 0, y == 0)))))
-
-        .. [Burhenne90]
-               Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
-               Quantorenelimination für lineare reelle Probleme.
-               Diploma Thesis, University of Passau, Germany, 1990
         """
         from .pnf import PrenexNormalForm
         prenex_normal_form: PrenexNormalForm[α, τ, χ, σ] = PrenexNormalForm()

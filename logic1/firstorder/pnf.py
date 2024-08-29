@@ -3,9 +3,9 @@
 A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
 quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
 formula. The method used here minimizes the number of quantifier
-alternations in the prenex block [Burhenne90]_.
+alternations in the prenex block [Burhenne-1990]_.
 
-.. [Burhenne90]
+.. [Burhenne-1990]
        Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
        Quantorenelimination für lineare reelle Probleme.
        Diploma Thesis, University of Passau, Germany, 1990

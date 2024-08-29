@@ -54,26 +54,30 @@ going to describe the occurring classes starting at the top.
   Generic Types
   *************
 
-  .. data:: logic1.firstorder.formula.α
+  .. data:: α
     :value: TypeVar('α', bound='AtomicFormula')
+    :canonical: logic1.firstorder.formula.α
 
     A type variable denoting a type of atomic formulas with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
-  .. data:: logic1.firstorder.formula.τ
+  .. data:: τ
     :value: TypeVar('τ', bound='Term')
+    :canonical: logic1.firstorder.formula.τ
 
     A type variable denoting a type of terms with upper bound
     :class:`logic1.firstorder.atomic.Term`.
 
-  .. data:: logic1.firstorder.formula.χ
+  .. data:: χ
     :value: TypeVar('χ', bound='Variable')
+    :canonical: logic1.firstorder.formula.χ
 
     A type variable denoting a type of variables with upper bound
     :class:`logic1.firstorder.atomic.Variable`.
 
-  .. data:: logic1.firstorder.formula.σ
+  .. data:: σ
     :value: TypeVar('σ')
+    :canonical: logic1.firstorder.formula.σ
 
     A type variable denoting a type that is admissible in addition to terms as a
     dictionary entry in :meth:`.Formula.subs`. Instances of type :data:`.σ` that

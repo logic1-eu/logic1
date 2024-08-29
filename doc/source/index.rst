@@ -82,8 +82,9 @@ T
    api/support/index.rst
 
 .. toctree::
-   :caption: Indices
+   :caption: Indices and References
    :hidden:
 
    py-modindex.rst
    genindex.rst
+   references.rst

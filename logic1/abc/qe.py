@@ -742,7 +742,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
           is equivalent modulo those assumptions.
 
         :param workers:
-          Specifies the number of processes used:
+          Specifies the number of processes to be used in parallel:
 
           * The default value `workers=0` uses a sequential implementation,
             which avoids overhead when input problems are small. For all other
@@ -762,7 +762,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             of CPUs of the machine, and workers=-3 is an interesting choice,
             which leaves one CPU free for smooth interaction with the machine.
 
-        :param **options:
+        :param `**options`:
           Keyword arguments with keywords corresponding to attributes of the
           generic type :data:`.ω`, which extends :class:`.Options`.
 
@@ -776,7 +776,6 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
 
           * Some theories have an option for *generic quantifier elimination*,
             which adds additional assumptions in the course of the elimination.
-
         """
         timer = Timer()
         delta_time_formatter.set_reference_time(time.time())

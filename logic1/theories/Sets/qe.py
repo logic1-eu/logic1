@@ -126,7 +126,9 @@ old_qe = DepricatedQuantifierElimination()
 class Theory(abc.qe.Theory[AtomicFormula, Variable, Variable, Never]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
-    Required by :class:`.Node` and :class:`.QuantifierElimination`.
+    Required by :class:`.Node` and :class:`.QuantifierElimination` for
+    instantiating the type variable :data:`.abc.qe.θ` of :class:`.abc.qe.Node`
+    and :class:`.abc.qe.QuantifierElimination`, respectively.
     """
 
     def simplify(self, f: Formula) -> Formula:
@@ -139,7 +141,9 @@ class Theory(abc.qe.Theory[AtomicFormula, Variable, Variable, Never]):
 class Node(abc.qe.Node[Formula, Variable, Theory]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
-    :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination`.
+    :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination` for
+    instantiating the type variable :data:`.abc.qe.ν` of
+    :class:`.abc.qe.QuantifierElimination`.
     """
 
     options: abc.qe.Options
@@ -234,7 +238,10 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 @dataclass
 class QuantifierElimination(abc.qe.QuantifierElimination[
         Node, Theory, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
-    """Implements the abstract methods
+    """
+    Quantifier elimination for the theory of sets with cardinanity constraints.
+
+    Implements the abstract methods
     :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
     :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
     :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
@@ -305,3 +312,45 @@ class QuantifierElimination(abc.qe.QuantifierElimination[
 
 
 qe = quantifier_elimination = QuantifierElimination()
+"""
+Quantifier elimination for the theory of sets with cardinanity constraints.
+Technically, :func:`.qe` is an instance of the callable class
+:class:`.QuantifierElimination`.
+
+:param f:
+  The input formula to which quantifier elimination will be applied.
+
+:param assume:
+  A list of atomic formulas that are assumed to hold. The return value
+  is equivalent modulo those assumptions.
+
+:param workers:
+  Specifies the number of processes to be used in parallel:
+
+  * The default value `workers=0` uses a sequential implementation,
+    which avoids overhead when input problems are small. For all other
+    values, there are additional processes started.
+
+  * A positive value `workers=n > 0` uses `n + 2` processes: the master
+    process, `n` worker processes, and a proxy processes that manages
+    shared data.
+
+    .. note::
+      `workers=1` uses the parallel implementation with only one
+      worker. Algorithmically this is similar to the sequential version
+      with `workers=0` but comes at the cost of 2 additional processes.
+
+  * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
+    many workers.  It follows that `workers=-2` exactly allocates all
+    of CPUs of the machine, and workers=-3 is an interesting choice,
+    which leaves one CPU free for smooth interaction with the machine.
+
+:param `**options`:
+  Keyword arguments with keywords corresponding to attributes of
+  :class:`.abc.qe.Options`. Those are :attr:`.log_level`, :attr:`.log_rate`.
+
+:returns:
+
+  A quantifier-free equivalent of `f` modulo the assumptions that are passed as
+  the `assume` parameter.
+"""

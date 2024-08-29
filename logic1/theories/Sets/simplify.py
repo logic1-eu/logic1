@@ -1,3 +1,9 @@
+"""
+This module implements *deep simplification* through the generation and
+propagation of internal theories during recursion. It is an adaptation of the
+*standard simplifier* from [DolzmannSturm-1997]_ tailored to the specific
+requirements of Sets.
+"""
 from typing import Iterable, Never, Optional, Self
 
 from ... import abc
@@ -12,8 +18,10 @@ from ...support.tracing import trace  # noqa
 class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
     """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
     :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
-    <.abc.simplify.Theory.next_>` of it super class :class:`.abc.simplify.Theory`.
-    Required by :class:`.Sets.simplify.Simplify`.
+    <.abc.simplify.Theory.next_>` of it super class
+    :class:`.abc.simplify.Theory`. Required by
+    :class:`.Sets.simplify.Simplify` for instantiating the type variable
+    :data:`.abc.simplify.θ` of :class:`.abc.simplify.Simplify`.
     """
     _ref_min_card: Index
     _ref_max_card: Index
@@ -140,13 +148,15 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
 
 
 class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, Theory]):
-    """Implements the abstract methods :meth:`create_initial_theory
+    """Deep simplification in the style of [DolzmannSturm-1997]_. Implements
+    the abstract methods :meth:`create_initial_theory
     <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
     <.abc.simplify.Simplify.simpl_at>` of its super class
     :class:`.abc.simplify.Simplify`.
 
-    The canonical way to use available methods is via :func:`.is_valid` and
-    :func:`.simplify` as described below.
+    The simplifier should be called via :func:`.simplify`, as described below.
+    In addition, this class inherits :meth:`.abc.simplify.Simplify.is_valid`,
+    which should be called via :func:`.is_valid`, as described below.
     """
 
     def create_initial_theory(self) -> Theory:

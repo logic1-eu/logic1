@@ -1,12 +1,7 @@
 """This module provides an implementation of *deep simplifcication* based on
 generating and propagating internal theories during recursion in Real Closed
 fields. This is essentially the *standard simplifier*, which has been proposed
-for Ordered Fields in [DS97]_.
-
-.. [DS97]
-  A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
-  Ordered Fields.  J. Symb. Comput. 24(2):209–231, 1997. Open access at
-  `doi:10.1006/ jsco.1997.0123 <https://doi.org/10.1006/jsco.1997.0123>`_
+for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
 from functools import lru_cache
@@ -27,8 +22,10 @@ from ...support.tracing import trace  # noqa
 class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
     """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
     :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
-    <.abc.simplify.Theory.next_>` of it super class :class:`.abc.simplify.Theory`.
-    Required by :class:`.RCF.simplify.Simplify`.
+    <.abc.simplify.Theory.next_>` of it super class
+    :class:`.abc.simplify.Theory`. Required by
+    :class:`.Sets.simplify.Simplify` for instantiating the type variable
+    :data:`.abc.simplify.θ` of :class:`.abc.simplify.Simplify`.
     """
 
     class _Interval:
@@ -292,16 +289,15 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
 
 
 class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]):
-    """Deep simplification following [DS97]_. Implements the abstract methods
-    :meth:`create_initial_theory <.abc.simplify.Simplify.create_initial_theory>`
-    and :meth:`simpl_at <.abc.simplify.Simplify.simpl_at>` of its super class
-    :class:`.abc.simplify.Simplify`. This class is callable so that any
-    instance gives access to the actual simplifier.
+    """Deep simplification following [DolzmannSturm-1997]_. Implements the
+    abstract methods :meth:`create_initial_theory
+    <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
+    <.abc.simplify.Simplify.simpl_at>` of its super class
+    :class:`.abc.simplify.Simplify`.
 
-    The canonical way to call the simplifier is via :func:`.simplify`, as
-    described below. In addition, this class inherits
-    :meth:`.abc.simplify.Simplify.is_valid`, which is available  via
-    :func:`.is_valid`, as described below.
+    The simplifier should be called via :func:`.simplify`, as described below.
+    In addition, this class inherits :meth:`.abc.simplify.Simplify.is_valid`,
+    which should be called via :func:`.is_valid`, as described below.
     """
 
     explode_always: bool = True
@@ -320,16 +316,15 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
                  explode_always: bool = True,
                  prefer_order: bool = True,
                  prefer_weak: bool = False) -> Formula:
-        r"""This function establishes the user interface to the standard
-        simplifier. Technically, it is an instance of the callable class
-        :class:`.RCF.simplify.Simplify`.
+        r"""Simplify `f` modulo `assume`.
 
         :param f:
           The formula to be simplified
 
-        :param assume: A list of atomic formulas that are assumed to hold. The
-          simplification result is equivalent modulo those assumptions. Note that
-          assumptions do not affect bound variables.
+        :param assume:
+          A list of atomic formulas that are assumed to hold. The
+          simplification result is equivalent modulo those assumptions. Note
+          that assumptions do not affect bound variables.
 
           >>> from logic1.firstorder import *
           >>> from logic1.theories.RCF import *
@@ -338,8 +333,8 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
           Ex(a, a - 5 > 0)
 
         :param explode_always:
-          Simplification can split certain atomic formula built from products or square
-          sums:
+          Simplification can split certain atomic formulas built from products
+          or square sums:
 
           .. admonition:: Example
 
@@ -402,7 +397,8 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
                :math:`a \neq 0 \land (b = 0 \lor a > 0)`
 
           By default, the right hand sides in the Example are preferred. If
-          `prefer_weak` is :data:`True`, then the left hand sides  are preferred.
+          `prefer_weak` is :data:`True`, then the left hand sides are
+          preferred.
 
           >>> from logic1.firstorder import *
           >>> from logic1.theories.RCF import *

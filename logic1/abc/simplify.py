@@ -1,12 +1,7 @@
 """This module :mod:`logic1.abc.simplify` provides a generic abstract
 implementation of *deep simplifcication* based on generating and propagating
 internal theories during recursion. This is essentially the *standard
-simplifier*, which has been proposed for Ordered Fields in [DS97]_.
-
-.. [DS97]
-  A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
-  Ordered Fields.  J. Symb. Comput. 24(2):209–231, 1997. Open access at
-  `doi:10.1006/ jsco.1997.0123 <https://doi.org/10.1006/jsco.1997.0123>`_
+simplifier*, which has been proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
 import more_itertools
@@ -78,7 +73,7 @@ class Theory(Generic[α, τ, χ, σ]):
 
 
 class Simplify(Generic[α, τ, χ, σ, θ]):
-    """Deep simplification following [DS97]_.
+    """Deep simplification following [DolzmannSturm-1997]_.
 
     .. seealso::
       Derived classes in various theories: :class:`.RCF.simplify.Simplify`,
@@ -87,7 +82,7 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
 
     @abstractmethod
     def create_initial_theory(self) -> θ:
-        """Create a fresh instance of :class:`θ`.
+        """Create a fresh instance of :class:`.θ`.
         """
         ...
 
@@ -107,11 +102,10 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
           A list of atomic formulas that are assumed to hold. The result of the
           validity test is correct modulo these assumptions.
 
-        :returns:
-          Returns :data:`True` or :data:`False` if :func:`.simplify` succeeds
-          in heuristically simplifying `f` to :data:`.T` or :data:`.F`,
-          respectively. Returns :data:`None` in the sense of "don't know"
-          otherwise.
+        :returns: Returns :data:`True` or :data:`False` if
+          :meth:`.abc.simplify.Simplify.simplify` succeeds in heuristically
+          simplifying `f` to :data:`.T` or :data:`.F`, respectively. Returns
+          :data:`None` in the sense of "don't know" otherwise.
         """
         match self.simplify(f, assume):
             case _T():

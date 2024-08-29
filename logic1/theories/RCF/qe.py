@@ -1,4 +1,4 @@
-"""Real quantifier elimination by virtual substitution.
+"""Real quantifier elimination by virtual substitution [Sturm-2018]_.
 """
 from __future__ import annotations
 
@@ -27,7 +27,9 @@ class Failed(Exception):
 class Theory(abc.qe.Theory[AtomicFormula, Term, Variable, int]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
-    Required by :class:`.Node` and :class:`.VirtualSubstitution`.
+    Required by :class:`.Node` and :class:`.VirtualSubstitution` for
+    instantiating the type variable :data:`.abc.qe.θ` of :class:`.abc.qe.Node`
+    and :class:`.abc.qe.QuantifierElimination`, respectively.
     """
 
     def simplify(self, f: Formula) -> Formula:
@@ -49,7 +51,10 @@ class CLUSTERING(Enum):
 
 
 class GENERIC(Enum):
-    """Available degrees of genericity. Required by :class:`.Options`.
+    """Available degrees of genericity. For details on generic quantifier
+    elimination see
+
+    Required by :class:`.Options`.
     """
     NONE = auto()
     """Regular quantifier elimination, not making any assumptions.
@@ -430,7 +435,9 @@ class EliminationSet:
 class Node(abc.qe.Node[Formula, Variable, Theory]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
-    :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution`.
+    :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution` for
+    instantiating the type variable :data:`.abc.qe.ν` of
+    :class:`.abc.qe.QuantifierElimination`.
     """
 
     answer: list
@@ -763,28 +770,74 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 
 @dataclass
 class Options(abc.qe.Options):
-    """Adds further options to those specified by its super class
-    :class:`.abc.qe.Options`. The whole set of options can be provided to
-    :func:`.qe`. Required by :class:`.VirtualSubstitution`.
+    """The options specified here, as well as the options inherited from
+    :class:`.abc.qe.Options`, can be passed to the callable class
+    :class:`.VirtualSubstitution` as keyword arguments.
+
+    Required by :class:`.VirtualSubstitution` for instantiating the type
+    variable :data:`.abc.qe.ω` of :class:`.abc.qe.QuantifierElimination`.
     """
 
     clustering: CLUSTERING = CLUSTERING.FULL
-    """The clustering strategy used by :class:`.VirtualSubstitution`.
+    """The clustering strategy used by :class:`.VirtualSubstitution`. See
+    [Kosta-2016]_ for details on clustering.
     """
 
     generic: GENERIC = GENERIC.NONE
-    """The degree of genericity used by :class:`.VirtualSubstitution`.
+    """The degree of genericity used by :class:`.VirtualSubstitution`. See
+    [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_ for details on generic
+    quantifier elimination.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+
+    >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
+    ...    assume=[c > 0])
+    Or(And(b != 0, a^2 - 2 == 0),
+       And(a^2 - 2 != 0, 4*a^2*c - b^2 - 8*c <= 0))
+    >>> qe.theory.atoms
+    [c > 0]
+
+    >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
+    ...    assume=[c > 0], generic=GENERIC.FULL)
+    4*a^2*c - b^2 - 8*c <= 0
+    >>> qe.theory.atoms
+    [c > 0, a^2 - 2 != 0]
+
+    >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
+    ...    assume=[c > 0], generic=GENERIC.MONOMIAL)
+    Or(a^2 - 2 == 0, 4*a^2*c - b^2 - 8*c <= 0)
+    >>> qe.theory.atoms
+    [c > 0, b != 0]
     """
 
     traditional_guards: bool = True
-    """
+    """`traditional_guards=False` strictly follows the construction of guards
+    as described in [Kosta-2016]_.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+
+    >>> qe(Ex(x, a * x**2 + b * x + c == 0))
+    Or(And(c == 0, b == 0, a == 0),
+       And(b != 0, a == 0),
+       And(a != 0, 4*a*c - b^2 <= 0))
+
+    >>> qe(Ex(x, a * x**2 + b * x + c == 0), traditional_guards=False)
+    Or(And(c == 0, b == 0, a == 0),
+       And(b != 0, Or(c == 0, a == 0)),
+       And(a != 0, 4*a*c - b^2 <= 0))
     """
 
 
 @dataclass
 class VirtualSubstitution(abc.qe.QuantifierElimination[
         Node, Theory, list[str], Options, AtomicFormula, Term, Variable, int]):
-    """Quantifier elimination by virtual substitution. Implements the abstract methods
+    """Real quantifier elimination by virtual substitution.
+
+    Implements the abstract methods
     :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
     :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
     :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
@@ -846,3 +899,53 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
 
 
 qe = virtual_substitution = VirtualSubstitution()
+"""
+Real quantifier elimination by virtual substitution. The implementation
+essentially follows [Kosta-2016]_ up to degree two. It also offers generic
+quantifier elimination [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_.
+
+Technically, :func:`.qe` is an instance of the callable class
+:class:`.VirtualSubstitution`.
+
+:param f:
+  The input formula to which quantifier elimination will be applied.
+
+:param assume:
+  A list of atomic formulas that are assumed to hold. The return value
+  is equivalent modulo those assumptions.
+
+:param workers:
+  Specifies the number of processes to be used in parallel:
+
+  * The default value `workers=0` uses a sequential implementation,
+    which avoids overhead when input problems are small. For all other
+    values, there are additional processes started.
+
+  * A positive value `workers=n > 0` uses `n + 2` processes: the master
+    process, `n` worker processes, and a proxy processes that manages
+    shared data.
+
+    .. note::
+      `workers=1` uses the parallel implementation with only one
+      worker. Algorithmically this is similar to the sequential version
+      with `workers=0` but comes at the cost of 2 additional processes.
+
+  * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
+    many workers.  It follows that `workers=-2` exactly allocates all
+    of CPUs of the machine, and workers=-3 is an interesting choice,
+    which leaves one CPU free for smooth interaction with the machine.
+
+:param `**options`:
+  Keyword arguments with keywords corresponding to attributes of
+  :class:`.Options`. Those are :attr:`.clustering`, :attr:`.generic`,
+  :attr:`.log_level`, :attr:`.log_rate`, :attr:`.traditional_guards`.
+
+:returns:
+  A quantifier-free equivalent of `f` modulo assumptions that are available in
+  :attr:`qe.theory.atoms <.abc.qe.QuantifierElimination.theory>` at the end of
+  the computation. With regular quantifier elimination, the assumptions are
+  those passed as the `assume` parameter, modulo simplification. With
+  *generic quantifier elimination*, inequations in the parameters can be
+  added in the course of the elimination. See :attr:`.Options.generic` for
+  examples.
+"""
