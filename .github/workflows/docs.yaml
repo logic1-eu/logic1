@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: |
+          sudo apt-get -y install graphviz
+      - run: |
           source $CONDA/etc/profile.d/conda.sh
           CFLAGS="-Wno-incompatible-pointer-types" conda env create -f environment.yaml
           conda activate logic1_minimal
