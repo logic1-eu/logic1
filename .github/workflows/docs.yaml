@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v4
       - run: |
           source $CONDA/etc/profile.d/conda.sh
-          conda env create -f environment.yaml
+          CFLAGS="-Wno-incompatible-pointer-types" conda env create -f environment.yaml
           conda activate logic1_minimal
           conda env list
           conda list
