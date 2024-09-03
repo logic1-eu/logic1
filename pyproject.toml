@@ -14,10 +14,8 @@ readme = "README.md"
 dependencies = [
   "more-itertools",
   "pyeda",
-  "sagemath",
   "sphinx",
   "sphinx-book-theme",
-  "sympy"
 ]
 requires-python = ">=3.11,<3.12"
 classifiers = [
