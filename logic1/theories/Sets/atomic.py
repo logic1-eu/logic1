@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import string
-from typing import Any, ClassVar, Final, Iterator, Never, Optional, TypeAlias
+from typing import Any, ClassVar, Final, Iterator, Never, Optional, Self, TypeAlias
 
 from ... import firstorder
 from ...firstorder import _F, _T
@@ -293,15 +293,15 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
                 assert False, self
         return self
 
-    def subs(self, d: dict[Variable, Variable]) -> AtomicFormula:
+    def subs(self, d: dict[Variable, Variable]) -> Self:
         """Simultaneous substitution of variables for variables. Implements the
         abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         match self:
             case C() | C_():
-                return self
+                return self  # type: ignore[return-value]
             case Eq() | Ne():
-                return self.op(self.lhs.subs(d), self.rhs.subs(d))
+                return self.op(self.lhs.subs(d), self.rhs.subs(d))  # type: ignore[return-value]
             case _:
                 assert False, f'{self}: {type(self)}'
 

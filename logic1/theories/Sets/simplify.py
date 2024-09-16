@@ -61,12 +61,12 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                     if n > self._cur_min_card:
                         self._cur_min_card = n
                     if self._cur_min_card > self._cur_max_card:
-                        raise Theory.Inconsistent
+                        raise Theory.Inconsistent()
                 case C_(index=n):
                     if n - 1 < self._cur_max_card:
                         self._cur_max_card = n - 1
                     if self._cur_min_card > self._cur_max_card:
-                        raise Theory.Inconsistent
+                        raise Theory.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
                     equations = []
                     Q = {lhs, rhs}
@@ -79,32 +79,31 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                     equations.append(Q)
                     self._cur_equations = equations
                 case Ne(lhs=lhs, rhs=rhs):
-                    self._cur_inequations = self._cur_inequations.union({atom})
+                    self._cur_inequations.add(atom)
                 case _:
                     assert False
             for ne in self._cur_inequations:
                 for P in self._cur_equations:
                     if ne.lhs in P and ne.rhs in P:
-                        raise Theory.Inconsistent
-            # # Create substitution from the equations
-            # sigma = dict()
-            # for P in self._cur_equations:
-            #     x = max(P, key=Variable.sort_key)
-            #     for y in P:
-            #         if y is not x:
-            #             sigma[y] = x
-            # # Substitute into inequations
-            # inequations = set()
-            # for ne in self._cur_inequations:
-            #     ne_subs = ne.subs(sigma)
-            #     match ne_subs.lhs.compare(ne_subs.rhs):
-            #         case 0:
-            #             raise Theory.Inconsistent
-            #         case 1:
-            #             inequations.update({Ne(ne_subs.rhs, ne_subs.lhs)})
-            #         case -1:
-            #             inequations.update({ne_subs})
-            # self._cur_inequations = inequations
+                        raise Theory.Inconsistent()
+
+            # Create substitution from the equations
+            sigma = dict()
+            for P in self._cur_equations:
+                x = min(P, key=Variable.sort_key)
+                for y in P:
+                    sigma[y] = x
+            # Substitute into inequations
+            inequations = set()
+            for ne in self._cur_inequations:
+                ne_subs = ne.subs(sigma)
+                if ne_subs.lhs == ne_subs.rhs:
+                    raise Theory.Inconsistent()
+                if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
+                    inequations.add(ne_subs)
+                else:
+                    inequations.add(Ne(ne_subs.rhs, ne_subs.lhs))
+            self._cur_inequations = inequations
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.Theory.extract`.
@@ -138,12 +137,12 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
         theory_next = self.__class__()
         theory_next._ref_min_card = self._cur_min_card
         theory_next._ref_max_card = self._cur_max_card
-        theory_next._ref_equations = self._cur_equations
-        theory_next._ref_inequations = self._cur_inequations
+        theory_next._ref_equations = self._cur_equations.copy()
+        theory_next._ref_inequations = self._cur_inequations.copy()
         theory_next._cur_min_card = self._cur_min_card
         theory_next._cur_max_card = self._cur_max_card
-        theory_next._cur_equations = self._cur_equations
-        theory_next._cur_inequations = self._cur_inequations
+        theory_next._cur_equations = self._cur_equations.copy()
+        theory_next._cur_inequations = self._cur_inequations.copy()
         return theory_next
 
 

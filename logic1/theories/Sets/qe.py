@@ -131,7 +131,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 class QuantifierElimination(abc.qe.QuantifierElimination[
         Node, Theory, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
     """
-    Quantifier elimination for the theory of sets with cardinanity constraints.
+    Quantifier elimination for the theory of sets with cardinality constraints.
 
     Implements the abstract methods
     :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,

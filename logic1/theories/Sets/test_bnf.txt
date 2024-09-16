@@ -16,13 +16,13 @@ T
 a == o
 
 >>> dnf(Equivalent(a == o, b == o))
-Or(And(a == b, a == o), And(a != o, b != o))
+Or(a == b, And(a != o, b != o))
 
 >>> dnf(((a == o) | (b != o)) & ((a != o) | (b == o)))
-Or(And(a == b, a == o), And(a != o, b != o))
+Or(a == b, And(a != o, b != o))
 
 >>> dnf(((a != o) | (b == o)) & ((a == o) | (b == o)))
-b == o
+Or(And(a == b, a == o), And(b == o, a != b))
 
 >>> cnf(T)
 T
@@ -37,4 +37,4 @@ T
 a == o
 
 >>> cnf(Equivalent(a == o, b == o))
-And(Or(a == o, b != o), Or(b == o, a != o))
+And(Or(a == b, a != o), Or(a == b, b != o))
