@@ -280,7 +280,7 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
         """
         theory_next = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
-            theory_next._reference = self._current
+            theory_next._reference = self._current.copy()
         else:
             theory_next._reference = {p: q for p, q in self._current.items()
                                       if remove not in p.vars()}

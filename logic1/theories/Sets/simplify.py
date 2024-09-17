@@ -4,15 +4,48 @@ propagation of internal theories during recursion. It is an adaptation of the
 *standard simplifier* from [DolzmannSturm-1997]_ tailored to the specific
 requirements of Sets.
 """
-from typing import Iterable, Never, Optional, Self
+from __future__ import annotations
+
+from typing import Iterable, Iterator, Never, Optional, Self
 
 from ... import abc
+from dataclasses import dataclass, field
 
 from ...firstorder import And, Or
 from .atomic import AtomicFormula, C, C_, Eq, Index, Ne, oo, Variable
 from .typing import Formula
 
 from ...support.tracing import trace  # noqa
+
+
+@dataclass(frozen=True)
+class UnionFind:
+    _parents: dict[Variable, Variable] = field(default_factory=dict)
+
+    def copy(self) -> UnionFind:
+        return UnionFind(self._parents.copy())
+
+    def find(self, v: Variable) -> Variable:
+        try:
+            root = self.find(self._parents[v])
+        except KeyError:
+            return v
+        self._parents[v] = root
+        return root
+
+    def union(self, v1: Variable, v2: Variable) -> None:
+        root1 = self.find(v1)
+        root2 = self.find(v2)
+        if root1 == root2:
+            return
+        if Variable.sort_key(root1) <= Variable.sort_key(root2):
+            self._parents[root2] = root1
+        else:
+            self._parents[root1] = root2
+
+    def equations(self) -> Iterator[Eq]:
+        for y in self._parents:
+            yield Eq(self.find(y), y)
 
 
 class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
@@ -25,22 +58,22 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
     """
     _ref_min_card: Index
     _ref_max_card: Index
-    _ref_equations: list[set[Variable]]
+    _ref_equations: UnionFind
     _ref_inequations: set[Ne]
 
     _cur_min_card: Index
     _cur_max_card: Index
-    _cur_equations: list[set[Variable]]
+    _cur_equations: UnionFind
     _cur_inequations: set[Ne]
 
     def __init__(self) -> None:
         self._ref_min_card = 1
         self._ref_max_card = oo
-        self._ref_equations = []
+        self._ref_equations = UnionFind()
         self._ref_inequations = set()
         self._cur_min_card = 1
         self._cur_max_card = oo
-        self._cur_equations = []
+        self._cur_equations = UnionFind()
         self._cur_inequations = set()
 
     def __repr__(self) -> str:
@@ -68,35 +101,20 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                     if self._cur_min_card > self._cur_max_card:
                         raise Theory.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
-                    equations = []
-                    Q = {lhs, rhs}
-                    for P in self._cur_equations:
-                        if lhs in P or rhs in P:
-                            # This happens at most twice.
-                            Q = Q.union(P)
-                        else:
-                            equations.append(P)
-                    equations.append(Q)
-                    self._cur_equations = equations
+                    self._cur_equations.union(lhs, rhs)
                 case Ne(lhs=lhs, rhs=rhs):
                     self._cur_inequations.add(atom)
                 case _:
                     assert False
             for ne in self._cur_inequations:
-                for P in self._cur_equations:
-                    if ne.lhs in P and ne.rhs in P:
-                        raise Theory.Inconsistent()
+                if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
+                    raise Theory.Inconsistent()
 
-            # Create substitution from the equations
-            sigma = dict()
-            for P in self._cur_equations:
-                x = min(P, key=Variable.sort_key)
-                for y in P:
-                    sigma[y] = x
             # Substitute into inequations
             inequations = set()
             for ne in self._cur_inequations:
-                ne_subs = ne.subs(sigma)
+                ne_subs = ne.subs({ne.lhs: self._cur_equations.find(ne.lhs),
+                                   ne.rhs: self._cur_equations.find(ne.rhs)})
                 if ne_subs.lhs == ne_subs.rhs:
                     raise Theory.Inconsistent()
                 if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
@@ -113,15 +131,9 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
             L.append(C(self._cur_min_card))
         if self._cur_max_card < self._ref_max_card:
             L.append(C_(self._cur_max_card + 1))
-        for P in self._cur_equations:
-            x = min(P, key=Variable.sort_key)
-            for y in P:
-                if x != y:
-                    for Q in self._ref_equations:
-                        if x in Q and y in Q:
-                            break
-                    else:
-                        L.append(Eq(x, y))
+        for eq in self._cur_equations.equations():
+            if self._ref_equations.find(eq.lhs) != self._ref_equations.find(eq.rhs):
+                L.append(eq)
         for ne in self._cur_inequations:
             if ne not in self._ref_inequations:
                 L.append(ne)
@@ -130,19 +142,25 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.next_`.
+        """Implements the abstract method :meth:`.abc.simplify.next_`.
         """
-        if remove is not None:
-            raise NotImplementedError
         theory_next = self.__class__()
         theory_next._ref_min_card = self._cur_min_card
         theory_next._ref_max_card = self._cur_max_card
-        theory_next._ref_equations = self._cur_equations.copy()
-        theory_next._ref_inequations = self._cur_inequations.copy()
-        theory_next._cur_min_card = self._cur_min_card
-        theory_next._cur_max_card = self._cur_max_card
-        theory_next._cur_equations = self._cur_equations.copy()
-        theory_next._cur_inequations = self._cur_inequations.copy()
+        if remove is None:
+            theory_next._ref_equations = self._cur_equations.copy()
+            theory_next._ref_inequations = self._cur_inequations.copy()
+        else:
+            theory_next._ref_equations = UnionFind()
+            for eq in self._cur_equations.equations():
+                if remove not in eq.fvars():
+                    theory_next._ref_equations.union(eq.lhs, eq.rhs)
+            theory_next._ref_inequations = {ne for ne in self._cur_inequations
+                                            if remove not in ne.fvars()}
+        theory_next._cur_min_card = theory_next._ref_min_card
+        theory_next._cur_max_card = theory_next._ref_max_card
+        theory_next._cur_equations = theory_next._ref_equations.copy()
+        theory_next._cur_inequations = theory_next._ref_inequations.copy()
         return theory_next
 
 
