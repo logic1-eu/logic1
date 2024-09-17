@@ -24,16 +24,17 @@ class Failed(Exception):
     pass
 
 
-class Theory(abc.qe.Theory[AtomicFormula, Term, Variable, int]):
+class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
     """Implements the abstract method :meth:`simplify()
-    <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
-    Required by :class:`.Node` and :class:`.VirtualSubstitution` for
-    instantiating the type variable :data:`.abc.qe.θ` of :class:`.abc.qe.Node`
-    and :class:`.abc.qe.QuantifierElimination`, respectively.
+    <.abc.qe.Assumptions.simplify>` of its super class
+    :class:`.abc.qe.Assumptions`. Required by :class:`.Node` and
+    :class:`.VirtualSubstitution` for instantiating the type variable
+    :data:`.abc.qe.λ` of :class:`.abc.qe.Node` and
+    :class:`.abc.qe.QuantifierElimination`, respectively.
     """
 
     def simplify(self, f: Formula) -> Formula:
-        """Implements the abstract method :meth:`.abc.qe.Theory.simplify`.
+        """Implements the abstract method :meth:`.abc.qe.Assumptions.simplify`.
         """
         return simplify(f, explode_always=False, prefer_order=False, prefer_weak=True)
 
@@ -62,13 +63,13 @@ class GENERIC(Enum):
 
     MONOMIAL = auto()
     """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.theory`, where the left hand side of those
+    :attr:`.abc.qe.QuantifierElimination.assumptions`, where the left hand side of those
     atomic formulas is a monomial (and the right hand side is zero).
     """
 
     FULL = auto()
     """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.theory`.
+    :attr:`.abc.qe.QuantifierElimination.assumptions`.
     """
 
 
@@ -198,12 +199,12 @@ class Cluster:
     def __iter__(self) -> Iterator[RootSpec]:
         return iter(self.root_specs)
 
-    def bound_type(self, atom: AtomicFormula, x: Variable, theory: Theory)\
+    def bound_type(self, atom: AtomicFormula, x: Variable, assumptions: Assumptions)\
             -> tuple[bool, Optional[TAG]]:
         epsilons = set()
         tags = set()
         for root_spec in self.root_specs:
-            if simplify(root_spec.guard(atom.lhs, x), assume=theory.atoms) is _F():
+            if simplify(root_spec.guard(atom.lhs, x), assume=assumptions.atoms) is _F():
                 continue
             with_epsilon, tag = root_spec.bound_type(atom)
             if tag is not None:
@@ -253,9 +254,9 @@ class PRD:
     cluster: Cluster
     xguard: Formula = field(default_factory=_T)
 
-    def guard(self, theory: Theory) -> Formula:
+    def guard(self, assumptions: Assumptions) -> Formula:
         guard = self.cluster.guard(self.term, self.variable)
-        return simplify(And(self.xguard, guard), assume=theory.atoms)
+        return simplify(And(self.xguard, guard), assume=assumptions.atoms)
 
     def vsubs(self, atom: AtomicFormula) -> Formula:
         """Virtually substitute self into atom yielding a quantifier-free
@@ -393,11 +394,11 @@ class TestPoint:
     prd: Optional[PRD] = None
     nsp: NSP = NSP.NONE
 
-    def guard(self, theory: Theory):
+    def guard(self, assumptions: Assumptions):
         if self.prd is None:
             return _T()
         else:
-            guard = self.prd.guard(theory)
+            guard = self.prd.guard(assumptions)
             assert guard is not _F(), self
             return guard
 
@@ -425,14 +426,14 @@ class EliminationSet:
     test_points: list[TestPoint]
     method: str
 
-    def _translate(self, theory: Theory):
+    def _translate(self, assumptions: Assumptions):
         return (self.method,
                 self.variable,
-                [(tp.guard(theory), tp._translate()) for tp in self.test_points])
+                [(tp.guard(assumptions), tp._translate()) for tp in self.test_points])
 
 
 @dataclass
-class Node(abc.qe.Node[Formula, Variable, Theory]):
+class Node(abc.qe.Node[Formula, Variable, Assumptions]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution` for
@@ -476,14 +477,14 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                     outermost_block=self.outermost_block,
                     options=self.options)
 
-    def eset(self, theory: Theory) -> EliminationSet:
-        return self.gauss_eset(theory) or self.regular_eset(theory)
+    def eset(self, assumptions: Assumptions) -> EliminationSet:
+        return self.gauss_eset(assumptions) or self.regular_eset(assumptions)
 
-    def gauss_eset(self, theory: Theory) -> Optional[EliminationSet]:
+    def gauss_eset(self, assumptions: Assumptions) -> Optional[EliminationSet]:
         if not isinstance(self.formula, And):
             return None
         for degree in (1, 2):
-            # Look for degree-Gauss with a non-zero coefficient modulo theory
+            # Look for degree-Gauss with a non-zero coefficient modulo assumptions
             for round_ in (GENERIC.NONE, GENERIC.MONOMIAL, GENERIC.FULL):
                 if round_ == GENERIC.MONOMIAL and not self.outermost_block:
                     break
@@ -502,7 +503,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                         a = lhs.coefficient({x: degree})
                         match round_:
                             case GENERIC.NONE:
-                                if not is_valid(a != 0, theory.atoms):
+                                if not is_valid(a != 0, assumptions.atoms):
                                     continue
                                 abc.qe.logger.debug(f'{degree}-Gauss')
                             case GENERIC.MONOMIAL:
@@ -510,19 +511,19 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                                     continue
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
-                                theory.append(a != 0)
+                                assumptions.append(a != 0)
                                 abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
                             case GENERIC.FULL:
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
-                                theory.append(a != 0)
+                                assumptions.append(a != 0)
                                 abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
                         self.variables.remove(x)
                         test_points = []
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
                             for sign in (1, -1):
                                 prd = PRD(sign * lhs, x, cluster)
-                                if prd.guard(theory) is not _F():
+                                if prd.guard(assumptions) is not _F():
                                     test_points.append(TestPoint(prd))
                         eset = EliminationSet(variable=x, test_points=test_points, method='g')
                         return eset
@@ -545,14 +546,14 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
             case _:
                 assert False, self.options.generic
 
-    def process(self, theory: Theory) -> list[Node]:
+    def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
         """
-        eset = self.eset(theory)
-        nodes = self.vsubs(eset, theory)
+        eset = self.eset(assumptions)
+        nodes = self.vsubs(eset, assumptions)
         return nodes
 
-    def regular_eset(self, theory: Theory) -> EliminationSet:
+    def regular_eset(self, assumptions: Assumptions) -> EliminationSet:
 
         def red(f: Term, x: Variable, d: int) -> Term:
             return f - f.coefficient({x: d}) * x ** d
@@ -566,19 +567,19 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                 clusters = Node.real_type_selection[self.options.clustering][d]
                 for cluster in clusters:
                     prd = PRD(atom.lhs, x, cluster, xguard)
-                    (with_epsilon, tag) = cluster.bound_type(atom, x, theory)
+                    (with_epsilon, tag) = cluster.bound_type(atom, x, assumptions)
                     if tag is not None:
                         cs = CandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
                     if set(cluster) != set(- cluster):
                         prd = PRD(- atom.lhs, x, cluster, xguard)
-                        (with_epsilon, tag) = (- cluster).bound_type(atom, x, theory)
+                        (with_epsilon, tag) = (- cluster).bound_type(atom, x, assumptions)
                         if tag is not None:
                             cs = CandidateSolution(prd, with_epsilon, tag)
                             candidate_solutions.add(cs)
                 lc = atom.lhs.coefficient({x: d})
                 if self.is_admissible_assumption(lc != 0):
-                    theory.append(lc != 0)
+                    assumptions.append(lc != 0)
                     break
                 atom = atom.op(red(atom.lhs, x, d), 0)
                 if self.options.traditional_guards:
@@ -598,7 +599,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                         assert False, atom
                     case 0 | 1 | 2:
                         for candidate in at_cs(atom, x):
-                            if candidate.prd.guard(theory) is not _F():
+                            if candidate.prd.guard(assumptions) is not _F():
                                 candidates[candidate.tag].add(candidate)
                     case _:
                         raise DegreeViolation(atom, x, atom.lhs.degree(x))
@@ -625,7 +626,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
         eset = EliminationSet(variable=best_variable, test_points=test_points, method='e')
         return eset
 
-    def vsubs(self, eset: EliminationSet, theory: Theory) -> list[Node]:
+    def vsubs(self, eset: EliminationSet, assumptions: Assumptions) -> list[Node]:
 
         def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> Formula:
             """Virtually substitute a test point into an atom.
@@ -756,7 +757,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
         for tp in eset.test_points:
             new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
             # requires discussion: guard will be simplified twice
-            new_formula = simplify(And(tp.guard(theory), new_formula), assume=theory.atoms)
+            new_formula = simplify(And(tp.guard(assumptions), new_formula), assume=assumptions.atoms)
             if new_formula is _T():
                 raise abc.qe.FoundT()
             new_nodes.append(
@@ -796,19 +797,19 @@ class Options(abc.qe.Options):
     ...    assume=[c > 0])
     Or(And(b != 0, a^2 - 2 == 0),
        And(a^2 - 2 != 0, 4*a^2*c - b^2 - 8*c <= 0))
-    >>> qe.theory.atoms
+    >>> qe.assumptions
     [c > 0]
 
     >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
     ...    assume=[c > 0], generic=GENERIC.FULL)
     4*a^2*c - b^2 - 8*c <= 0
-    >>> qe.theory.atoms
+    >>> qe.assumptions
     [c > 0, a^2 - 2 != 0]
 
     >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
     ...    assume=[c > 0], generic=GENERIC.MONOMIAL)
     Or(a^2 - 2 == 0, 4*a^2*c - b^2 - 8*c <= 0)
-    >>> qe.theory.atoms
+    >>> qe.assumptions
     [c > 0, b != 0]
     """
 
@@ -834,13 +835,13 @@ class Options(abc.qe.Options):
 
 @dataclass
 class VirtualSubstitution(abc.qe.QuantifierElimination[
-        Node, Theory, list[str], Options, AtomicFormula, Term, Variable, int]):
+        Node, Assumptions, list[str], Options, AtomicFormula, Term, Variable, int]):
     """Real quantifier elimination by virtual substitution.
 
     Implements the abstract methods
     :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
     :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
-    :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
+    :meth:`create_assumptions() <.abc.qe.QuantifierElimination.create_assumptions>`,
     :meth:`create_true_node() <.abc.qe.QuantifierElimination.create_true_node>`,
     :meth:`final_simplify() <.abc.qe.QuantifierElimination.final_simplify>`,
     :meth:`init_env() <.abc.qe.QuantifierElimination.init_env>`,
@@ -854,20 +855,22 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
         return Options(**kwargs)
 
     def create_root_nodes(self, variables: Iterable[Variable], matrix: Formula) -> list[Node]:
-        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_root_nodes`.
+        """Implements the abstract method
+        :meth:`.abc.qe.QuantifierElimination.create_root_nodes`.
         """
         assert self.options is not None
-        assert self.theory is not None
+        assert self._assumptions is not None
         return [Node(variables=list(variables),
-                     formula=simplify(matrix, assume=self.theory.atoms),
+                     formula=simplify(matrix, assume=self._assumptions.atoms),
                      answer=[],
                      outermost_block=not self.blocks,
                      options=self.options)]
 
-    def create_theory(self, assume: Iterable[AtomicFormula]) -> Theory:
-        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_theory`.
+    def create_assumptions(self, assume: Iterable[AtomicFormula]) -> Assumptions:
+        """Implements the abstract method
+        :meth:`.abc.qe.QuantifierElimination.create_assumptions`.
         """
-        return Theory(assume)
+        return Assumptions(assume)
 
     def create_true_node(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_true_node`.
@@ -880,7 +883,8 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
                     options=self.options)
 
     def final_simplify(self, formula: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
-        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.final_simplify`.
+        """Implements the abstract method
+        :meth:`.abc.qe.QuantifierElimination.final_simplify`.
         """
         return simplify(formula, assume)
 
@@ -942,7 +946,7 @@ Technically, :func:`.qe` is an instance of the callable class
 
 :returns:
   A quantifier-free equivalent of `f` modulo assumptions that are available in
-  :attr:`qe.theory.atoms <.abc.qe.QuantifierElimination.theory>` at the end of
+  :attr:`qe.assumptions <.abc.qe.QuantifierElimination.assumptions>` at the end of
   the computation. With regular quantifier elimination, the assumptions are
   those passed as the `assume` parameter, modulo simplification. With
   *generic quantifier elimination*, inequations in the parameters can be

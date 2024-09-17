@@ -8,10 +8,10 @@ Quantifier Elimination
 
 .. automodule:: logic1.theories.Sets.qe
 
-  Theories
-  ********
+  Assumptions
+  ***********
 
-  .. autoclass:: Theory
+  .. autoclass:: Assumptions
     :special-members:
 
   Nodes

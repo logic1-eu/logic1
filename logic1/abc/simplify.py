@@ -144,39 +144,39 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         :returns:
           A simplified equivalent of `f` modulo `assume`.
         """
-        th = self.create_initial_representation()
+        ir = self.create_initial_representation()
         try:
-            th.add(And, assume)
-        except th.Inconsistent:
+            ir.add(And, assume)
+        except ir.Inconsistent:
             return _T()
-        th = th.next_()
+        ir = ir.next_()
         f = f.to_pnf()
         quantifiers = []
         while isinstance(f, (Ex, All)):
-            th = th.next_(remove=f.var)
+            ir = ir.next_(remove=f.var)
             quantifiers.append((f.op, f.var))
             f = f.arg
-        f = self._simpl_nnf(f, th)
+        f = self._simpl_nnf(f, ir)
         free_vars = set(f.fvars())
         for Q, var in reversed(quantifiers):
             if var in free_vars:
                 f = Q(var, f)
         return f
 
-    def _simpl_nnf(self, f: Formula[α, τ, χ, σ], th: ρ) -> Formula[α, τ, χ, σ]:
+    def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         match f:
             case And() | Or():
-                return self._simpl_and_or(f, th)
+                return self._simpl_and_or(f, ir)
             case _F() | _T():
                 return f
             case AtomicFormula():
-                # Build a trivial binary And in order to apply th. Unary And
+                # Build a trivial binary And in order to apply ir. Unary And
                 # does not exist.
-                return self._simpl_and_or(And(f, _T()), th)
+                return self._simpl_and_or(And(f, _T()), ir)
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.op!r}')
 
-    def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], th: ρ) -> Formula[α, τ, χ, σ]:
+    def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         """
         `f` must be in negation normal form (NNF).
         """
@@ -195,13 +195,13 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         new_others, atoms = split(simplified_atoms)
         others = others.union(new_others)
         try:
-            th.add(gand, atoms)
-        except th.Inconsistent:
+            ir.add(gand, atoms)
+        except ir.Inconsistent:
             return gand.definite_element()
         simplified_others: set[Formula[α, τ, χ, σ]] = set()
         while others:
             arg = others.pop()
-            simplified_arg = self._simpl_nnf(arg, th.next_())
+            simplified_arg = self._simpl_nnf(arg, ir.next_())
             if isinstance(simplified_arg, gand.definite()):
                 return simplified_arg
             elif isinstance(simplified_arg, gand.neutral()):
@@ -219,14 +219,14 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
             if new_atoms:
                 try:
-                    th.add(gand, new_atoms)  # Can save resimp if th does not change
-                except th.Inconsistent:
+                    ir.add(gand, new_atoms)  # Can save resimp if th does not change
+                except ir.Inconsistent:
                     return gand.definite_element()
                 others = others.union(simplified_others)
                 simplified_others = new_others
             else:
                 simplified_others = simplified_others.union(new_others)
-        final_atoms = list(th.extract(gand))
+        final_atoms = list(ir.extract(gand))
         final_atoms.sort()
         final_others = list(simplified_others)
         final_others.sort()

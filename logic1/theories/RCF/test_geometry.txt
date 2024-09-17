@@ -17,14 +17,14 @@ of a triangle ABC. If O does not lie outside of ABC, then ∠ACB = ∠AOB/2.
 ...                          (1 - t1 * t2) * t == t1 + t2,
 ...                          x1 * t_prime == u1),
 ...                      t == t_prime).all({u1, u2, u3})
->>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.FULL), qe.assume
+>>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.FULL), qe.assumptions
 (T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0])
->>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.MONOMIAL), qe.assume
+>>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.MONOMIAL), qe.assumptions
 (And(Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0),
      Or(u3 > 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0)), [u3 != 0])
->>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.FULL), qe.assume
+>>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.FULL), qe.assumptions
 (T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0])
->>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+>>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assumptions
 (And(Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 == 0, u1^2 - u2^2 + u3^2 != 0, u1^2
 - u2^2 + 3*u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 +
 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u3 < 0, u1 != 0, u1^2 - u2^2 -
@@ -53,7 +53,7 @@ u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4
 u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4
 < 0, u1^5 - 2*u1^3*u2^2 + 2*u1^3*u3^2 + u1*u2^4 - 2*u1*u2^2*u3^2 - 3*u1*u3^4 <
 0)), [u3 != 0])
->>> qe(stu99_3_16, assume=[u1 != 0], clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+>>> qe(stu99_3_16, assume=[u1 != 0], clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assumptions
 (T, [u3 != 0, u1 != 0])
 >>> VV.pop()
 
@@ -86,6 +86,6 @@ all eight points lie on a line. This holds over R but not over C.
 ...                       x1*x4 - (x2 - u1)*x3 - u1*x1 == 0,
 ...                       u3*x4 - u2*x3 == 0),
 ...                   2*u2*x4 + 2*u3*x3 - u3**2 - u2**2 == 0))
->>> qe(ex6, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assume
+>>> qe(ex6, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assumptions
 (u1 != 0, [u3 != 0])
 >>> VV.pop()

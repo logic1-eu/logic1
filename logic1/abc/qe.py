@@ -66,8 +66,8 @@ multiprocessing_logger.addHandler(multiprocessing_handler)
 """A type variable denoting the type of the principal argument of the
 abstract method :meth:`.QuantifierElimination.init_env`."""
 
-θ = TypeVar('θ', bound='Theory')
-"""A type variable denoting a assumptions with upper bound :class:`.Theory`.
+λ = TypeVar('λ', bound='Assumptions')
+"""A type variable denoting a assumptions with upper bound :class:`.Assumptions`.
 """
 
 ω = TypeVar('ω', bound='Options')
@@ -85,7 +85,7 @@ class NodeProcessFailure(Exception):
 
 
 @dataclass
-class Node(Generic[φ, χ, θ]):
+class Node(Generic[φ, χ, λ]):
     """Holds a subproblem for existential quantifier elimination. Theories
     implementing the interface can put restrictions on the existing fields and
     add further fields.
@@ -108,7 +108,7 @@ class Node(Generic[φ, χ, θ]):
         ...
 
     @abstractmethod
-    def process(self, theory: θ) -> list[Self]:
+    def process(self, assumptions: λ) -> list[Self]:
         """This `node` describes a formula ``Ex(node.variables,
         node.formula)``. Select a `variable` from ``node.variables`` and
         compute a list `S` of successor nodes such that:
@@ -529,7 +529,7 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 
 
 @dataclass
-class Theory(Generic[α, τ, χ, σ]):
+class Assumptions(Generic[α, τ, χ, σ]):
     """Holds the currently valid assumptions. This starts with user assumptions
     explicitly provided by the user. Certain variants of quantified elimination
     may add further assumptions in the course of the elimination.
@@ -538,7 +538,7 @@ class Theory(Generic[α, τ, χ, σ]):
         * The argument `assume` of :meth:`.QuantifierElimination.__call__`.
         * Generic quantifier elimination in :mod:`.RCF.qe`.
 
-    This is an upper bound for the type variable :data:`.θ`.
+    This is an upper bound for the type variable :data:`.λ`.
     """
 
     class Inconsistent(Exception):
@@ -605,7 +605,7 @@ class Options:
 
 
 @dataclass
-class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
+class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
     """A generic callable class that implements quantifier elimination.
     """
 
@@ -620,7 +620,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
     """
 
     # Attribute group 2 - arguments state of the computation:
-    theory: Optional[θ] = None
+    _assumptions: Optional[λ] = None
     """Wraps a list of atoms, which serve as external assumptions. This
     includes the assumptions passed via the `assume` parameter of
     :meth:`__call__`. Some theories have an option for *generic quantifier
@@ -769,7 +769,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         :returns:
           A quantifier-free equivalent of `f` modulo certain assumptions. A
           simplified equivalent of all relevant assumptions are available as
-          :attr:`.theory`.
+          :attr:`.assumptions`.
 
           * Regularly, the assumptions are exactly those passed as the `assume`
             parameter.
@@ -783,7 +783,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         # also within __call__. This is not really nice, but it does the job
         # and saves some code.
         QuantifierElimination.__init__(self)  # dicuss: NF is :-(
-        self.theory = self.create_theory(assume)
+        self._assumptions = self.create_assumptions(assume)
         if workers >= 0:
             self.workers = workers
         else:
@@ -809,9 +809,15 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         return result
 
     @property
-    def assume(self) -> list[α]:
-        assert self.theory is not None
-        return self.theory.atoms
+    def assumptions(self) -> list[α]:
+        """A list of atoms, which serve as external assumptions. This includes
+        the assumptions passed via the `assume` parameter of
+        :meth:`__call__`. Some theories have an option for *generic quantifier
+        elimination*, which adds additional assumptions on parameters in
+        the course of the elimination.
+        """
+        assert self._assumptions is not None
+        return self._assumptions.atoms.copy()
 
     def collect_success_nodes(self) -> None:
         assert self.success_nodes is not None
@@ -842,8 +848,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         ...
 
     @abstractmethod
-    def create_theory(self, assume: Iterable[α]) -> θ:
-        """Create in instance of :data:`.θ` that holds `assume`. Those
+    def create_assumptions(self, assume: Iterable[α]) -> λ:
+        """Create in instance of :data:`.λ` that holds `assume`. Those
         assumptions `assume` are the corresponding parameter of
         :meth:`.__call__`.
         """
@@ -881,7 +887,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             logger.debug(f'found {num_atoms} atoms')
         logger.info('final simplification')
         timer = Timer()
-        self.result = self.final_simplify(self.matrix, assume=self.theory.atoms)
+        self.result = self.final_simplify(self.matrix, assume=self._assumptions.atoms)
         self.time_final_simplification = timer.get()
         if logger.isEnabledFor(logging.DEBUG):
             logger.debug(f'{self.time_final_simplification=:.3f}')
@@ -930,7 +936,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
 
         assert self.options is not None
         assert self.root_nodes is not None
-        assert self.theory is not None
+        assert self._assumptions is not None
         logger.debug('entering sync manager context')
         timer = Timer()
         manager: SyncManager[Formula[α, τ, χ, σ], ν]
@@ -944,7 +950,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             success_nodes: multiprocessing.Queue[Optional[list[ν]]] = multiprocessing.Queue()
             self.success_nodes = NodeList()
             failure_nodes = manager.NodeList()  # type: ignore
-            final_theories: multiprocessing.Queue[θ] = multiprocessing.Queue()
+            final_assumptions: multiprocessing.Queue[λ] = multiprocessing.Queue()
             found_t = manager.Value('i', 0)
             processes: list[mp.Process] = []
             sentinels: list[int] = []
@@ -957,7 +963,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                 process = mp.Process(
                     target=self.parallel_process_block_worker,
                     args=(working_nodes, success_nodes, failure_nodes,
-                          self.theory, final_theories, m_lock, found_t,
+                          self._assumptions, final_assumptions, m_lock, found_t,
                           i, log_level, reference_time,
                           born_processes, self.init_env_arg()))
                 process.start()
@@ -1007,8 +1013,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
             logger.debug(f'{self.time_multiprocessing=:.3f}')
             new_assumptions = []
             for i in range(self.workers):
-                new_assumptions.extend(final_theories.get().atoms)
-            self.theory.extend(new_assumptions)
+                new_assumptions.extend(final_assumptions.get().atoms)
+            self._assumptions.extend(new_assumptions)
             if found_t.value > 0:
                 pl = 's' if found_t.value > 1 else ''
                 logger.debug(f'{found_t.value} worker{pl} found T')
@@ -1056,8 +1062,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                                       working_nodes: WorkingNodeListProxy,
                                       success_nodes: multiprocessing.Queue[Optional[list[Node]]],
                                       failure_nodes: NodeListProxy,
-                                      theory: Theory,
-                                      final_theories: multiprocessing.Queue[Theory],
+                                      assumptions: Assumptions,
+                                      final_assumptions: multiprocessing.Queue[Assumptions],
                                       m_lock: threading.Lock,
                                       found_t: mp.sharedctypes.Synchronized,
                                       i: int,
@@ -1079,7 +1085,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                     time.sleep(0.001)
                     continue
                 try:
-                    nodes = node.process(theory)
+                    nodes = node.process(assumptions)
                 except NodeProcessFailure:
                     failure_nodes.append(node)
                     working_nodes.task_done()
@@ -1097,8 +1103,8 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
         success_nodes.put(None)
-        multiprocessing_logger.debug(f'sending {theory=}')
-        final_theories.put(theory)
+        multiprocessing_logger.debug(f'sending {assumptions=}')
+        final_assumptions.put(assumptions)
         multiprocessing_logger.debug(f'worker process {i} exiting')
 
     def process_block(self) -> None:
@@ -1127,7 +1133,7 @@ class QuantifierElimination(Generic[ν, θ, ι, ω, α, τ, χ, σ]):
                     last_log = t
             node = self.working_nodes.pop()
             try:
-                nodes = node.process(self.theory)
+                nodes = node.process(self._assumptions)
             except NodeProcessFailure:
                 self.failure_nodes.append(node)
                 continue

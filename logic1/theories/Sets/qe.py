@@ -15,22 +15,22 @@ from logic1.theories.Sets.simplify import simplify
 from logic1.theories.Sets.typing import Formula
 
 
-class Theory(abc.qe.Theory[AtomicFormula, Variable, Variable, Never]):
+class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
     """Implements the abstract method :meth:`simplify()
-    <.abc.qe.Theory.simplify>` of its super class :class:`.abc.qe.Theory`.
+    <.abc.qe.Assumptions.simplify>` of its super class :class:`.abc.qe.Assumptions`.
     Required by :class:`.Node` and :class:`.QuantifierElimination` for
-    instantiating the type variable :data:`.abc.qe.θ` of :class:`.abc.qe.Node`
+    instantiating the type variable :data:`.abc.qe.λ` of :class:`.abc.qe.Node`
     and :class:`.abc.qe.QuantifierElimination`, respectively.
     """
 
     def simplify(self, f: Formula) -> Formula:
-        """Implements the abstract method :meth:`.abc.qe.Theory.simplify`.
+        """Implements the abstract method :meth:`.abc.qe.Assumptions.simplify`.
         """
         return simplify(f)
 
 
 @dataclass
-class Node(abc.qe.Node[Formula, Variable, Theory]):
+class Node(abc.qe.Node[Formula, Variable, Assumptions]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination` for
@@ -45,7 +45,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
         """
         return Node(variables=self.variables, formula=self.formula, options=self.options)
 
-    def process(self, theory: Theory) -> list[Node]:
+    def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
         """
         # We assume that that atoms of the form v == v or v != v have been
@@ -58,13 +58,13 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
         best_variable, _ = counter.most_common()[-1]
         self.variables.remove(best_variable)
         phi_prime = self.qe1(best_variable, self.formula)
-        phi_prime = simplify(phi_prime, assume=theory.atoms)
+        phi_prime = simplify(phi_prime, assume=assumptions.atoms)
         phi_prime = dnf(phi_prime)
         match phi_prime:
             case Or():
                 nodes = []
                 for arg in phi_prime.args:
-                    formula = simplify(arg, assume=theory.atoms)
+                    formula = simplify(arg, assume=assumptions.atoms)
                     if formula is _T():
                         raise abc.qe.FoundT()
                     nodes.append(Node(variables=self.variables.copy(),
@@ -72,7 +72,7 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
                                       options=self.options))
                 return nodes
             case _:
-                formula = simplify(phi_prime, assume=theory.atoms)
+                formula = simplify(phi_prime, assume=assumptions.atoms)
                 if formula is _T():
                     raise abc.qe.FoundT()
                 return [Node(variables=self.variables.copy(),
@@ -129,14 +129,14 @@ class Node(abc.qe.Node[Formula, Variable, Theory]):
 
 @dataclass
 class QuantifierElimination(abc.qe.QuantifierElimination[
-        Node, Theory, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
+        Node, Assumptions, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
     """
     Quantifier elimination for the theory of sets with cardinality constraints.
 
     Implements the abstract methods
     :meth:`create_options() <.abc.qe.QuantifierElimination.create_options>`,
     :meth:`create_root_nodes() <.abc.qe.QuantifierElimination.create_root_nodes>`,
-    :meth:`create_theory() <.abc.qe.QuantifierElimination.create_theory>`,
+    :meth:`create_assumptions() <.abc.qe.QuantifierElimination.create_assumptions>`,
     :meth:`create_true_node() <.abc.qe.QuantifierElimination.create_true_node>`,
     :meth:`final_simplify() <.abc.qe.QuantifierElimination.final_simplify>`,
     :meth:`init_env() <.abc.qe.QuantifierElimination.init_env>`,
@@ -153,15 +153,15 @@ class QuantifierElimination(abc.qe.QuantifierElimination[
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_root_nodes`.
         """
         assert self.options is not None
-        assert self.theory is not None
-        formula = simplify(matrix, assume=self.theory.atoms)
+        assert self._assumptions is not None
+        formula = simplify(matrix, assume=self._assumptions.atoms)
         formula = dnf(formula)
         match formula:
             case Or():
                 root_nodes = []
                 for arg in formula.args:
                     node = Node(variables=list(variables),
-                                formula=simplify(arg, assume=self.theory.atoms),
+                                formula=simplify(arg, assume=self._assumptions.atoms),
                                 options=self.options)
                     if node.formula is _T():
                         raise abc.qe.FoundT()
@@ -169,16 +169,16 @@ class QuantifierElimination(abc.qe.QuantifierElimination[
                 return root_nodes
             case _:
                 node = Node(variables=list(variables),
-                            formula=simplify(formula, assume=self.theory.atoms),
+                            formula=simplify(formula, assume=self._assumptions.atoms),
                             options=self.options)
                 if node.formula is _T():
                     raise abc.qe.FoundT()
                 return [node]
 
-    def create_theory(self, assume: Iterable[AtomicFormula]) -> Theory:
-        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_theory`.
+    def create_assumptions(self, assume: Iterable[AtomicFormula]) -> Assumptions:
+        """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_assumptions`.
         """
-        return Theory(assume)
+        return Assumptions(assume)
 
     def create_true_node(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.create_true_node`.

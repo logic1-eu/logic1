@@ -63,12 +63,12 @@ Quantifier Elimination
       A type variable denoting the type of the principal argument of the
       abstract method :meth:`.QuantifierElimination.init_env`.
 
-    .. data:: θ
-      :value: TypeVar('θ', bound='Theory')
-      :canonical: logic1.abc.qe.θ
+    .. data:: λ
+      :value: TypeVar('λ', bound='Assumptions')
+      :canonical: logic1.abc.qe.λ
 
       A type variable denoting a assumptions with upper bound
-      :class:`.Theory`.
+      :class:`.Assumptions`.
 
     .. data:: ω
       :value: TypeVar('ω', bound='Options')
@@ -78,14 +78,14 @@ Quantifier Elimination
       :meth:`.QuantifierElimination.__call__` with upper bound
       :class:`.Options`.
 
-    Theories
-    ********
+    Assumptions
+    ***********
 
-    .. autoclass:: Theory
+    .. autoclass:: Assumptions
       :members: atoms, append, extend, simplify
       :special-members:
 
-      .. autoclass:: logic1.abc.qe.Theory.Inconsistent
+      .. autoclass:: logic1.abc.qe.Assumptions.Inconsistent
         :special-members:
 
     Nodes
@@ -111,7 +111,7 @@ Quantifier Elimination
 
       A first group of attributes holds the state of the computation:
 
-      .. autoattribute:: theory
+      .. autoproperty:: assumptions
       .. autoattribute:: blocks
       .. autoattribute:: matrix
       .. autoattribute:: negated
@@ -123,8 +123,8 @@ Quantifier Elimination
 
       Note that the parameter `f` of :meth:`__call__` inizializes
       :attr:`.blocks` and :attr:`matrix`, and the parameter `assume` inizializes
-      :attr:`.theory`. The next group of attributes corresponds to read-only
-      input parameters of
+      :attr:`.assumptions`. The next group of attributes corresponds to
+      read-only input parameters of
       :meth:`__call__`:
 
       .. autoattribute:: workers
@@ -147,7 +147,7 @@ Quantifier Elimination
       .. automethod:: __call__
       .. automethod:: create_options
       .. automethod:: create_root_nodes
-      .. automethod:: create_theory
+      .. automethod:: create_assumptions
       .. automethod:: create_true_node
       .. automethod:: final_simplify
       .. automethod:: init_env
