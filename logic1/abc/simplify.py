@@ -1,7 +1,8 @@
 """This module :mod:`logic1.abc.simplify` provides a generic abstract
 implementation of *deep simplifcication* based on generating and propagating
-internal theories during recursion. This is essentially the *standard
-simplifier*, which has been proposed for Ordered Fields in [DolzmannSturm-1997]_.
+internal representations during recursion. This is essentially the *standard
+simplifier*, which has been proposed for Ordered Fields in
+[DolzmannSturm-1997]_.
 """
 
 import more_itertools
@@ -23,18 +24,19 @@ from ..support.tracing import trace  # noqa
 χ = TypeVar('χ', bound='Variable')
 σ = TypeVar('σ')
 
-θ = TypeVar('θ', bound='Theory')
+ρ = TypeVar('ρ', bound='InternalRepresentation')
 
 
-class Theory(Generic[α, τ, χ, σ]):
+class InternalRepresentation(Generic[α, τ, χ, σ]):
     """This abstract class serves as an upper bound for the type variable
-    :data:`θ` in :class:`.abc.simplify.Simplify`. It specifies an interface
+    :data:`ρ` in :class:`.abc.simplify.Simplify`. It specifies an interface
     comprising methods required there.
 
-    The principal idea is that a :class:`Theory` should hold two abstract
-    pieces of information, *reference* and *current*. Both *reference* and
-    *current* hold  information that is equivalent to a conjunction of atomic
-    formulas. In the course of recursive simplification in
+    The principal idea is that a :class:`InternalRepresentation` should hold
+    two abstract pieces of information, *reference* and *current*. Both
+    *reference* and *current* hold  information that is equivalent to a
+    conjunction of atomic formulas. In the course of recursive simplification
+    in
     :class:`.abc.simplify.Simplify`, *reference*  is inherited from above;
     *current* starts with the information from *reference* and is enriched
     with information from all atomic formulas on the toplevel of the
@@ -46,7 +48,7 @@ class Theory(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> None:
-        """Add to this theory's *current* information originating from `atoms`.
+        """Add *current* information originating from `atoms`.
         If `gand` is :class:`.And`, consider ``atoms``. If `gand` is
         :class:`.Or`, consider ``(Not(at) for at in atoms)``. This is where
         simplification is supposed to take place.
@@ -55,8 +57,8 @@ class Theory(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]]) -> Iterable[α]:
-        """Comapare *current* and *reference* to identify and extract from this
-        theory information that must be represented on the toplevel of the
+        """Comapare *current* and *reference* to identify and extract
+        information that must be represented on the toplevel of the
         subformula currently under consideration. If `gand` is :class:`.And`,
         the result represents a conjunction.  If `gand` is :class:`.Or`,  it
         represents a disjunction.
@@ -72,7 +74,7 @@ class Theory(Generic[α, τ, χ, σ]):
         ...
 
 
-class Simplify(Generic[α, τ, χ, σ, θ]):
+class Simplify(Generic[α, τ, χ, σ, ρ]):
     """Deep simplification following [DolzmannSturm-1997]_.
 
     .. seealso::
@@ -81,8 +83,8 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
     """
 
     @abstractmethod
-    def create_initial_theory(self) -> θ:
-        """Create a fresh instance of :class:`.θ`.
+    def create_initial_representation(self) -> ρ:
+        """Create a fresh instance of :class:`.ρ`.
         """
         ...
 
@@ -127,7 +129,7 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
         y == 0)`` over the reals could be desirable within a disjunction but
         not otherwise.
         """
-        # Does not receive the theory, by design.
+        # Does not receive the internal representation, by design.
         ...
 
     def simplify(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Formula[α, τ, χ, σ]:
@@ -142,7 +144,7 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
         :returns:
           A simplified equivalent of `f` modulo `assume`.
         """
-        th = self.create_initial_theory()
+        th = self.create_initial_representation()
         try:
             th.add(And, assume)
         except th.Inconsistent:
@@ -161,7 +163,7 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
                 f = Q(var, f)
         return f
 
-    def _simpl_nnf(self, f: Formula[α, τ, χ, σ], th: θ) -> Formula[α, τ, χ, σ]:
+    def _simpl_nnf(self, f: Formula[α, τ, χ, σ], th: ρ) -> Formula[α, τ, χ, σ]:
         match f:
             case And() | Or():
                 return self._simpl_and_or(f, th)
@@ -174,7 +176,7 @@ class Simplify(Generic[α, τ, χ, σ, θ]):
             case _:
                 raise NotImplementedError(f'Simplify does not know {f.op!r}')
 
-    def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], th: θ) -> Formula[α, τ, χ, σ]:
+    def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], th: ρ) -> Formula[α, τ, χ, σ]:
         """
         `f` must be in negation normal form (NNF).
         """

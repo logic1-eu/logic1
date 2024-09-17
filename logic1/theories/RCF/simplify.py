@@ -1,7 +1,7 @@
 """This module provides an implementation of *deep simplifcication* based on
-generating and propagating internal theories during recursion in Real Closed
-fields. This is essentially the *standard simplifier*, which has been proposed
-for Ordered Fields in [DolzmannSturm-1997]_.
+generating and propagating internal representations during recursion in Real
+Closed fields. This is essentially the *standard simplifier*, which has been
+proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
 from functools import lru_cache
@@ -19,13 +19,14 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
-    """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
-    :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
-    <.abc.simplify.Theory.next_>` of it super class
-    :class:`.abc.simplify.Theory`. Required by
+class InternalRepresentation(
+        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int]):
+    """Implements the abstract methods :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
+    :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and :meth:`next_()
+    <.abc.simplify.InternalRepresentation.next_>` of it super class
+    :class:`.abc.simplify.InternalRepresentation`. Required by
     :class:`.Sets.simplify.Simplify` for instantiating the type variable
-    :data:`.abc.simplify.θ` of :class:`.abc.simplify.Simplify`.
+    :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
 
     class _Interval:
@@ -45,9 +46,9 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
             assert lopen or start is not -oo
             assert ropen or end is not oo
             if start > end:
-                raise Theory.Inconsistent
+                raise InternalRepresentation.Inconsistent
             if (lopen or ropen) and start == end:
-                raise Theory.Inconsistent
+                raise InternalRepresentation.Inconsistent
             self.lopen = lopen
             self.start = start
             self.end = end
@@ -94,10 +95,10 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
         self._current = dict()
 
     def __repr__(self):
-        return f'Theory({self._reference}, {self._current})'
+        return f'InternalRepresentation({self._reference}, {self._current})'
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.add`.
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
@@ -107,22 +108,22 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
                 rel = rel.complement()
             # We model p in ivl \ exc.
             if rel is Eq:
-                ivl = Theory._Interval(False, q, q, False)
+                ivl = InternalRepresentation._Interval(False, q, q, False)
                 exc = set()
             elif rel is Ne:
-                ivl = Theory._Interval(True, -oo, oo, True)
+                ivl = InternalRepresentation._Interval(True, -oo, oo, True)
                 exc = {q}
             elif rel is Ge:
-                ivl = Theory._Interval(False, q, oo, True)
+                ivl = InternalRepresentation._Interval(False, q, oo, True)
                 exc = set()
             elif rel is Le:
-                ivl = Theory._Interval(True, -oo, q, False)
+                ivl = InternalRepresentation._Interval(True, -oo, q, False)
                 exc = set()
             elif rel is Gt:
-                ivl = Theory._Interval(True, q, oo, True)
+                ivl = InternalRepresentation._Interval(True, q, oo, True)
                 exc = set()
             elif rel is Lt:
-                ivl = Theory._Interval(True, -oo, q, True)
+                ivl = InternalRepresentation._Interval(True, -oo, q, True)
                 exc = set()
             else:
                 assert False, rel
@@ -137,14 +138,14 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
                 # exc. We are going to use inf and sup in contrast to start and
                 # end, because ivl can be a FiniteSet.
                 if ivl.start in exc:
-                    # It follows that ivl is left-closed. Theory._Interval
+                    # It follows that ivl is left-closed. InternalRepresentation._Interval
                     # raises Inconsistent if ivl gets empty.
-                    ivl = Theory._Interval(True, ivl.start, ivl.end, ivl.ropen)
+                    ivl = InternalRepresentation._Interval(True, ivl.start, ivl.end, ivl.ropen)
                     exc = exc.difference({ivl.start})
                 if ivl.end in exc:
                     # It follows that ivl is right-closed. ivl cannot get emty
                     # here.
-                    ivl = Theory._Interval(ivl.lopen, ivl.start, ivl.end, True)
+                    ivl = InternalRepresentation._Interval(ivl.lopen, ivl.start, ivl.end, True)
                     exc = exc.difference(ivl.end)
             self._current[p] = (ivl, exc)
 
@@ -171,9 +172,9 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
-        >>> rel, p, q = Theory._decompose_atom(f); rel, p, q
+        >>> rel, p, q = InternalRepresentation._decompose_atom(f); rel, p, q
         (<class 'logic1.theories.RCF.atomic.Le'>, a^2 + 2*a*b + b^2, -1/2)
-        >>> g = Theory._compose_atom(rel, p, q); g
+        >>> g = InternalRepresentation._compose_atom(rel, p, q); g
         2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
         >>> (f.lhs.poly / g.lhs.poly)
         3
@@ -190,14 +191,14 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
         return f.op, p, Rational(q) / Rational(c)
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.extract`.
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
         L: list[AtomicFormula] = []
         for p in self._current:
             if p in self._reference:
                 ref_ivl, ref_exc = self._reference[p]
             else:
-                ref_ivl, ref_exc = Theory._Interval(True, -oo, oo, True), set()
+                ref_ivl, ref_exc = InternalRepresentation._Interval(True, -oo, oo, True), set()
             ivl, exc = self._current[p]
             # ivl cannot be empty because the construction of an empty interval
             # raises an Exception in `add`.
@@ -276,22 +277,22 @@ class Theory(abc.simplify.Theory[AtomicFormula, Term, Variable, int]):
         return L
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.next_`.
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.next_`.
         """
-        theory_next = self.__class__(self.prefer_weak, self.prefer_order)
+        result = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
-            theory_next._reference = self._current.copy()
+            result._reference = self._current.copy()
         else:
-            theory_next._reference = {p: q for p, q in self._current.items()
-                                      if remove not in p.vars()}
-        theory_next._current = theory_next._reference.copy()
-        return theory_next
+            result._reference = {p: q for p, q in self._current.items()
+                                 if remove not in p.vars()}
+        result._current = result._reference.copy()
+        return result
 
 
-class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]):
+class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, InternalRepresentation]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
-    abstract methods :meth:`create_initial_theory
-    <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
+    abstract methods :meth:`create_initial_representation
+    <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
     <.abc.simplify.Simplify.simpl_at>` of its super class
     :class:`.abc.simplify.Simplify`.
 
@@ -304,11 +305,11 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, Theory]
     prefer_order: bool = True
     prefer_weak: bool = False
 
-    def create_initial_theory(self) -> Theory:
+    def create_initial_representation(self) -> InternalRepresentation:
         """Implements the abstract method
-        :meth:`.abc.simplify.Simplify.create_initial_theory`.
+        :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        return Theory(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
+        return InternalRepresentation(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
 
     def simplify(self,
                  f: Formula,

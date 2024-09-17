@@ -1,8 +1,8 @@
 """
 This module implements *deep simplification* through the generation and
-propagation of internal theories during recursion. It is an adaptation of the
-*standard simplifier* from [DolzmannSturm-1997]_ tailored to the specific
-requirements of Sets.
+propagation of internal representations during recursion. It is an adaptation
+of the *standard simplifier* from [DolzmannSturm-1997]_ tailored to the
+specific requirements of Sets.
 """
 from __future__ import annotations
 
@@ -48,13 +48,15 @@ class UnionFind:
             yield Eq(self.find(y), y)
 
 
-class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
-    """Implements the abstract methods :meth:`add() <.abc.simplify.Theory.add>`,
-    :meth:`extract() <.abc.simplify.Theory.extract>`, and :meth:`next_()
-    <.abc.simplify.Theory.next_>` of it super class
-    :class:`.abc.simplify.Theory`. Required by
+class InternalRepresentation(
+        abc.simplify.InternalRepresentation[AtomicFormula, Variable, Variable, Never]):
+    """Implements the abstract methods
+    :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
+    :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and
+    :meth:`next_() <.abc.simplify.InternalRepresentation.next_>` of it super
+    class :class:`.abc.simplify.InternalRepresentation`. Required by
     :class:`.Sets.simplify.Simplify` for instantiating the type variable
-    :data:`.abc.simplify.θ` of :class:`.abc.simplify.Simplify`.
+    :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
     _ref_min_card: Index
     _ref_max_card: Index
@@ -77,13 +79,13 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
         self._cur_inequations = set()
 
     def __repr__(self) -> str:
-        return (f'Theory([{self._ref_min_card}..{self._ref_max_card}], '
+        return (f'InternalRepresentation([{self._ref_min_card}..{self._ref_max_card}], '
                 f'{self._ref_equations}, {self._ref_inequations} | '
                 f'[{self._cur_min_card}..{self._cur_max_card}], '
                 f'{self._cur_equations}, {self._cur_inequations})')
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.add`.
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
             if gand is Or:
@@ -94,12 +96,12 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                     if n > self._cur_min_card:
                         self._cur_min_card = n
                     if self._cur_min_card > self._cur_max_card:
-                        raise Theory.Inconsistent()
+                        raise InternalRepresentation.Inconsistent()
                 case C_(index=n):
                     if n - 1 < self._cur_max_card:
                         self._cur_max_card = n - 1
                     if self._cur_min_card > self._cur_max_card:
-                        raise Theory.Inconsistent()
+                        raise InternalRepresentation.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
                     self._cur_equations.union(lhs, rhs)
                 case Ne(lhs=lhs, rhs=rhs):
@@ -108,7 +110,7 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                     assert False
             for ne in self._cur_inequations:
                 if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
-                    raise Theory.Inconsistent()
+                    raise InternalRepresentation.Inconsistent()
 
             # Substitute into inequations
             inequations = set()
@@ -116,7 +118,7 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
                 ne_subs = ne.subs({ne.lhs: self._cur_equations.find(ne.lhs),
                                    ne.rhs: self._cur_equations.find(ne.rhs)})
                 if ne_subs.lhs == ne_subs.rhs:
-                    raise Theory.Inconsistent()
+                    raise InternalRepresentation.Inconsistent()
                 if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
                     inequations.add(ne_subs)
                 else:
@@ -124,7 +126,7 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
             self._cur_inequations = inequations
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
-        """Implements the abstract method :meth:`.abc.simplify.Theory.extract`.
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
         L: list[AtomicFormula] = []
         if self._cur_min_card > self._ref_min_card:
@@ -144,30 +146,31 @@ class Theory(abc.simplify.Theory[AtomicFormula, Variable, Variable, Never]):
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.next_`.
         """
-        theory_next = self.__class__()
-        theory_next._ref_min_card = self._cur_min_card
-        theory_next._ref_max_card = self._cur_max_card
+        result = self.__class__()
+        result._ref_min_card = self._cur_min_card
+        result._ref_max_card = self._cur_max_card
         if remove is None:
-            theory_next._ref_equations = self._cur_equations.copy()
-            theory_next._ref_inequations = self._cur_inequations.copy()
+            result._ref_equations = self._cur_equations.copy()
+            result._ref_inequations = self._cur_inequations.copy()
         else:
-            theory_next._ref_equations = UnionFind()
+            result._ref_equations = UnionFind()
             for eq in self._cur_equations.equations():
                 if remove not in eq.fvars():
-                    theory_next._ref_equations.union(eq.lhs, eq.rhs)
-            theory_next._ref_inequations = {ne for ne in self._cur_inequations
-                                            if remove not in ne.fvars()}
-        theory_next._cur_min_card = theory_next._ref_min_card
-        theory_next._cur_max_card = theory_next._ref_max_card
-        theory_next._cur_equations = theory_next._ref_equations.copy()
-        theory_next._cur_inequations = theory_next._ref_inequations.copy()
-        return theory_next
+                    result._ref_equations.union(eq.lhs, eq.rhs)
+            result._ref_inequations = {ne for ne in self._cur_inequations
+                                       if remove not in ne.fvars()}
+        result._cur_min_card = result._ref_min_card
+        result._cur_max_card = result._ref_max_card
+        result._cur_equations = result._ref_equations.copy()
+        result._cur_inequations = result._ref_inequations.copy()
+        return result
 
 
-class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, Theory]):
+class Simplify(
+        abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, InternalRepresentation]):
     """Deep simplification in the style of [DolzmannSturm-1997]_. Implements
-    the abstract methods :meth:`create_initial_theory
-    <.abc.simplify.Simplify.create_initial_theory>` and :meth:`simpl_at
+    the abstract methods :meth:`create_initial_representation
+    <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
     <.abc.simplify.Simplify.simpl_at>` of its super class
     :class:`.abc.simplify.Simplify`.
 
@@ -176,11 +179,11 @@ class Simplify(abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, T
     which should be called via :func:`.is_valid`, as described below.
     """
 
-    def create_initial_theory(self) -> Theory:
+    def create_initial_representation(self) -> InternalRepresentation:
         """Implements the abstract method
-        :meth:`.abc.simplify.Simplify.create_initial_theory`.
+        :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        return Theory()
+        return InternalRepresentation()
 
     def simpl_at(self,
                  atom: AtomicFormula,

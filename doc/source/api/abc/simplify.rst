@@ -13,7 +13,7 @@ Simplification
   corresponding sections of the various domains:
 
   * :ref:`Simplification in Real Closed Fields <api-RCF-simplify>`
-  * :ref:`Simplification in the theory of Sets <api-Sets-simplify>`
+  * :ref:`Simplification in the InternalRepresentation of Sets <api-Sets-simplify>`
 
 .. automodule:: logic1.abc.simplify
 
@@ -41,21 +41,21 @@ Simplification
     :value: TypeVar('σ')
     :canonical: logic1.abc.simplify.σ
 
-  Additionally, we introduce a type variable :data:`θ` for theories internally
-  used by the simplifier.
+  Additionally, we introduce a type variable :data:`ρ` for internal
+  representations used by the simplifier.
 
-  .. data:: θ
-    :value: TypeVar('θ', bound='Theory')
-    :canonical: logic1.abc.simplify.θ
+  .. data:: ρ
+    :value: TypeVar('ρ', bound='InternalRepresentation')
+    :canonical: logic1.abc.simplify.ρ
 
     A type variable denoting a type of variables with upper bound
-    :class:`logic1.abc.simplify.Theory`.
+    :class:`logic1.abc.simplify.InternalRepresentation`.
 
 
-  Theories
-  ********
+  Internal Representations
+  ************************
 
-  .. autoclass:: Theory
+  .. autoclass:: InternalRepresentation
     :members: add, extract, next_
     :special-members:
 

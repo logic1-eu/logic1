@@ -8,10 +8,10 @@ Simplification
 
 .. automodule:: logic1.theories.Sets.simplify
 
-  Theories
-  ********
+  Internal Representations
+  ************************
 
-  .. autoclass:: Theory
+  .. autoclass:: InternalRepresentation
     :special-members:
 
   Simplification and Validity
