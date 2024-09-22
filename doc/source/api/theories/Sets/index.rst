@@ -11,4 +11,5 @@ Sets
 
    atomic.rst
    simplify.rst
+   bnf.rst
    qe.rst

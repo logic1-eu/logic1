@@ -4,11 +4,16 @@
 References
 **********
 
+.. [BraytonEtAl-1984]
+  R. Brayton, G. Hatchel, C. McMullen, and A. Sangiovanni-Vincentelli, Logic
+  Minimization Algorithms for VLSI Synthesis, Kluwer Academic Publishers,
+  Boston, MA, 1984. `doi:10.1007/978-1-4613-2821-6
+  <https://doi.org/10.1007/978-1-4613-2821-6>`_
+
 .. [Burhenne-1990]
   Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
   Quantorenelimination für lineare reelle Probleme.
   Diploma Thesis, University of Passau, Germany, 1990
-
 
 .. [DolzmannSturm-1997]
   A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over

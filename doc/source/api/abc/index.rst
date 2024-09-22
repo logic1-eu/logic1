@@ -9,4 +9,5 @@ Abstract Base Classes
 .. toctree::
 
    simplify.rst
+   bnf.rst
    qe.rst

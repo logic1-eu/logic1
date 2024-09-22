@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.Sets import *
 
->>> a, b, c, d, o = VV.get('a', 'b', 'c', 'd', 'o')
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> dnf(T)
 T
@@ -12,17 +12,17 @@ F
 >>> dnf(And(T, T))
 T
 
->>> dnf(a == o)
-a == o
+>>> dnf(a == d)
+a == d
 
->>> dnf(Equivalent(a == o, b == o))
-Or(a == b, And(a != o, b != o))
+>>> dnf(Equivalent(a == d, b == d))
+Or(a == b, And(a != d, b != d))
 
->>> dnf(((a == o) | (b != o)) & ((a != o) | (b == o)))
-Or(a == b, And(a != o, b != o))
+>>> dnf(((a == d) | (b != d)) & ((a != d) | (b == d)))
+Or(a == b, And(a != d, b != d))
 
->>> dnf(((a != o) | (b == o)) & ((a == o) | (b == o)))
-Or(And(a == b, a == o), And(b == o, a != b))
+>>> dnf(((a != d) | (b == d)) & ((a == d) | (b == d)))
+Or(And(a == b, a == d), And(b == d, a != b))
 
 >>> cnf(T)
 T
@@ -33,8 +33,14 @@ F
 >>> cnf(And(T, T))
 T
 
->>> cnf(a == o)
-a == o
+>>> cnf(a == d)
+a == d
 
->>> cnf(Equivalent(a == o, b == o))
-And(Or(a == b, a != o), Or(a == b, b != o))
+>>> cnf(Equivalent(a == d, b == d))
+And(Or(a == b, a != d), Or(a == b, b != d))
+
+>>> cnf(((a == d) | (b != d)) & ((a != d) | (b == d)))
+And(Or(a == b, a != d), Or(a == b, b != d))
+
+>>> cnf(((a != d) | (b == d)) & ((a == d) | (b == d)))
+And(Or(a == b, a != d), Or(a == d, b == d))

@@ -4,11 +4,26 @@ from .simplify import simplify as _simplify
 from .typing import Formula
 
 
-class DisjunctiveNormalForm(abc.bnf.DisjunctiveNormalForm[AtomicFormula, Term, Variable, int]):
+class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, int]):
+    """Implements the abstract method :meth:`simplify
+    <.abc.bnf.BooleanNormalForm.simplify>` of its super class
+    :class:`.abc.bnf.BooleanNormalForm`. In addition, this class inherits
+    :meth:`cnf <.abc.bnf.BooleanNormalForm.cnf>` and :meth:`dnf
+    <.abc.bnf.BooleanNormalForm.dnf>`, which should be called via
+    :func:`.cnf` and :func:`.dnf` as described below, respectively.
+    """
 
     def simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method
+        :meth:`.abc.bnf.BooleanNormalForm.simplify`.
+        """
         return _simplify(f)
 
 
-dnf = DisjunctiveNormalForm()
-cnf = DisjunctiveNormalForm(dualize=True)
+cnf = BooleanNormalForm().cnf
+"""User interface for the computation of a conjunctive normal form.
+"""
+
+dnf = BooleanNormalForm().dnf
+"""User interface for the computation of a disjunctive normal form.
+"""

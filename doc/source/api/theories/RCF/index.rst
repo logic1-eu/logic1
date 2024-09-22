@@ -11,4 +11,5 @@ Real Closed Fields
 
    atomic.rst
    simplify.rst
+   bnf.rst
    qe.rst
