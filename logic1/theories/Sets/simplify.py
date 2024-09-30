@@ -111,23 +111,21 @@ class InternalRepresentation(
             for ne in self._cur_inequations:
                 if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-
-            # Substitute into inequations
-            inequations = set()
             for ne in self._cur_inequations:
-                ne_subs = ne.subs({ne.lhs: self._cur_equations.find(ne.lhs),
-                                   ne.rhs: self._cur_equations.find(ne.rhs)})
-                if ne_subs.lhs == ne_subs.rhs:
+                if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-                if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
-                    inequations.add(ne_subs)
-                else:
-                    inequations.add(Ne(ne_subs.rhs, ne_subs.lhs))
-            self._cur_inequations = inequations
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
+        def canonicalize(ne: Ne) -> Ne:
+            ne_subs = ne.subs({ne.lhs: self._cur_equations.find(ne.lhs),
+                               ne.rhs: self._cur_equations.find(ne.rhs)})
+            if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
+                return ne_subs
+            else:
+                return Ne(ne_subs.rhs, ne_subs.lhs)
+
         L: list[AtomicFormula] = []
         if self._cur_min_card > self._ref_min_card:
             L.append(C(self._cur_min_card))
@@ -136,8 +134,10 @@ class InternalRepresentation(
         for eq in self._cur_equations.equations():
             if self._ref_equations.find(eq.lhs) != self._ref_equations.find(eq.rhs):
                 L.append(eq)
+        canonical_ref_inequations = {canonicalize(ne) for ne in self._ref_inequations}
         for ne in self._cur_inequations:
-            if ne not in self._ref_inequations:
+            ne = canonicalize(ne)
+            if ne not in canonical_ref_inequations:
                 L.append(ne)
         if gand is Or:
             L = [atom.to_complement() for atom in L]

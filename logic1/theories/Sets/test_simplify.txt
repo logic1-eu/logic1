@@ -1,0 +1,7 @@
+>>> from logic1 import *
+>>> from logic1.theories.Sets import *
+
+>>> a, b, c, y, z = VV.get('a', 'b', 'c', 'y', 'z')
+
+>>> simplify(And(b != c, Or(y == z, And(a == b, b != c))))
+And(b != c, Or(a == b, y == z))
