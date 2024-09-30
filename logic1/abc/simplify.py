@@ -219,7 +219,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
             if new_atoms:
                 try:
-                    ir.add(gand, new_atoms)  # Can save resimp if th does not change
+                    ir.add(gand, new_atoms)  # Can save resimp if ir does not change
                 except ir.Inconsistent:
                     return gand.definite_element()
                 others = others.union(simplified_others)

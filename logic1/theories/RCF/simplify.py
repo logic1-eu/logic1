@@ -5,6 +5,7 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
 from functools import lru_cache
+from dataclasses import dataclass
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
@@ -29,26 +30,31 @@ class InternalRepresentation(
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
 
+    @dataclass
     class _Interval:
         # Non-empty real intervals. Raises Inconsistent when an empty interval
         # is created.
 
+        lopen: bool = True
+        start: Rational | MinusInfinity = -oo
+        end: Rational | PlusInfinity = oo
+        ropen: bool = True
+
         def __contains__(self, q: Rational) -> bool:
-            assert isinstance(q, Rational)
             if q < self.start or (self.lopen and q == self.start):
                 return False
             if self.end < q or (self.ropen and q == self.end):
                 return False
             return True
 
-        def __init__(self, lopen: bool = False, start: Rational | MinusInfinity = -oo,
-                     end: Rational | PlusInfinity = oo, ropen: bool = False) -> None:
+        def __init__(self, lopen: bool, start: Rational | MinusInfinity,
+                     end: Rational | PlusInfinity, ropen: bool) -> None:
             assert lopen or start is not -oo
             assert ropen or end is not oo
             if start > end:
-                raise InternalRepresentation.Inconsistent
+                raise InternalRepresentation.Inconsistent()
             if (lopen or ropen) and start == end:
-                raise InternalRepresentation.Inconsistent
+                raise InternalRepresentation.Inconsistent()
             self.lopen = lopen
             self.start = start
             self.end = end
@@ -78,6 +84,7 @@ class InternalRepresentation(
             return self.__class__(lopen, start, end, ropen)
 
         def is_point(self) -> bool:
+            # It is assumed and has been asserted that the interval is not empty.
             return self.start == self.end
 
         def __repr__(self):
@@ -103,10 +110,10 @@ class InternalRepresentation(
         for atom in atoms:
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
-            rel, p, q = self._decompose_atom(atom)
+            rel, t, q = self._decompose_atom(atom)
             if gand is Or:
                 rel = rel.complement()
-            # We model p in ivl \ exc.
+            # We model t in ivl \ exc.
             if rel is Eq:
                 ivl = InternalRepresentation._Interval(False, q, q, False)
                 exc = set()
@@ -127,8 +134,8 @@ class InternalRepresentation(
                 exc = set()
             else:
                 assert False, rel
-            if p in self._current:
-                cur_ivl, cur_exc = self._current[p]
+            if t in self._current:
+                cur_ivl, cur_exc = self._current[t]
                 ivl = ivl.intersection(cur_ivl)
                 exc = exc.union(cur_exc)
                 # Restrict exc to the new ivl.
@@ -141,21 +148,20 @@ class InternalRepresentation(
                     # It follows that ivl is left-closed. InternalRepresentation._Interval
                     # raises Inconsistent if ivl gets empty.
                     ivl = InternalRepresentation._Interval(True, ivl.start, ivl.end, ivl.ropen)
-                    exc = exc.difference({ivl.start})
+                    exc.remove(ivl.start)
                 if ivl.end in exc:
                     # It follows that ivl is right-closed. ivl cannot get emty
                     # here.
                     ivl = InternalRepresentation._Interval(ivl.lopen, ivl.start, ivl.end, True)
-                    exc = exc.difference(ivl.end)
-            self._current[p] = (ivl, exc)
+                    exc.remove(ivl.end)
+            self._current[t] = (ivl, exc)
 
     @staticmethod
     @lru_cache(maxsize=None)
-    def _compose_atom(rel: type[AtomicFormula], p: Term, q: Rational)\
-            -> AtomicFormula:
+    def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
-        return rel(den * p - num, 0)
+        return rel(den * t - num, 0)
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -194,18 +200,20 @@ class InternalRepresentation(
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
         L: list[AtomicFormula] = []
-        for p in self._current:
-            if p in self._reference:
-                ref_ivl, ref_exc = self._reference[p]
+        for t in self._current:
+            if t in self._reference:
+                ref_ivl, ref_exc = self._reference[t]
             else:
                 ref_ivl, ref_exc = InternalRepresentation._Interval(True, -oo, oo, True), set()
-            ivl, exc = self._current[p]
+            ivl, exc = self._current[t]
             # ivl cannot be empty because the construction of an empty interval
-            # raises an Exception in `add`.
+            # raises an Exception during `add`.
             if ivl.is_point():
                 if ref_ivl.is_point():
-                    assert ref_ivl.start == ivl.start, f'{ref_ivl} != {ivl}'
+                    assert ref_ivl.start == ivl.start
+                    # throw away the point ivl \ exc, which is equal to ref_ivl \ ref_exc
                 else:
+                    assert ivl.start in ref_ivl and ivl.start not in ref_exc
                     # Pick the one point of ivl.
                     q = ivl.start
                     # When gand is And, the equation q = 0 is generally
@@ -215,14 +223,14 @@ class InternalRepresentation(
                     if self.prefer_order and gand is Or:
                         if q == ref_ivl.start:
                             assert not ref_ivl.lopen
-                            L.append(self._compose_atom(Le, p, q))
+                            L.append(self._compose_atom(Le, t, q))
                         elif q == ref_ivl.end:
                             assert not ref_ivl.ropen
-                            L.append(self._compose_atom(Ge, p, q))
+                            L.append(self._compose_atom(Ge, t, q))
                         else:
-                            L.append(self._compose_atom(Eq, p, q))
+                            L.append(self._compose_atom(Eq, t, q))
                     else:
-                        L.append(self._compose_atom(Eq, p, q))
+                        L.append(self._compose_atom(Eq, t, q))
             else:
                 # We know that ref_ivl is a proper interval, too, because ivl
                 # is a subset of ref_ivl.
@@ -232,46 +240,50 @@ class InternalRepresentation(
                         # When gand is Or, weak and strong are dualized via
                         # subsequent negation.
                         if xor(self.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Ge, p, ivl.start))
+                            L.append(self._compose_atom(Ge, t, ivl.start))
                         else:
-                            L.append(self._compose_atom(Gt, p, ivl.start))
+                            L.append(self._compose_atom(Gt, t, ivl.start))
                     else:
                         if ivl.lopen:
-                            L.append(self._compose_atom(Gt, p, ivl.start))
+                            L.append(self._compose_atom(Gt, t, ivl.start))
                         else:
-                            L.append(self._compose_atom(Ge, p, ivl.start))
+                            L.append(self._compose_atom(Ge, t, ivl.start))
                 elif ref_ivl.start == ivl.start:
                     if not ref_ivl.lopen and ivl.lopen:
                         # When gand is Or, Ne will become Eq via subsequent
                         # nagation. This is generally preferable.
                         if self.prefer_order and gand is And:
-                            L.append(self._compose_atom(Gt, p, ivl.start))
+                            L.append(self._compose_atom(Gt, t, ivl.start))
                         else:
-                            L.append(self._compose_atom(Ne, p, ivl.start))
+                            L.append(self._compose_atom(Ne, t, ivl.start))
+                else:
+                    assert False
                 if ivl.end < ref_ivl.end:
                     if ivl.end in ref_exc:
                         # When gand is Or, weak and strong are dualized via
                         # subsequent negation.
                         if xor(self.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Le, p, ivl.end))
+                            L.append(self._compose_atom(Le, t, ivl.end))
                         else:
-                            L.append(self._compose_atom(Lt, p, ivl.end))
+                            L.append(self._compose_atom(Lt, t, ivl.end))
                     else:
                         if ivl.ropen:
-                            L.append(self._compose_atom(Lt, p, ivl.end))
+                            L.append(self._compose_atom(Lt, t, ivl.end))
                         else:
-                            L.append(self._compose_atom(Le, p, ivl.end))
+                            L.append(self._compose_atom(Le, t, ivl.end))
                 elif ref_ivl.end == ivl.end:
                     if not ref_ivl.ropen and ivl.ropen:
                         # When gand is Or, Ne will become Eq via subsequent
                         # nagation. This is generally preferable.
                         if self.prefer_order and gand is And:
-                            L.append(self._compose_atom(Lt, p, ivl.end))
+                            L.append(self._compose_atom(Lt, t, ivl.end))
                         else:
-                            L.append(self._compose_atom(Ne, p, ivl.end))
+                            L.append(self._compose_atom(Ne, t, ivl.end))
+                else:
+                    assert False
             for q in exc:
                 if q not in ref_exc:
-                    L.append(self._compose_atom(Ne, p, q))
+                    L.append(self._compose_atom(Ne, t, q))
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
