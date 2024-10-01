@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from enum import auto, Enum
+from fractions import Fraction
 import sage.all as sage  # type: ignore[import-untyped]
+from sage.all import QQ, Rational
 from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
     MPolynomial_libsingular as Polynomial)
 from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
     Polynomial_generic_dense as UnivariatePolynomial)
-from typing import Any, ClassVar, Final, Iterable, Iterator, Self
+from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
 
 from ... import firstorder
 from ...firstorder import _T, _F
@@ -315,6 +317,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return str(sage.latex(self.poly))
 
+    def as_variable(self) -> Variable:
+        if not self.poly.is_generator():
+            raise ValueError(f'{self} is not a variable')
+        return Variable(self.poly)
+
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified
         in the python dictionary `degrees`.
@@ -599,7 +606,7 @@ class Variable(Term, firstorder.Variable['Variable', int]):
         return self.VV.fresh(suffix=f'_{str(self)}')
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int]):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int | Fraction]):
 
     @property
     def lhs(self) -> Term:
@@ -757,11 +764,41 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
         return D[cls]
 
-    def subs(self, d: dict[Variable, Term | int]) -> Self:
-        """Simultaneous substitution of terms for variables. Implements the
-        abstract method :meth:`.firstorder.atomic.AtomicFormula.subs`.
+    def subs(self, sigma: Mapping[Variable, Term | int | Fraction]) -> Self:
+        """Simultaneous substitution of terms, integers, or fractions for
+        variables. The resulting left hand side term is generally a primitive
+        polynomial over the integers. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
-        return self.op(self.lhs.subs(d), self.rhs.subs(d))
+        sage_keywords: dict[str, Polynomial | Rational] = dict()
+        for variable, pseudo_term in sigma.items():
+            match pseudo_term:
+                case int():
+                    sage_keywords[str(variable)] = Rational(pseudo_term)
+                case Fraction(numerator=num, denominator=den):
+                    sage_keywords[str(variable)] = Rational(num) / Rational(den)
+                case Term(poly=poly):
+                    sage_keywords[str(variable)] = poly
+                case _:
+                    assert False, type(pseudo_term)
+        lhs = self.lhs.poly.change_ring(QQ).subs(**sage_keywords)
+        rhs = self.rhs.poly.change_ring(QQ).subs(**sage_keywords)
+        lhs -= rhs
+        # lhs is now a sage polynomial over QQ or Rational.
+        match lhs:
+            case Polynomial():
+                try:
+                    lhs = lhs / lhs.content()
+                except ZeroDivisionError:
+                    pass
+            case Rational():
+                lhs = lhs.numerator()
+            case _:
+                assert False, type(lhs)
+        lhs = polynomial_ring(lhs)
+        # The AtomicFormula constructor will call the Term constructor, which
+        # will in turn cast lhs, rhs to polynomial_ring.
+        return self.op(lhs, 0)
 
 
 class Eq(AtomicFormula):

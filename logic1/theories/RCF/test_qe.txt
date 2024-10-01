@@ -116,9 +116,9 @@ logic1.support.excepthook.NoTraceException: Failed - 2 failure nodes
 
 No degree violations with when turning traditional guards off:
 >>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE, traditional_guards=False).atoms())
-106
+83
 >>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL, traditional_guards=False).atoms())
-47
+40
 
 # 5 Generic quadratic polynomials
 >>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')
@@ -130,16 +130,16 @@ No degree violations with when turning traditional guards off:
 ...                          a4 * x**2 + b4 * x + c4 < 0,
 ...                          a5 * x**2 + b5 * x + c5 < 0))
 >>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.NONE).atoms())
-566
+563
 >>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.FULL).atoms())
-286
+283
 
 # Motzkin's Polynomial
 >>> mp = All(x, Implies(And(x >= 0, y >= 0), 1 + x * y * (x + y - 3) >= 0))
 >>> qe(mp, clustering=CLUSTERING.NONE)
-And(Or(y != 0, y^2 - 3*y >= 0), Or(y - 4 <= 0, y^2 - 4*y <= 0, y^2 - 3*y >= 0))
+Or(y - 4 <= 0, y^2 - 4*y <= 0, y^2 - 3*y >= 0)
 >>> qe(mp, clustering=CLUSTERING.FULL)
-And(Or(y != 0, y^2 - 3*y >= 0), Or(y <= 0, y - 3 >= 0, y - 1 == 0, y^2 - 4*y <= 0))
+Or(y <= 0, y - 3 >= 0, y - 1 == 0, y^2 - 4*y <= 0)
 >>> qe(mp.all(), clustering=CLUSTERING.NONE)
 T
 >>> qe(mp.all(), clustering=CLUSTERING.FULL)

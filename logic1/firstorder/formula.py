@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 import functools
-from typing import (Any, Callable, Final, Generic, Iterable, Iterator, Self, TypeVar)
+from typing import Any, Callable, Final, Generic, Iterable, Iterator, Self, TypeVar
 from typing_extensions import TypeIs
 
 from ..support.tracing import trace  # noqa

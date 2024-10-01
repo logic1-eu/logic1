@@ -4,6 +4,9 @@
 pytest:
 	pytest -n 8 --exitfirst --doctest-modules
 
+pytest-seq:
+	pytest --exitfirst --doctest-modules
+
 pytest-full:
 	pytest -n 8 --doctest-modules
 

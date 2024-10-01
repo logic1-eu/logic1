@@ -38,8 +38,11 @@ Ex(G0001_a, All(G0002_a, Or(a - b > 0, And(Or(a == 0, G0002_a - b <= 0),
 >>> VV.pop()
 
 # Test assumption
+>>> VV.push()
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 >>> simplify(Or(a > b, Equivalent(a == 0, Ex(a, a > b))), assume=[a == 0])
-Ex(G0003_a, Or(a - b > 0, G0003_a - b > 0))
+Ex(G0005_a, Or(b < 0, G0005_a - b > 0))
+>>> VV.pop()
 
 >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
 Ex(a, a - 5 > 0)

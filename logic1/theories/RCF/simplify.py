@@ -4,8 +4,9 @@ Closed fields. This is essentially the *standard simplifier*, which has been
 proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
-from functools import lru_cache
 from dataclasses import dataclass
+from fractions import Fraction
+from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
@@ -21,7 +22,7 @@ from ...support.tracing import trace  # noqa
 
 
 class InternalRepresentation(
-        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int]):
+        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int | Fraction]):
     """Implements the abstract methods :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
     :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and :meth:`next_()
     <.abc.simplify.InternalRepresentation.next_>` of it super class
@@ -92,8 +93,8 @@ class InternalRepresentation(
             right = ')' if self.ropen else ']'
             return f'{left}{self.start}, {self.end}{right}'
 
-    _reference: dict[Term, tuple[_Interval, set]]
-    _current: dict[Term, tuple[_Interval, set]]
+    _reference: dict[Term, tuple[_Interval, set[Rational]]]
+    _current: dict[Term, tuple[_Interval, set[Rational]]]
 
     def __init__(self, prefer_weak: bool, prefer_order: bool) -> None:
         self.prefer_weak = prefer_weak
@@ -107,7 +108,16 @@ class InternalRepresentation(
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
+        substitution = self._as_substitution()
         for atom in atoms:
+            atom = atom.subs(substitution)
+            if atom.lhs.is_constant():
+                if xor(bool(atom), gand is Or):
+                    continue
+                else:
+                    raise InternalRepresentation.Inconsistent()
+            if atom.lhs.lc() < 0:
+                atom = atom.op.converse()(-atom.lhs, 0)
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
             rel, t, q = self._decompose_atom(atom)
@@ -156,6 +166,24 @@ class InternalRepresentation(
                     exc.remove(ivl.end)
             self._current[t] = (ivl, exc)
 
+    def _as_substitution(self) -> dict[Variable, Fraction]:
+        """Return a substitution {v_1: q_1, ..., v_n: q_n} of rational numbers
+        for variables, which is derived from self._reference knowing that v_i
+        == q_i.
+        """
+        substitution = dict()
+        for t, (ivl, _) in self._reference.items():
+            try:
+                v = t.as_variable()
+            except ValueError:
+                continue
+            if not ivl.is_point():
+                continue
+            # ivl.start cannot be infinite
+            assert isinstance(ivl.start, Rational)
+            substitution[v] = Fraction(int(ivl.start.numerator()), int(ivl.start.denominator()))
+        return substitution
+
     @staticmethod
     @lru_cache(maxsize=None)
     def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
@@ -172,8 +200,7 @@ class InternalRepresentation(
         equivalent to :math:`p \rho q`.
 
         We assume that :data:`f` has gone through :meth:`_simpl_at` so that
-        its right hand side is zero and its left hand side polynomial has
-        gone through SymPy's :meth:`expand`.
+        its right hand side is zero.
 
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
@@ -301,7 +328,8 @@ class InternalRepresentation(
         return result
 
 
-class Simplify(abc.simplify.Simplify[AtomicFormula, Term, Variable, int, InternalRepresentation]):
+class Simplify(abc.simplify.Simplify[
+        AtomicFormula, Term, Variable, int | Fraction, InternalRepresentation]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
     abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at

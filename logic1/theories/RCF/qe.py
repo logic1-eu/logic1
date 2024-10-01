@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import auto, Enum
+from fractions import Fraction
 from typing import ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias
 from typing import reveal_type  # noqa
 
@@ -24,7 +25,7 @@ class Failed(Exception):
     pass
 
 
-class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
+class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int | Fraction]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Assumptions.simplify>` of its super class
     :class:`.abc.qe.Assumptions`. Required by :class:`.Node` and
@@ -835,7 +836,7 @@ class Options(abc.qe.Options):
 
 @dataclass
 class VirtualSubstitution(abc.qe.QuantifierElimination[
-        Node, Assumptions, list[str], Options, AtomicFormula, Term, Variable, int]):
+        Node, Assumptions, list[str], Options, AtomicFormula, Term, Variable, int | Fraction]):
     """Real quantifier elimination by virtual substitution.
 
     Implements the abstract methods
