@@ -13,7 +13,7 @@ jobs:
           sudo apt-get -y install graphviz
       - run: |
           source $CONDA/etc/profile.d/conda.sh
-          CFLAGS="-Wno-incompatible-pointer-types" conda env create -f environment.yaml
+          CFLAGS="-Wno-incompatible-pointer-types" conda env create -f logic1_minimal.yaml
           conda activate logic1_minimal
           conda env list
           conda list
