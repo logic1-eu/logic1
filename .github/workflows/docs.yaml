@@ -14,7 +14,7 @@ jobs:
       - run: |
           source $CONDA/etc/profile.d/conda.sh
           CFLAGS="-Wno-incompatible-pointer-types" conda env create -f logic1_dev.yaml
-          conda activate logic1_minimal
+          conda activate logic1_dev
           conda env list
           conda list
           export PYTHONPATH="$PYTHONPATH:$(pwd)"
