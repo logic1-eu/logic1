@@ -10,7 +10,7 @@ from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import Iterable, Optional, Self
+from typing import Final, Iterable, Optional, Self
 
 from ... import abc
 
@@ -19,6 +19,9 @@ from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Term, TSQ, Variable
 from .typing import Formula
 
 from ...support.tracing import trace  # noqa
+
+
+CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 class InternalRepresentation(
@@ -105,19 +108,11 @@ class InternalRepresentation(
     def __repr__(self):
         return f'InternalRepresentation({self._reference}, {self._current})'
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
-        substitution = self._as_substitution()
+        has_changed = False
         for atom in atoms:
-            atom = atom.subs(substitution)
-            if atom.lhs.is_constant():
-                if xor(bool(atom), gand is Or):
-                    continue
-                else:
-                    raise InternalRepresentation.Inconsistent()
-            if atom.lhs.lc() < 0:
-                atom = atom.op.converse()(-atom.lhs, 0)
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
             rel, t, q = self._decompose_atom(atom)
@@ -164,8 +159,12 @@ class InternalRepresentation(
                     # here.
                     ivl = InternalRepresentation._Interval(ivl.lopen, ivl.start, ivl.end, True)
                     exc.remove(ivl.end)
-            self._current[t] = (ivl, exc)
+            if self._current.get(t) != (ivl, exc):
+                self._current[t] = (ivl, exc)
+                has_changed = True
+        return has_changed
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def _as_substitution(self) -> dict[Variable, Fraction]:
         """Return a substitution {v_1: q_1, ..., v_n: q_n} of rational numbers
         for variables, which is derived from self._reference knowing that v_i
@@ -185,14 +184,14 @@ class InternalRepresentation(
         return substitution
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=CACHE_SIZE)
     def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
         num = q.numerator()
         den = q.denominator()
         return rel(den * t - num, 0)
 
     @staticmethod
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=CACHE_SIZE)
     def _decompose_atom(f: AtomicFormula)\
             -> tuple[type[AtomicFormula], Term, Rational]:
         r"""Decompose into relation :math:`\rho`, term :math:`p` without
@@ -345,11 +344,27 @@ class Simplify(abc.simplify.Simplify[
     prefer_order: bool = True
     prefer_weak: bool = False
 
-    def create_initial_representation(self) -> InternalRepresentation:
+    def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
+            -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        return InternalRepresentation(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
+        ir = InternalRepresentation(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
+        for atom in assume:
+            simplified_atom = self._simpl_at(atom, And, explode_always=False)
+            match simplified_atom:
+                case AtomicFormula():
+                    ir.add(And, [simplified_atom])
+                case And(args=args):
+                    assert all(isinstance(arg, AtomicFormula) for arg in args)
+                    ir.add(And, args)
+                case _T():
+                    continue
+                case _F():
+                    raise InternalRepresentation.Inconsistent()
+                case _:
+                    assert False, simplified_atom
+        return ir
 
     def simplify(self,
                  f: Formula,
@@ -461,9 +476,7 @@ class Simplify(abc.simplify.Simplify[
         self.prefer_weak = prefer_weak
         return super().simplify(f, assume)
 
-    def simpl_at(self,
-                 atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> Formula:
+    def simpl_at(self, atom: AtomicFormula, context: Optional[type[And] | type[Or]]) -> Formula:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.simpl_at`.
         """
@@ -471,7 +484,7 @@ class Simplify(abc.simplify.Simplify[
         # Hashable. https://github.com/python/mypy/issues/11470
         return self._simpl_at(atom, context, self.explode_always)  # type: ignore[arg-type]
 
-    @lru_cache(maxsize=None)
+    @lru_cache(maxsize=CACHE_SIZE)
     def _simpl_at(self,
                   atom: AtomicFormula,
                   context: Optional[type[And] | type[Or]],
@@ -597,6 +610,16 @@ class Simplify(abc.simplify.Simplify[
                 return Not(_simpl_at_ge(lhs, context)).to_nnf()
             case _:
                 assert False
+
+    def transform_atom(self, atom: AtomicFormula, ir: InternalRepresentation) -> AtomicFormula:
+        substitution = ir._as_substitution()
+        atom = atom.subs(substitution)
+        assert atom.rhs == 0
+        if atom.lhs.is_constant():
+            return Eq(0, 0) if bool(atom) else Eq(1, 0)
+        if atom.lhs.lc() < 0:
+            atom = atom.op.converse()(-atom.lhs, 0)
+        return atom
 
 
 simplify = Simplify().simplify

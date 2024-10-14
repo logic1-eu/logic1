@@ -5,13 +5,11 @@ simplifier*, which has been proposed for Ordered Fields in
 [DolzmannSturm-1997]_.
 """
 
-import more_itertools
-
 from abc import abstractmethod
-from typing import cast, Generic, Iterable, Optional, Self, TypeVar
+from typing import Generic, Iterable, Optional, Self, TypeVar
 
 from ..firstorder import (
-    All, And, AtomicFormula, Ex, _F, Formula, Or, _T, Term, Variable)
+    And, AtomicFormula, _F, Formula, Or, QuantifiedFormula, _T, Term, Variable)
 
 from ..support.tracing import trace  # noqa
 
@@ -47,7 +45,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         pass
 
     @abstractmethod
-    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> None:
+    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> bool:
         """Add *current* information originating from `atoms`.
         If `gand` is :class:`.And`, consider ``atoms``. If `gand` is
         :class:`.Or`, consider ``(Not(at) for at in atoms)``. This is where
@@ -83,7 +81,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
     """
 
     @abstractmethod
-    def create_initial_representation(self) -> ρ:
+    def create_initial_representation(self, assume: Iterable[α]) -> ρ:
         """Create a fresh instance of :class:`.ρ`.
         """
         ...
@@ -118,9 +116,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 return None
 
     @abstractmethod
-    def simpl_at(self,
-                 atom: α,
-                 context: Optional[type[And[α, τ, χ, σ]] | type[Or[α, τ, χ, σ]]]) \
+    def simpl_at(self, atom: α, context: Optional[type[And[α, τ, χ, σ]] | type[Or[α, τ, χ, σ]]]) \
             -> Formula[α, τ, χ, σ]:
         """Simplify the atomic formula `atom`. The `context` tells whether
         `atom` occurs within a conjunction or a disjunction. This can be taken
@@ -144,56 +140,45 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         :returns:
           A simplified equivalent of `f` modulo `assume`.
         """
-        ir = self.create_initial_representation()
         try:
-            ir.add(And, assume)
-        except ir.Inconsistent:
+            ir = self.create_initial_representation(assume)
+        except InternalRepresentation.Inconsistent:
             return _T()
-        ir = ir.next_()
-        f = f.to_pnf()
-        quantifiers = []
-        while isinstance(f, (Ex, All)):
-            ir = ir.next_(remove=f.var)
-            quantifiers.append((f.op, f.var))
-            f = f.arg
-        f = self._simpl_nnf(f, ir)
-        free_vars = set(f.fvars())
-        for Q, var in reversed(quantifiers):
-            if var in free_vars:
-                f = Q(var, f)
-        return f
+        f = f.to_nnf(to_positive=True)
+        return self._simpl_nnf(f, ir)
 
     def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
-        match f:
-            case And() | Or():
-                return self._simpl_and_or(f, ir)
-            case _F() | _T():
-                return f
-            case AtomicFormula():
-                # Build a trivial binary And in order to apply ir. Unary And
-                # does not exist.
-                return self._simpl_and_or(And(f, _T()), ir)
-            case _:
-                raise NotImplementedError(f'Simplify does not know {f.op!r}')
+        if Formula.is_atomic(f):
+            ir = ir.next_()
+            return self._simpl_atomic(f, ir)
+        if Formula.is_and(f) or Formula.is_or(f):
+            ir = ir.next_()
+            return self._simpl_and_or(f, ir)
+        if Formula.is_quantified_formula(f):
+            ir = ir.next_(remove=f.var)
+            return self._simpl_quantified(f, ir)
+        if Formula.is_true(f) or Formula.is_false(f):
+            return f
+        assert False, f
 
     def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         """
         `f` must be in negation normal form (NNF).
         """
-
-        def split(args: Iterable[Formula[α, τ, χ, σ]]) -> tuple[set[Formula[α, τ, χ, σ]], set[α]]:
-            """
-            Returns the set of non-atoms and an iterator of atoms contained in
-            :data:`args`, in that order.
-            """
-            i1, i2 = more_itertools.partition(Formula.is_atomic, args)
-            return set(i1), cast(set[α], set(i2))
-
         gand = f.op
-        others, atoms = split(f.args)
-        simplified_atoms = (self.simpl_at(atom, f.op) for atom in atoms)
-        new_others, atoms = split(simplified_atoms)
-        others = others.union(new_others)
+        atoms = set()
+        others = set()
+        for arg in f.args:
+            if Formula.is_atomic(arg):
+                arg = self.simpl_at(self.transform_atom(arg, ir), gand)
+            if isinstance(arg, gand.definite()):
+                return arg
+            if isinstance(arg, gand.neutral()):
+                continue
+            if Formula.is_atomic(arg):
+                atoms.add(arg)
+            else:
+                others.add(arg)
         try:
             ir.add(gand, atoms)
         except ir.Inconsistent:
@@ -201,29 +186,38 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         simplified_others: set[Formula[α, τ, χ, σ]] = set()
         while others:
             arg = others.pop()
-            simplified_arg = self._simpl_nnf(arg, ir.next_())
+            simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):
                 return simplified_arg
             elif isinstance(simplified_arg, gand.neutral()):
-                new_others = set()
-                new_atoms: Iterable[α] = ()
+                new_atoms: set[α] = set()
+                new_others: set[Formula[α, τ, χ, σ]] = set()
             elif isinstance(simplified_arg, gand):
-                new_others, new_atoms = split(simplified_arg.args)
-            elif Formula.is_atomic(simplified_arg):
+                new_atoms = set()
                 new_others = set()
-                new_atoms = (simplified_arg,)
-            elif isinstance(simplified_arg, gand.dual()):
-                new_others = {simplified_arg}
-                new_atoms = ()
+                for arg in simplified_arg.args:
+                    if Formula.is_atomic(arg):
+                        new_atoms.add(arg)
+                    else:
+                        new_others.add(arg)
+            elif Formula.is_atomic(simplified_arg):
+                new_atoms = {simplified_arg}
+                new_others = set()
             else:
-                raise NotImplementedError(f'unknown operator {simplified_arg.op} in {f}')
+                assert isinstance(simplified_arg, gand.dual()) \
+                    or Formula.is_quantified_formula(simplified_arg)
+                new_atoms = set()
+                new_others = {simplified_arg}
             if new_atoms:
                 try:
-                    ir.add(gand, new_atoms)  # Can save resimp if ir does not change
+                    has_changed = ir.add(gand, new_atoms)
                 except ir.Inconsistent:
                     return gand.definite_element()
-                others = others.union(simplified_others)
-                simplified_others = new_others
+                if has_changed:
+                    others = others.union(simplified_others)
+                    simplified_others = new_others  # subtle but correct
+                else:  # Save resimp if ir has not changed
+                    simplified_others = simplified_others.union(new_others)
             else:
                 simplified_others = simplified_others.union(new_others)
         final_atoms = list(ir.extract(gand))
@@ -231,3 +225,34 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         final_others = list(simplified_others)
         final_others.sort()
         return gand(*final_atoms, *final_others)
+
+    def _simpl_atomic(self, atom: α, ir: ρ) -> Formula[α, τ, χ, σ]:
+        # This method is called for toplevel atoms and for atoms whose context
+        # is a quantifier. Atoms with context And, Or are handled directly in
+        # _simpl_and_or. At the moment a quantifier context is treated the same
+        # way as a toplevel context.
+        f = self.simpl_at(atom, context=None)
+        if not Formula.is_atomic(f):
+            return self._simpl_nnf(f, ir)
+        try:
+            ir.add(And, [f])
+        except ir.Inconsistent:
+            return _F()
+        final_atoms = list(ir.extract(And))
+        match len(final_atoms):
+            case 0:
+                return _T()
+            case 1:
+                return final_atoms[0]
+            case _:
+                assert False, final_atoms
+
+    def _simpl_quantified(self, f: QuantifiedFormula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
+        """
+        `f` must be in negation normal form (NNF).
+        """
+        simplified_arg = self._simpl_nnf(f.arg, ir)
+        return f.op(f.var, simplified_arg)
+
+    def transform_atom(self, atom: α, ir: ρ) -> α:
+        return atom

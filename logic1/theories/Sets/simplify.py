@@ -11,7 +11,7 @@ from typing import Iterable, Iterator, Never, Optional, Self
 from ... import abc
 from dataclasses import dataclass, field
 
-from ...firstorder import And, Or
+from ...firstorder import And, _F, Or, _T
 from .atomic import AtomicFormula, C, C_, Eq, Index, Ne, oo, Variable
 from .typing import Formula
 
@@ -84,7 +84,7 @@ class InternalRepresentation(
                 f'[{self._cur_min_card}..{self._cur_max_card}], '
                 f'{self._cur_equations}, {self._cur_inequations})')
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> None:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
@@ -114,6 +114,7 @@ class InternalRepresentation(
             for ne in self._cur_inequations:
                 if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
+        return True
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
@@ -179,15 +180,26 @@ class Simplify(
     which should be called via :func:`.is_valid`, as described below.
     """
 
-    def create_initial_representation(self) -> InternalRepresentation:
+    def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
+            -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        return InternalRepresentation()
+        ir = InternalRepresentation()
+        for atom in assume:
+            simplified_atom = self.simpl_at(atom, And)
+            match simplified_atom:
+                case AtomicFormula():
+                    ir.add(And, [simplified_atom])
+                case _T():
+                    continue
+                case _F():
+                    raise ir.Inconsistent()
+                case _:
+                    assert False, simplified_atom
+        return ir
 
-    def simpl_at(self,
-                 atom: AtomicFormula,
-                 context: Optional[type[And] | type[Or]]) -> Formula:
+    def simpl_at(self, atom: AtomicFormula, context: Optional[type[And] | type[Or]]) -> Formula:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.simpl_at`.
         """
