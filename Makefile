@@ -10,6 +10,9 @@ pytest-seq:
 pytest-full:
 	pytest -n 8 --doctest-modules
 
+pytest-full-seq:
+	pytest --doctest-modules
+
 test-doc:
 	cd doc && make test
 

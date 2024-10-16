@@ -24,10 +24,10 @@ a == 0
 a != 0
 
 >>> simplify(And(a > b, Equivalent(a == 0, b > 0)))
-And(a - b > 0, Or(b <= 0, a == 0), Or(b > 0, a != 0))
+And(b <= 0, a != 0, a - b > 0)
 
 >>> simplify(Or(a > b, Equivalent(a == 0, b > 0)))
-Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a != 0)))
+Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a < 0)))
 
 # Test quantifiers
 >>> VV.push()

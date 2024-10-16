@@ -4,13 +4,12 @@ Closed fields. This is essentially the *standard simplifier*, which has been
 proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
-from dataclasses import dataclass
-from fractions import Fraction
+from dataclasses import dataclass, field
 from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
 from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
-from typing import Final, Iterable, Optional, Self
+from typing import Final, Iterable, Optional, Self, TypeAlias
 
 from ... import abc
 
@@ -24,8 +23,76 @@ from ...support.tracing import trace  # noqa
 CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
+@dataclass
+class _Interval:
+    # Non-empty real intervals. Raises Inconsistent when an empty interval
+    # is created.
+
+    lopen: bool = True
+    start: Rational | MinusInfinity = -oo
+    end: Rational | PlusInfinity = oo
+    ropen: bool = True
+
+    def __contains__(self, q: Rational) -> bool:
+        if q < self.start or (self.lopen and q == self.start):
+            return False
+        if self.end < q or (self.ropen and q == self.end):
+            return False
+        return True
+
+    def __init__(self, lopen: bool, start: Rational | MinusInfinity,
+                 end: Rational | PlusInfinity, ropen: bool) -> None:
+        assert lopen or start is not -oo, (lopen, start, end, ropen)
+        assert ropen or end is not oo
+        if start > end:
+            raise InternalRepresentation.Inconsistent()
+        if (lopen or ropen) and start == end:
+            raise InternalRepresentation.Inconsistent()
+        self.lopen = lopen
+        self.start = start
+        self.end = end
+        self.ropen = ropen
+
+    def intersection(self, other: Self) -> Self:
+        if self.start < other.start:
+            lopen = other.lopen
+            start = other.start
+        elif other.start < self.start:
+            lopen = self.lopen
+            start = self.start
+        else:
+            assert self.start == other.start
+            start = self.start
+            lopen = self.lopen or other.lopen
+        if self.end < other.end:
+            end = self.end
+            ropen = self.ropen
+        elif other.end < self.end:
+            end = other.end
+            ropen = other.ropen
+        else:
+            assert self.end == other.end
+            end = self.end
+            ropen = self.ropen or other.ropen
+        return self.__class__(lopen, start, end, ropen)
+
+    def is_point(self) -> bool:
+        # It is assumed and has been asserted that the interval is not empty.
+        return self.start == self.end
+
+    def __repr__(self):
+        left = '(' if self.lopen else '['
+        right = ')' if self.ropen else ']'
+        return f'{left}{self.start}, {self.end}{right}'
+
+
+Knowledge: TypeAlias = dict[Term, tuple[_Interval, set[Rational]]]
+Substitution: TypeAlias = dict[Variable, Rational]
+
+
+@dataclass
 class InternalRepresentation(
-        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int | Fraction]):
+        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int]):
     """Implements the abstract methods :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
     :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and :meth:`next_()
     <.abc.simplify.InternalRepresentation.next_>` of it super class
@@ -33,161 +100,109 @@ class InternalRepresentation(
     :class:`.Sets.simplify.Simplify` for instantiating the type variable
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
-
-    @dataclass
-    class _Interval:
-        # Non-empty real intervals. Raises Inconsistent when an empty interval
-        # is created.
-
-        lopen: bool = True
-        start: Rational | MinusInfinity = -oo
-        end: Rational | PlusInfinity = oo
-        ropen: bool = True
-
-        def __contains__(self, q: Rational) -> bool:
-            if q < self.start or (self.lopen and q == self.start):
-                return False
-            if self.end < q or (self.ropen and q == self.end):
-                return False
-            return True
-
-        def __init__(self, lopen: bool, start: Rational | MinusInfinity,
-                     end: Rational | PlusInfinity, ropen: bool) -> None:
-            assert lopen or start is not -oo
-            assert ropen or end is not oo
-            if start > end:
-                raise InternalRepresentation.Inconsistent()
-            if (lopen or ropen) and start == end:
-                raise InternalRepresentation.Inconsistent()
-            self.lopen = lopen
-            self.start = start
-            self.end = end
-            self.ropen = ropen
-
-        def intersection(self, other: Self) -> Self:
-            if self.start < other.start:
-                lopen = other.lopen
-                start = other.start
-            elif other.start < self.start:
-                lopen = self.lopen
-                start = self.start
-            else:
-                assert self.start == other.start
-                start = self.start
-                lopen = self.lopen or other.lopen
-            if self.end < other.end:
-                end = self.end
-                ropen = self.ropen
-            elif other.end < self.end:
-                end = other.end
-                ropen = other.ropen
-            else:
-                assert self.end == other.end
-                end = self.end
-                ropen = self.ropen or other.ropen
-            return self.__class__(lopen, start, end, ropen)
-
-        def is_point(self) -> bool:
-            # It is assumed and has been asserted that the interval is not empty.
-            return self.start == self.end
-
-        def __repr__(self):
-            left = '(' if self.lopen else '['
-            right = ')' if self.ropen else ']'
-            return f'{left}{self.start}, {self.end}{right}'
-
-    _reference: dict[Term, tuple[_Interval, set[Rational]]]
-    _current: dict[Term, tuple[_Interval, set[Rational]]]
-
-    def __init__(self, prefer_weak: bool, prefer_order: bool) -> None:
-        self.prefer_weak = prefer_weak
-        self.prefer_order = prefer_order
-        self._reference = dict()
-        self._current = dict()
-
-    def __repr__(self):
-        return f'InternalRepresentation({self._reference}, {self._current})'
+    prefer_weak: bool
+    prefer_order: bool
+    _ref_knowl: Knowledge = field(default_factory=dict)
+    _ref_subst: Substitution = field(default_factory=dict)
+    _cur_knowl: Knowledge = field(default_factory=dict)
+    _cur_subst: Substitution = field(default_factory=dict)
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
+        if gand is Or:
+            atoms = (atom.to_complement() for atom in atoms)
         has_changed = False
         for atom in atoms:
+            # print(f'{atom=}')
+            # print(f'{self=}')
+            # print()
+            atom = atom.subsq(self._cur_subst)
+            if atom.lhs.is_constant():
+                if bool(atom):
+                    continue
+                else:
+                    raise InternalRepresentation.Inconsistent()
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
             rel, t, q = self._decompose_atom(atom)
-            if gand is Or:
-                rel = rel.complement()
+            if t.lc() < 0:
+                rel = rel.converse()
+                t = -t
+                q = -q
             # We model t in ivl \ exc.
             if rel is Eq:
-                ivl = InternalRepresentation._Interval(False, q, q, False)
+                ivl = _Interval(False, q, q, False)
                 exc = set()
             elif rel is Ne:
-                ivl = InternalRepresentation._Interval(True, -oo, oo, True)
+                ivl = _Interval(True, -oo, oo, True)
                 exc = {q}
             elif rel is Ge:
-                ivl = InternalRepresentation._Interval(False, q, oo, True)
+                ivl = _Interval(False, q, oo, True)
                 exc = set()
             elif rel is Le:
-                ivl = InternalRepresentation._Interval(True, -oo, q, False)
+                ivl = _Interval(True, -oo, q, False)
                 exc = set()
             elif rel is Gt:
-                ivl = InternalRepresentation._Interval(True, q, oo, True)
+                ivl = _Interval(True, q, oo, True)
                 exc = set()
             elif rel is Lt:
-                ivl = InternalRepresentation._Interval(True, -oo, q, True)
+                ivl = _Interval(True, -oo, q, True)
                 exc = set()
             else:
                 assert False, rel
-            if t in self._current:
-                cur_ivl, cur_exc = self._current[t]
-                ivl = ivl.intersection(cur_ivl)
-                exc = exc.union(cur_exc)
-                # Restrict exc to the new ivl.
-                exc = {x for x in exc if x in ivl}
-                # Note that exc is a subset of ivl now. Fix the case that ivl
-                # is closed on either side and the corresponding endpoint is in
-                # exc. We are going to use inf and sup in contrast to start and
-                # end, because ivl can be a FiniteSet.
-                if ivl.start in exc:
-                    # It follows that ivl is left-closed. InternalRepresentation._Interval
-                    # raises Inconsistent if ivl gets empty.
-                    ivl = InternalRepresentation._Interval(True, ivl.start, ivl.end, ivl.ropen)
-                    exc.remove(ivl.start)
-                if ivl.end in exc:
-                    # It follows that ivl is right-closed. ivl cannot get emty
-                    # here.
-                    ivl = InternalRepresentation._Interval(ivl.lopen, ivl.start, ivl.end, True)
-                    exc.remove(ivl.end)
-            if self._current.get(t) != (ivl, exc):
-                self._current[t] = (ivl, exc)
+            t, ivl, exc = self.prune_item(self._cur_knowl, t, ivl, exc)
+            if self._cur_knowl.get(t) != (ivl, exc):
+                subst_value = self.as_subst_value(gand, t, ivl, exc)
+                if subst_value is not None:
+                    self._add_point(gand, t, subst_value)
+                else:
+                    self._cur_knowl[t] = (ivl, exc)
                 has_changed = True
         return has_changed
 
-    @lru_cache(maxsize=CACHE_SIZE)
-    def _as_substitution(self) -> dict[Variable, Fraction]:
-        """Return a substitution {v_1: q_1, ..., v_n: q_n} of rational numbers
-        for variables, which is derived from self._reference knowing that v_i
-        == q_i.
-        """
-        substitution = dict()
-        for t, (ivl, _) in self._reference.items():
-            try:
-                v = t.as_variable()
-            except ValueError:
-                continue
-            if not ivl.is_point():
-                continue
-            # ivl.start cannot be infinite
-            assert isinstance(ivl.start, Rational)
-            substitution[v] = Fraction(int(ivl.start.numerator()), int(ivl.start.denominator()))
-        return substitution
+    def _add_point(self, gand: type[And | Or], t: Term, q: Rational) -> None:
+        stack = [(t, q)]
+        while stack:
+            t, q = stack.pop()
+            v = t.as_variable()
+            if v in self._cur_subst:
+                if self._cur_subst[v] != q:
+                    raise InternalRepresentation.Inconsistent()
+                else:
+                    continue
+            else:
+                self._cur_subst[v] = q
+            cur_knowl: Knowledge = dict()
+            for t, (ivl, exc) in self._cur_knowl.items():
+                t, ivl, exc = self.fancy_subs(t, ivl, exc, {v: q})
+                if t.is_constant():
+                    t_as_rational = Rational(t.as_int())
+                    if t_as_rational in ivl and t_as_rational not in exc:
+                        continue
+                    else:
+                        raise InternalRepresentation.Inconsistent()
+                t, ivl, exc = self.prune_item(cur_knowl, t, ivl, exc)
+                subst_value = self.as_subst_value(gand, t, ivl, exc)
+                if subst_value is not None:
+                    stack.append((t, subst_value))
+                else:
+                    cur_knowl[t] = (ivl, exc)
+            self._cur_knowl = cur_knowl
+
+    @staticmethod
+    def as_subst_value(gand, t, ivl, exc) -> Optional[Rational]:
+        if not t.is_variable():
+            return None
+        if ivl.is_point() and not exc:
+            return ivl.start
+        return None
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
     def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
-        num = q.numerator()
-        den = q.denominator()
+        num = q.numer()
+        den = q.denom()
         return rel(den * t - num, 0)
 
     @staticmethod
@@ -220,18 +235,27 @@ class InternalRepresentation(
         # will not be divisible by c. This is relevant for the reconstruction
         # in _compose_atom to work. assert c == 1 or not q % c == 0,
         # f'{c} divides {q}'
-        return f.op, p, Rational(q) / Rational(c)
+        return f.op, p, Rational((q, c))
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
+        ref_knowl: Knowledge = dict()
+        for t, (ivl, exc) in self._ref_knowl.items():
+            t, ivl, exc = self.fancy_subs(t, ivl, exc, self._cur_subst)
+            t, ivl, exc = self.prune_item(ref_knowl, t, ivl, exc)
+            ref_knowl[t] = (ivl, exc)
+        # print(f'extract: {self._ref_knowl=}\n'
+        #       f'         {self._cur_knowl=}\n'
+        #       f'         {self._cur_subst=}\n'
+        #       f'         {ref_knowl=}')
         L: list[AtomicFormula] = []
-        for t in self._current:
-            if t in self._reference:
-                ref_ivl, ref_exc = self._reference[t]
+        for t in self._cur_knowl:
+            if t in ref_knowl:
+                ref_ivl, ref_exc = ref_knowl[t]
             else:
-                ref_ivl, ref_exc = InternalRepresentation._Interval(True, -oo, oo, True), set()
-            ivl, exc = self._current[t]
+                ref_ivl, ref_exc = _Interval(True, -oo, oo, True), set()
+            ivl, exc = self._cur_knowl[t]
             # ivl cannot be empty because the construction of an empty interval
             # raises an Exception during `add`.
             if ivl.is_point():
@@ -260,6 +284,7 @@ class InternalRepresentation(
             else:
                 # We know that ref_ivl is a proper interval, too, because ivl
                 # is a subset of ref_ivl.
+                # print(f'{t=}, {ref_ivl=}, {ivl=}')
                 assert not ref_ivl.is_point()
                 if ref_ivl.start < ivl.start:
                     if ivl.start in ref_exc:
@@ -283,7 +308,7 @@ class InternalRepresentation(
                         else:
                             L.append(self._compose_atom(Ne, t, ivl.start))
                 else:
-                    assert False
+                    assert False, (self, (t, ivl, exc))
                 if ivl.end < ref_ivl.end:
                     if ivl.end in ref_exc:
                         # When gand is Or, weak and strong are dualized via
@@ -310,25 +335,91 @@ class InternalRepresentation(
             for q in exc:
                 if q not in ref_exc:
                     L.append(self._compose_atom(Ne, t, q))
+        for v, q in self._cur_subst.items():
+            if v in self._ref_subst:
+                continue
+            cur_subst = {vv: qq for vv, qq in self._cur_subst.items() if vv != v}
+            ref_knowl = dict()
+            for t, (ivl, exc) in self._ref_knowl.items():
+                t, ivl, exc = self.fancy_subs(t, ivl, exc, cur_subst)
+                t, ivl, exc = self.prune_item(ref_knowl, t, ivl, exc)
+                ref_knowl[t] = (ivl, exc)
+            if self.prefer_order and gand is Or and v in ref_knowl:
+                ref_ivl, ref_exc = ref_knowl[v]
+                if q == ref_ivl.start:
+                    assert not ref_ivl.lopen
+                    L.append(self._compose_atom(Le, v, q))
+                elif q == ref_ivl.end:
+                    assert not ref_ivl.ropen
+                    L.append(self._compose_atom(Ge, v, q))
+                else:
+                    L.append(self._compose_atom(Eq, v, q))
+            else:
+                L.append(self._compose_atom(Eq, v, q))
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
+
+    @staticmethod
+    def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
+            -> tuple[Term, _Interval, set[Rational]]:
+        content, t = t._subsq_rat(subst)
+        if content == 0:
+            return t, ivl, exc
+        assert content > 0, (content, t)
+        if t.lc() >= 0:
+            ivl = _Interval(ivl.lopen, ivl.start / content, ivl.end / content, ivl.ropen)
+        else:
+            t = -t
+            content = -content
+            ivl = _Interval(ivl.ropen, ivl.end / content, ivl.start / content, ivl.lopen)
+        exc = {point / content for point in exc}
+        return t, ivl, exc
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.next_`.
         """
         result = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
-            result._reference = self._current.copy()
+            result._ref_knowl = self._cur_knowl.copy()
+            result._ref_subst = self._cur_subst.copy()
         else:
-            result._reference = {p: q for p, q in self._current.items()
+            result._ref_knowl = {p: q for p, q in self._cur_knowl.items()
                                  if remove not in p.vars()}
-        result._current = result._reference.copy()
+            result._ref_subst = {p: q for p, q in self._cur_subst.items()
+                                 if p != remove}
+        result._cur_knowl = result._ref_knowl.copy()
+        result._cur_subst = result._ref_subst.copy()
         return result
+
+    @staticmethod
+    def prune_item(knowl: Knowledge, t: Term, ivl: _Interval, exc: set[Rational]) \
+            -> tuple[Term, _Interval, set[Rational]]:
+        if t in knowl:
+            cur_ivl, cur_exc = knowl[t]
+            ivl = ivl.intersection(cur_ivl)
+            exc = exc.union(cur_exc)
+            # Restrict exc to the new ivl.
+            exc = {x for x in exc if x in ivl}
+            # Note that exc is a subset of ivl now. Fix the case that ivl
+            # is closed on either side and the corresponding endpoint is in
+            # exc. We are going to use inf and sup in contrast to start and
+            # end, because ivl can be a FiniteSet.
+            if ivl.start in exc:
+                # It follows that ivl is left-closed. _Interval
+                # raises Inconsistent if ivl gets empty.
+                ivl = _Interval(True, ivl.start, ivl.end, ivl.ropen)
+                exc.remove(ivl.start)
+            if ivl.end in exc:
+                # It follows that ivl is right-closed. ivl cannot get emty
+                # here.
+                ivl = _Interval(ivl.lopen, ivl.start, ivl.end, True)
+                exc.remove(ivl.end)
+        return t, ivl, exc
 
 
 class Simplify(abc.simplify.Simplify[
-        AtomicFormula, Term, Variable, int | Fraction, InternalRepresentation]):
+        AtomicFormula, Term, Variable, int, InternalRepresentation]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
     abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
@@ -599,11 +690,11 @@ class Simplify(abc.simplify.Simplify[
             case Ge():
                 return _simpl_at_ge(lhs, context)
             case Le():
-                return _simpl_at_ge(- lhs, context)
+                return _simpl_at_ge(-lhs, context)
             case Gt():
                 if context is not None:
                     context = context.dual()
-                return Not(_simpl_at_ge(- lhs, context)).to_nnf()
+                return Not(_simpl_at_ge(-lhs, context)).to_nnf()
             case Lt():
                 if context is not None:
                     context = context.dual()
@@ -612,8 +703,8 @@ class Simplify(abc.simplify.Simplify[
                 assert False
 
     def transform_atom(self, atom: AtomicFormula, ir: InternalRepresentation) -> AtomicFormula:
-        substitution = ir._as_substitution()
-        atom = atom.subs(substitution)
+        substitution = ir._cur_subst
+        atom = atom.subsq(substitution)
         assert atom.rhs == 0
         if atom.lhs.is_constant():
             return Eq(0, 0) if bool(atom) else Eq(1, 0)
