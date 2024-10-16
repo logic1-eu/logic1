@@ -209,7 +209,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
     def __ge__(self, other: Term | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
-            return Le(- lhs, 0)
+            return Le(-lhs, 0)
         return Ge(lhs, 0)
 
     def __gt__(self, other: Term | int) -> Gt | Lt:
@@ -219,7 +219,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
+        return hash(self.poly)
 
     def __init__(self, arg: Polynomial | sage.Integer | int | UnivariatePolynomial) -> None:
         match arg:
@@ -305,6 +305,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
+    def as_int(self) -> int:
+        if not self.is_constant():
+            raise ValueError(f'{self} is not constant')
+        return int(self.poly)
+
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
@@ -318,7 +323,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return str(sage.latex(self.poly))
 
     def as_variable(self) -> Variable:
-        if not self.poly.is_generator():
+        if not self.is_variable():
             raise ValueError(f'{self} is not a variable')
         return Variable(self.poly)
 
@@ -468,6 +473,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             return TSQ.WEAK
         return TSQ.STRICT
 
+    def is_variable(self) -> bool:
+        """Return :obj:`True` if this term is a variable.
+        """
+        return self.poly.is_generator()
+
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.
 
@@ -581,6 +591,41 @@ class Term(firstorder.Term['Term', 'Variable', int]):
                 case _:
                     assert False, (self, d)
         return Term(self.poly.subs(**sage_keywords))
+
+    def subs_fraction(self, sigma: Mapping[Variable, Term | int | Fraction]) \
+            -> tuple[Fraction, Term]:
+        """Simultaneous substitution of terms, integers, or fractions for
+        variables. The result (c, p) describes a polynomial q = c * p over Q.
+        c is the content of of q, and p is a polynomial over Z.
+        """
+        sage_keywords: dict[str, Polynomial | Rational] = dict()
+        for variable, pseudo_term in sigma.items():
+            match pseudo_term:
+                case int():
+                    sage_keywords[str(variable)] = Rational(pseudo_term)
+                case Fraction(numerator=num, denominator=den):
+                    sage_keywords[str(variable)] = Rational(num) / Rational(den)
+                case Term(poly=poly):
+                    sage_keywords[str(variable)] = poly
+                case _:
+                    assert False, type(pseudo_term)
+        poly = self.poly.change_ring(QQ).subs(**sage_keywords)
+        # poly is now a sage polynomial over QQ or Rational.
+        match poly:
+            case Polynomial():
+                c = poly.content()
+                content = Fraction(int(c.numerator()), int(c.denominator()))
+                try:
+                    poly = poly / c
+                except ZeroDivisionError:
+                    pass
+            case Rational():
+                poly = poly.numerator()
+                content = Fraction(1, int(poly.denominator()))
+            case _:
+                assert False, type(poly)
+        poly = polynomial_ring(poly)
+        return (content, Term(poly))
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements

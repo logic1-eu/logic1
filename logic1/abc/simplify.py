@@ -161,6 +161,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
             return f
         assert False, f
 
+    @trace()
     def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         """
         `f` must be in negation normal form (NNF).
