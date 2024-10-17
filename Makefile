@@ -1,5 +1,5 @@
 .PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
-		coverage coverage_html clean veryclean
+		coverage coverage_html clean veryclean conda-build
 
 pytest:
 	pytest -n 8 --exitfirst --doctest-modules
@@ -38,3 +38,10 @@ clean:
 
 veryclean:
 	rm -rf htmlcov .coverage
+
+conda-build:
+	LOGIC1_GIT_REPO="file:$$(pwd)" \
+	LOGIC1_GIT_REV="$$(git rev-parse HEAD)" \
+	LOGIC1_VERSION="$$(python -m setuptools_scm)" \
+	rattler-build build --recipe conda
+

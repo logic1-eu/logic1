@@ -1,0 +1,39 @@
+source:
+  git: ${{ env.get("LOGIC1_GIT_REPO") }}
+  rev: ${{ env.get("LOGIC1_GIT_REV") }}
+
+package:
+  name: logic1
+  version: ${{ env.get("LOGIC1_VERSION") }}
+
+build:
+  number: 0
+  noarch: python
+  script: python -m pip install . -vv --no-deps --no-build-isolation
+
+requirements:
+  host:
+    - python >=3.11,<3.12
+    - pip
+    - setuptools_scm
+  run:
+    - more-itertools
+    - pyeda
+    - sage
+    - typing-extensions
+
+tests:
+  - python:
+      imports:
+        - logic1
+      pip_check: false
+  - script:
+      - python -m doctest -o NORMALIZE_WHITESPACE logic1/theories/Sets/test_qe.txt
+    files:
+      source:
+        - logic1/theories/Sets/test_qe.txt
+
+about:
+  license: GPL-2.0-or-later
+  summary: Interpreted first-order logic in Python
+  homepage: https://docs.logic1.eu/
