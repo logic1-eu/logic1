@@ -24,6 +24,7 @@ dependencies:
   - pytest
   - pytest-xdist
   - sage
+  - setuptools_scm
   - snakeviz
   - sphinx
   - sphinx-book-theme

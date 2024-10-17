@@ -1,6 +1,6 @@
 [project]
 name = "logic1"
-version = "0.1.0"
+dynamic = ["version"] # See https://setuptools-scm.readthedocs.io/en/v8.1.0/usage/
 description = "Interpreted first-order logic in Python"
 authors = [
   {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
@@ -14,8 +14,6 @@ readme = "README.md"
 dependencies = [
   "more-itertools",
   "pyeda",
-  "sphinx",
-  "sphinx-book-theme",
 ]
 requires-python = ">=3.11,<3.12"
 classifiers = [
@@ -26,3 +24,12 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Typing :: Typed"
 ]
+
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["logic1*"]
+
+[tool.setuptools_scm]
