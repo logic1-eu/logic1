@@ -23,6 +23,7 @@ dependencies:
   - pyeda
   - pytest
   - pytest-xdist
+  - rattler-build
   - sage
   - setuptools_scm
   - snakeviz
