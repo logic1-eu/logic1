@@ -9,17 +9,24 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          sudo apt-get -y install graphviz
-      - run: |
-          source $CONDA/etc/profile.d/conda.sh
-          CFLAGS="-Wno-incompatible-pointer-types" conda env create -f logic1_dev.yaml
-          conda activate logic1_dev
-          conda env list
-          conda list
-          export PYTHONPATH="$PYTHONPATH:$(pwd)"
-          cd doc
-          make html
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          micromamba-version: '2.0.2-0'
+          environment-file: logic1_dev.yaml
+          init-shell: bash
+          cache-environment: true
+          post-cleanup: all
+          generate-run-shell: true
+
+      - name: Install Graphviz
+        run: sudo apt-get -y install graphviz
+
+      - name: Generate Documentation in HTML format
+        run: PYTHONPATH="$PYTHONPATH:$(pwd)" make html
+        shell: micromamba-shell {0}
+        working-directory: doc
+
       - uses: actions/upload-pages-artifact@v3
         with: { path: 'doc/build/html' }
 
