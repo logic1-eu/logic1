@@ -113,9 +113,19 @@ class InternalRepresentation(
         """
         has_changed = False
         for atom in atoms:
+            atom = atom.subs(self._cur_subst)
+            if atom.lhs.is_constant():
+                if xor(bool(atom), gand is Or):
+                    continue
+                else:
+                    raise InternalRepresentation.Inconsistent()
             # rel is the relation of atom, p is the parametric part, and q is
             # the negative of the Rational absolute summand.
             rel, t, q = self._decompose_atom(atom)
+            if t.lc() < 0:
+                rel = rel.converse()
+                t = -t
+                q = -q
             if gand is Or:
                 rel = rel.complement()
             # We model t in ivl \ exc.
@@ -139,69 +149,17 @@ class InternalRepresentation(
                 exc = set()
             else:
                 assert False, rel
-            if t in self._cur_knowl:
-                cur_ivl, cur_exc = self._cur_knowl[t]
-                ivl = ivl.intersection(cur_ivl)
-                exc = exc.union(cur_exc)
-                # Restrict exc to the new ivl.
-                exc = {x for x in exc if x in ivl}
-                # Note that exc is a subset of ivl now. Fix the case that ivl
-                # is closed on either side and the corresponding endpoint is in
-                # exc. We are going to use inf and sup in contrast to start and
-                # end, because ivl can be a FiniteSet.
-                if ivl.start in exc:
-                    # It follows that ivl is left-closed. _Interval
-                    # raises Inconsistent if ivl gets empty.
-                    ivl = _Interval(True, ivl.start, ivl.end, ivl.ropen)
-                    exc.remove(ivl.start)
-                if ivl.end in exc:
-                    # It follows that ivl is right-closed. ivl cannot get emty
-                    # here.
-                    ivl = _Interval(ivl.lopen, ivl.start, ivl.end, True)
-                    exc.remove(ivl.end)
+            t, ivl, exc = self.prune_item(self._cur_knowl, t, ivl, exc)
             if self._cur_knowl.get(t) != (ivl, exc):
-                if t.is_variable() and ivl.is_point() and not exc:
-                    self._add_point(t, ivl.start)
+                subst_value = self.as_subst_value(gand, t, ivl, exc)
+                if subst_value is not None:
+                    self._add_point(gand, t, subst_value)
                 else:
                     self._cur_knowl[t] = (ivl, exc)
                 has_changed = True
         return has_changed
 
-    def _add_point(self, t: Term, r: Rational) -> None:
-
-        def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
-                -> tuple[Term, _Interval, set[Rational]]:
-            content, t = t.subs_fraction(subst)
-            if content == 0:
-                return t, ivl, exc
-            assert content > 0, (content, t)
-            c = Rational(content.numerator) / Rational(content.denominator)
-            if t.lc() >= 0:
-                ivl = _Interval(ivl.lopen, ivl.start / c, ivl.end / c, ivl.ropen)
-            else:
-                t = -t
-                c = -c
-                ivl = _Interval(ivl.ropen, ivl.end / c, ivl.start / c, ivl.lopen)
-            exc = {point / c for point in exc}
-            return t, ivl, exc
-
-        def update_knowl(knowl: Knowledge, subst: Substitution) -> Knowledge:
-            # Mutably modifies stack.
-            result = dict()
-            for t, (ivl, exc) in knowl.items():
-                t, ivl, exc = fancy_subs(t, ivl, exc, subst)
-                if t.is_constant():
-                    t_as_rational = Rational(t.as_int())
-                    if t_as_rational in ivl and t_as_rational not in exc:
-                        continue
-                    else:
-                        raise InternalRepresentation.Inconsistent()
-                if t.is_variable() and ivl.is_point() and not exc:
-                    stack.append((t, ivl.start))
-                else:
-                    result[t] = (ivl, exc)
-            return result
-
+    def _add_point(self, gand: type[And | Or], t: Term, r: Rational) -> None:
         stack = [(t, r)]
         while stack:
             t, r = stack.pop()
@@ -214,8 +172,32 @@ class InternalRepresentation(
                     continue
             else:
                 self._cur_subst[v] = q
-            self._cur_knowl = update_knowl(self._cur_knowl, {v: q})
-            # self._ref_knowl = update_knowl(self._ref_knowl, {v: q})
+            cur_knowl = dict()
+            for t, (ivl, exc) in self._cur_knowl.items():
+                t, ivl, exc = self.fancy_subs(t, ivl, exc, {v: q})
+                if t.is_constant():
+                    t_as_rational = Rational(t.as_int())
+                    if t_as_rational in ivl and t_as_rational not in exc:
+                        continue
+                    else:
+                        raise InternalRepresentation.Inconsistent()
+                t, ivl, exc = self.prune_item(self._cur_knowl, t, ivl, exc)
+                subst_value = self.as_subst_value(gand, t, ivl, exc)
+                if subst_value is not None:
+                    stack.append((t, subst_value))
+                else:
+                    cur_knowl[t] = (ivl, exc)
+            self._cur_knowl = cur_knowl
+
+    @staticmethod
+    def as_subst_value(gand, t, ivl, exc) -> Optional[Rational]:
+        if not t.is_variable():
+            return None
+        if gand is And and ivl.is_point() and not exc:
+            return ivl.start
+        if gand is Or and ivl.start is -oo and ivl.end is oo and len(exc) == 1:
+            return next(iter(exc))
+        return None
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
@@ -259,10 +241,19 @@ class InternalRepresentation(
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
+        ref_knowl: Knowledge = dict()
+        for t, (ivl, exc) in self._ref_knowl.items():
+            t, ivl, exc = self.fancy_subs(t, ivl, exc, self._cur_subst)
+            t, ivl, exc = self.prune_item(ref_knowl, t, ivl, exc)
+            ref_knowl[t] = (ivl, exc)
+        print(f'extract: {self._ref_knowl=}\n'
+              f'         {self._cur_knowl=}\n'
+              f'         {self._cur_subst=}\n'
+              f'         {ref_knowl=}')
         L: list[AtomicFormula] = []
         for t in self._cur_knowl:
-            if t in self._ref_knowl:
-                ref_ivl, ref_exc = self._ref_knowl[t]
+            if t in ref_knowl:
+                ref_ivl, ref_exc = ref_knowl[t]
             else:
                 ref_ivl, ref_exc = _Interval(True, -oo, oo, True), set()
             ivl, exc = self._cur_knowl[t]
@@ -294,8 +285,8 @@ class InternalRepresentation(
             else:
                 # We know that ref_ivl is a proper interval, too, because ivl
                 # is a subset of ref_ivl.
+                print(f'{t=}, {ref_ivl=}, {ivl=}')
                 assert not ref_ivl.is_point()
-                print(f'{ref_ivl=}, {ivl=}')
                 if ref_ivl.start < ivl.start:
                     if ivl.start in ref_exc:
                         # When gand is Or, weak and strong are dualized via
@@ -318,7 +309,7 @@ class InternalRepresentation(
                         else:
                             L.append(self._compose_atom(Ne, t, ivl.start))
                 else:
-                    assert False
+                    assert False, (self, (t, ivl, exc))
                 if ivl.end < ref_ivl.end:
                     if ivl.end in ref_exc:
                         # When gand is Or, weak and strong are dualized via
@@ -349,8 +340,8 @@ class InternalRepresentation(
             r = Rational(q)
             if v in self._ref_subst:
                 continue
-            if self.prefer_order and gand is Or and v in self._ref_knowl:
-                ref_ivl, ref_exc = self._ref_knowl[v]
+            if self.prefer_order and gand is Or and v in ref_knowl:
+                ref_ivl, ref_exc = ref_knowl[v]
                 if r == ref_ivl.start:
                     assert not ref_ivl.lopen
                     L.append(self._compose_atom(Le, v, r))
@@ -364,6 +355,23 @@ class InternalRepresentation(
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
+
+    @staticmethod
+    def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
+            -> tuple[Term, _Interval, set[Rational]]:
+        content, t = t.subs_fraction(subst)
+        if content == 0:
+            return t, ivl, exc
+        assert content > 0, (content, t)
+        c = Rational(content.numerator) / Rational(content.denominator)
+        if t.lc() >= 0:
+            ivl = _Interval(ivl.lopen, ivl.start / c, ivl.end / c, ivl.ropen)
+        else:
+            t = -t
+            c = -c
+            ivl = _Interval(ivl.ropen, ivl.end / c, ivl.start / c, ivl.lopen)
+        exc = {point / c for point in exc}
+        return t, ivl, exc
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.next_`.
@@ -380,6 +388,31 @@ class InternalRepresentation(
         result._cur_knowl = result._ref_knowl.copy()
         result._cur_subst = result._ref_subst.copy()
         return result
+
+    @staticmethod
+    def prune_item(knowl: Knowledge, t: Term, ivl: _Interval, exc: set[Rational]) \
+            -> tuple[Term, _Interval, set[Rational]]:
+        if t in knowl:
+            cur_ivl, cur_exc = knowl[t]
+            ivl = ivl.intersection(cur_ivl)
+            exc = exc.union(cur_exc)
+            # Restrict exc to the new ivl.
+            exc = {x for x in exc if x in ivl}
+            # Note that exc is a subset of ivl now. Fix the case that ivl
+            # is closed on either side and the corresponding endpoint is in
+            # exc. We are going to use inf and sup in contrast to start and
+            # end, because ivl can be a FiniteSet.
+            if ivl.start in exc:
+                # It follows that ivl is left-closed. _Interval
+                # raises Inconsistent if ivl gets empty.
+                ivl = _Interval(True, ivl.start, ivl.end, ivl.ropen)
+                exc.remove(ivl.start)
+            if ivl.end in exc:
+                # It follows that ivl is right-closed. ivl cannot get emty
+                # here.
+                ivl = _Interval(ivl.lopen, ivl.start, ivl.end, True)
+                exc.remove(ivl.end)
+        return t, ivl, exc
 
 
 class Simplify(abc.simplify.Simplify[

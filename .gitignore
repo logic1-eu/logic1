@@ -21,3 +21,6 @@ dist
 
 # PyCharm
 .idea
+
+# rattler-build
+output

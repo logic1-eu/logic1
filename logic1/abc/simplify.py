@@ -128,6 +128,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         # Does not receive the internal representation, by design.
         ...
 
+    @trace()
     def simplify(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Formula[α, τ, χ, σ]:
         """Simplify `f` modulo `assume`.
 
@@ -147,6 +148,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         f = f.to_nnf(to_positive=True)
         return self._simpl_nnf(f, ir)
 
+    @trace()
     def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         if Formula.is_atomic(f):
             ir = ir.next_()
@@ -227,6 +229,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         final_others.sort()
         return gand(*final_atoms, *final_others)
 
+    @trace()
     def _simpl_atomic(self, atom: α, ir: ρ) -> Formula[α, τ, χ, σ]:
         # This method is called for toplevel atoms and for atoms whose context
         # is a quantifier. Atoms with context And, Or are handled directly in
