@@ -5,7 +5,6 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
 
 from dataclasses import dataclass, field
-from fractions import Fraction
 from functools import lru_cache
 from operator import xor
 from sage.all import oo, product, Rational  # type: ignore
@@ -88,12 +87,12 @@ class _Interval:
 
 
 Knowledge: TypeAlias = dict[Term, tuple[_Interval, set[Rational]]]
-Substitution: TypeAlias = dict[Variable, Fraction]
+Substitution: TypeAlias = dict[Variable, Rational]
 
 
 @dataclass
 class InternalRepresentation(
-        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int | Fraction]):
+        abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int]):
     """Implements the abstract methods :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
     :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and :meth:`next_()
     <.abc.simplify.InternalRepresentation.next_>` of it super class
@@ -111,9 +110,11 @@ class InternalRepresentation(
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
+        if gand is Or:
+            atoms = (atom.to_complement() for atom in atoms)
         has_changed = False
         for atom in atoms:
-            atom = atom.subs(self._cur_subst)
+            atom = atom.subsq(self._cur_subst)
             if atom.lhs.is_constant():
                 if xor(bool(atom), gand is Or):
                     continue
@@ -126,8 +127,6 @@ class InternalRepresentation(
                 rel = rel.converse()
                 t = -t
                 q = -q
-            if gand is Or:
-                rel = rel.complement()
             # We model t in ivl \ exc.
             if rel is Eq:
                 ivl = _Interval(False, q, q, False)
@@ -159,12 +158,11 @@ class InternalRepresentation(
                 has_changed = True
         return has_changed
 
-    def _add_point(self, gand: type[And | Or], t: Term, r: Rational) -> None:
-        stack = [(t, r)]
+    def _add_point(self, gand: type[And | Or], t: Term, q: Rational) -> None:
+        stack = [(t, q)]
         while stack:
-            t, r = stack.pop()
+            t, q = stack.pop()
             v = t.as_variable()
-            q = Fraction(int(r.numerator()), int(r.denominator()))
             if v in self._cur_subst:
                 if self._cur_subst[v] != q:
                     raise InternalRepresentation.Inconsistent()
@@ -202,8 +200,8 @@ class InternalRepresentation(
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
     def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
-        num = q.numerator()
-        den = q.denominator()
+        num = q.numer()
+        den = q.denom()
         return rel(den * t - num, 0)
 
     @staticmethod
@@ -236,7 +234,7 @@ class InternalRepresentation(
         # will not be divisible by c. This is relevant for the reconstruction
         # in _compose_atom to work. assert c == 1 or not q % c == 0,
         # f'{c} divides {q}'
-        return f.op, p, Rational(q) / Rational(c)
+        return f.op, p, Rational((q, c))
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
@@ -337,21 +335,20 @@ class InternalRepresentation(
                 if q not in ref_exc:
                     L.append(self._compose_atom(Ne, t, q))
         for v, q in self._cur_subst.items():
-            r = Rational(q)
             if v in self._ref_subst:
                 continue
             if self.prefer_order and gand is Or and v in ref_knowl:
                 ref_ivl, ref_exc = ref_knowl[v]
-                if r == ref_ivl.start:
+                if q == ref_ivl.start:
                     assert not ref_ivl.lopen
-                    L.append(self._compose_atom(Le, v, r))
-                elif r == ref_ivl.end:
+                    L.append(self._compose_atom(Le, v, q))
+                elif q == ref_ivl.end:
                     assert not ref_ivl.ropen
-                    L.append(self._compose_atom(Ge, v, r))
+                    L.append(self._compose_atom(Ge, v, q))
                 else:
-                    L.append(self._compose_atom(Eq, v, r))
+                    L.append(self._compose_atom(Eq, v, q))
             else:
-                L.append(self._compose_atom(Eq, v, r))
+                L.append(self._compose_atom(Eq, v, q))
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
@@ -359,18 +356,17 @@ class InternalRepresentation(
     @staticmethod
     def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
             -> tuple[Term, _Interval, set[Rational]]:
-        content, t = t.subs_fraction(subst)
+        content, t = t._subsq_rat(subst)
         if content == 0:
             return t, ivl, exc
         assert content > 0, (content, t)
-        c = Rational(content.numerator) / Rational(content.denominator)
         if t.lc() >= 0:
-            ivl = _Interval(ivl.lopen, ivl.start / c, ivl.end / c, ivl.ropen)
+            ivl = _Interval(ivl.lopen, ivl.start / content, ivl.end / content, ivl.ropen)
         else:
             t = -t
-            c = -c
-            ivl = _Interval(ivl.ropen, ivl.end / c, ivl.start / c, ivl.lopen)
-        exc = {point / c for point in exc}
+            content = -content
+            ivl = _Interval(ivl.ropen, ivl.end / content, ivl.start / content, ivl.lopen)
+        exc = {point / content for point in exc}
         return t, ivl, exc
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
@@ -416,7 +412,7 @@ class InternalRepresentation(
 
 
 class Simplify(abc.simplify.Simplify[
-        AtomicFormula, Term, Variable, int | Fraction, InternalRepresentation]):
+        AtomicFormula, Term, Variable, int, InternalRepresentation]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
     abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
@@ -701,7 +697,7 @@ class Simplify(abc.simplify.Simplify[
 
     def transform_atom(self, atom: AtomicFormula, ir: InternalRepresentation) -> AtomicFormula:
         substitution = ir._cur_subst
-        atom = atom.subs(substitution)
+        atom = atom.subsq(substitution)
         assert atom.rhs == 0
         if atom.lhs.is_constant():
             return Eq(0, 0) if bool(atom) else Eq(1, 0)
