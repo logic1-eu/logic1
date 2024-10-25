@@ -84,7 +84,7 @@ class InternalRepresentation(
                 f'[{self._cur_min_card}..{self._cur_max_card}], '
                 f'{self._cur_equations}, {self._cur_inequations})')
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
@@ -114,7 +114,7 @@ class InternalRepresentation(
             for ne in self._cur_inequations:
                 if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-        return True
+        return abc.simplify.Restart.OTHERS
 
     def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.

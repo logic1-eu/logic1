@@ -107,12 +107,12 @@ class InternalRepresentation(
     _cur_knowl: Knowledge = field(default_factory=dict)
     _cur_subst: Substitution = field(default_factory=dict)
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> bool:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         if gand is Or:
             atoms = (atom.to_complement() for atom in atoms)
-        has_changed = False
+        restart = abc.simplify.Restart.NONE
         for atom in atoms:
             # print(f'{atom=}')
             # print(f'{self=}')
@@ -156,10 +156,12 @@ class InternalRepresentation(
                 subst_value = self.as_subst_value(gand, t, ivl, exc)
                 if subst_value is not None:
                     self._add_point(gand, t, subst_value)
+                    restart = abc.simplify.Restart.ALL
                 else:
                     self._cur_knowl[t] = (ivl, exc)
-                has_changed = True
-        return has_changed
+                    if restart is not abc.simplify.Restart.ALL:
+                        restart = abc.simplify.Restart.OTHERS
+        return restart
 
     def _add_point(self, gand: type[And | Or], t: Term, q: Rational) -> None:
         stack = [(t, q)]

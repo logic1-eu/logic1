@@ -6,6 +6,7 @@ simplifier*, which has been proposed for Ordered Fields in
 """
 
 from abc import abstractmethod
+from enum import auto, Enum
 from typing import Generic, Iterable, Optional, Self, TypeVar
 
 from ..firstorder import (
@@ -23,6 +24,12 @@ from ..support.tracing import trace  # noqa
 σ = TypeVar('σ')
 
 ρ = TypeVar('ρ', bound='InternalRepresentation')
+
+
+class Restart(Enum):
+    NONE = auto()
+    OTHERS = auto()
+    ALL = auto()
 
 
 class InternalRepresentation(Generic[α, τ, χ, σ]):
@@ -45,7 +52,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         pass
 
     @abstractmethod
-    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> bool:
+    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> Restart:
         """Add *current* information originating from `atoms`.
         If `gand` is :class:`.And`, consider ``atoms``. If `gand` is
         :class:`.Or`, consider ``(Not(at) for at in atoms)``. This is where
@@ -210,14 +217,14 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 new_others = {simplified_arg}
             if new_atoms:
                 try:
-                    has_changed = ir.add(gand, new_atoms)
+                    restart = ir.add(gand, new_atoms)
                 except ir.Inconsistent:
                     return gand.definite_element()
-                if has_changed:
+                if restart is Restart.NONE:
+                    simplified_others = simplified_others.union(new_others)
+                else:  # Save resimp if ir has not changed
                     others = others.union(simplified_others)
                     simplified_others = new_others  # subtle but correct
-                else:  # Save resimp if ir has not changed
-                    simplified_others = simplified_others.union(new_others)
             else:
                 simplified_others = simplified_others.union(new_others)
         final_atoms = list(ir.extract(gand))
