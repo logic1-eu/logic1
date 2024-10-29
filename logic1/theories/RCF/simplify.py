@@ -161,6 +161,7 @@ class InternalRepresentation(
                     self._cur_knowl[t] = (ivl, exc)
                     if restart is not abc.simplify.Restart.ALL:
                         restart = abc.simplify.Restart.OTHERS
+            # print(f'{self=}')
         return restart
 
     def _add_point(self, gand: type[And | Or], t: Term, q: Rational) -> None:
@@ -365,17 +366,24 @@ class InternalRepresentation(
     @staticmethod
     def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
             -> tuple[Term, _Interval, set[Rational]]:
-        content, t = t._subsq_rat(subst)
-        if content == 0:
+        c, t = t._subsq_rat(subst)
+        if t.is_constant():
             return t, ivl, exc
-        assert content > 0, (content, t)
+        assert c > 0, (c, t)
+        constant_coefficient = t.constant_coefficient()
+        t -= constant_coefficient
+        content = t.content()
+        t /= content
+        c *= content
+        shift = Rational((constant_coefficient, content))
         if t.lc() >= 0:
-            ivl = _Interval(ivl.lopen, ivl.start / content, ivl.end / content, ivl.ropen)
+            ivl = _Interval(ivl.lopen, ivl.start / c - shift, ivl.end / c - shift, ivl.ropen)
         else:
             t = -t
-            content = -content
-            ivl = _Interval(ivl.ropen, ivl.end / content, ivl.start / content, ivl.lopen)
-        exc = {point / content for point in exc}
+            c = -c
+            shift = -shift
+            ivl = _Interval(ivl.ropen, ivl.end / c - shift, ivl.start / c - shift, ivl.lopen)
+        exc = {point / c - shift for point in exc}
         return t, ivl, exc
 
     def next_(self, remove: Optional[Variable] = None) -> Self:

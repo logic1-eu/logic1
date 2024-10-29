@@ -6,6 +6,7 @@ simplifier*, which has been proposed for Ordered Fields in
 """
 
 from abc import abstractmethod
+from collections import deque
 from enum import auto, Enum
 from typing import Generic, Iterable, Optional, Self, TypeVar
 
@@ -173,27 +174,14 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         `f` must be in negation normal form (NNF).
         """
         gand = f.op
-        atoms = set()
-        others = set()
-        for arg in f.args:
-            if Formula.is_atomic(arg):
-                arg = self.simpl_at(self.transform_atom(arg, ir), gand)
-            if isinstance(arg, gand.definite()):
-                return arg
-            if isinstance(arg, gand.neutral()):
-                continue
-            if Formula.is_atomic(arg):
-                atoms.add(arg)
-            else:
-                others.add(arg)
-        try:
-            ir.add(gand, atoms)
-        except ir.Inconsistent:
-            return gand.definite_element()
+        queue = deque(f.args)
         simplified_others: set[Formula[α, τ, χ, σ]] = set()
-        while others:
-            arg = others.pop()
-            simplified_arg = self._simpl_nnf(arg, ir)
+        while queue:
+            arg = queue.popleft()
+            if Formula.is_atomic(arg):
+                simplified_arg = self.simpl_at(self.transform_atom(arg, ir), gand)
+            else:
+                simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):
                 return simplified_arg
             elif isinstance(simplified_arg, gand.neutral()):
@@ -223,8 +211,12 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 if restart is Restart.NONE:
                     simplified_others = simplified_others.union(new_others)
                 else:  # Save resimp if ir has not changed
-                    others = others.union(simplified_others)
+                    for simplified_other in simplified_others:
+                        if simplified_other not in queue:
+                            queue.append(simplified_other)
                     simplified_others = new_others  # subtle but correct
+                    if restart is Restart.ALL:
+                        pass
             else:
                 simplified_others = simplified_others.union(new_others)
         final_atoms = list(ir.extract(gand))
