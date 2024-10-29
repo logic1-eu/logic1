@@ -4,3 +4,9 @@
 >>> VV.imp('u2')
 >>> simplify(u2**2 == 0)
 u2 == 0
+
+# derived from testseries3 in test_simplify_motor.txt
+>>> VV.imp('x', 'y')
+>>> simplify(And(y - 40 <= 0, Or(And(9*x + 400*y - 20050 <= 0, y - 40 == 0),
+...          And(9*x + 400*y - 20050 > 0, x - 450 == 0))))
+And(y - 40 == 0, x - 450 <= 0)

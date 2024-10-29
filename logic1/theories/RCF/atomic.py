@@ -209,7 +209,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
     def __ge__(self, other: Term | int) -> Ge | Le:
         lhs = self - (other if isinstance(other, Term) else Term(other))
         if lhs.lc() < 0:
-            return Le(- lhs, 0)
+            return Le(-lhs, 0)
         return Ge(lhs, 0)
 
     def __gt__(self, other: Term | int) -> Gt | Lt:
@@ -219,7 +219,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        return hash((tuple(str(cls) for cls in self.__class__.mro()), self.poly))
+        return hash(self.poly)
 
     def __init__(self, arg: Polynomial | sage.Integer | int | UnivariatePolynomial) -> None:
         match arg:
@@ -305,6 +305,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
+    def as_int(self) -> int:
+        if not self.is_constant():
+            raise ValueError(f'{self} is not constant')
+        return int(self.poly)
+
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
@@ -318,7 +323,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return str(sage.latex(self.poly))
 
     def as_variable(self) -> Variable:
-        if not self.poly.is_generator():
+        if not self.is_variable():
             raise ValueError(f'{self} is not a variable')
         return Variable(self.poly)
 
@@ -468,6 +473,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             return TSQ.WEAK
         return TSQ.STRICT
 
+    def is_variable(self) -> bool:
+        """Return :obj:`True` if this term is a variable.
+        """
+        return self.poly.is_generator()
+
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.
 
@@ -558,7 +568,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return term.poly
 
-    def subs(self, d: dict[Variable, Term | int]) -> Term:
+    def subs(self, d: Mapping[Variable, Term | int]) -> Term:
         """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import VV
@@ -581,6 +591,46 @@ class Term(firstorder.Term['Term', 'Variable', int]):
                 case _:
                     assert False, (self, d)
         return Term(self.poly.subs(**sage_keywords))
+
+    def subsq(self, sigma: dict[Variable, Term | int | Fraction | Rational]) \
+            -> tuple[Fraction, Term]:
+        content, term = self._subsq_rat(sigma)
+        content_as_fraction = Fraction(int(content.numer()), int(content.denom()))
+        return content_as_fraction, term
+
+    def _subsq_rat(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) \
+            -> tuple[Rational, Term]:
+        """Simultaneous substitution of terms, integers, or fractions for
+        variables. The result (c, p) describes a polynomial q = c * p over Q.
+        c is the content of of q, and p is a polynomial over Z.
+        """
+        sage_keywords: dict[str, Polynomial | Rational] = dict()
+        for variable, pseudo_term in sigma.items():
+            match pseudo_term:
+                case Term():
+                    sage_keywords[str(variable)] = pseudo_term.poly
+                case int() | Fraction():
+                    sage_keywords[str(variable)] = Rational(pseudo_term)
+                case Rational():
+                    sage_keywords[str(variable)] = pseudo_term
+                case _:
+                    assert False, type(pseudo_term)
+        poly = self.poly.change_ring(QQ).subs(**sage_keywords)
+        # poly is now a sage polynomial over QQ or a Rational.
+        match poly:
+            case Polynomial():
+                content = poly.content()
+                try:
+                    poly = poly / content
+                except ZeroDivisionError:
+                    pass
+            case Rational():
+                content = Rational((1, poly.denom()))
+                poly = poly.numer()
+            case _:
+                assert False, type(poly)
+        poly = polynomial_ring(poly)
+        return content, Term(poly)
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
@@ -606,7 +656,7 @@ class Variable(Term, firstorder.Variable['Variable', int]):
         return self.VV.fresh(suffix=f'_{str(self)}')
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int | Fraction]):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int]):
 
     @property
     def lhs(self) -> Term:
@@ -764,27 +814,35 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
         return D[cls]
 
-    def subs(self, sigma: Mapping[Variable, Term | int | Fraction]) -> Self:
+    def subs(self, sigma: Mapping[Variable, Term | int]) -> Self:
+        """Formal simultaneous term substitution into the two argument terms of
+        the atomic formula. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        """
+        return self.op(self.lhs.subs(sigma), self.rhs.subs(sigma))
+
+    def subsq(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) -> Self:
         """Simultaneous substitution of terms, integers, or fractions for
         variables. The resulting left hand side term is generally a primitive
-        polynomial over the integers. Implements the abstract method
-        :meth:`.firstorder.atomic.AtomicFormula.subs`.
+        polynomial over the integers, and the resulting right hand side is
+        zero. The result is equivalent to the result of formal term
+        substitution into the two argument terms of the atomic formula when
+        admitting rational coefficients.
         """
         sage_keywords: dict[str, Polynomial | Rational] = dict()
         for variable, pseudo_term in sigma.items():
             match pseudo_term:
-                case int():
-                    sage_keywords[str(variable)] = Rational(pseudo_term)
-                case Fraction(numerator=num, denominator=den):
-                    sage_keywords[str(variable)] = Rational(num) / Rational(den)
                 case Term(poly=poly):
                     sage_keywords[str(variable)] = poly
+                case int() | Fraction():
+                    sage_keywords[str(variable)] = Rational(pseudo_term)
+                case Rational():
+                    sage_keywords[str(variable)] = pseudo_term
                 case _:
                     assert False, type(pseudo_term)
+        lhs = self.lhs.poly - self.rhs.poly
         lhs = self.lhs.poly.change_ring(QQ).subs(**sage_keywords)
-        rhs = self.rhs.poly.change_ring(QQ).subs(**sage_keywords)
-        lhs -= rhs
-        # lhs is now a sage polynomial over QQ or Rational.
+        # lhs is either a sage polynomial over QQ or a Rational.
         match lhs:
             case Polynomial():
                 try:
@@ -796,8 +854,8 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             case _:
                 assert False, type(lhs)
         lhs = polynomial_ring(lhs)
-        # The AtomicFormula constructor will call the Term constructor, which
-        # will in turn cast lhs, rhs to polynomial_ring.
+        # The AtomicFormula constructor will call the Term constructor on lhs
+        # and rhs.
         return self.op(lhs, 0)
 
 

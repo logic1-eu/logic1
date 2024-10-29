@@ -20,30 +20,13 @@ of a triangle ABC. If O does not lie outside of ABC, then ∠ACB = ∠AOB/2.
 >>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.FULL), qe.assumptions
 (T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0])
 >>> qe(stu99_3_16, clustering=CLUSTERING.NONE, generic=GENERIC.MONOMIAL), qe.assumptions
-(And(Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0),
-     Or(u3 > 0, u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0)), [u3 != 0])
+(T, [u3 != 0])
 >>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.FULL), qe.assumptions
 (T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0])
 >>> qe(stu99_3_16, clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assumptions
-(And(Or(u3 < 0, u1 != 0, u2^2 - 3*u3^2 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 -
-u2^2 + u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2
-+ u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u3 < 0, u1 != 0, u1^2 - u2^2 - u3^2 == 0,
-u1^2 - u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 <
-0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u3 > 0,
-u1 != 0, u2^2 - 3*u3^2 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0,
-u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
-2*u2^2*u3^2 + u3^4 < 0), Or(u3 > 0, u1 != 0, u1^2 - u2^2 - u3^2 == 0, u1^2 -
-u2^2 + u3^2 != 0, u1^2 - u2^2 + 3*u3^2 != 0, u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4
-- 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0), Or(u1 != 0, u2^2 -
-3*u3^2 == 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 != 0, u1^2*u3 - u2^2*u3
-+ u3^3 < 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 + 2*u2^2*u3^2 + u3^4 < 0),
-Or(u1 != 0, u2^2 - 3*u3^2 == 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2 !=
-0, u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
-2*u2^2*u3^2 + u3^4 < 0), Or(u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2
-!= 0, u1^2*u3 - u2^2*u3 + u3^3 < 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
-2*u2^2*u3^2 + u3^4 < 0), Or(u1 != 0, u1^2 - u2^2 - u3^2 != 0, u1^2 - u2^2 + u3^2
-!= 0, u1^2*u3 - u2^2*u3 + u3^3 > 0, u1^4 - 2*u1^2*u2^2 + 2*u1^2*u3^2 + u2^4 +
-2*u2^2*u3^2 + u3^4 < 0)), [u3 != 0])
+(And(Or(u3 < 0, u1 != 0, u2^2 - 3*u3^2 != 0, u2^2*u3 - u3^3 > 0, And(u2 - u3 !=
+0, u2 + u3 != 0)), Or(u3 > 0, u1 != 0, u2^2 - 3*u3^2 != 0, u2^2*u3 - u3^3 < 0,
+And(u2 - u3 != 0, u2 + u3 != 0))), [u3 != 0])
 >>> qe(stu99_3_16, assume=[u1 != 0], clustering=CLUSTERING.FULL, generic=GENERIC.MONOMIAL), qe.assumptions
 (T, [u3 != 0, u1 != 0])
 >>> VV.pop()

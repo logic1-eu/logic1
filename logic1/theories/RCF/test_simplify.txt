@@ -24,24 +24,23 @@ a == 0
 a != 0
 
 >>> simplify(And(a > b, Equivalent(a == 0, b > 0)))
-And(a - b > 0, Or(b <= 0, a == 0), Or(b > 0, a != 0))
+And(b <= 0, a != 0, a - b > 0)
 
 >>> simplify(Or(a > b, Equivalent(a == 0, b > 0)))
-Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a != 0)))
+Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a < 0)))
 
 # Test quantifiers
 >>> VV.push()
 >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 >>> simplify(Or(a > b, Equivalent(a == 0, Ex(a, a > b))))
-Ex(G0001_a, All(G0002_a, Or(a - b > 0, And(Or(a == 0, G0002_a - b <= 0),
-    Or(a != 0, G0001_a - b > 0)))))
+Or(a - b > 0, And(Or(a == 0, All(a, a - b <= 0)), Or(a != 0, Ex(a, a - b > 0))))
 >>> VV.pop()
 
 # Test assumption
 >>> VV.push()
 >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 >>> simplify(Or(a > b, Equivalent(a == 0, Ex(a, a > b))), assume=[a == 0])
-Ex(G0005_a, Or(b < 0, G0005_a - b > 0))
+Or(b < 0, Ex(a, a - b > 0))
 >>> VV.pop()
 
 >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
