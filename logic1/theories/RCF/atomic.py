@@ -189,7 +189,8 @@ class Term(firstorder.Term['Term', 'Variable', int]):
 
     @poly.setter
     def poly(self, value: Polynomial):
-        self._poly = value
+        # self._poly = value  # old
+        self._poly = self.polynomial_ring(value)  # new
 
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
