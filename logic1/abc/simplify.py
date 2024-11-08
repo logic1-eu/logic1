@@ -5,8 +5,9 @@ simplifier*, which has been proposed for Ordered Fields in
 [DolzmannSturm-1997]_.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import deque
+from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Generic, Iterable, Optional, Self, TypeVar
 
@@ -25,6 +26,11 @@ from ..support.tracing import trace  # noqa
 σ = TypeVar('σ')
 
 ρ = TypeVar('ρ', bound='InternalRepresentation')
+
+ω = TypeVar('ω', bound='Options')
+"""A type variable denoting a options for
+:meth:`.Simplify.simplify` with upper bound :class:`.Options`.
+"""
 
 
 class Restart(Enum):
@@ -62,7 +68,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]]) -> Iterable[α]:
+    def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], ref: Self) -> Iterable[α]:
         """Comapare *current* and *reference* to identify and extract
         information that must be represented on the toplevel of the
         subformula currently under consideration. If `gand` is :class:`.And`,
@@ -79,13 +85,32 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         """
         ...
 
+    def transform_atom(self, atom: α) -> α:
+        return atom
 
-class Simplify(Generic[α, τ, χ, σ, ρ]):
+
+class Options(ABC):
+    """This class holds options that can be provided to
+    :meth:`.Simplify.simplify`. Theories subclassing
+    :class:`.Simplify` can add further options by subclassing
+    :class:`.Options`.
+
+    This is an upper bound for the type variable :data:`.ω`.
+    """
+    pass
+
+
+@dataclass(frozen=True)
+class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
     """Deep simplification following [DolzmannSturm-1997]_.
 
     .. seealso::
       Derived classes in various theories: :class:`.RCF.simplify.Simplify`,
       :class:`.Sets.simplify.Simplify`
+    """
+
+    _options: ω
+    """The options that have been passed to :meth:`.simplify`.
     """
 
     @abstractmethod
@@ -94,8 +119,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         """
         ...
 
-    def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
-            -> Optional[bool]:
+    def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Optional[bool]:
         """Simplification-based heuristic test for vailidity of a formula.
 
         .. admonition:: Mathematical definition
@@ -173,13 +197,15 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         """
         `f` must be in negation normal form (NNF).
         """
+        ref = ir
+        ir = ir.next_()
         gand = f.op
         queue = deque(f.args)
         simplified_others: set[Formula[α, τ, χ, σ]] = set()
         while queue:
             arg = queue.popleft()
             if Formula.is_atomic(arg):
-                simplified_arg = self.simpl_at(self.transform_atom(arg, ir), gand)
+                simplified_arg = self.simpl_at(ir.transform_atom(arg), gand)
             else:
                 simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):
@@ -219,7 +245,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                         pass
             else:
                 simplified_others = simplified_others.union(new_others)
-        final_atoms = list(ir.extract(gand))
+        final_atoms = list(ir.extract(gand, ref))
         final_atoms.sort()
         final_others = list(simplified_others)
         final_others.sort()
@@ -230,6 +256,8 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         # is a quantifier. Atoms with context And, Or are handled directly in
         # _simpl_and_or. At the moment a quantifier context is treated the same
         # way as a toplevel context.
+        ref = ir
+        ir = ir.next_()
         f = self.simpl_at(atom, context=None)
         if not Formula.is_atomic(f):
             return self._simpl_nnf(f, ir)
@@ -237,7 +265,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
             ir.add(And, [f])
         except ir.Inconsistent:
             return _F()
-        final_atoms = list(ir.extract(And))
+        final_atoms = list(ir.extract(And, ref))
         match len(final_atoms):
             case 0:
                 return _T()
@@ -252,6 +280,3 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         """
         simplified_arg = self._simpl_nnf(f.arg, ir)
         return f.op(f.var, simplified_arg)
-
-    def transform_atom(self, atom: α, ir: ρ) -> α:
-        return atom

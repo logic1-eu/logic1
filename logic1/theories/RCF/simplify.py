@@ -24,26 +24,31 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 @dataclass
-class _Interval:
-    # Non-empty real intervals. Raises Inconsistent when an empty interval
-    # is created.
+class _Range:
+    r"""Non-empty range IVL \ EXC, where IVL is an interval with boundaries in
+    QQ, -oo, oo, and EXC is is created. A finite subset of the interior of
+    IVL. Raises InternalRepresentation.Inconsistent if IVL \ EXC gets empty.
+    """
 
     lopen: bool = True
     start: Rational | MinusInfinity = -oo
     end: Rational | PlusInfinity = oo
     ropen: bool = True
+    exc: set[Rational] = field(default_factory=set)
 
     def __contains__(self, q: Rational) -> bool:
         if q < self.start or (self.lopen and q == self.start):
             return False
         if self.end < q or (self.ropen and q == self.end):
             return False
+        if q in self.exc:
+            return False
         return True
 
     def __init__(self, lopen: bool, start: Rational | MinusInfinity,
-                 end: Rational | PlusInfinity, ropen: bool) -> None:
-        assert lopen or start is not -oo, (lopen, start, end, ropen)
-        assert ropen or end is not oo
+                 end: Rational | PlusInfinity, ropen: bool, exc: set[Rational]) -> None:
+        assert lopen or start is not -oo, (lopen, start, end, ropen, exc)
+        assert ropen or end is not oo, (lopen, start, end, ropen, exc)
         if start > end:
             raise InternalRepresentation.Inconsistent()
         if (lopen or ropen) and start == end:
@@ -52,6 +57,8 @@ class _Interval:
         self.start = start
         self.end = end
         self.ropen = ropen
+        assert all(start < x < end for x in exc)
+        self.exc = exc
 
     def intersection(self, other: Self) -> Self:
         if self.start < other.start:
@@ -74,7 +81,20 @@ class _Interval:
             assert self.end == other.end
             end = self.end
             ropen = self.ropen or other.ropen
-        return self.__class__(lopen, start, end, ropen)
+        # Fix the case that ivl is closed on either side and the corresponding
+        # endpoint is in self.exc or other.exc
+        if start in self.exc or start in other.exc:
+            lopen = True
+        if end in self.exc or end in other.exc:
+            ropen = True
+        exc = set()
+        for x in self.exc:
+            if start < x < end:
+                exc.add(x)
+        for x in other.exc:
+            if start < x < end:
+                exc.add(x)
+        return self.__class__(lopen, start, end, ropen, exc)
 
     def is_point(self) -> bool:
         # It is assumed and has been asserted that the interval is not empty.
@@ -83,11 +103,123 @@ class _Interval:
     def __repr__(self):
         left = '(' if self.lopen else '['
         right = ')' if self.ropen else ']'
-        return f'{left}{self.start}, {self.end}{right}'
+        return f'{left}{self.start}, {self.end}{right} \\ {self.exc}'
+
+    def transform(self, scale: Rational, shift: Rational) -> Self:
+        if scale >= 0:
+            lopen = self.lopen
+            start = scale * self.start + shift
+            end = scale * self.end + shift
+            ropen = self.ropen
+        else:
+            lopen = self.ropen
+            start = scale * self.end + shift
+            end = scale * self.start + shift
+            ropen = self.lopen
+        exc = {scale * point + shift for point in self.exc}
+        return self.__class__(lopen, start, end, ropen, exc)
 
 
-Knowledge: TypeAlias = dict[Term, tuple[_Interval, set[Rational]]]
+Knowledge: TypeAlias = dict[Term, _Range]
 Substitution: TypeAlias = dict[Variable, Rational]
+
+
+@dataclass
+class _BasicKnowledge:
+
+    term: Term
+    range: _Range
+
+    def as_subst_value(self) -> Rational:
+        assert self.is_substitution()
+        return self.range.start
+
+    def is_substitution(self) -> bool:
+        return self.term.is_variable() and self.range.is_point()
+
+    def prune(self, knowl: Knowledge) -> Self:
+        try:
+            range_ = knowl[self.term]
+        except KeyError:
+            return self
+        range_ = range_.intersection(self.range)
+        return self.__class__(self.term, range_)
+
+    def subs(self, subst: Substitution) -> Self:
+        c, t = self.term._subsq_rat(subst)
+        if t.is_constant():
+            return self.__class__(t, self.range)
+        assert c > 0, (c, t)
+        constant_coefficient = t.constant_coefficient()
+        t -= constant_coefficient
+        content = t.content()
+        t /= content
+        c *= content
+        shift = Rational((constant_coefficient, content))
+        if t.lc() < 0:
+            t = -t
+            c = -c
+            shift = -shift
+        range_ = self.range.transform(1 / c, -shift)
+        return self.__class__(t, range_)
+
+    @classmethod
+    @lru_cache(maxsize=CACHE_SIZE)
+    def from_atom(cls, f: AtomicFormula) -> Self:
+        r"""Convert AtomicFormula into _BasicKnowledge.
+
+        We assume that :data:`f` has gone through :meth:`_simpl_at` so that
+        its right hand side is zero.
+
+        >>> from .atomic import VV
+        >>> a, b = VV.get('a', 'b')
+        >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
+        >>> bknowl = _BasicKnowledge.from_atom(f); bknowl
+        _BasicKnowledge(term=a^2 + 2*a*b + b^2, range=(-Infinity, -1/2] \ set())
+        >>> g = InternalRepresentation._compose_atom(f.op, bknowl.term, bknowl.range.end); g
+        2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
+        >>> (f.lhs.poly / g.lhs.poly)
+        3
+        """
+        rel = f.op
+        lhs = f.lhs
+        q = -lhs.constant_coefficient()
+        p = lhs + q
+        c = p.content()
+        p /= c
+        # Given that _simpl_at has produced a primitive polynomial, q != 0
+        # will not be divisible by c. This is relevant for the reconstruction
+        # in _compose_atom to work.
+        assert c == 1 or not q % c == 0, f'{c} divides {q}'
+        r = Rational((q, c))
+        if p.lc() < 0:
+            rel = rel.converse()
+            p = -p
+            r = -r
+        # rel is the relation of atom, p is the parametric part, and r is
+        # the negative of the Rational absolute summand.
+        if rel is Eq:
+            range_ = _Range(False, r, r, False, set())
+        elif rel is Ne:
+            range_ = _Range(True, -oo, oo, True, {r})
+        elif rel is Ge:
+            range_ = _Range(False, r, oo, True, set())
+        elif rel is Le:
+            range_ = _Range(True, -oo, r, False, set())
+        elif rel is Gt:
+            range_ = _Range(True, r, oo, True, set())
+        elif rel is Lt:
+            range_ = _Range(True, -oo, r, True, set())
+        else:
+            assert False, rel
+        return cls(p, range_)
+
+
+@dataclass(frozen=True)
+class Options(abc.simplify.Options):
+    explode_always: bool = True
+    prefer_order: bool = True
+    prefer_weak: bool = False
 
 
 @dataclass
@@ -100,12 +232,9 @@ class InternalRepresentation(
     :class:`.Sets.simplify.Simplify` for instantiating the type variable
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
-    prefer_weak: bool
-    prefer_order: bool
-    _ref_knowl: Knowledge = field(default_factory=dict)
-    _ref_subst: Substitution = field(default_factory=dict)
-    _cur_knowl: Knowledge = field(default_factory=dict)
-    _cur_subst: Substitution = field(default_factory=dict)
+    _options: Options
+    _knowl: Knowledge = field(default_factory=dict)
+    _subst: Substitution = field(default_factory=dict)
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
@@ -117,89 +246,54 @@ class InternalRepresentation(
             # print(f'{atom=}')
             # print(f'{self=}')
             # print()
-            atom = atom.subsq(self._cur_subst)
+            atom = atom.subsq(self._subst)
             if atom.lhs.is_constant():
                 if bool(atom):
                     continue
                 else:
                     raise InternalRepresentation.Inconsistent()
-            # rel is the relation of atom, p is the parametric part, and q is
-            # the negative of the Rational absolute summand.
-            rel, t, q = self._decompose_atom(atom)
-            if t.lc() < 0:
-                rel = rel.converse()
-                t = -t
-                q = -q
-            # We model t in ivl \ exc.
-            if rel is Eq:
-                ivl = _Interval(False, q, q, False)
-                exc = set()
-            elif rel is Ne:
-                ivl = _Interval(True, -oo, oo, True)
-                exc = {q}
-            elif rel is Ge:
-                ivl = _Interval(False, q, oo, True)
-                exc = set()
-            elif rel is Le:
-                ivl = _Interval(True, -oo, q, False)
-                exc = set()
-            elif rel is Gt:
-                ivl = _Interval(True, q, oo, True)
-                exc = set()
-            elif rel is Lt:
-                ivl = _Interval(True, -oo, q, True)
-                exc = set()
-            else:
-                assert False, rel
-            t, ivl, exc = self.prune_item(self._cur_knowl, t, ivl, exc)
-            if self._cur_knowl.get(t) != (ivl, exc):
-                subst_value = self.as_subst_value(gand, t, ivl, exc)
-                if subst_value is not None:
-                    self._add_point(gand, t, subst_value)
+            bknowl = _BasicKnowledge.from_atom(atom).prune(self._knowl)
+            if self._knowl.get(bknowl.term) != bknowl.range:
+                if bknowl.is_substitution():
+                    self._add_point(bknowl)
                     restart = abc.simplify.Restart.ALL
                 else:
-                    self._cur_knowl[t] = (ivl, exc)
+                    self._knowl[bknowl.term] = bknowl.range
                     if restart is not abc.simplify.Restart.ALL:
                         restart = abc.simplify.Restart.OTHERS
             # print(f'{self=}')
         return restart
 
-    def _add_point(self, gand: type[And | Or], t: Term, q: Rational) -> None:
+    def _add_point(self, bknowl: _BasicKnowledge) -> None:
+        # print(f'_add_point: {self=}, {bknowl=}')
+        t = bknowl.term
+        q = bknowl.as_subst_value()
         stack = [(t, q)]
         while stack:
             t, q = stack.pop()
             v = t.as_variable()
-            if v in self._cur_subst:
-                if self._cur_subst[v] != q:
+            if v in self._subst:
+                if self._subst[v] != q:
                     raise InternalRepresentation.Inconsistent()
                 else:
                     continue
             else:
-                self._cur_subst[v] = q
-            cur_knowl: Knowledge = dict()
-            for t, (ivl, exc) in self._cur_knowl.items():
-                t, ivl, exc = self.fancy_subs(t, ivl, exc, {v: q})
-                if t.is_constant():
-                    t_as_rational = Rational(t.as_int())
-                    if t_as_rational in ivl and t_as_rational not in exc:
+                self._subst[v] = q
+            knowl: Knowledge = dict()
+            for t, range_ in self._knowl.items():
+                bknowl = _BasicKnowledge(t, range_).subs({v: q})
+                if bknowl.term.is_constant():
+                    t_as_rational = Rational(bknowl.term.as_int())
+                    if t_as_rational in bknowl.range:
                         continue
                     else:
                         raise InternalRepresentation.Inconsistent()
-                t, ivl, exc = self.prune_item(cur_knowl, t, ivl, exc)
-                subst_value = self.as_subst_value(gand, t, ivl, exc)
-                if subst_value is not None:
-                    stack.append((t, subst_value))
+                bknowl = bknowl.prune(knowl)
+                if bknowl.is_substitution():
+                    stack.append((bknowl.term, bknowl.as_subst_value()))
                 else:
-                    cur_knowl[t] = (ivl, exc)
-            self._cur_knowl = cur_knowl
-
-    @staticmethod
-    def as_subst_value(gand, t, ivl, exc) -> Optional[Rational]:
-        if not t.is_variable():
-            return None
-        if ivl.is_point() and not exc:
-            return ivl.start
-        return None
+                    knowl[bknowl.term] = bknowl.range
+            self._knowl = knowl
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
@@ -208,152 +302,120 @@ class InternalRepresentation(
         den = q.denom()
         return rel(den * t - num, 0)
 
-    @staticmethod
-    @lru_cache(maxsize=CACHE_SIZE)
-    def _decompose_atom(f: AtomicFormula)\
-            -> tuple[type[AtomicFormula], Term, Rational]:
-        r"""Decompose into relation :math:`\rho`, term :math:`p` without
-        absolute summand, and rational :math:`q` such that :data:`f` is
-        equivalent to :math:`p \rho q`.
-
-        We assume that :data:`f` has gone through :meth:`_simpl_at` so that
-        its right hand side is zero.
-
-        >>> from .atomic import VV
-        >>> a, b = VV.get('a', 'b')
-        >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
-        >>> rel, p, q = InternalRepresentation._decompose_atom(f); rel, p, q
-        (<class 'logic1.theories.RCF.atomic.Le'>, a^2 + 2*a*b + b^2, -1/2)
-        >>> g = InternalRepresentation._compose_atom(rel, p, q); g
-        2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
-        >>> (f.lhs.poly / g.lhs.poly)
-        3
-        """
-        lhs = f.lhs
-        q = -lhs.constant_coefficient()
-        p = lhs + q
-        c = p.content()
-        p /= c
-        # Given that _simpl_at has produced a primitive polynomial, q != 0
-        # will not be divisible by c. This is relevant for the reconstruction
-        # in _compose_atom to work. assert c == 1 or not q % c == 0,
-        # f'{c} divides {q}'
-        return f.op, p, Rational((q, c))
-
-    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
-        ref_knowl: Knowledge = dict()
-        for t, (ivl, exc) in self._ref_knowl.items():
-            t, ivl, exc = self.fancy_subs(t, ivl, exc, self._cur_subst)
-            t, ivl, exc = self.prune_item(ref_knowl, t, ivl, exc)
-            ref_knowl[t] = (ivl, exc)
-        # print(f'extract: {self._ref_knowl=}\n'
-        #       f'         {self._cur_knowl=}\n'
-        #       f'         {self._cur_subst=}\n'
-        #       f'         {ref_knowl=}')
+        knowl: Knowledge = dict()
+        for t, range_ in ref._knowl.items():
+            bknowl = _BasicKnowledge(t, range_).subs(self._subst).prune(knowl)
+            knowl[bknowl.term] = bknowl.range
+        # print(f'extract: {ref._knowl=}\n'
+        #       f'         {self._knowl=}\n'
+        #       f'         {self._subst=}\n'
+        #       f'         {knowl=}')
         L: list[AtomicFormula] = []
-        for t in self._cur_knowl:
-            if t in ref_knowl:
-                ref_ivl, ref_exc = ref_knowl[t]
+        for t in self._knowl:
+            if t in knowl:
+                ref_range = knowl[t]
             else:
-                ref_ivl, ref_exc = _Interval(True, -oo, oo, True), set()
-            ivl, exc = self._cur_knowl[t]
-            # ivl cannot be empty because the construction of an empty interval
-            # raises an Exception during `add`.
-            if ivl.is_point():
-                if ref_ivl.is_point():
-                    assert ref_ivl.start == ivl.start
-                    # throw away the point ivl \ exc, which is equal to ref_ivl \ ref_exc
+                ref_range = _Range(True, -oo, oo, True, set())
+            range_ = self._knowl[t]
+            # range_ cannot be empty because the construction of an empty range
+            # raises an exception during `add`.
+            if range_.is_point():
+                # Pick the one point of range_.
+                q = range_.start
+                if ref_range.is_point():
+                    assert q == ref_range.start
+                    # throw away the point q, which is equal to the point
+                    # describe by ref_range
                 else:
-                    assert ivl.start in ref_ivl and ivl.start not in ref_exc
-                    # Pick the one point of ivl.
-                    q = ivl.start
+                    assert q in ref_range
                     # When gand is And, the equation q = 0 is generally
                     # preferable. Otherwise, q = 0 would become q != 0
                     # via subsequent negation, and we want to take
-                    # self.prefer_order into consideration.
-                    if self.prefer_order and gand is Or:
-                        if q == ref_ivl.start:
-                            assert not ref_ivl.lopen
+                    # self._options.prefer_order into consideration.
+                    if self._options.prefer_order and gand is Or:
+                        if q == ref_range.start:
+                            assert not ref_range.lopen
                             L.append(self._compose_atom(Le, t, q))
-                        elif q == ref_ivl.end:
-                            assert not ref_ivl.ropen
+                        elif q == ref_range.end:
+                            assert not ref_range.ropen
                             L.append(self._compose_atom(Ge, t, q))
                         else:
                             L.append(self._compose_atom(Eq, t, q))
                     else:
                         L.append(self._compose_atom(Eq, t, q))
             else:
-                # We know that ref_ivl is a proper interval, too, because ivl
-                # is a subset of ref_ivl.
                 # print(f'{t=}, {ref_ivl=}, {ivl=}')
-                assert not ref_ivl.is_point()
-                if ref_ivl.start < ivl.start:
-                    if ivl.start in ref_exc:
+                #
+                # We know that ref_range is a proper interval, too, because
+                # range_ is a subset of ref_range.
+                assert not ref_range.is_point()
+                if ref_range.start < range_.start:
+                    if range_.start in ref_range.exc:
                         # When gand is Or, weak and strong are dualized via
                         # subsequent negation.
-                        if xor(self.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Ge, t, ivl.start))
+                        if xor(self._options.prefer_weak, gand is Or):
+                            L.append(self._compose_atom(Ge, t, range_.start))
                         else:
-                            L.append(self._compose_atom(Gt, t, ivl.start))
+                            L.append(self._compose_atom(Gt, t, range_.start))
                     else:
-                        if ivl.lopen:
-                            L.append(self._compose_atom(Gt, t, ivl.start))
+                        if range_.lopen:
+                            L.append(self._compose_atom(Gt, t, range_.start))
                         else:
-                            L.append(self._compose_atom(Ge, t, ivl.start))
-                elif ref_ivl.start == ivl.start:
-                    if not ref_ivl.lopen and ivl.lopen:
+                            L.append(self._compose_atom(Ge, t, range_.start))
+                elif ref_range.start == range_.start:
+                    if not ref_range.lopen and range_.lopen:
                         # When gand is Or, Ne will become Eq via subsequent
                         # nagation. This is generally preferable.
-                        if self.prefer_order and gand is And:
-                            L.append(self._compose_atom(Gt, t, ivl.start))
+                        if self._options.prefer_order and gand is And:
+                            L.append(self._compose_atom(Gt, t, range_.start))
                         else:
-                            L.append(self._compose_atom(Ne, t, ivl.start))
+                            L.append(self._compose_atom(Ne, t, range_.start))
                 else:
-                    assert False, (self, (t, ivl, exc))
-                if ivl.end < ref_ivl.end:
-                    if ivl.end in ref_exc:
+                    assert False, (self, (t, range_))
+                if range_.end < ref_range.end:
+                    if range_.end in ref_range.exc:
                         # When gand is Or, weak and strong are dualized via
                         # subsequent negation.
-                        if xor(self.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Le, t, ivl.end))
+                        if xor(self._options.prefer_weak, gand is Or):
+                            L.append(self._compose_atom(Le, t, range_.end))
                         else:
-                            L.append(self._compose_atom(Lt, t, ivl.end))
+                            L.append(self._compose_atom(Lt, t, range_.end))
                     else:
-                        if ivl.ropen:
-                            L.append(self._compose_atom(Lt, t, ivl.end))
+                        if range_.ropen:
+                            L.append(self._compose_atom(Lt, t, range_.end))
                         else:
-                            L.append(self._compose_atom(Le, t, ivl.end))
-                elif ref_ivl.end == ivl.end:
-                    if not ref_ivl.ropen and ivl.ropen:
+                            L.append(self._compose_atom(Le, t, range_.end))
+                elif ref_range.end == range_.end:
+                    if not ref_range.ropen and range_.ropen:
                         # When gand is Or, Ne will become Eq via subsequent
                         # nagation. This is generally preferable.
-                        if self.prefer_order and gand is And:
-                            L.append(self._compose_atom(Lt, t, ivl.end))
+                        if self._options.prefer_order and gand is And:
+                            L.append(self._compose_atom(Lt, t, range_.end))
                         else:
-                            L.append(self._compose_atom(Ne, t, ivl.end))
+                            L.append(self._compose_atom(Ne, t, range_.end))
                 else:
                     assert False
-            for q in exc:
-                if q not in ref_exc:
+            for q in range_.exc:
+                if q not in ref_range.exc:
                     L.append(self._compose_atom(Ne, t, q))
-        for v, q in self._cur_subst.items():
-            if v in self._ref_subst:
+        for v, q in self._subst.items():
+            if v in ref._subst:
                 continue
-            cur_subst = {vv: qq for vv, qq in self._cur_subst.items() if vv != v}
-            ref_knowl = dict()
-            for t, (ivl, exc) in self._ref_knowl.items():
-                t, ivl, exc = self.fancy_subs(t, ivl, exc, cur_subst)
-                t, ivl, exc = self.prune_item(ref_knowl, t, ivl, exc)
-                ref_knowl[t] = (ivl, exc)
-            if self.prefer_order and gand is Or and v in ref_knowl:
-                ref_ivl, ref_exc = ref_knowl[v]
-                if q == ref_ivl.start:
-                    assert not ref_ivl.lopen
+            subst = {vv: qq for vv, qq in self._subst.items() if vv != v}
+            knowl = dict()
+            for t, range_ in ref._knowl.items():
+                bknowl = _BasicKnowledge(t, range_).subs(subst).prune(knowl)
+                knowl[bknowl.term] = bknowl.range
+            if self._options.prefer_order and gand is Or and v in knowl:
+                ref_range = knowl[v]
+                if q == ref_range.start:
+                    assert not ref_range.lopen
                     L.append(self._compose_atom(Le, v, q))
-                elif q == ref_ivl.end:
-                    assert not ref_ivl.ropen
+                elif q == ref_range.end:
+                    assert not ref_range.ropen
                     L.append(self._compose_atom(Ge, v, q))
                 else:
                     L.append(self._compose_atom(Eq, v, q))
@@ -363,73 +425,30 @@ class InternalRepresentation(
             L = [atom.to_complement() for atom in L]
         return L
 
-    @staticmethod
-    def fancy_subs(t: Term, ivl: _Interval, exc: set[Rational], subst: Substitution) \
-            -> tuple[Term, _Interval, set[Rational]]:
-        c, t = t._subsq_rat(subst)
-        if t.is_constant():
-            return t, ivl, exc
-        assert c > 0, (c, t)
-        constant_coefficient = t.constant_coefficient()
-        t -= constant_coefficient
-        content = t.content()
-        t /= content
-        c *= content
-        shift = Rational((constant_coefficient, content))
-        if t.lc() >= 0:
-            ivl = _Interval(ivl.lopen, ivl.start / c - shift, ivl.end / c - shift, ivl.ropen)
-        else:
-            t = -t
-            c = -c
-            shift = -shift
-            ivl = _Interval(ivl.ropen, ivl.end / c - shift, ivl.start / c - shift, ivl.lopen)
-        exc = {point / c - shift for point in exc}
-        return t, ivl, exc
-
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.next_`.
         """
-        result = self.__class__(self.prefer_weak, self.prefer_order)
         if remove is None:
-            result._ref_knowl = self._cur_knowl.copy()
-            result._ref_subst = self._cur_subst.copy()
+            knowl = self._knowl.copy()
+            subst = self._subst.copy()
         else:
-            result._ref_knowl = {p: q for p, q in self._cur_knowl.items()
-                                 if remove not in p.vars()}
-            result._ref_subst = {p: q for p, q in self._cur_subst.items()
-                                 if p != remove}
-        result._cur_knowl = result._ref_knowl.copy()
-        result._cur_subst = result._ref_subst.copy()
-        return result
+            knowl = {p: q for p, q in self._knowl.items() if remove not in p.vars()}
+            subst = {p: q for p, q in self._subst.items() if p != remove}
+        return self.__class__(self._options, knowl, subst)
 
-    @staticmethod
-    def prune_item(knowl: Knowledge, t: Term, ivl: _Interval, exc: set[Rational]) \
-            -> tuple[Term, _Interval, set[Rational]]:
-        if t in knowl:
-            cur_ivl, cur_exc = knowl[t]
-            ivl = ivl.intersection(cur_ivl)
-            exc = exc.union(cur_exc)
-            # Restrict exc to the new ivl.
-            exc = {x for x in exc if x in ivl}
-            # Note that exc is a subset of ivl now. Fix the case that ivl
-            # is closed on either side and the corresponding endpoint is in
-            # exc. We are going to use inf and sup in contrast to start and
-            # end, because ivl can be a FiniteSet.
-            if ivl.start in exc:
-                # It follows that ivl is left-closed. _Interval
-                # raises Inconsistent if ivl gets empty.
-                ivl = _Interval(True, ivl.start, ivl.end, ivl.ropen)
-                exc.remove(ivl.start)
-            if ivl.end in exc:
-                # It follows that ivl is right-closed. ivl cannot get emty
-                # here.
-                ivl = _Interval(ivl.lopen, ivl.start, ivl.end, True)
-                exc.remove(ivl.end)
-        return t, ivl, exc
+    def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
+        atom = atom.subsq(self._subst)
+        assert atom.rhs == 0
+        if atom.lhs.is_constant():
+            return Eq(0, 0) if bool(atom) else Eq(1, 0)
+        if atom.lhs.lc() < 0:
+            atom = atom.op.converse()(-atom.lhs, 0)
+        return atom
 
 
+@dataclass(frozen=True)
 class Simplify(abc.simplify.Simplify[
-        AtomicFormula, Term, Variable, int, InternalRepresentation]):
+        AtomicFormula, Term, Variable, int, InternalRepresentation, Options]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
     abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
@@ -441,16 +460,14 @@ class Simplify(abc.simplify.Simplify[
     which should be called via :func:`.is_valid`, as described below.
     """
 
-    explode_always: bool = True
-    prefer_order: bool = True
-    prefer_weak: bool = False
+    _options: Options = field(default_factory=Options)
 
-    def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
+    def create_initial_representation(self, assume: Iterable[AtomicFormula]) \
             -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        ir = InternalRepresentation(prefer_weak=self.prefer_weak, prefer_order=self.prefer_order)
+        ir = InternalRepresentation(_options=self._options)
         for atom in assume:
             simplified_atom = self._simpl_at(atom, And, explode_always=False)
             match simplified_atom:
@@ -467,123 +484,14 @@ class Simplify(abc.simplify.Simplify[
                     assert False, simplified_atom
         return ir
 
-    def simplify(self,
-                 f: Formula,
-                 assume: Iterable[AtomicFormula] = [],
-                 explode_always: bool = True,
-                 prefer_order: bool = True,
-                 prefer_weak: bool = False) -> Formula:
-        r"""Simplify `f` modulo `assume`.
-
-        :param f:
-          The formula to be simplified
-
-        :param assume:
-          A list of atomic formulas that are assumed to hold. The
-          simplification result is equivalent modulo those assumptions. Note
-          that assumptions do not affect bound variables.
-
-          >>> from logic1.firstorder import *
-          >>> from logic1.theories.RCF import *
-          >>> a, b = VV.get('a', 'b')
-          >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
-          Ex(a, a - 5 > 0)
-
-        :param explode_always:
-          Simplification can split certain atomic formulas built from products
-          or square sums:
-
-          .. admonition:: Example
-
-            1.
-              1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
-              2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
-
-            2.
-              1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
-              2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
-
-          If `explode_always` is :data:`False`, the splittings in "1." are only applied
-          within disjunctions and the ones in "2." are only applied within conjunctions.
-          This keeps terms more complex but the boolean structure simpler.
-
-          >>> from logic1.firstorder import *
-          >>> from logic1.theories.RCF import *
-          >>> a, b, c = VV.get('a', 'b', 'c')
-          >>> simplify(And(a * b == 0, c == 0))
-          And(c == 0, Or(b == 0, a == 0))
-          >>> simplify(And(a * b == 0, c == 0), explode_always=False)
-          And(c == 0, a*b == 0)
-          >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
-          Or(c == 0, b == 0, a == 0)
-
-        :param prefer_order:
-          One can sometimes equivalently choose between order inequalities and
-          (in)equations.
-
-          .. admonition:: Example
-
-            1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
-               :math:`a > 0 \lor (b = 0 \land a \neq 0)`
-            2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
-               :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
-
-          By default, the left hand sides in the Example are preferred. If
-          `prefer_order` is :data:`False`, then the right hand sides are preferred.
-
-          >>> from logic1.firstorder import *
-          >>> from logic1.theories.RCF import *
-          >>> a, b = VV.get('a', 'b')
-          >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
-          And(a >= 0, Or(b == 0, a > 0))
-          >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
-          And(a >= 0, Or(b == 0, a > 0))
-          >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
-          And(a >= 0, Or(b == 0, a != 0))
-          >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
-          And(a >= 0, Or(b == 0, a != 0))
-
-        :param prefer_weak:
-          One can sometimes equivalently choose between strict and weak inequalities.
-
-          .. admonition:: Example
-
-            1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
-               :math:`a = 0 \lor (b = 0 \land a > 0)`
-            2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
-               :math:`a \neq 0 \land (b = 0 \lor a > 0)`
-
-          By default, the right hand sides in the Example are preferred. If
-          `prefer_weak` is :data:`True`, then the left hand sides are
-          preferred.
-
-          >>> from logic1.firstorder import *
-          >>> from logic1.theories.RCF import *
-          >>> a, b = VV.get('a', 'b')
-          >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
-          And(a != 0, Or(b == 0, a > 0))
-          >>> simplify(And(a != 0, Or(b == 0, a > 0)))
-          And(a != 0, Or(b == 0, a > 0))
-          >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
-          And(a != 0, Or(b == 0, a >= 0))
-          >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
-          And(a != 0, Or(b == 0, a >= 0))
-
-        :returns:
-          A simplified equivalent of `f` modulo `assume`.
-        """
-        self.explode_always = explode_always
-        self.prefer_order = prefer_order
-        self.prefer_weak = prefer_weak
-        return super().simplify(f, assume)
-
     def simpl_at(self, atom: AtomicFormula, context: Optional[type[And] | type[Or]]) -> Formula:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.simpl_at`.
         """
         # MyPy does not recognize that And[Any, Any, Any] is an instance of
         # Hashable. https://github.com/python/mypy/issues/11470
-        return self._simpl_at(atom, context, self.explode_always)  # type: ignore[arg-type]
+        return self._simpl_at(
+            atom, context, self._options.explode_always)  # type: ignore[arg-type]
 
     @lru_cache(maxsize=CACHE_SIZE)
     def _simpl_at(self,
@@ -712,18 +620,109 @@ class Simplify(abc.simplify.Simplify[
             case _:
                 assert False
 
-    def transform_atom(self, atom: AtomicFormula, ir: InternalRepresentation) -> AtomicFormula:
-        substitution = ir._cur_subst
-        atom = atom.subsq(substitution)
-        assert atom.rhs == 0
-        if atom.lhs.is_constant():
-            return Eq(0, 0) if bool(atom) else Eq(1, 0)
-        if atom.lhs.lc() < 0:
-            atom = atom.op.converse()(-atom.lhs, 0)
-        return atom
+
+def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
+    r"""Simplify `f` modulo `assume`.
+
+    :param f:
+      The formula to be simplified
+
+    :param assume:
+      A list of atomic formulas that are assumed to hold. The
+      simplification result is equivalent modulo those assumptions. Note
+      that assumptions do not affect bound variables.
+
+      >>> from logic1.firstorder import *
+      >>> from logic1.theories.RCF import *
+      >>> a, b = VV.get('a', 'b')
+      >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
+      Ex(a, a - 5 > 0)
+
+    :param explode_always:
+      Simplification can split certain atomic formulas built from products
+      or square sums:
+
+      .. admonition:: Example
+
+        1.
+          1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
+          2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
+
+        2.
+          1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
+          2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
+
+      If `explode_always` is :data:`False`, the splittings in "1." are only applied
+      within disjunctions and the ones in "2." are only applied within conjunctions.
+      This keeps terms more complex but the boolean structure simpler.
+
+      >>> from logic1.firstorder import *
+      >>> from logic1.theories.RCF import *
+      >>> a, b, c = VV.get('a', 'b', 'c')
+      >>> simplify(And(a * b == 0, c == 0))
+      And(c == 0, Or(b == 0, a == 0))
+      >>> simplify(And(a * b == 0, c == 0), explode_always=False)
+      And(c == 0, a*b == 0)
+      >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
+      Or(c == 0, b == 0, a == 0)
+
+    :param prefer_order:
+      One can sometimes equivalently choose between order inequalities and
+      (in)equations.
+
+      .. admonition:: Example
+
+        1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
+           :math:`a > 0 \lor (b = 0 \land a \neq 0)`
+        2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
+           :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
+
+      By default, the left hand sides in the Example are preferred. If
+      `prefer_order` is :data:`False`, then the right hand sides are preferred.
+
+      >>> from logic1.firstorder import *
+      >>> from logic1.theories.RCF import *
+      >>> a, b = VV.get('a', 'b')
+      >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
+      And(a >= 0, Or(b == 0, a > 0))
+      >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
+      And(a >= 0, Or(b == 0, a > 0))
+      >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+      And(a >= 0, Or(b == 0, a != 0))
+      >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+      And(a >= 0, Or(b == 0, a != 0))
+
+    :param prefer_weak:
+      One can sometimes equivalently choose between strict and weak inequalities.
+
+      .. admonition:: Example
+
+        1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
+           :math:`a = 0 \lor (b = 0 \land a > 0)`
+        2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
+           :math:`a \neq 0 \land (b = 0 \lor a > 0)`
+
+      By default, the right hand sides in the Example are preferred. If
+      `prefer_weak` is :data:`True`, then the left hand sides are
+      preferred.
+
+      >>> from logic1.firstorder import *
+      >>> from logic1.theories.RCF import *
+      >>> a, b = VV.get('a', 'b')
+      >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
+      And(a != 0, Or(b == 0, a > 0))
+      >>> simplify(And(a != 0, Or(b == 0, a > 0)))
+      And(a != 0, Or(b == 0, a > 0))
+      >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+      And(a != 0, Or(b == 0, a >= 0))
+      >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+      And(a != 0, Or(b == 0, a >= 0))
+
+    :returns:
+      A simplified equivalent of `f` modulo `assume`.
+    """
+    return Simplify(Options(**options)).simplify(f, assume)
 
 
-simplify = Simplify().simplify
-
-
-is_valid = Simplify().is_valid
+def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Optional[bool]:
+    return Simplify(Options(**options)).is_valid(f, assume)
