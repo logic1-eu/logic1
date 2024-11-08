@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+>>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(And(a == 0, Or(b != 0, And(c <= 0, Or(d > 0, a == 0)))))
@@ -111,6 +111,16 @@ True
 False
 >>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])  # return None
 
+# Examples by NF during the development of simpl_and_or:
+>>> simplify(And(x + y == 0, Or(And(x == 0, y != 0), And(x != 0, y == 0))))
+F
+>>> simplify(And(x**2 + y == 0, Or(And(x == 0, y != 0), And(x != 0, y == 0))))
+F
+
+# The following example shows that it is necessary to resest the ir in
+# simpl_and_or when new substitutions have been found
+>>> simplify(And(x**2 + y**2 + z > 0, z == 1))
+z - 1 == 0
 
 #  Regressions of problems during development
 

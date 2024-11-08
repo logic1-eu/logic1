@@ -85,6 +85,9 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         """
         ...
 
+    def restart(self, ir: Self) -> Self:
+        assert False
+
     def transform_atom(self, atom: α) -> α:
         return atom
 
@@ -181,13 +184,10 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
 
     def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         if Formula.is_atomic(f):
-            ir = ir.next_()
             return self._simpl_atomic(f, ir)
         if Formula.is_and(f) or Formula.is_or(f):
-            ir = ir.next_()
             return self._simpl_and_or(f, ir)
         if Formula.is_quantified_formula(f):
-            ir = ir.next_(remove=f.var)
             return self._simpl_quantified(f, ir)
         if Formula.is_true(f) or Formula.is_false(f):
             return f
@@ -205,7 +205,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         while queue:
             arg = queue.popleft()
             if Formula.is_atomic(arg):
-                simplified_arg = self.simpl_at(ir.transform_atom(arg), gand)
+                simplified_arg = self.simpl_at(ir.transform_atom(arg), context=gand)
             else:
                 simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):
@@ -234,15 +234,24 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
                     restart = ir.add(gand, new_atoms)
                 except ir.Inconsistent:
                     return gand.definite_element()
-                if restart is Restart.NONE:
+                if restart is Restart.NONE:  # Save resimp if ir has not changed
                     simplified_others = simplified_others.union(new_others)
-                else:  # Save resimp if ir has not changed
+                elif restart is Restart.OTHERS:
                     for simplified_other in simplified_others:
                         if simplified_other not in queue:
                             queue.append(simplified_other)
                     simplified_others = new_others  # subtle but correct
-                    if restart is Restart.ALL:
-                        pass
+                else:
+                    assert restart is Restart.ALL
+                    for simplified_other in simplified_others:
+                        if simplified_other not in queue:
+                            queue.append(simplified_other)
+                    simplified_others = new_others
+                    for atom in ir.extract(gand, ref):
+                        if atom not in queue:
+                            queue.appendleft(atom)
+                    # queue = deque(f.args)
+                    ir = ref.restart(ir)
             else:
                 simplified_others = simplified_others.union(new_others)
         final_atoms = list(ir.extract(gand, ref))
@@ -278,5 +287,6 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         """
         `f` must be in negation normal form (NNF).
         """
+        ir = ir.next_(remove=f.var)
         simplified_arg = self._simpl_nnf(f.arg, ir)
         return f.op(f.var, simplified_arg)

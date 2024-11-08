@@ -436,6 +436,15 @@ class InternalRepresentation(
             subst = {p: q for p, q in self._subst.items() if p != remove}
         return self.__class__(self._options, knowl, subst)
 
+    def restart(self, ir: Self) -> Self:
+        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.restart`.
+        """
+        result = self.next_()
+        for v, q in ir._subst.items():
+            bknowl = _BasicKnowledge(v, _Range(False, q, q, False, set()))
+            result._add_point(bknowl)
+        return result
+
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
         atom = atom.subsq(self._subst)
         assert atom.rhs == 0
