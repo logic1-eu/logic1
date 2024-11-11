@@ -7,8 +7,8 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 from dataclasses import dataclass, field
 from functools import lru_cache
 from operator import xor
-from sage.all import oo, product, Rational  # type: ignore
-from sage.rings.infinity import MinusInfinity, PlusInfinity  # type: ignore
+from sage.all import oo, product, Rational
+from sage.rings.infinity import MinusInfinity, PlusInfinity
 from typing import Final, Iterable, Optional, Self, TypeAlias
 
 from ... import abc
@@ -108,8 +108,8 @@ class _Range:
     def transform(self, scale: Rational, shift: Rational) -> Self:
         if scale >= 0:
             lopen = self.lopen
-            start = scale * self.start + shift
-            end = scale * self.end + shift
+            start: Rational | MinusInfinity = scale * self.start + shift
+            end: Rational | PlusInfinity = scale * self.end + shift
             ropen = self.ropen
         else:
             lopen = self.ropen
@@ -132,6 +132,7 @@ class _BasicKnowledge:
 
     def as_subst_value(self) -> Rational:
         assert self.is_substitution()
+        assert isinstance(self.range.start, Rational)
         return self.range.start
 
     def is_substitution(self) -> bool:
@@ -160,7 +161,7 @@ class _BasicKnowledge:
             t = -t
             c = -c
             shift = -shift
-        range_ = self.range.transform(1 / c, -shift)
+        range_ = self.range.transform(~c, -shift)
         return self.__class__(t, range_)
 
     @classmethod
@@ -325,6 +326,7 @@ class InternalRepresentation(
             if range_.is_point():
                 # Pick the one point of range_.
                 q = range_.start
+                assert isinstance(q, Rational)
                 if ref_range.is_point():
                     assert q == ref_range.start
                     # throw away the point q, which is equal to the point

@@ -2,13 +2,25 @@ from __future__ import annotations
 
 from enum import auto, Enum
 from fractions import Fraction
-import sage.all as sage  # type: ignore[import-untyped]
-from sage.all import QQ, Rational
-from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
-    MPolynomial_libsingular as Polynomial)
-from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
-    Polynomial_generic_dense as UnivariatePolynomial)
 from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
+
+from sage.all import QQ
+# Importing QQ from sage.rings.rational_fields does not work. In fact, a fresh
+# instance of RationalField is assigned to QQ in sage.all.
+from sage.misc.latex import latex as sage_latex
+from sage.rings.integer import Integer
+from sage.rings.integer_ring import ZZ
+# Importing ZZ from its original place of definition in contrast to sage.all
+# seems to be fine.
+from sage.rings.polynomial.multi_polynomial_libsingular import (
+    MPolynomial_libsingular as MPolynomial,
+    MPolynomialRing_libsingular as MPolynomialRing)
+from sage.rings.polynomial.polynomial_ring_constructor import (
+    PolynomialRing as sage_PolynomialRing)
+from sage.rings.polynomial.polynomial_element import (
+    Polynomial_generic_dense as UPolynomial)
+from sage.rings.polynomial.term_order import TermOrder
+from sage.rings.rational import Rational
 
 from ... import firstorder
 from ...firstorder import _T, _F
@@ -17,16 +29,16 @@ from ...support.excepthook import NoTraceException
 from ...support.tracing import trace  # noqa
 
 
-class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
+class _PolynomialRing:
 
-    sage_ring: sage.PolynomialRing
+    sage_ring: MPolynomialRing
+    stack: list[MPolynomialRing]
 
     def __call__(self, obj):
         return self.sage_ring(obj)
 
     def __init__(self, term_order='deglex'):
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, 'unused_', implementation='singular', order=term_order)
+        self.sage_ring = self.MPolynomialRing_factory('unused_', order=term_order)
         self.stack = []
 
     def __repr__(self):
@@ -37,8 +49,7 @@ class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
         assert var not in new_vars
         new_vars.append(var)
         new_vars.sort()
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
+        self.sage_ring = self.MPolynomialRing_factory(new_vars, order=self.sage_ring.term_order())
 
     def ensure_vars(self, vars_: Iterable[str]) -> None:
 
@@ -56,24 +67,26 @@ class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
                 new_vars.append(v)
         if have_appended:
             new_vars.sort(key=sort_key)
-            self.sage_ring = sage.PolynomialRing(
-                sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
+            self.sage_ring = self.MPolynomialRing_factory(
+                new_vars, order=self.sage_ring.term_order())
 
-    def get_vars(self) -> tuple[Polynomial, ...]:
-        gens = self.sage_ring.gens()
-        gens = (g for g in gens if str(g) != 'unused_')
+    def get_vars(self) -> tuple[MPolynomial[Integer], ...]:
+        gens = (g for g in self.sage_ring.gens() if str(g) != 'unused_')
         return tuple(gens)
+
+    @staticmethod
+    def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
+        return sage_PolynomialRing(ZZ, names, order=order, implementation='singular')
 
     def pop(self) -> None:
         self.sage_ring = self.stack.pop()
 
     def push(self) -> None:
         self.stack.append(self.sage_ring)
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, 'unused_', implementation='singular', order=self.sage_ring.term_order())
+        self.sage_ring = self.MPolynomialRing_factory('unused_', order=self.sage_ring.term_order())
 
 
-polynomial_ring = PolynomialRing()
+polynomial_ring = _PolynomialRing()
 
 
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
@@ -91,10 +104,10 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             -- import variables into global namespace
     """
 
-    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
+    polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
     @property
-    def stack(self) -> list[sage.PolynomialRing]:
+    def stack(self) -> list[MPolynomialRing]:
         """Implements abstract property
         :attr:`.firstorder.atomic.VariableSet.stack`.
         """
@@ -170,13 +183,13 @@ class TSQ(Enum):
 
 class Term(firstorder.Term['Term', 'Variable', int]):
 
-    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
+    polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
-    _poly: Polynomial
+    _poly: MPolynomial[Integer]
 
     # The property should be private. We might want a method to_sage()
     @property
-    def poly(self) -> Polynomial:
+    def poly(self) -> MPolynomial[Integer]:
         """
         An instance of :class:`MPolynomial_libsingular
         <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
@@ -188,7 +201,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return self._poly
 
     @poly.setter
-    def poly(self, value: Polynomial):
+    def poly(self, value: MPolynomial[Integer]):
         # self._poly = value  # old
         self._poly = self.polynomial_ring(value)  # new
 
@@ -222,11 +235,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
     def __hash__(self) -> int:
         return hash(self.poly)
 
-    def __init__(self, arg: Polynomial | sage.Integer | int | UnivariatePolynomial) -> None:
+    def __init__(self, arg: MPolynomial[Integer] | Integer | int | UPolynomial) -> None:
         match arg:
-            case Polynomial():
+            case MPolynomial():
                 self.poly = arg
-            case sage.Integer() | int() | UnivariatePolynomial():
+            case Integer() | int() | UPolynomial():
                 self.poly = self.polynomial_ring(arg)
             case _:
                 raise ValueError(
@@ -321,7 +334,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         >>> t.as_latex()
         'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
         """
-        return str(sage.latex(self.poly))
+        return str(sage_latex(self.poly))
 
     def as_variable(self) -> Variable:
         if not self.is_variable():
@@ -563,8 +576,8 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return Term(quotient), Term(remainder)
 
     @staticmethod
-    def sort_key(term: Term) -> Polynomial:
-        """A sort key suitable for ordering instances of this class. Implements
+    def sort_key(term: Term) -> MPolynomial[Integer]:
+        """A sort key suitable for ordering instances of this class. ImplementTerm(remainder)s
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
         return term.poly
@@ -582,7 +595,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :external:meth:`MPolynomial_libsingular.subs()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
         """
-        sage_keywords = dict()
+        sage_keywords: dict[str, MPolynomial[Integer] | int] = dict()
         for variable, substitute in d.items():
             match substitute:
                 case Term():
@@ -605,7 +618,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         variables. The result (c, p) describes a polynomial q = c * p over Q.
         c is the content of of q, and p is a polynomial over Z.
         """
-        sage_keywords: dict[str, Polynomial | Rational] = dict()
+        sage_keywords: dict[str, MPolynomial[Integer] | Rational] = dict()
         for variable, pseudo_term in sigma.items():
             match pseudo_term:
                 case Term():
@@ -619,7 +632,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         poly = self.poly.change_ring(QQ).subs(**sage_keywords)
         # poly is now a sage polynomial over QQ or a Rational.
         match poly:
-            case Polynomial():
+            case MPolynomial():
                 content = poly.content()
                 try:
                     poly = poly / content
@@ -830,7 +843,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         substitution into the two argument terms of the atomic formula when
         admitting rational coefficients.
         """
-        sage_keywords: dict[str, Polynomial | Rational] = dict()
+        sage_keywords: dict[str, MPolynomial[Integer] | Rational] = dict()
         for variable, pseudo_term in sigma.items():
             match pseudo_term:
                 case Term(poly=poly):
@@ -845,13 +858,13 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         lhs = self.lhs.poly.change_ring(QQ).subs(**sage_keywords)
         # lhs is either a sage polynomial over QQ or a Rational.
         match lhs:
-            case Polynomial():
+            case MPolynomial():
                 try:
                     lhs = lhs / lhs.content()
                 except ZeroDivisionError:
                     pass
             case Rational():
-                lhs = lhs.numerator()
+                lhs = lhs.numer()
             case _:
                 assert False, type(lhs)
         lhs = polynomial_ring(lhs)
