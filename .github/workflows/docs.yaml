@@ -1,7 +1,7 @@
 name: docs
 
 on:
-  push: { branches: [ 'main' ] }
+  push:
   workflow_dispatch:
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
         run: sudo apt-get -y install graphviz
 
       - name: Generate Documentation in HTML format
-        run: PYTHONPATH="$PYTHONPATH:$(pwd)" make html
+        run: PYTHONPATH="$(readlink -f $(pwd)/..)" make html
         shell: micromamba-shell {0}
         working-directory: doc
 
@@ -35,6 +35,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
