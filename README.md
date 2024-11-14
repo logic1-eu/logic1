@@ -1,6 +1,10 @@
 # Logic1 &ndash; Interpreted First-order Logic in Python
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/version.svg)](https://anaconda.org/conda-forge/logic1)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/latest_release_date.svg)](https://anaconda.org/conda-forge/logic1)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/platforms.svg)](https://anaconda.org/conda-forge/logic1)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/downloads.svg)](https://anaconda.org/conda-forge/logic1)
 
-Authors: Nicolas Faroß, Thomas Sturm
+Authors: Nicolas Faroß, Lorenz Leutgeb, Thomas Sturm
 
 License: GPL-2.0-or-later. See the [LICENSE](LICENSE) file for details.
 
@@ -8,9 +12,26 @@ Documentation: [docs.logic1.eu](https://docs.logic1.eu)
 
 ## About
 
-This software is currently a research prototype. We want to arrive at a
-well-documented robust first distribution soon. You are very welcome to follow
-our development already now.
+This software is still at an early development stage. Nevertheless, you are very
+welcome to use it already now. Any feedback is highly appreciated!
+
+Logic1 can be installed via Conda from the conda-forge conda channel. You will
+need a working Conda installation: either Miniforge, Mambaforge, Miniconda,
+or Anaconda. Miniforge and Mambaforge use conda-forge as the default channel.
+If you are using Miniconda or Anaconda, set it up to use conda-forge as follows:
+
+```shell
+$ conda config --add channels conda-forge
+$ conda config --set channel_priority strict
+```
+
+Create and activate a new conda environment containing Logic1, either with mamba
+or conda:
+
+```shell
+$ conda create -n logic1 logic1
+$ conda activate logic1
+```
 
 ## Description
 
