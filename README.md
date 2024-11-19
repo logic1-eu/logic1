@@ -1,8 +1,8 @@
 # Logic1 &ndash; Interpreted First-order Logic in Python
-[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/version.svg)](https://anaconda.org/conda-forge/logic1?)
-[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/latest_release_date.svg)](https://anaconda.org/conda-forge/logic1?)
-[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/platforms.svg)](https://anaconda.org/conda-forge/logic1?)
-[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/downloads.svg)](https://anaconda.org/conda-forge/logic1?)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/version.svg?)](https://anaconda.org/conda-forge/logic1?)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/latest_release_date.svg?)](https://anaconda.org/conda-forge/logic1?)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/platforms.svg?)](https://anaconda.org/conda-forge/logic1?)
+[![Anaconda-Server Badge](https://anaconda.org/conda-forge/logic1/badges/downloads.svg?)](https://anaconda.org/conda-forge/logic1?)
 
 Authors: Nicolas Faroß, Lorenz Leutgeb, Thomas Sturm
 
