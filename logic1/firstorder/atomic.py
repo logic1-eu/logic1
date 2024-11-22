@@ -250,6 +250,12 @@ class AtomicFormula(Formula[α, τ, χ, σ]):
         """
         ...
 
+    def as_redlog(self) -> str:
+        """Redlog representation as a string. This method is required by the
+        corresponding recursive first-order method :meth:`.Formula.as_redlog`.
+        """
+        raise NotImplementedError()
+
     @final
     def atoms(self: α) -> Iterator[α]:
         yield self

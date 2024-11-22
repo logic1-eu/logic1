@@ -345,6 +345,33 @@ class Formula(Generic[α, τ, χ, σ]):
                 # abstract method AtomicFormula.as_latex.
                 assert False
 
+    def as_redlog(self) -> str:
+        r"""Redlog representation as a string, which can be used elsewhere.
+        """
+        match self:
+            case All():
+                return f'all({self.var}, {self.arg.as_redlog()})'
+            case Ex():
+                return f'ex({self.var}, {self.arg.as_redlog()})'
+            case And():
+                return '(' + ' and '.join(arg.as_redlog() for arg in self.args) + ')'
+            case Or():
+                return '(' + ' or '.join(arg.as_redlog() for arg in self.args) + ')'
+            case Implies():
+                return f'({self.lhs.as_redlog()} impl {self.rhs.as_redlog()})'
+            case Equivalent():
+                return f'({self.lhs.as_redlog()} equiv {self.rhs.as_redlog()})'
+            case Not():
+                return f'not {self.arg.as_redlog()}'
+            case _F():
+                return 'false'
+            case _T():
+                return 'true'
+            case _:
+                # Atomic formulas are caught by the implementation of the
+                # abstract method AtomicFormula.as_redlog.
+                assert False
+
     def atoms(self) -> Iterator[α]:
         """
         An iterator over all instances of :class:`AtomicFormula

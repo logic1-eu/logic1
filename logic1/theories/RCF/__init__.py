@@ -5,6 +5,7 @@ from .atomic import VV, Eq, Ne, Ge, Le, Gt, Lt, polynomial_ring, Term, Variable 
 from .bnf import cnf, dnf  # noqa
 from .parser import l1  # noqa
 from .qe import CLUSTERING, GENERIC, qe  # noqa
+from . import redlog  # noqa
 from .simplify import is_valid, simplify  # noqa
 
 __all__ = [
@@ -15,6 +16,8 @@ __all__ = [
     'l1',
 
     'CLUSTERING', 'GENERIC', 'qe',
+
+    'redlog',
 
     'simplify',
 

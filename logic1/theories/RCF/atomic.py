@@ -756,6 +756,14 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
 
+    def as_redlog(self) -> str:
+        """Latex representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+        """
+        SYMBOL: Final = {
+            Eq: '=', Ne: '<>', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
+        return f'{self.lhs!r} {SYMBOL[self.op]} {self.rhs!r}'
+
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of
         `quantified`. Yield each such variable once for each term that it
