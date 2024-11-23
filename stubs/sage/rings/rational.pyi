@@ -60,6 +60,9 @@ class Rational:
     def __rmul__(self, other: object) -> Any:
         ...
 
+    def __truediv__(self, other: object) -> Any:
+        ...
+
     def denom(self) -> Integer:
         ...
 

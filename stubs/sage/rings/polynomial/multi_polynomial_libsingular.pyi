@@ -131,10 +131,16 @@ class MPolynomial_libsingular(Generic[ρ]):
     def is_generator(self) -> bool:
         ...
 
+    def is_monomial(self) -> bool:
+        ...
+
     def is_zero(self) -> bool:
         ...
 
     def lc(self) -> ρ:
+        ...
+
+    def monomial_coefficient(self, mon: Self) -> ρ:
         ...
 
     def monomials(self) -> list[Self]:

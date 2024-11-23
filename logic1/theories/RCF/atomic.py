@@ -389,7 +389,9 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :external:meth:`MPolynomial.content()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.content>`
         """
-        return int(self.poly.content())
+        content = int(self.poly.content())
+        assert content > 0 or (content == 0 and self == 0)
+        return content
 
     def degree(self, x: Variable) -> int:
         """Return the degree in `x` of this term.
@@ -420,6 +422,14 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
         """
         return Term(self.poly.derivative(x.poly, n))
+
+    @classmethod
+    def _equal(cls, x: object, y: object) -> bool:
+        if isinstance(x, cls) and isinstance(y, cls):
+            return x.poly == y.poly
+        if isinstance(x, cls) or isinstance(y, cls):
+            return False
+        return x == y
 
     # discuss bug:
     # >>> (2*x).factor()
@@ -487,6 +497,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             return TSQ.WEAK
         return TSQ.STRICT
 
+    def is_monomial(self) -> bool:
+        """Return :obj:`True` if this term is a monomial.
+        """
+        return self.poly.is_monomial()
+
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
         """
@@ -517,6 +532,18 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.lc>`
         """
         return int(self.poly.lc())
+
+    def monomial_coefficient(self, mon: Term) -> int:
+        """Return the coefficient in the base ring of the monomial mon in self,
+        where mon must have the same parent as self.
+
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.monomial_coefficient()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomial_coefficient>`
+        """
+        if not mon.is_monomial():
+            raise ValueError(f'{mon} is not a monomial')
+        return int(self.poly.monomial_coefficient(mon.poly))
 
     def monomials(self) -> list[Term]:
         """List of monomials of this term. A monomial is defined here as a
@@ -606,29 +633,31 @@ class Term(firstorder.Term['Term', 'Variable', int]):
                     assert False, (self, d)
         return Term(self.poly.subs(**sage_keywords))
 
-    def subsq(self, sigma: dict[Variable, Term | int | Fraction | Rational]) \
+    def subsq(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) \
             -> tuple[Fraction, Term]:
-        content, term = self._subsq_rat(sigma)
-        content_as_fraction = Fraction(int(content.numer()), int(content.denom()))
-        return content_as_fraction, term
-
-    def _subsq_rat(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) \
-            -> tuple[Rational, Term]:
-        """Simultaneous substitution of terms, integers, or fractions for
-        variables. The result (c, p) describes a polynomial q = c * p over Q.
-        c is the content of of q, and p is a polynomial over Z.
-        """
-        sage_keywords: dict[str, MPolynomial[Integer] | Rational] = dict()
+        sigma_rat: dict[Variable, Rational | MPolynomial[Rational]] = dict()
         for variable, pseudo_term in sigma.items():
             match pseudo_term:
                 case Term():
-                    sage_keywords[str(variable)] = pseudo_term.poly
+                    sigma_rat[variable] = pseudo_term.poly.change_ring(QQ)
                 case int() | Fraction():
-                    sage_keywords[str(variable)] = Rational(pseudo_term)
+                    sigma_rat[variable] = Rational(pseudo_term)
                 case Rational():
-                    sage_keywords[str(variable)] = pseudo_term
+                    sigma_rat[variable] = pseudo_term
                 case _:
                     assert False, type(pseudo_term)
+        content, term = self._subsq_rat(sigma_rat)
+        content_as_fraction = Fraction(int(content.numer()), int(content.denom()))
+        return content_as_fraction, term
+
+    def _subsq_rat(self, sigma: Mapping[Variable, Rational | MPolynomial[Rational]]) \
+            -> tuple[Rational, Term]:
+        """Simultaneous substitution of rationals and polynomials over the
+        rationals for variables. The result (c, p) describes a polynomial q = c
+        * p over Q. c >= 0 is the content of of q, and p is a polynomial over
+        Z. If c == 0, then p == 0.
+        """
+        sage_keywords = {str(key): value for key, value in sigma.items()}
         poly = self.poly.change_ring(QQ).subs(**sage_keywords)
         # poly is now a sage polynomial over QQ or a Rational.
         match poly:
@@ -851,34 +880,12 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         substitution into the two argument terms of the atomic formula when
         admitting rational coefficients.
         """
-        sage_keywords: dict[str, MPolynomial[Integer] | Rational] = dict()
-        for variable, pseudo_term in sigma.items():
-            match pseudo_term:
-                case Term(poly=poly):
-                    sage_keywords[str(variable)] = poly
-                case int() | Fraction():
-                    sage_keywords[str(variable)] = Rational(pseudo_term)
-                case Rational():
-                    sage_keywords[str(variable)] = pseudo_term
-                case _:
-                    assert False, type(pseudo_term)
-        lhs = self.lhs.poly - self.rhs.poly
-        lhs = self.lhs.poly.change_ring(QQ).subs(**sage_keywords)
-        # lhs is either a sage polynomial over QQ or a Rational.
-        match lhs:
-            case MPolynomial():
-                try:
-                    lhs = lhs / lhs.content()
-                except ZeroDivisionError:
-                    pass
-            case Rational():
-                lhs = lhs.numer()
-            case _:
-                assert False, type(lhs)
-        lhs = polynomial_ring(lhs)
-        # The AtomicFormula constructor will call the Term constructor on lhs
-        # and rhs.
-        return self.op(lhs, 0)
+        _, term = (self.lhs - self.rhs).subsq(sigma)
+        return self.op(term, 0)
+
+    def _subsq_rat(self, sigma: Mapping[Variable, Rational | MPolynomial[Rational]]) -> Self:
+        _, term = (self.lhs - self.rhs)._subsq_rat(sigma)
+        return self.op(term, 0)
 
 
 class Eq(AtomicFormula):

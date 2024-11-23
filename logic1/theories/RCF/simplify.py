@@ -7,9 +7,14 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 from dataclasses import dataclass, field
 from functools import lru_cache
 from operator import xor
-from sage.all import oo, product, Rational
+from sage.all import oo, product, QQ
+# Importing QQ from sage.rings.rational_fields does not work. In fact, a fresh
+# instance of RationalField is assigned to QQ in sage.all.
+from sage.rings.polynomial.multi_polynomial_libsingular import (
+    MPolynomial_libsingular as MPolynomial)
 from sage.rings.infinity import MinusInfinity, PlusInfinity
-from typing import Final, Iterable, Optional, Self, TypeAlias
+from sage.rings.rational import Rational
+from typing import Final, Iterable, Iterator, Optional, Self, TypeAlias
 
 from ... import abc
 
@@ -45,20 +50,14 @@ class _Range:
             return False
         return True
 
-    def __init__(self, lopen: bool, start: Rational | MinusInfinity,
-                 end: Rational | PlusInfinity, ropen: bool, exc: set[Rational]) -> None:
-        assert lopen or start is not -oo, (lopen, start, end, ropen, exc)
-        assert ropen or end is not oo, (lopen, start, end, ropen, exc)
-        if start > end:
+    def __post_init__(self) -> None:
+        if self.start > self.end:
             raise InternalRepresentation.Inconsistent()
-        if (lopen or ropen) and start == end:
+        if (self.lopen or self.ropen) and self.start == self.end:
             raise InternalRepresentation.Inconsistent()
-        self.lopen = lopen
-        self.start = start
-        self.end = end
-        self.ropen = ropen
-        assert all(start < x < end for x in exc)
-        self.exc = exc
+        assert self.lopen or self.start is not -oo, self
+        assert self.ropen or self.end is not oo, self
+        assert all(self.start < x < self.end for x in self.exc), self
 
     def intersection(self, other: Self) -> Self:
         if self.start < other.start:
@@ -100,6 +99,9 @@ class _Range:
         # It is assumed and has been asserted that the interval is not empty.
         return self.start == self.end
 
+    def is_zero(self) -> bool:
+        return self.is_point() and self.start == 0
+
     def __repr__(self):
         left = '(' if self.lopen else '['
         right = ')' if self.ropen else ']'
@@ -121,7 +123,94 @@ class _Range:
 
 
 Knowledge: TypeAlias = dict[Term, _Range]
-Substitution: TypeAlias = dict[Variable, Rational]
+
+
+@dataclass(frozen=True)
+class _SubstValue:
+    coefficient: Rational
+    variable: Optional[Variable]
+
+    def __post_init__(self) -> None:
+        assert self.coefficient != 0 or self.variable is None
+
+    def as_rational(self) -> 'Rational | MPolynomial[Rational]':
+        if self.variable is None:
+            return self.coefficient
+        else:
+            return self.coefficient * self.variable.poly.change_ring(QQ)
+
+
+@dataclass(unsafe_hash=True)
+class _Substitution:
+    parents: dict[Variable, _SubstValue] = field(default_factory=dict)
+
+    def __iter__(self) -> Iterator[tuple[Variable, _SubstValue]]:
+        for var in self.parents:
+            yield var, self.find(var)
+
+    def as_dict(self) -> 'dict[Variable, Rational | MPolynomial[Rational]]':
+        """Convert this :class:._Substitution` into a dictionary that can used
+        as an argument to subsitution methods.
+        """
+        return {var: val.as_rational() for var, val in self}
+
+    def copy(self) -> Self:
+        return self.__class__(self.parents.copy())
+
+    def find(self, v: Variable) -> _SubstValue:
+        return self.internal_find(v)
+
+    def internal_find(self, v: Optional[Variable]) -> _SubstValue:
+        if v is None:
+            return _SubstValue(Rational(1), None)
+        try:
+            parent = self.parents[v]
+        except KeyError:
+            return _SubstValue(Rational(1), v)
+        root = self.internal_find(parent.variable)
+        root = _SubstValue(parent.coefficient * root.coefficient, root.variable)
+        self.parents[v] = root
+        return root
+
+    def union(self, val1: _SubstValue, val2: _SubstValue) -> None:
+        root1 = self.internal_find(val1.variable)
+        root2 = self.internal_find(val2.variable)
+        c1 = val1.coefficient * root1.coefficient
+        c2 = val2.coefficient * root2.coefficient
+        if root1.variable is not None and root2.variable is not None:
+            if root1.variable == root2.variable:
+                if c1 != c2:
+                    self.parents[root1.variable] = _SubstValue(Rational(0), None)
+            elif Variable.sort_key(root1.variable) < Variable.sort_key(root2.variable):
+                self.parents[root2.variable] = _SubstValue(c1 / c2, root1.variable)
+            else:
+                self.parents[root1.variable] = _SubstValue(c2 / c1, root2.variable)
+        elif root1.variable is None and root2.variable is not None:
+            self.parents[root2.variable] = _SubstValue(c1 / c2, None)
+        elif root1.variable is not None and root2.variable is None:
+            self.parents[root1.variable] = _SubstValue(c2 / c1, None)
+        else:
+            if c1 != c2:
+                raise InternalRepresentation.Inconsistent()
+
+    def is_redundant(self, val1: _SubstValue, val2: _SubstValue) -> Optional[bool]:
+        """Check if the equation ``val1 == val2`` is redundant modulo self.
+        """
+        root1 = self.internal_find(val1.variable)
+        root2 = self.internal_find(val2.variable)
+        c1 = val1.coefficient * root1.coefficient
+        c2 = val2.coefficient * root2.coefficient
+        if root1.variable is None and root2.variable is None:
+            return c1 == c2
+        if root1.variable is None or root2.variable is None:
+            return None
+        if root1.variable == root2.variable and c1 == c2:
+            return True
+        else:
+            return None
+
+    def equations(self) -> Iterator[Eq]:
+        raise NotImplementedError()
 
 
 @dataclass
@@ -130,13 +219,34 @@ class _BasicKnowledge:
     term: Term
     range: _Range
 
-    def as_subst_value(self) -> Rational:
+    def __post_init__(self) -> None:
+        assert self.term.lc() > 0
+        assert self.term.constant_coefficient() == 0
+        assert self.term.content() == 1
+
+    def as_subst_values(self) -> tuple[_SubstValue, _SubstValue]:
         assert self.is_substitution()
-        assert isinstance(self.range.start, Rational)
-        return self.range.start
+        mons = self.term.monomials()
+        if len(mons) == 1:
+            assert isinstance(self.range.start, Rational)
+            return (_SubstValue(Rational(1), self.term.as_variable()),
+                    _SubstValue(self.range.start, None))
+        else:
+            x1 = mons[0].as_variable()
+            x2 = mons[1].as_variable()
+            c1 = self.term.monomial_coefficient(x1)
+            c2 = self.term.monomial_coefficient(x2)
+            return (_SubstValue(Rational(c1), x1), _SubstValue(Rational(-c2), x2))
 
     def is_substitution(self) -> bool:
-        return self.term.is_variable() and self.range.is_point()
+        if not self.range.is_point():
+            return False
+        mons = self.term.monomials()
+        if len(mons) == 1:
+            return mons[0].is_variable()
+        if len(mons) == 2:
+            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
+        return False
 
     def prune(self, knowl: Knowledge) -> Self:
         try:
@@ -146,11 +256,12 @@ class _BasicKnowledge:
         range_ = range_.intersection(self.range)
         return self.__class__(self.term, range_)
 
-    def subs(self, subst: Substitution) -> Self:
-        c, t = self.term._subsq_rat(subst)
+    def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
+        c, t = self.term._subsq_rat(sigma)
         if t.is_constant():
-            return self.__class__(t, self.range)
-        assert c > 0, (c, t)
+            if c * Rational(t.as_int()) in self.range:
+                return None
+            raise InternalRepresentation.Inconsistent()
         constant_coefficient = t.constant_coefficient()
         t -= constant_coefficient
         content = t.content()
@@ -235,7 +346,7 @@ class InternalRepresentation(
     """
     _options: Options
     _knowl: Knowledge = field(default_factory=dict)
-    _subst: Substitution = field(default_factory=dict)
+    _subst: _Substitution = field(default_factory=_Substitution)
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
@@ -246,14 +357,12 @@ class InternalRepresentation(
         for atom in atoms:
             # print(f'{atom=}')
             # print(f'{self=}')
-            # print()
-            atom = atom.subsq(self._subst)
-            if atom.lhs.is_constant():
-                if bool(atom):
-                    continue
-                else:
-                    raise InternalRepresentation.Inconsistent()
-            bknowl = _BasicKnowledge.from_atom(atom).prune(self._knowl)
+            # assert all(v not in self._subst.as_dict() for v in atom.fvars())
+            assert not atom.lhs.is_constant()
+            maybe_bknowl = _BasicKnowledge.from_atom(atom).subs(self._subst.as_dict())
+            if maybe_bknowl is None:
+                continue
+            bknowl = maybe_bknowl.prune(self._knowl)
             if self._knowl.get(bknowl.term) != bknowl.range:
                 if bknowl.is_substitution():
                     self._add_point(bknowl)
@@ -263,35 +372,25 @@ class InternalRepresentation(
                     if restart is not abc.simplify.Restart.ALL:
                         restart = abc.simplify.Restart.OTHERS
             # print(f'{self=}')
+            # print()
         return restart
 
     def _add_point(self, bknowl: _BasicKnowledge) -> None:
         # print(f'_add_point: {self=}, {bknowl=}')
-        t = bknowl.term
-        q = bknowl.as_subst_value()
-        stack = [(t, q)]
+        assert bknowl.is_substitution()
+        stack = [bknowl]
         while stack:
-            t, q = stack.pop()
-            v = t.as_variable()
-            if v in self._subst:
-                if self._subst[v] != q:
-                    raise InternalRepresentation.Inconsistent()
-                else:
-                    continue
-            else:
-                self._subst[v] = q
+            bknowl = stack.pop()
+            val1, val2 = bknowl.as_subst_values()
+            self._subst.union(val1, val2)
             knowl: Knowledge = dict()
             for t, range_ in self._knowl.items():
-                bknowl = _BasicKnowledge(t, range_).subs({v: q})
-                if bknowl.term.is_constant():
-                    t_as_rational = Rational(bknowl.term.as_int())
-                    if t_as_rational in bknowl.range:
-                        continue
-                    else:
-                        raise InternalRepresentation.Inconsistent()
-                bknowl = bknowl.prune(knowl)
+                maybe_bknowl = _BasicKnowledge(t, range_).subs(self._subst.as_dict())
+                if maybe_bknowl is None:
+                    continue
+                bknowl = maybe_bknowl.prune(knowl)
                 if bknowl.is_substitution():
-                    stack.append((bknowl.term, bknowl.as_subst_value()))
+                    stack.append(bknowl)
                 else:
                     knowl[bknowl.term] = bknowl.range
             self._knowl = knowl
@@ -308,7 +407,10 @@ class InternalRepresentation(
         """
         knowl: Knowledge = dict()
         for t, range_ in ref._knowl.items():
-            bknowl = _BasicKnowledge(t, range_).subs(self._subst).prune(knowl)
+            maybe_bknowl = _BasicKnowledge(t, range_).subs(self._subst.as_dict())
+            if maybe_bknowl is None:
+                continue
+            bknowl = maybe_bknowl.prune(knowl)
             knowl[bknowl.term] = bknowl.range
         # print(f'extract: {ref._knowl=}\n'
         #       f'         {self._knowl=}\n'
@@ -403,26 +505,42 @@ class InternalRepresentation(
             for q in range_.exc:
                 if q not in ref_range.exc:
                     L.append(self._compose_atom(Ne, t, q))
-        for v, q in self._subst.items():
-            if v in ref._subst:
+        known_subst = ref._subst.copy()
+        # print(f'{known_subst=}')
+        items = sorted(self._subst, key=lambda item: Term.sort_key(item[0]))
+        for var, val in items:
+            if known_subst.is_redundant(_SubstValue(Rational(1), var), val):
                 continue
-            subst = {vv: qq for vv, qq in self._subst.items() if vv != v}
+            known_subst.union(_SubstValue(Rational(1), var), val)
+            # print(f'{known_subst=}')
+            subst = {v: qq for v, qq in self._subst.as_dict().items() if v != var}
             knowl = dict()
             for t, range_ in ref._knowl.items():
-                bknowl = _BasicKnowledge(t, range_).subs(subst).prune(knowl)
+                maybe_bknowl = _BasicKnowledge(t, range_).subs(subst)
+                if maybe_bknowl is None:
+                    continue
+                bknowl = maybe_bknowl.prune(knowl)
                 knowl[bknowl.term] = bknowl.range
-            if self._options.prefer_order and gand is Or and v in knowl:
-                ref_range = knowl[v]
+            if val.variable is None:
+                t = var
+                q = val.coefficient
+            else:
+                t = val.coefficient.denom() * var - val.coefficient.numer() * val.variable
+                if t.lc() < 0:
+                    t = -t
+                q = Rational(0)
+            if self._options.prefer_order and gand is Or and t in knowl:
+                ref_range = knowl[t]
                 if q == ref_range.start:
                     assert not ref_range.lopen
-                    L.append(self._compose_atom(Le, v, q))
+                    L.append(self._compose_atom(Le, t, q))
                 elif q == ref_range.end:
                     assert not ref_range.ropen
-                    L.append(self._compose_atom(Ge, v, q))
+                    L.append(self._compose_atom(Ge, t, q))
                 else:
-                    L.append(self._compose_atom(Eq, v, q))
+                    L.append(self._compose_atom(Eq, t, q))
             else:
-                L.append(self._compose_atom(Eq, v, q))
+                L.append(self._compose_atom(Eq, t, q))
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
@@ -435,20 +553,31 @@ class InternalRepresentation(
             subst = self._subst.copy()
         else:
             knowl = {p: q for p, q in self._knowl.items() if remove not in p.vars()}
-            subst = {p: q for p, q in self._subst.items() if p != remove}
+            subst = _Substitution()
+            for var, val in self._subst:
+                if var != remove and (val.variable is None or val.variable != remove):
+                    subst.union(_SubstValue(Rational(1), var), val)
         return self.__class__(self._options, knowl, subst)
 
     def restart(self, ir: Self) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.restart`.
         """
         result = self.next_()
-        for v, q in ir._subst.items():
-            bknowl = _BasicKnowledge(v, _Range(False, q, q, False, set()))
+        for var, val in ir._subst:
+            if val.variable is None:
+                t: Term = var
+                q = val.coefficient
+            else:
+                t = val.coefficient.denom() * var - val.coefficient.numer() * val.variable
+                if t.lc() < 0:
+                    t = -t
+                q = Rational(0)
+            bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
             result._add_point(bknowl)
         return result
 
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
-        atom = atom.subsq(self._subst)
+        atom = atom._subsq_rat(self._subst.as_dict())
         assert atom.rhs == 0
         if atom.lhs.is_constant():
             return Eq(0, 0) if bool(atom) else Eq(1, 0)

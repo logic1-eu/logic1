@@ -10,3 +10,13 @@ u2 == 0
 >>> simplify(And(y - 40 <= 0, Or(And(9*x + 400*y - 20050 <= 0, y - 40 == 0),
 ...          And(9*x + 400*y - 20050 > 0, x - 450 == 0))))
 And(y - 40 == 0, x - 450 <= 0)
+
+# derived from testseries5 in test_simplify_motor.txt
+>>> i2, n, p1, q, td = VV.get('i2', 'n', 'p1', 'q', 'td')
+>>> evil = And(2*p1 - 7 >= 0, 80*i2 + 250*p1 + 2*q - 1457 == 0, i2 == 0, n >= 0, q - 40 <= 0, q >= 0,
+...            Or(And(400*q + 9*td - 20050 <= 0, q == 0),
+...               And(400*q + 9*td - 20050 > 0, 9*td - 20050 == 0)))
+>>> simplify(evil)
+And(q >= 0, q - 40 <= 0, 2*p1 - 7 >= 0, 250*p1 + 2*q - 1457 == 0, n >= 0,
+i2 == 0, Or(And(9*td - 20050 == 0, q > 0), And(9*td - 20050 <= 0, q == 0,
+250*p1 - 1457 == 0)))

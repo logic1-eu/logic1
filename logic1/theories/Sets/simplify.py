@@ -18,7 +18,7 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class UnionFind:
     _parents: dict[Variable, Variable] = field(default_factory=dict)
 

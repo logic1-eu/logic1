@@ -34,9 +34,19 @@ from ..support.tracing import trace  # noqa
 
 
 class Restart(Enum):
+    """Used for the return value of :meth:`.InternalRepresentation:add`.
+    """
     NONE = auto()
+    """No formulas of the current level require resimplification.
+    """
+
     OTHERS = auto()
+    """Non-atoms of the current level require resimplification.
+    """
+
     ALL = auto()
+    """All formulas of the current level require resimplification.
+    """
 
 
 class InternalRepresentation(Generic[α, τ, χ, σ]):
@@ -48,14 +58,18 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
     two abstract pieces of information, *reference* and *current*. Both
     *reference* and *current* hold  information that is equivalent to a
     conjunction of atomic formulas. In the course of recursive simplification
-    in
-    :class:`.abc.simplify.Simplify`, *reference*  is inherited from above;
+    in:class:`.abc.simplify.Simplify`, *reference*  is inherited from above;
     *current* starts with the information from *reference* and is enriched
     with information from all atomic formulas on the toplevel of the
     subformula currently under consideration.
     """
 
     class Inconsistent(Exception):
+        """Indicates that an instance of :class:`InternalRepresentation`
+        contains inconsistent information. This exception is typically handled
+        in :class:`.abc.Simplify` and its derived classes, where appropriate
+        values are returned.
+        """
         pass
 
     @abstractmethod
@@ -183,6 +197,8 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         return self._simpl_nnf(f, ir)
 
     def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
+        """Simplify the negation normal form `f` modulo `ir`.
+        """
         if Formula.is_atomic(f):
             return self._simpl_atomic(f, ir)
         if Formula.is_and(f) or Formula.is_or(f):
@@ -194,8 +210,8 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         assert False, f
 
     def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
-        """
-        `f` must be in negation normal form (NNF).
+        """Simplify the negation normal form `f`, which starts with either
+        :class:`.And` or :class:`.Or`, modulo `ir`.
         """
         ref = ir
         ir = ir.next_()
@@ -261,10 +277,12 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         return gand(*final_atoms, *final_others)
 
     def _simpl_atomic(self, atom: α, ir: ρ) -> Formula[α, τ, χ, σ]:
-        # This method is called for toplevel atoms and for atoms whose context
-        # is a quantifier. Atoms with context And, Or are handled directly in
-        # _simpl_and_or. At the moment a quantifier context is treated the same
-        # way as a toplevel context.
+        """Simplify `atom`, which either stands on the toplevel or is the
+        argument formula of a quantifier, modulo `ir`. At the moment, there is
+        no difference made between these two cases. Argument atoms of
+        :class:`.And`, :class:`.Or` are handled directly in
+        :meth:`._simpl_and_or`.
+        """
         ref = ir
         ir = ir.next_()
         f = self.simpl_at(atom, context=None)
@@ -284,8 +302,8 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
                 assert False, final_atoms
 
     def _simpl_quantified(self, f: QuantifiedFormula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
-        """
-        `f` must be in negation normal form (NNF).
+        """Simplify the negation normal form `f`, which starts with either
+        :class:`.Ex` or :class:`.All`, modulo `ir`.
         """
         ir = ir.next_(remove=f.var)
         simplified_arg = self._simpl_nnf(f.arg, ir)
