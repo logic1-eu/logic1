@@ -791,7 +791,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """
         SYMBOL: Final = {
             Eq: '=', Ne: '<>', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
-        return f'{self.lhs!r} {SYMBOL[self.op]} {self.rhs!r}'
+        return f'({self.lhs!r} {SYMBOL[self.op]} {self.rhs!r})'
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of

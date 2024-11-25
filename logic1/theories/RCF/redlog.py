@@ -1,8 +1,10 @@
 import subprocess
-from typing import Final
+from typing import Final, Iterable
 
 import logic1.firstorder as firstorder
+from logic1.support.excepthook import NoTraceException
 from logic1.theories.RCF.atomic import AtomicFormula, Variable
+from logic1.theories.RCF.qe import GENERIC
 from logic1.theories.RCF.typing import Formula
 
 _START: Final = '889e0d7343405c079195e7b8903c8c9e'
@@ -56,7 +58,7 @@ procedure r2py_qea(l);
     end;
 
 procedure r2py_equation_list(l);
-    begin scalar ans;
+    begin scalar equation, ans;
         pop l;
         if l then <<
             equation := car l;
@@ -139,9 +141,41 @@ def _eval(s: str, variables: set[Variable]) -> object:
     return eval(s, locals() | {str(v): v for v in variables})
 
 
-def gqe(f: Formula) -> tuple[list[AtomicFormula], Formula]:
-    input = f.as_redlog()
-    output = _call_redlog(f'r2py_gqe rlgqe {input}')
+def gqe(f: Formula, generic: GENERIC = GENERIC.FULL) -> tuple[list[AtomicFormula], Formula]:
+    """Generic real quantifier elimination using the Redlog function `rlgqe
+    <https://www.redlog.eu/documentation/service.php?key=rlgqe>`_.
+
+    :param f:
+      The input formula to which quantifier elimination will be applied.
+
+    :returns:
+      A pair `(assumptions, f')`. The formula `f'` is a quantifier-free
+      equivalent of `f` modulo the `assumptions`. All assumptions are
+      instances of :class:`.Ne`; if `generic=GENERIC.MONOMIAL`, then all left
+      hand sides of assumptions are monomial .
+
+    >>> from logic1 import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.MONOMIAL)
+    ([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
+    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.FULL)
+    ([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
+
+    .. seealso::
+      :meth:`.qe` with `generic` in :attr:`.GENERIC.FULL`, :attr:`.GENERIC.MONOMIAL`.
+    """
+    match generic:
+        case GENERIC.NONE:
+            raise NoTraceException('GENERIC.NONE is not supported - use redlog.qe instead')
+        case GENERIC.MONOMIAL:
+            rl_switches = 'off rlqegenct;'
+        case GENERIC.FULL:
+            rl_switches = 'on rlqegenct;'
+        case _:
+            assert False, generic
+    rl_f = f.as_redlog()
+    output = _call_redlog(f'<< {rl_switches} r2py_gqe rlgqe({rl_f}) >>')
     result = _eval(output, _variables(f))
     assert isinstance(result, tuple), result
     assert len(result) == 2, result
@@ -151,9 +185,37 @@ def gqe(f: Formula) -> tuple[list[AtomicFormula], Formula]:
     return result
 
 
-def qe(f: Formula) -> Formula:
-    input = f.as_redlog()
-    output = _call_redlog(f'r2py_formula rlqe {input}')
+def _map_option(logic1_setting: bool, redlog_switch: str) -> str:
+    return f'{"on" if logic1_setting else "off"} {redlog_switch};'
+
+
+def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+    """Real quantifier elimination using the Redlog function `rlqe
+    <https://www.redlog.eu/documentation/service.php?key=rlqe>`_.
+
+    :param f:
+      The input formula to which quantifier elimination will be applied.
+
+    :param assume:
+      A list of atomic formulas that are assumed to hold. The return value
+      is equivalent modulo those assumptions.
+
+    :returns:
+      A quantifier-free equivalent of `f` modulo `assume`.
+
+    >>> from logic1 import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c, x, y = VV.get('a', 'b', 'c', 'x', 'y')
+    >>> redlog.qe(All(x, Ex(y, x**2 + x*y + b > 0 and x + a*y**2 + b <= 0)));
+    a < 0
+    >>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), [b != 0])
+    Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0)
+    >>> redlog.qe(All(x, Ex(y, And(b + x**2 + x*y > 0, a*y**2 + b + x <= 0))))
+    And(b > 0, a < 0)
+    """
+    rl_f = f.as_redlog()
+    rl_assume = '{' + ', '.join(atom.as_redlog() for atom in assume) + '}'
+    output = _call_redlog(f'r2py_formula rlqe({rl_f}, {rl_assume})')
     result = _eval(output, _variables(f))
     assert isinstance(result, firstorder.Formula), result
     return result
@@ -170,9 +232,28 @@ def qea(f: Formula) -> list[tuple[Formula, list[str]]]:
     return result
 
 
-def simplify(f: Formula) -> Formula:
-    input = f.as_redlog()
-    output = _call_redlog(f'r2py_formula rlsimpl {input}')
+def simplify(f: Formula, assume: Iterable[AtomicFormula] = [],
+             explode_always: bool = True, prefer_order: bool = True, prefer_weak: bool = False) \
+        -> Formula:
+    """Simplification using the Redlog function `rlsimpl
+    <https://www.redlog.eu/documentation/service.php?key=simpl>`_.
+
+    :param f:
+      The input formula to which quantifier elimination will be applied.
+
+    :param assume:
+      A list of atomic formulas that are assumed to hold. The return value
+      is equivalent modulo those assumptions.
+
+    :returns:
+      A simplified equivalent of `f` modulo `assume`.
+    """
+    rl_switches = (f'{_map_option(explode_always, "rlsiexpla")} '
+                   f'{_map_option(prefer_order, "rlsipo")} '
+                   f'{_map_option(prefer_weak, "rlsipw")}')
+    rl_f = f.as_redlog()
+    rl_assume = '{' + ', '.join(atom.as_redlog() for atom in assume) + '}'
+    output = _call_redlog(f'<< {rl_switches} r2py_formula rlsimpl({rl_f}, {rl_assume}) >>')
     result = _eval(output, _variables(f))
     assert isinstance(result, firstorder.Formula), result
     return result
