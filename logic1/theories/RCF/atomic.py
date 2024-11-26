@@ -561,6 +561,28 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return [Term(monomial) for monomial in self.poly.monomials()]
 
+    def _reduce_rat(self, G: Iterable[Rational | MPolynomial[Rational]]) -> tuple[Rational, Term]:
+        """Reduce self modulo G. The result (c, p) describes a polynomial q = c
+        * p over Q. c >= 0 is the content of of q, and p is a polynomial over
+        Z. If c == 0, then p == 0.
+        """
+        poly = self.poly.change_ring(QQ).reduce(G)
+        # poly is now a sage polynomial over QQ or a Rational.
+        match poly:
+            case MPolynomial():
+                content = poly.content()
+                try:
+                    poly = poly / content
+                except ZeroDivisionError:
+                    pass
+            case Rational():
+                content = Rational((1, poly.denom()))
+                poly = poly.numer()
+            case _:
+                assert False, type(poly)
+        poly = polynomial_ring(poly)
+        return content, Term(poly)
+
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
         """Quotient and remainder of this term and `other`.
 

@@ -14,7 +14,7 @@ from sage.rings.polynomial.multi_polynomial_libsingular import (
     MPolynomial_libsingular as MPolynomial)
 from sage.rings.infinity import MinusInfinity, PlusInfinity
 from sage.rings.rational import Rational
-from typing import Final, Iterable, Iterator, Optional, Self, TypeAlias
+from typing import Final, Iterable, Iterator, Optional, Self
 
 from ... import abc
 
@@ -26,6 +26,13 @@ from ...support.tracing import trace  # noqa
 
 
 CACHE_SIZE: Final[Optional[int]] = 2**16
+
+
+@dataclass(frozen=True)
+class Options(abc.simplify.Options):
+    explode_always: bool = True
+    prefer_order: bool = True
+    prefer_weak: bool = False
 
 
 @dataclass
@@ -120,9 +127,6 @@ class _Range:
             ropen = self.lopen
         exc = {scale * point + shift for point in self.exc}
         return self.__class__(lopen, start, end, ropen, exc)
-
-
-Knowledge: TypeAlias = dict[Term, _Range]
 
 
 @dataclass(frozen=True)
@@ -224,6 +228,93 @@ class _BasicKnowledge:
         assert self.term.constant_coefficient() == 0
         assert self.term.content() == 1
 
+    def as_atoms(self, ref_range: _Range, gand: type[And | Or], options: Options) \
+            -> list[AtomicFormula]:
+        L = []
+        # range_ cannot be empty because the construction of an empty range
+        # raises an exception during `add`.
+        if self.range.is_point():
+            # Pick the one point of self.range.
+            q = self.range.start
+            assert isinstance(q, Rational)
+            if ref_range.is_point():
+                assert q == ref_range.start
+                # throw away the point q, which is equal to the point
+                # describe by ref_range
+            else:
+                assert q in ref_range
+                # When gand is And, the equation q = 0 is generally
+                # preferable. Otherwise, q = 0 would become q != 0
+                # via subsequent negation, and we want to take
+                # options.prefer_order into consideration.
+                if options.prefer_order and gand is Or:
+                    if q == ref_range.start:
+                        assert not ref_range.lopen
+                        L.append(self._compose_atom(Le, self.term, q))
+                    elif q == ref_range.end:
+                        assert not ref_range.ropen
+                        L.append(self._compose_atom(Ge, self.term, q))
+                    else:
+                        L.append(self._compose_atom(Eq, self.term, q))
+                else:
+                    L.append(self._compose_atom(Eq, self.term, q))
+        else:
+            # print(f'{t=}, {ref_ivl=}, {ivl=}')
+            #
+            # We know that ref_range is a proper interval, too, because
+            # self.range is a subset of ref_range.
+            assert not ref_range.is_point()
+            if ref_range.start < self.range.start:
+                if self.range.start in ref_range.exc:
+                    # When gand is Or, weak and strong are dualized via
+                    # subsequent negation.
+                    if xor(options.prefer_weak, gand is Or):
+                        L.append(self._compose_atom(Ge, self.term, self.range.start))
+                    else:
+                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                else:
+                    if self.range.lopen:
+                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                    else:
+                        L.append(self._compose_atom(Ge, self.term, self.range.start))
+            elif ref_range.start == self.range.start:
+                if not ref_range.lopen and self.range.lopen:
+                    # When gand is Or, Ne will become Eq via subsequent
+                    # nagation. This is generally preferable.
+                    if options.prefer_order and gand is And:
+                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                    else:
+                        L.append(self._compose_atom(Ne, self.term, self.range.start))
+            else:
+                assert False
+            if self.range.end < ref_range.end:
+                if self.range.end in ref_range.exc:
+                    # When gand is Or, weak and strong are dualized via
+                    # subsequent negation.
+                    if xor(options.prefer_weak, gand is Or):
+                        L.append(self._compose_atom(Le, self.term, self.range.end))
+                    else:
+                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                else:
+                    if self.range.ropen:
+                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                    else:
+                        L.append(self._compose_atom(Le, self.term, self.range.end))
+            elif ref_range.end == self.range.end:
+                if not ref_range.ropen and self.range.ropen:
+                    # When gand is Or, Ne will become Eq via subsequent
+                    # nagation. This is generally preferable.
+                    if options.prefer_order and gand is And:
+                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                    else:
+                        L.append(self._compose_atom(Ne, self.term, self.range.end))
+            else:
+                assert False
+        for q in self.range.exc:
+            if q not in ref_range.exc:
+                L.append(self._compose_atom(Ne, self.term, q))
+        return L
+
     def as_subst_values(self) -> tuple[_SubstValue, _SubstValue]:
         assert self.is_substitution()
         mons = self.term.monomials()
@@ -238,6 +329,13 @@ class _BasicKnowledge:
             c2 = self.term.monomial_coefficient(x2)
             return (_SubstValue(Rational(c1), x1), _SubstValue(Rational(-c2), x2))
 
+    @staticmethod
+    @lru_cache(maxsize=CACHE_SIZE)
+    def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
+        num = q.numer()
+        den = q.denom()
+        return rel(den * t - num, 0)
+
     def is_substitution(self) -> bool:
         if not self.range.is_point():
             return False
@@ -248,16 +346,9 @@ class _BasicKnowledge:
             return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
         return False
 
-    def prune(self, knowl: Knowledge) -> Self:
-        try:
-            range_ = knowl[self.term]
-        except KeyError:
-            return self
-        range_ = range_.intersection(self.range)
-        return self.__class__(self.term, range_)
-
     def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
-        c, t = self.term._subsq_rat(sigma)
+        G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
+        c, t = self.term._reduce_rat(G)
         if t.is_constant():
             if c * Rational(t.as_int()) in self.range:
                 return None
@@ -327,11 +418,51 @@ class _BasicKnowledge:
         return cls(p, range_)
 
 
-@dataclass(frozen=True)
-class Options(abc.simplify.Options):
-    explode_always: bool = True
-    prefer_order: bool = True
-    prefer_weak: bool = False
+@dataclass
+class _Knowledge:
+
+    dict_: dict[Term, _Range] = field(default_factory=dict)
+
+    def __contains__(self, t: Term) -> bool:
+        return t in self.dict_
+
+    def __getitem__(self, t: Term) -> _Range:
+        return self.dict_[t]
+
+    def __iter__(self) -> Iterator[_BasicKnowledge]:
+        for t, range_ in self.dict_.items():
+            yield _BasicKnowledge(t, range_)
+
+    def add(self, bknowl: _BasicKnowledge) -> None:
+        bknowl = self.prune(bknowl)
+        self.dict_[bknowl.term] = bknowl.range
+
+    def copy(self) -> Self:
+        return self.__class__(self.dict_.copy())
+
+    def get(self, key: Term, default: _Range = _Range(True, -oo, oo, True, set())) -> _Range:
+        return self.dict_.get(key, default)
+
+    def is_known(self, bknowl: _BasicKnowledge) -> bool:
+        bknowl = self.prune(bknowl)
+        return self.get(bknowl.term) != bknowl.range
+
+    def prune(self, bknowl: _BasicKnowledge) -> _BasicKnowledge:
+        try:
+            range_ = self.dict_[bknowl.term]
+        except KeyError:
+            return bknowl
+        range_ = range_.intersection(bknowl.range)
+        return bknowl.__class__(bknowl.term, range_)
+
+    def subs(self, subst: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Self:
+        knowl = self.__class__()
+        for bknowl in self:
+            maybe_bknowl = bknowl.subs(subst)
+            if maybe_bknowl is None:
+                continue
+            knowl.add(maybe_bknowl)
+        return knowl
 
 
 @dataclass
@@ -345,7 +476,7 @@ class InternalRepresentation(
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
     _options: Options
-    _knowl: Knowledge = field(default_factory=dict)
+    _knowl: _Knowledge = field(default_factory=_Knowledge)
     _subst: _Substitution = field(default_factory=_Substitution)
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
@@ -362,38 +493,32 @@ class InternalRepresentation(
             maybe_bknowl = _BasicKnowledge.from_atom(atom).subs(self._subst.as_dict())
             if maybe_bknowl is None:
                 continue
-            bknowl = maybe_bknowl.prune(self._knowl)
-            if self._knowl.get(bknowl.term) != bknowl.range:
+            bknowl = self._knowl.prune(maybe_bknowl)
+            if self._knowl.is_known(maybe_bknowl):
                 if bknowl.is_substitution():
-                    self._add_point(bknowl)
+                    self._propagate(bknowl)
                     restart = abc.simplify.Restart.ALL
                 else:
-                    self._knowl[bknowl.term] = bknowl.range
+                    self._knowl.add(bknowl)
                     if restart is not abc.simplify.Restart.ALL:
                         restart = abc.simplify.Restart.OTHERS
             # print(f'{self=}')
             # print()
         return restart
 
-    def _add_point(self, bknowl: _BasicKnowledge) -> None:
-        # print(f'_add_point: {self=}, {bknowl=}')
+    def _propagate(self, bknowl: _BasicKnowledge) -> None:
+        # print(f'_propagate: {self=}, {bknowl=}')
         assert bknowl.is_substitution()
         stack = [bknowl]
         while stack:
-            bknowl = stack.pop()
-            val1, val2 = bknowl.as_subst_values()
-            self._subst.union(val1, val2)
-            knowl: Knowledge = dict()
-            for t, range_ in self._knowl.items():
-                maybe_bknowl = _BasicKnowledge(t, range_).subs(self._subst.as_dict())
-                if maybe_bknowl is None:
-                    continue
-                bknowl = maybe_bknowl.prune(knowl)
+            for bknowl in stack:
+                val1, val2 = bknowl.as_subst_values()
+                self._subst.union(val1, val2)
+            stack = []
+            self._knowl = self._knowl.subs(self._subst.as_dict())
+            for bknowl in self._knowl:
                 if bknowl.is_substitution():
                     stack.append(bknowl)
-                else:
-                    knowl[bknowl.term] = bknowl.range
-            self._knowl = knowl
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
@@ -405,106 +530,16 @@ class InternalRepresentation(
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
-        knowl: Knowledge = dict()
-        for t, range_ in ref._knowl.items():
-            maybe_bknowl = _BasicKnowledge(t, range_).subs(self._subst.as_dict())
-            if maybe_bknowl is None:
-                continue
-            bknowl = maybe_bknowl.prune(knowl)
-            knowl[bknowl.term] = bknowl.range
+
+        knowl = ref._knowl.subs(self._subst.as_dict())
         # print(f'extract: {ref._knowl=}\n'
         #       f'         {self._knowl=}\n'
         #       f'         {self._subst=}\n'
         #       f'         {knowl=}')
         L: list[AtomicFormula] = []
-        for t in self._knowl:
-            if t in knowl:
-                ref_range = knowl[t]
-            else:
-                ref_range = _Range(True, -oo, oo, True, set())
-            range_ = self._knowl[t]
-            # range_ cannot be empty because the construction of an empty range
-            # raises an exception during `add`.
-            if range_.is_point():
-                # Pick the one point of range_.
-                q = range_.start
-                assert isinstance(q, Rational)
-                if ref_range.is_point():
-                    assert q == ref_range.start
-                    # throw away the point q, which is equal to the point
-                    # describe by ref_range
-                else:
-                    assert q in ref_range
-                    # When gand is And, the equation q = 0 is generally
-                    # preferable. Otherwise, q = 0 would become q != 0
-                    # via subsequent negation, and we want to take
-                    # self._options.prefer_order into consideration.
-                    if self._options.prefer_order and gand is Or:
-                        if q == ref_range.start:
-                            assert not ref_range.lopen
-                            L.append(self._compose_atom(Le, t, q))
-                        elif q == ref_range.end:
-                            assert not ref_range.ropen
-                            L.append(self._compose_atom(Ge, t, q))
-                        else:
-                            L.append(self._compose_atom(Eq, t, q))
-                    else:
-                        L.append(self._compose_atom(Eq, t, q))
-            else:
-                # print(f'{t=}, {ref_ivl=}, {ivl=}')
-                #
-                # We know that ref_range is a proper interval, too, because
-                # range_ is a subset of ref_range.
-                assert not ref_range.is_point()
-                if ref_range.start < range_.start:
-                    if range_.start in ref_range.exc:
-                        # When gand is Or, weak and strong are dualized via
-                        # subsequent negation.
-                        if xor(self._options.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Ge, t, range_.start))
-                        else:
-                            L.append(self._compose_atom(Gt, t, range_.start))
-                    else:
-                        if range_.lopen:
-                            L.append(self._compose_atom(Gt, t, range_.start))
-                        else:
-                            L.append(self._compose_atom(Ge, t, range_.start))
-                elif ref_range.start == range_.start:
-                    if not ref_range.lopen and range_.lopen:
-                        # When gand is Or, Ne will become Eq via subsequent
-                        # nagation. This is generally preferable.
-                        if self._options.prefer_order and gand is And:
-                            L.append(self._compose_atom(Gt, t, range_.start))
-                        else:
-                            L.append(self._compose_atom(Ne, t, range_.start))
-                else:
-                    assert False, (self, (t, range_))
-                if range_.end < ref_range.end:
-                    if range_.end in ref_range.exc:
-                        # When gand is Or, weak and strong are dualized via
-                        # subsequent negation.
-                        if xor(self._options.prefer_weak, gand is Or):
-                            L.append(self._compose_atom(Le, t, range_.end))
-                        else:
-                            L.append(self._compose_atom(Lt, t, range_.end))
-                    else:
-                        if range_.ropen:
-                            L.append(self._compose_atom(Lt, t, range_.end))
-                        else:
-                            L.append(self._compose_atom(Le, t, range_.end))
-                elif ref_range.end == range_.end:
-                    if not ref_range.ropen and range_.ropen:
-                        # When gand is Or, Ne will become Eq via subsequent
-                        # nagation. This is generally preferable.
-                        if self._options.prefer_order and gand is And:
-                            L.append(self._compose_atom(Lt, t, range_.end))
-                        else:
-                            L.append(self._compose_atom(Ne, t, range_.end))
-                else:
-                    assert False
-            for q in range_.exc:
-                if q not in ref_range.exc:
-                    L.append(self._compose_atom(Ne, t, q))
+        for bknowl in self._knowl:
+            ref_range = knowl.get(bknowl.term)
+            L.extend(bknowl.as_atoms(ref_range, gand, self._options))
         known_subst = ref._subst.copy()
         # print(f'{known_subst=}')
         items = sorted(self._subst, key=lambda item: Term.sort_key(item[0]))
@@ -513,16 +548,10 @@ class InternalRepresentation(
                 continue
             known_subst.union(_SubstValue(Rational(1), var), val)
             # print(f'{known_subst=}')
-            subst = {v: qq for v, qq in self._subst.as_dict().items() if v != var}
-            knowl = dict()
-            for t, range_ in ref._knowl.items():
-                maybe_bknowl = _BasicKnowledge(t, range_).subs(subst)
-                if maybe_bknowl is None:
-                    continue
-                bknowl = maybe_bknowl.prune(knowl)
-                knowl[bknowl.term] = bknowl.range
+            subst = {v: q for v, q in self._subst.as_dict().items() if v != var}
+            knowl = ref._knowl.subs(subst)
             if val.variable is None:
-                t = var
+                t: Term = var
                 q = val.coefficient
             else:
                 t = val.coefficient.denom() * var - val.coefficient.numer() * val.variable
@@ -552,7 +581,10 @@ class InternalRepresentation(
             knowl = self._knowl.copy()
             subst = self._subst.copy()
         else:
-            knowl = {p: q for p, q in self._knowl.items() if remove not in p.vars()}
+            knowl = _Knowledge()
+            for bknowl in self._knowl:
+                if remove not in bknowl.term.vars():
+                    knowl.add(bknowl)
             subst = _Substitution()
             for var, val in self._subst:
                 if var != remove and (val.variable is None or val.variable != remove):
@@ -573,12 +605,14 @@ class InternalRepresentation(
                     t = -t
                 q = Rational(0)
             bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
-            result._add_point(bknowl)
+            result._propagate(bknowl)
         return result
 
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
-        atom = atom._subsq_rat(self._subst.as_dict())
+        G = {key.poly.change_ring(QQ) - val for key, val in self._subst.as_dict().items()}
         assert atom.rhs == 0
+        _, lhs = atom.lhs._reduce_rat(G)
+        atom = atom.op(lhs, 0)
         if atom.lhs.is_constant():
             return Eq(0, 0) if bool(atom) else Eq(1, 0)
         if atom.lhs.lc() < 0:
