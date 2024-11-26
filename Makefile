@@ -6,6 +6,9 @@ ignores = "--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt"
 pytest:
 	pytest -n 8 --exitfirst --doctest-modules $(ignores)
 
+pytest-fast:
+	PYTHONOPTIMIZE=TRUE pytest -n 8 --disable-warnings --exitfirst --doctest-modules $(ignores)
+
 pytest-seq:
 	pytest --exitfirst --doctest-modules $(ignores)
 

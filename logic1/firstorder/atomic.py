@@ -97,13 +97,15 @@ class VariableSet(Generic[χ]):
         try:
             assert isinstance(frame, FrameType)
             module = frame.f_globals['__name__']
-            assert module == '__main__', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is module {module}'
+            if module != '__main__':
+                raise RuntimeError(
+                    f'expecting imp to be called from the top level of module __main__; '
+                    f'context is module {module}')
             function = frame.f_code.co_name
-            assert function == '<module>', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is function {function} in module {module}'
+            if function != '<module>':
+                raise RuntimeError(
+                    f'expecting imp to be called from the top level of module __main__; '
+                    f'context is function {function} in module {module}')
             for v in vars_:
                 frame.f_globals[str(v)] = v
         finally:

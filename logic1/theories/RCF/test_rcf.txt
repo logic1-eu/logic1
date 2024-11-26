@@ -9,4 +9,4 @@ a*x + b == 0
 >>> any_function()
 Traceback (most recent call last):
 ...
-AssertionError: expecting imp to be called from the top level of module __main__; context is function any_function in module __main__
+RuntimeError: expecting imp to be called from the top level of module __main__; context is function any_function in module __main__
