@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, Iterator, Optional, TypeVar
+from typing import Generic, Iterable, Iterator, Optional, TypeVar
 
 # Strangely, the following import is not made in
 # sage/rings/polynomial/multi_polynomial_libsingular.pyx
@@ -154,6 +154,9 @@ class MPolynomial_libsingular(Generic[ρ]):
         ...
 
     def quo_rem(self, right: Self) -> tuple[Self, Self]:
+        ...
+
+    def reduce(self, i: Iterable[Self]) -> Self:
         ...
 
     def subs(self, fixed: Optional[dict[Self, ρ]] = None, **kw) -> Self:

@@ -346,24 +346,43 @@ class _BasicKnowledge:
             return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
         return False
 
+    # def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
+    #     G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
+    #     c, t = self.term._reduce_rat(G)
+    #     if t.is_constant():
+    #         if c * Rational(t.as_int()) in self.range:
+    #             return None
+    #         raise InternalRepresentation.Inconsistent()
+    #     constant_coefficient = t.constant_coefficient()
+    #     t -= constant_coefficient
+    #     content = t.content()
+    #     t /= content
+    #     c *= content
+    #     shift = Rational((constant_coefficient, content))
+    #     if t.lc() < 0:
+    #         t = -t
+    #         c = -c
+    #         shift = -shift
+    #     range_ = self.range.transform(~c, -shift)
+    #     return self.__class__(t, range_)
+
     def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
-        G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
-        c, t = self.term._reduce_rat(G)
+        G = [key - val for key, val in sigma.items()]
+        t = self.term.reduce(G)
+        constant_coefficient = Rational(t.constant_coefficient())
         if t.is_constant():
-            if c * Rational(t.as_int()) in self.range:
+            if constant_coefficient in self.range:
                 return None
             raise InternalRepresentation.Inconsistent()
-        constant_coefficient = t.constant_coefficient()
         t -= constant_coefficient
-        content = t.content()
+        content = Rational(t.content())
         t /= content
-        c *= content
-        shift = Rational((constant_coefficient, content))
+        shift = constant_coefficient / content
         if t.lc() < 0:
             t = -t
-            c = -c
+            content = -content
             shift = -shift
-        range_ = self.range.transform(~c, -shift)
+        range_ = self.range.transform(~content, -shift)
         return self.__class__(t, range_)
 
     @classmethod
@@ -386,15 +405,15 @@ class _BasicKnowledge:
         """
         rel = f.op
         lhs = f.lhs
-        q = -lhs.constant_coefficient()
+        q = Rational(-lhs.constant_coefficient())
         p = lhs + q
-        c = p.content()
+        c = Rational(p.content())
         p /= c
         # Given that _simpl_at has produced a primitive polynomial, q != 0
         # will not be divisible by c. This is relevant for the reconstruction
         # in _compose_atom to work.
-        assert c == 1 or not q % c == 0, f'{c} divides {q}'
-        r = Rational((q, c))
+        # assert c == 1 or not q % c == 0, f'{c} divides {q}'
+        r = q / c
         if p.lc() < 0:
             rel = rel.converse()
             p = -p
@@ -609,9 +628,9 @@ class InternalRepresentation(
         return result
 
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
-        G = {key.poly.change_ring(QQ) - val for key, val in self._subst.as_dict().items()}
+        G = {key - val for key, val in self._subst.as_dict().items()}
         assert atom.rhs == 0
-        _, lhs = atom.lhs._reduce_rat(G)
+        lhs = atom.lhs.reduce(G)
         atom = atom.op(lhs, 0)
         if atom.lhs.is_constant():
             return Eq(0, 0) if bool(atom) else Eq(1, 0)
@@ -773,7 +792,7 @@ class Simplify(abc.simplify.Simplify[
             # In the following if-condition, the __bool__ method of atom.op
             # will be called.
             return _T() if atom.op(lhs, 0) else _F()
-        lhs /= lhs.content()
+        lhs /= Rational(lhs.content())
         match atom:
             case Eq():
                 return _simpl_at_eq_ne(Eq, lhs, context)

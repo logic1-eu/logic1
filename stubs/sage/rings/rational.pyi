@@ -1,6 +1,8 @@
 from typing import Any
 
 from fractions import Fraction
+
+from gmpy2 import mpq
 from sage.rings.integer import Integer
 
 
@@ -42,7 +44,7 @@ class Rational:
         # Don't quite know how to deal with the infinities.
         ...
 
-    def __init__(self, arg: int | Fraction | tuple[int | Integer, int | Integer]) -> None:
+    def __init__(self, arg: int | mpq | Fraction | tuple[int | Integer, int | Integer]) -> None:
         ...
 
     def __invert__(self) -> Self:
