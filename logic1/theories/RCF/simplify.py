@@ -224,9 +224,8 @@ class _BasicKnowledge:
     range: _Range
 
     def __post_init__(self) -> None:
-        assert self.term.lc() > 0
+        assert self.term.lc() == 1, self
         assert self.term.constant_coefficient() == 0
-        assert self.term.content() == 1
 
     def as_atoms(self, ref_range: _Range, gand: type[And | Or], options: Options) \
             -> list[AtomicFormula]:
@@ -332,6 +331,12 @@ class _BasicKnowledge:
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
     def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
+        lhs = t - q
+        lhs /= Rational(lhs.content())
+        return rel(lhs, 0)
+
+    @staticmethod
+    def _compose_atom_old(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
         num = q.numer()
         den = q.denom()
         return rel(den * t - num, 0)
@@ -346,43 +351,39 @@ class _BasicKnowledge:
             return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
         return False
 
-    # def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
-    #     G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
-    #     c, t = self.term._reduce_rat(G)
-    #     if t.is_constant():
-    #         if c * Rational(t.as_int()) in self.range:
-    #             return None
-    #         raise InternalRepresentation.Inconsistent()
-    #     constant_coefficient = t.constant_coefficient()
-    #     t -= constant_coefficient
-    #     content = t.content()
-    #     t /= content
-    #     c *= content
-    #     shift = Rational((constant_coefficient, content))
-    #     if t.lc() < 0:
-    #         t = -t
-    #         c = -c
-    #         shift = -shift
-    #     range_ = self.range.transform(~c, -shift)
-    #     return self.__class__(t, range_)
-
     def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
         G = [key - val for key, val in sigma.items()]
         t = self.term.reduce(G)
-        constant_coefficient = Rational(t.constant_coefficient())
         if t.is_constant():
-            if constant_coefficient in self.range:
+            if Rational(t.constant_coefficient()) in self.range:
                 return None
             raise InternalRepresentation.Inconsistent()
+        lc = Rational(t.lc())
+        t /= lc
+        q = Rational(t.constant_coefficient())
+        t -= q
+        range_ = self.range.transform(~lc, -q)
+        return self.__class__(t, range_)
+
+    def subs_old(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') \
+            -> Optional[Self]:
+        G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
+        c, t = self.term._reduce_rat(G)  # type: ignore
+        if t.is_constant():
+            if c * Rational(t.as_int()) in self.range:
+                return None
+            raise InternalRepresentation.Inconsistent()
+        constant_coefficient = t.constant_coefficient()
         t -= constant_coefficient
-        content = Rational(t.content())
+        content = t.content()
         t /= content
-        shift = constant_coefficient / content
+        c *= content
+        shift = Rational((constant_coefficient, content))
         if t.lc() < 0:
             t = -t
-            content = -content
+            c = -c
             shift = -shift
-        range_ = self.range.transform(~content, -shift)
+        range_ = self.range.transform(~c, -shift)
         return self.__class__(t, range_)
 
     @classmethod
@@ -403,6 +404,35 @@ class _BasicKnowledge:
         >>> (f.lhs.poly / g.lhs.poly)
         3
         """
+        rel = f.op
+        lhs = f.lhs
+        lc = Rational(lhs.lc())
+        if lc < 0:
+            rel = rel.converse()
+        lhs /= lc
+        q = -Rational(lhs.constant_coefficient())
+        term = lhs + q
+        # rel is the (possibly conversed) relation of atom, term is the monic
+        # parametric part, and q is the negative constant coefficient.
+        if rel is Eq:
+            range_ = _Range(False, q, q, False, set())
+        elif rel is Ne:
+            range_ = _Range(True, -oo, oo, True, {q})
+        elif rel is Ge:
+            range_ = _Range(False, q, oo, True, set())
+        elif rel is Le:
+            range_ = _Range(True, -oo, q, False, set())
+        elif rel is Gt:
+            range_ = _Range(True, q, oo, True, set())
+        elif rel is Lt:
+            range_ = _Range(True, -oo, q, True, set())
+        else:
+            assert False, rel
+        return cls(term, range_)
+
+    @classmethod
+    @lru_cache(maxsize=CACHE_SIZE)
+    def from_atom_old(cls, f: AtomicFormula) -> Self:
         rel = f.op
         lhs = f.lhs
         q = Rational(-lhs.constant_coefficient())
@@ -613,6 +643,19 @@ class InternalRepresentation(
     def restart(self, ir: Self) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.restart`.
         """
+        result = self.next_()
+        for var, val in ir._subst:
+            if val.variable is None:
+                t: Term = var
+                q = val.coefficient
+            else:
+                t = var - val.coefficient * val.variable
+                q = Rational(0)
+            bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
+            result._propagate(bknowl)
+        return result
+
+    def restart_old(self, ir: Self) -> Self:
         result = self.next_()
         for var, val in ir._subst:
             if val.variable is None:
