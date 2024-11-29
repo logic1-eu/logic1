@@ -6,8 +6,8 @@ from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
 
 from gmpy2 import mpq
 from sage.all import QQ
-# Importing QQ from sage.rings.rational_fields does not work. In fact, a fresh
-# instance of RationalField is assigned to QQ in sage.all.
+# Importing QQ from sage.rings.rational_fields causes problems. Notably, a
+# fresh instance of RationalField is assigned to QQ in sage.all.
 from sage.misc.latex import latex as sage_latex
 from sage.rings.integer import Integer
 from sage.rings.polynomial.multi_polynomial_libsingular import (
@@ -206,6 +206,8 @@ class Term(firstorder.Term['Term', 'Variable', int]):
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly + other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly + Rational(other))
         return Term(self.poly + other)
 
     def __eq__(self, other: Term | int) -> Eq:  # type: ignore[override]
@@ -272,6 +274,8 @@ class Term(firstorder.Term['Term', 'Variable', int]):
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly * other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly * Rational(other))
         return Term(self.poly * other)
 
     def __ne__(  # type: ignore[override]
@@ -291,26 +295,37 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return str(self.poly)
 
     def __radd__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__add__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) + self.poly)
         return Term(other + self.poly)
 
     def __rmul__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) * self.poly)
         return Term(other * self.poly)
 
     def __rsub__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) - self.poly)
         return Term(other - self.poly)
 
     def __sub__(self, other: object) -> Term:
         if isinstance(other, Term):
-            return self + (-other)
+            return Term(self.poly - other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly - Rational(other))
         return Term(self.poly - other)
 
     def __truediv__(self, other: object) -> Term:
-        # x*y / x yields y as a Sage rational function and throws here.
         if isinstance(other, Term):
             return Term(self.poly / other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly / Rational(other))
+        # x*y / x would yield y as a Sage rational function and raise and
+        # exception.
         return Term(self.poly / other)
 
     def __xor__(self, other: object) -> Term:

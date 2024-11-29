@@ -7,17 +7,14 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 from dataclasses import dataclass, field
 from functools import lru_cache
 from operator import xor
-from sage.all import oo, product, QQ
-# Importing QQ from sage.rings.rational_fields does not work. In fact, a fresh
-# instance of RationalField is assigned to QQ in sage.all.
-from sage.rings.polynomial.multi_polynomial_libsingular import (
-    MPolynomial_libsingular as MPolynomial)
+
+from gmpy2 import mpq
+from sage.all import oo, product
 from sage.rings.infinity import MinusInfinity, PlusInfinity
 from sage.rings.rational import Rational
 from typing import Final, Iterable, Iterator, Optional, Self
 
 from ... import abc
-
 from ...firstorder import And, _F, Not, Or, _T
 from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Term, TSQ, Variable
 from .typing import Formula
@@ -43,105 +40,147 @@ class _Range:
     """
 
     lopen: bool = True
-    start: Rational | MinusInfinity = -oo
-    end: Rational | PlusInfinity = oo
+    _start: Rational | MinusInfinity = -oo
+    _end: Rational | PlusInfinity = oo
     ropen: bool = True
-    exc: set[Rational] = field(default_factory=set)
+    _exc: set[Rational] = field(default_factory=set)
 
-    def __contains__(self, q: Rational) -> bool:
-        if q < self.start or (self.lopen and q == self.start):
+    @property
+    def start(self) -> mpq | MinusInfinity:
+        if isinstance(self._start, Rational):
+            return mpq(self._start)
+        return -oo
+
+    @start.setter
+    def start(self, arg: mpq | MinusInfinity) -> None:
+        if isinstance(arg, mpq):
+            self._start = Rational(arg)
+        self._start = -oo
+
+    @property
+    def end(self) -> mpq | PlusInfinity:
+        if isinstance(self._end, Rational):
+            return mpq(self._end)
+        return oo
+
+    @end.setter
+    def end(self, arg: mpq | PlusInfinity) -> None:
+        if isinstance(arg, mpq):
+            self._end = Rational(arg)
+        self._end = oo
+
+    @property
+    def exc(self) -> set[mpq]:
+        return {mpq(q) for q in self._exc}
+
+    @exc.setter
+    def exc(self, args: set[mpq]) -> None:
+        self._exc = {Rational(x) for x in args}
+
+    def __contains__(self, x: mpq) -> bool:
+        q = Rational(x)
+        if q < self._start or (self.lopen and q == self._start):
             return False
-        if self.end < q or (self.ropen and q == self.end):
+        if self._end < q or (self.ropen and q == self._end):
             return False
-        if q in self.exc:
+        if q in self._exc:
             return False
         return True
 
-    def __post_init__(self) -> None:
-        if self.start > self.end:
+    def __init__(self, lopen: bool = True, start: mpq | Rational | MinusInfinity = -oo,
+                 end: mpq | Rational | PlusInfinity = oo, ropen: bool = True,
+                 exc: set[mpq] | set[Rational] = set()) -> None:
+        self.lopen = lopen
+        self._start = Rational(start) if isinstance(start, mpq) else start
+        self._end = Rational(end) if isinstance(end, mpq) else end
+        self.ropen = ropen
+        self._exc = {Rational(x) if isinstance(x, mpq) else x for x in exc}
+        if self._start > self._end:
             raise InternalRepresentation.Inconsistent()
-        if (self.lopen or self.ropen) and self.start == self.end:
+        if (self.lopen or self.ropen) and self._start == self._end:
             raise InternalRepresentation.Inconsistent()
-        assert self.lopen or self.start is not -oo, self
-        assert self.ropen or self.end is not oo, self
-        assert all(self.start < x < self.end for x in self.exc), self
+        assert self.lopen or self._start is not -oo, self
+        assert self.ropen or self._end is not oo, self
+        assert all(self._start < x < self._end for x in self._exc), self
+
+    def __str__(self):
+        left = '(' if self.lopen else '['
+        right = ')' if self.ropen else ']'
+        return f'{left}{self._start}, {self._end}{right} \\ {self._exc}'
 
     def intersection(self, other: Self) -> Self:
-        if self.start < other.start:
+        if self._start < other._start:
             lopen = other.lopen
-            start = other.start
-        elif other.start < self.start:
+            _start = other._start
+        elif other._start < self._start:
             lopen = self.lopen
-            start = self.start
+            _start = self._start
         else:
-            assert self.start == other.start
-            start = self.start
+            assert self._start == other._start
+            _start = self._start
             lopen = self.lopen or other.lopen
-        if self.end < other.end:
-            end = self.end
+        if self._end < other._end:
+            _end = self._end
             ropen = self.ropen
-        elif other.end < self.end:
-            end = other.end
+        elif other._end < self._end:
+            _end = other._end
             ropen = other.ropen
         else:
-            assert self.end == other.end
-            end = self.end
+            assert self._end == other._end
+            _end = self._end
             ropen = self.ropen or other.ropen
         # Fix the case that ivl is closed on either side and the corresponding
         # endpoint is in self.exc or other.exc
-        if start in self.exc or start in other.exc:
+        if _start in self._exc or _start in other._exc:
             lopen = True
-        if end in self.exc or end in other.exc:
+        if _end in self._exc or _end in other._exc:
             ropen = True
-        exc = set()
-        for x in self.exc:
-            if start < x < end:
-                exc.add(x)
-        for x in other.exc:
-            if start < x < end:
-                exc.add(x)
-        return self.__class__(lopen, start, end, ropen, exc)
+        _exc = set()
+        for x in self._exc:
+            if _start < x < _end:
+                _exc.add(x)
+        for x in other._exc:
+            if _start < x < _end:
+                _exc.add(x)
+        return self.__class__(lopen, _start, _end, ropen, _exc)
 
     def is_point(self) -> bool:
         # It is assumed and has been asserted that the interval is not empty.
-        return self.start == self.end
+        return self._start == self._end
 
     def is_zero(self) -> bool:
-        return self.is_point() and self.start == 0
+        return self.is_point() and self._start == 0
 
-    def __repr__(self):
-        left = '(' if self.lopen else '['
-        right = ')' if self.ropen else ']'
-        return f'{left}{self.start}, {self.end}{right} \\ {self.exc}'
-
-    def transform(self, scale: Rational, shift: Rational) -> Self:
-        if scale >= 0:
+    def transform(self, scale: mpq, shift: mpq) -> Self:
+        _scale = Rational(scale)
+        _shift = Rational(shift)
+        if _scale >= 0:
             lopen = self.lopen
-            start: Rational | MinusInfinity = scale * self.start + shift
-            end: Rational | PlusInfinity = scale * self.end + shift
+            _start: Rational | MinusInfinity = _scale * self._start + _shift
+            _end: Rational | PlusInfinity = _scale * self._end + _shift
             ropen = self.ropen
         else:
             lopen = self.ropen
-            start = scale * self.end + shift
-            end = scale * self.start + shift
+            _start = _scale * self._end + _shift
+            _end = _scale * self._start + _shift
             ropen = self.lopen
-        exc = {scale * point + shift for point in self.exc}
-        return self.__class__(lopen, start, end, ropen, exc)
+        _exc = {_scale * point + _shift for point in self._exc}
+        return self.__class__(lopen, _start, _end, ropen, _exc)
 
 
 @dataclass(frozen=True)
 class _SubstValue:
-    coefficient: Rational
+    coefficient: mpq
     variable: Optional[Variable]
 
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
 
-    def as_rational(self) -> 'Rational | MPolynomial[Rational]':
+    def as_term(self) -> Term:
         if self.variable is None:
-            return self.coefficient
+            return Term(self.coefficient)
         else:
-            return self.coefficient * self.variable.poly.change_ring(QQ)
+            return self.coefficient * self.variable
 
 
 @dataclass(unsafe_hash=True)
@@ -152,11 +191,11 @@ class _Substitution:
         for var in self.parents:
             yield var, self.find(var)
 
-    def as_dict(self) -> 'dict[Variable, Rational | MPolynomial[Rational]]':
+    def as_dict(self) -> dict[Variable, Term]:
         """Convert this :class:._Substitution` into a dictionary that can used
         as an argument to subsitution methods.
         """
-        return {var: val.as_rational() for var, val in self}
+        return {var: val.as_term() for var, val in self}
 
     def copy(self) -> Self:
         return self.__class__(self.parents.copy())
@@ -166,11 +205,11 @@ class _Substitution:
 
     def internal_find(self, v: Optional[Variable]) -> _SubstValue:
         if v is None:
-            return _SubstValue(Rational(1), None)
+            return _SubstValue(mpq(1), None)
         try:
             parent = self.parents[v]
         except KeyError:
-            return _SubstValue(Rational(1), v)
+            return _SubstValue(mpq(1), v)
         root = self.internal_find(parent.variable)
         root = _SubstValue(parent.coefficient * root.coefficient, root.variable)
         self.parents[v] = root
@@ -184,7 +223,7 @@ class _Substitution:
         if root1.variable is not None and root2.variable is not None:
             if root1.variable == root2.variable:
                 if c1 != c2:
-                    self.parents[root1.variable] = _SubstValue(Rational(0), None)
+                    self.parents[root1.variable] = _SubstValue(mpq(0), None)
             elif Variable.sort_key(root1.variable) < Variable.sort_key(root2.variable):
                 self.parents[root2.variable] = _SubstValue(c1 / c2, root1.variable)
             else:
@@ -235,7 +274,7 @@ class _BasicKnowledge:
         if self.range.is_point():
             # Pick the one point of self.range.
             q = self.range.start
-            assert isinstance(q, Rational)
+            assert isinstance(q, mpq)
             if ref_range.is_point():
                 assert q == ref_range.start
                 # throw away the point q, which is equal to the point
@@ -318,28 +357,22 @@ class _BasicKnowledge:
         assert self.is_substitution()
         mons = self.term.monomials()
         if len(mons) == 1:
-            assert isinstance(self.range.start, Rational)
-            return (_SubstValue(Rational(1), self.term.as_variable()),
+            assert isinstance(self.range.start, mpq)
+            return (_SubstValue(mpq(1), self.term.as_variable()),
                     _SubstValue(self.range.start, None))
         else:
             x1 = mons[0].as_variable()
             x2 = mons[1].as_variable()
             c1 = self.term.monomial_coefficient(x1)
             c2 = self.term.monomial_coefficient(x2)
-            return (_SubstValue(Rational(c1), x1), _SubstValue(Rational(-c2), x2))
+            return (_SubstValue(c1, x1), _SubstValue(-c2, x2))
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
-    def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
+    def _compose_atom(rel: type[AtomicFormula], t: Term, q: mpq) -> AtomicFormula:
         lhs = t - q
-        lhs /= Rational(lhs.content())
+        lhs /= lhs.content()
         return rel(lhs, 0)
-
-    @staticmethod
-    def _compose_atom_old(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
-        num = q.numer()
-        den = q.denom()
-        return rel(den * t - num, 0)
 
     def is_substitution(self) -> bool:
         if not self.range.is_point():
@@ -351,39 +384,18 @@ class _BasicKnowledge:
             return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
         return False
 
-    def subs(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Optional[Self]:
+    def subs(self, sigma: dict[Variable, Term]) -> Optional[Self]:
         G = [key - val for key, val in sigma.items()]
         t = self.term.reduce(G)
         if t.is_constant():
-            if Rational(t.constant_coefficient()) in self.range:
+            if t.constant_coefficient() in self.range:
                 return None
             raise InternalRepresentation.Inconsistent()
-        lc = Rational(t.lc())
+        lc = t.lc()
         t /= lc
-        q = Rational(t.constant_coefficient())
+        q = t.constant_coefficient()
         t -= q
-        range_ = self.range.transform(~lc, -q)
-        return self.__class__(t, range_)
-
-    def subs_old(self, sigma: 'dict[Variable, Rational | MPolynomial[Rational]]') \
-            -> Optional[Self]:
-        G = [key.poly.change_ring(QQ) - val for key, val in sigma.items()]
-        c, t = self.term._reduce_rat(G)  # type: ignore
-        if t.is_constant():
-            if c * Rational(t.as_int()) in self.range:
-                return None
-            raise InternalRepresentation.Inconsistent()
-        constant_coefficient = t.constant_coefficient()
-        t -= constant_coefficient
-        content = t.content()
-        t /= content
-        c *= content
-        shift = Rational((constant_coefficient, content))
-        if t.lc() < 0:
-            t = -t
-            c = -c
-            shift = -shift
-        range_ = self.range.transform(~c, -shift)
+        range_ = self.range.transform(1 / lc, -q)
         return self.__class__(t, range_)
 
     @classmethod
@@ -397,8 +409,9 @@ class _BasicKnowledge:
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
-        >>> bknowl = _BasicKnowledge.from_atom(f); bknowl
-        _BasicKnowledge(term=a^2 + 2*a*b + b^2, range=(-Infinity, -1/2] \ set())
+        >>> bknowl = _BasicKnowledge.from_atom(f); print(bknowl)
+        _BasicKnowledge(term=a^2 + 2*a*b + b^2,
+            range=_Range(lopen=True, _start=-Infinity, _end=-1/2, ropen=False, _exc=set()))
         >>> g = InternalRepresentation._compose_atom(f.op, bknowl.term, bknowl.range.end); g
         2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
         >>> (f.lhs.poly / g.lhs.poly)
@@ -406,11 +419,11 @@ class _BasicKnowledge:
         """
         rel = f.op
         lhs = f.lhs
-        lc = Rational(lhs.lc())
+        lc = lhs.lc()
         if lc < 0:
             rel = rel.converse()
         lhs /= lc
-        q = -Rational(lhs.constant_coefficient())
+        q = -lhs.constant_coefficient()
         term = lhs + q
         # rel is the (possibly conversed) relation of atom, term is the monic
         # parametric part, and q is the negative constant coefficient.
@@ -429,42 +442,6 @@ class _BasicKnowledge:
         else:
             assert False, rel
         return cls(term, range_)
-
-    @classmethod
-    @lru_cache(maxsize=CACHE_SIZE)
-    def from_atom_old(cls, f: AtomicFormula) -> Self:
-        rel = f.op
-        lhs = f.lhs
-        q = Rational(-lhs.constant_coefficient())
-        p = lhs + q
-        c = Rational(p.content())
-        p /= c
-        # Given that _simpl_at has produced a primitive polynomial, q != 0
-        # will not be divisible by c. This is relevant for the reconstruction
-        # in _compose_atom to work.
-        # assert c == 1 or not q % c == 0, f'{c} divides {q}'
-        r = q / c
-        if p.lc() < 0:
-            rel = rel.converse()
-            p = -p
-            r = -r
-        # rel is the relation of atom, p is the parametric part, and r is
-        # the negative of the Rational absolute summand.
-        if rel is Eq:
-            range_ = _Range(False, r, r, False, set())
-        elif rel is Ne:
-            range_ = _Range(True, -oo, oo, True, {r})
-        elif rel is Ge:
-            range_ = _Range(False, r, oo, True, set())
-        elif rel is Le:
-            range_ = _Range(True, -oo, r, False, set())
-        elif rel is Gt:
-            range_ = _Range(True, r, oo, True, set())
-        elif rel is Lt:
-            range_ = _Range(True, -oo, r, True, set())
-        else:
-            assert False, rel
-        return cls(p, range_)
 
 
 @dataclass
@@ -504,7 +481,7 @@ class _Knowledge:
         range_ = range_.intersection(bknowl.range)
         return bknowl.__class__(bknowl.term, range_)
 
-    def subs(self, subst: 'dict[Variable, Rational | MPolynomial[Rational]]') -> Self:
+    def subs(self, subst: dict[Variable, Term]) -> Self:
         knowl = self.__class__()
         for bknowl in self:
             maybe_bknowl = bknowl.subs(subst)
@@ -571,9 +548,9 @@ class InternalRepresentation(
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
-    def _compose_atom(rel: type[AtomicFormula], t: Term, q: Rational) -> AtomicFormula:
-        num = q.numer()
-        den = q.denom()
+    def _compose_atom(rel: type[AtomicFormula], t: Term, q: mpq) -> AtomicFormula:
+        num = mpq(q.numerator)
+        den = mpq(q.denominator)
         return rel(den * t - num, 0)
 
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
@@ -593,9 +570,9 @@ class InternalRepresentation(
         # print(f'{known_subst=}')
         items = sorted(self._subst, key=lambda item: Term.sort_key(item[0]))
         for var, val in items:
-            if known_subst.is_redundant(_SubstValue(Rational(1), var), val):
+            if known_subst.is_redundant(_SubstValue(mpq(1), var), val):
                 continue
-            known_subst.union(_SubstValue(Rational(1), var), val)
+            known_subst.union(_SubstValue(mpq(1), var), val)
             # print(f'{known_subst=}')
             subst = {v: q for v, q in self._subst.as_dict().items() if v != var}
             knowl = ref._knowl.subs(subst)
@@ -603,10 +580,11 @@ class InternalRepresentation(
                 t: Term = var
                 q = val.coefficient
             else:
-                t = val.coefficient.denom() * var - val.coefficient.numer() * val.variable
+                t = mpq(val.coefficient.denominator) * var \
+                    - mpq(val.coefficient.numerator) * val.variable
                 if t.lc() < 0:
                     t = -t
-                q = Rational(0)
+                q = mpq(0)
             if self._options.prefer_order and gand is Or and t in knowl:
                 ref_range = knowl[t]
                 if q == ref_range.start:
@@ -637,7 +615,7 @@ class InternalRepresentation(
             subst = _Substitution()
             for var, val in self._subst:
                 if var != remove and (val.variable is None or val.variable != remove):
-                    subst.union(_SubstValue(Rational(1), var), val)
+                    subst.union(_SubstValue(mpq(1), var), val)
         return self.__class__(self._options, knowl, subst)
 
     def restart(self, ir: Self) -> Self:
@@ -650,22 +628,7 @@ class InternalRepresentation(
                 q = val.coefficient
             else:
                 t = var - val.coefficient * val.variable
-                q = Rational(0)
-            bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
-            result._propagate(bknowl)
-        return result
-
-    def restart_old(self, ir: Self) -> Self:
-        result = self.next_()
-        for var, val in ir._subst:
-            if val.variable is None:
-                t: Term = var
-                q = val.coefficient
-            else:
-                t = val.coefficient.denom() * var - val.coefficient.numer() * val.variable
-                if t.lc() < 0:
-                    t = -t
-                q = Rational(0)
+                q = mpq(0)
             bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
             result._propagate(bknowl)
         return result
@@ -835,7 +798,7 @@ class Simplify(abc.simplify.Simplify[
             # In the following if-condition, the __bool__ method of atom.op
             # will be called.
             return _T() if atom.op(lhs, 0) else _F()
-        lhs /= Rational(lhs.content())
+        lhs /= lhs.content()
         match atom:
             case Eq():
                 return _simpl_at_eq_ne(Eq, lhs, context)
