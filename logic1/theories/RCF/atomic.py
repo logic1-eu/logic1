@@ -239,11 +239,10 @@ class Term(firstorder.Term['Term', 'Variable', int]):
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
             self.poly = arg
-        elif isinstance(arg, (Fraction, Integer, int, mpq, Rational, UPolynomial)):
+        elif isinstance(arg, (Fraction, int, Integer, mpq, Rational, UPolynomial)):
             self.poly = self.polynomial_ring(arg)
         else:
-            raise ValueError(
-                f'arguments must be polynomial, integer, or rational; {arg} is {type(arg)}')
+            raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
         """Iterate over the polynomial representation of the term, yielding

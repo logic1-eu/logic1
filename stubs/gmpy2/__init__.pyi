@@ -1,9 +1,19 @@
+from __future__ import annotations
+
 from typing import Self
 from sage.all import Rational
 
 
-class mpz:
-    ...
+class mpfr:
+
+    def __gt__(self, other: object) -> bool:
+        ...
+
+    def __init__(self, *args) -> None:
+        ...
+
+    def __neg__(self) -> Self:
+        ...
 
 
 class mpq:
@@ -11,16 +21,22 @@ class mpq:
     numerator: mpz
     denominator: mpz
 
-    def __init__(self, arg: int | mpz | Rational) -> None:
+    def __add__(self, other: Self | mpfr) -> Self:
+        ...
+
+    def __ge__(self, other: object) -> bool:
         ...
 
     def __gt__(self, other: object) -> bool:
         ...
 
+    def __init__(self, arg: int | mpz | Rational) -> None:
+        ...
+
     def __lt__(self, other: object) -> bool:
         ...
 
-    def __mul__(self, other: Self) -> Self:
+    def __mul__(self, other: Self | mpfr) -> Self:
         ...
 
     def __neg__(self) -> Self:
@@ -31,3 +47,7 @@ class mpq:
 
     def __rtruediv__(self, other: int) -> Self:
         ...
+
+
+class mpz:
+    ...

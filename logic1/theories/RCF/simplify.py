@@ -6,13 +6,11 @@ proposed for Ordered Fields in [DolzmannSturm-1997]_.
 
 from dataclasses import dataclass, field
 from functools import lru_cache
+from math import prod
 from operator import xor
-
-from gmpy2 import mpq
-from sage.all import oo, product
-from sage.rings.infinity import MinusInfinity, PlusInfinity
-from sage.rings.rational import Rational
 from typing import Final, Iterable, Iterator, Optional, Self
+
+from gmpy2 import mpfr, mpq
 
 from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
@@ -23,6 +21,8 @@ from ...support.tracing import trace  # noqa
 
 
 CACHE_SIZE: Final[Optional[int]] = 2**16
+
+oo: Final[mpfr] = mpfr('inf')
 
 
 @dataclass(frozen=True)
@@ -35,137 +35,95 @@ class Options(abc.simplify.Options):
 @dataclass
 class _Range:
     r"""Non-empty range IVL \ EXC, where IVL is an interval with boundaries in
-    QQ, -oo, oo, and EXC is is created. A finite subset of the interior of
+    Q extended by {-oo, oo}, and EXC is a finite subset of the interior of
     IVL. Raises InternalRepresentation.Inconsistent if IVL \ EXC gets empty.
     """
 
     lopen: bool = True
-    _start: Rational | MinusInfinity = -oo
-    _end: Rational | PlusInfinity = oo
+    start: mpq | mpfr = -oo
+    end: mpq | mpfr = oo
     ropen: bool = True
-    _exc: set[Rational] = field(default_factory=set)
+    exc: set[mpq] = field(default_factory=set)
 
-    @property
-    def start(self) -> mpq | MinusInfinity:
-        if isinstance(self._start, Rational):
-            return mpq(self._start)
-        return -oo
-
-    @start.setter
-    def start(self, arg: mpq | MinusInfinity) -> None:
-        if isinstance(arg, mpq):
-            self._start = Rational(arg)
-        self._start = -oo
-
-    @property
-    def end(self) -> mpq | PlusInfinity:
-        if isinstance(self._end, Rational):
-            return mpq(self._end)
-        return oo
-
-    @end.setter
-    def end(self, arg: mpq | PlusInfinity) -> None:
-        if isinstance(arg, mpq):
-            self._end = Rational(arg)
-        self._end = oo
-
-    @property
-    def exc(self) -> set[mpq]:
-        return {mpq(q) for q in self._exc}
-
-    @exc.setter
-    def exc(self, args: set[mpq]) -> None:
-        self._exc = {Rational(x) for x in args}
-
-    def __contains__(self, x: mpq) -> bool:
-        q = Rational(x)
-        if q < self._start or (self.lopen and q == self._start):
+    def __contains__(self, q: mpq) -> bool:
+        if q < self.start or (self.lopen and q == self.start):
             return False
-        if self._end < q or (self.ropen and q == self._end):
+        if self.end < q or (self.ropen and q == self.end):
             return False
-        if q in self._exc:
+        if q in self.exc:
             return False
         return True
 
-    def __init__(self, lopen: bool = True, start: mpq | Rational | MinusInfinity = -oo,
-                 end: mpq | Rational | PlusInfinity = oo, ropen: bool = True,
-                 exc: set[mpq] | set[Rational] = set()) -> None:
-        self.lopen = lopen
-        self._start = Rational(start) if isinstance(start, mpq) else start
-        self._end = Rational(end) if isinstance(end, mpq) else end
-        self.ropen = ropen
-        self._exc = {Rational(x) if isinstance(x, mpq) else x for x in exc}
-        if self._start > self._end:
+    def __post_init__(self) -> None:
+        if self.start > self.end:
             raise InternalRepresentation.Inconsistent()
-        if (self.lopen or self.ropen) and self._start == self._end:
+        if (self.lopen or self.ropen) and self.start == self.end:
             raise InternalRepresentation.Inconsistent()
-        assert self.lopen or self._start is not -oo, self
-        assert self.ropen or self._end is not oo, self
-        assert all(self._start < x < self._end for x in self._exc), self
+        assert self.lopen or self.start is not -oo, self
+        assert self.ropen or self.end is not oo, self
+        assert all(self.start < x < self.end for x in self.exc), self
 
     def __str__(self):
         left = '(' if self.lopen else '['
         right = ')' if self.ropen else ']'
-        return f'{left}{self._start}, {self._end}{right} \\ {self._exc}'
+        return f'{left}{self.start}, {self.end}{right} \\ {self.exc}'
 
     def intersection(self, other: Self) -> Self:
-        if self._start < other._start:
+        if self.start < other.start:
             lopen = other.lopen
-            _start = other._start
-        elif other._start < self._start:
+            start = other.start
+        elif other.start < self.start:
             lopen = self.lopen
-            _start = self._start
+            start = self.start
         else:
-            assert self._start == other._start
-            _start = self._start
+            assert self.start == other.start
+            start = self.start
             lopen = self.lopen or other.lopen
-        if self._end < other._end:
-            _end = self._end
+        if self.end < other.end:
+            end = self.end
             ropen = self.ropen
-        elif other._end < self._end:
-            _end = other._end
+        elif other.end < self.end:
+            end = other.end
             ropen = other.ropen
         else:
-            assert self._end == other._end
-            _end = self._end
+            assert self.end == other.end
+            end = self.end
             ropen = self.ropen or other.ropen
         # Fix the case that ivl is closed on either side and the corresponding
         # endpoint is in self.exc or other.exc
-        if _start in self._exc or _start in other._exc:
+        if start in self.exc or start in other.exc:
             lopen = True
-        if _end in self._exc or _end in other._exc:
+        if end in self.exc or end in other.exc:
             ropen = True
-        _exc = set()
-        for x in self._exc:
-            if _start < x < _end:
-                _exc.add(x)
-        for x in other._exc:
-            if _start < x < _end:
-                _exc.add(x)
-        return self.__class__(lopen, _start, _end, ropen, _exc)
+        exc = set()
+        for x in self.exc:
+            if start < x < end:
+                exc.add(x)
+        for x in other.exc:
+            if start < x < end:
+                exc.add(x)
+        return self.__class__(lopen, start, end, ropen, exc)
 
     def is_point(self) -> bool:
         # It is assumed and has been asserted that the interval is not empty.
-        return self._start == self._end
+        return self.start == self.end
 
     def is_zero(self) -> bool:
-        return self.is_point() and self._start == 0
+        return self.is_point() and self.start == 0
 
     def transform(self, scale: mpq, shift: mpq) -> Self:
-        _scale = Rational(scale)
-        _shift = Rational(shift)
-        if _scale >= 0:
+        if scale >= 0:
             lopen = self.lopen
-            _start: Rational | MinusInfinity = _scale * self._start + _shift
-            _end: Rational | PlusInfinity = _scale * self._end + _shift
+            start = scale * self.start + shift
+            end = scale * self.end + shift
             ropen = self.ropen
         else:
             lopen = self.ropen
-            _start = _scale * self._end + _shift
-            _end = _scale * self._start + _shift
+            start = scale * self.end + shift
+            end = scale * self.start + shift
             ropen = self.lopen
-        _exc = {_scale * point + _shift for point in self._exc}
-        return self.__class__(lopen, _start, _end, ropen, _exc)
+        exc = {scale * point + shift for point in self.exc}
+        return self.__class__(lopen, start, end, ropen, exc)
 
 
 @dataclass(frozen=True)
@@ -176,6 +134,7 @@ class _SubstValue:
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def as_term(self) -> Term:
         if self.variable is None:
             return Term(self.coefficient)
@@ -303,6 +262,7 @@ class _BasicKnowledge:
             # self.range is a subset of ref_range.
             assert not ref_range.is_point()
             if ref_range.start < self.range.start:
+                assert isinstance(self.range.start, mpq)
                 if self.range.start in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
@@ -317,6 +277,7 @@ class _BasicKnowledge:
                         L.append(self._compose_atom(Ge, self.term, self.range.start))
             elif ref_range.start == self.range.start:
                 if not ref_range.lopen and self.range.lopen:
+                    assert isinstance(self.range.start, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -326,6 +287,7 @@ class _BasicKnowledge:
             else:
                 assert False
             if self.range.end < ref_range.end:
+                assert isinstance(self.range.end, mpq)
                 if self.range.end in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
@@ -340,6 +302,7 @@ class _BasicKnowledge:
                         L.append(self._compose_atom(Le, self.term, self.range.end))
             elif ref_range.end == self.range.end:
                 if not ref_range.ropen and self.range.ropen:
+                    assert isinstance(self.range.end, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -409,9 +372,9 @@ class _BasicKnowledge:
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
-        >>> bknowl = _BasicKnowledge.from_atom(f); print(bknowl)
+        >>> bknowl = _BasicKnowledge.from_atom(f); bknowl
         _BasicKnowledge(term=a^2 + 2*a*b + b^2,
-            range=_Range(lopen=True, _start=-Infinity, _end=-1/2, ropen=False, _exc=set()))
+            range=_Range(lopen=True, start=mpfr('-inf'), end=mpq(-1,2), ropen=False, exc=set()))
         >>> g = InternalRepresentation._compose_atom(f.op, bknowl.term, bknowl.range.end); g
         2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
         >>> (f.lhs.poly / g.lhs.poly)
@@ -712,7 +675,7 @@ class Simplify(abc.simplify.Simplify[
                     if explode_always:
                         args.append(fac_junctor(*(rel(v, 0) for v in power_product.vars())))
                     else:
-                        args.append(rel(product(power_product.vars()), 0))
+                        args.append(rel(prod(power_product.vars()), 0))
                 return tsq_junctor(*args)
 
             if rel is Eq:
@@ -768,7 +731,7 @@ class Simplify(abc.simplify.Simplify[
                     even_factors.append(factor)
                 else:
                     odd_factor *= factor
-            even_factor = product(even_factors)
+            even_factor = prod(even_factors)
             signed_remaining_squarefree_part = odd_factor * even_factor
             # TSQ tests on factorization
             if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
