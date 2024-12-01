@@ -436,36 +436,35 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return Term(self.poly.derivative(x.poly, n))
 
-    # discuss bug:
-    # >>> (2*x).factor()
-    def factor(self) -> tuple[Term, Term, dict[Term, int]]:
-        """Return the factorization of this term.
+    def factor(self) -> tuple[mpq, dict[Term, int]]:
+        """A polynomial factorization of this term.
+
+        :returns: A pair `(unit, D)`, where `unit` is a rational number, the
+          keys of `D` are irreducible factors, and the corresponding values are
+          their multiplicities. All irreducible factors are monic. Note that
+          the return value is uniquely determined by this specification.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
-        >>> t = x**2 - y**2
+        >>> t = -x**2 + y**2
         >>> t.factor()
-        (1, 1, {x - y: 1, x + y: 1})
+        (mpq(-1,1), {x - y: 1, x + y: 1})
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.factor()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.factor>`
         """
         F = self.poly.factor()
-        unit = Term(F.unit())
-        content = Term(1)
-        assert unit in (-1, 1), (self, F, unit)
+        assert F.unit().is_constant()
+        unit = mpq(F.unit().constant_coefficient())
         D = dict()
         for poly, multiplicity in F:
-            term = Term(poly)
-            if term.lc() < 0:
-                term = -term
-                unit = -unit
-            if term.is_constant():
-                content *= term
-            else:
-                D[term] = multiplicity
-        return unit, content, D
+            assert not poly.is_constant()
+            lc = poly.lc()
+            poly /= lc
+            unit *= mpq(lc)
+            D[Term(poly)] = multiplicity
+        return unit, D
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.

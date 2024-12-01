@@ -688,8 +688,8 @@ class Simplify(abc.simplify.Simplify[
             tsq = lhs.is_definite()
             if tsq == TSQ.STRICT:
                 return tsq_junctor.definite_element()
-            unit, _, factors = lhs.factor()
-            primitive_lhs = Term(1)
+            unit, factors = lhs.factor()
+            primitive_lhs = Term(unit)
             for factor in factors:
                 # Square-free part
                 primitive_lhs *= factor
@@ -721,9 +721,9 @@ class Simplify(abc.simplify.Simplify[
             if hit is not None:
                 return hit
             # Factorize
-            unit, _, factors = lhs.factor()
+            unit, factors = lhs.factor()
             even_factors = []
-            odd_factor = unit
+            odd_factor = Term(unit)
             for factor, multiplicity in factors.items():
                 if factor.is_definite() is TSQ.STRICT:
                     continue
@@ -747,7 +747,7 @@ class Simplify(abc.simplify.Simplify[
             # TSQ tests have failed
             if unit < 0:
                 rel = Le
-                odd_factor = - odd_factor
+                odd_factor = -odd_factor
             else:
                 rel = Ge
             if context is Or or explode_always:
