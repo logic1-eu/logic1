@@ -1,6 +1,5 @@
-from typing import Any
-
 from fractions import Fraction
+from typing import Any, Literal, Self
 
 from gmpy2 import mpq
 from sage.rings.integer import Integer
@@ -69,4 +68,7 @@ class Rational:
         ...
 
     def numer(self) -> Integer:
+        ...
+
+    def sign(self) -> Literal[-1, 0, 1]:
         ...

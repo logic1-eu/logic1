@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import Literal, Self
 from sage.all import Rational
 
 
@@ -50,4 +50,8 @@ class mpq:
 
 
 class mpz:
+    ...
+
+
+def sign(arg: mpfr | mpq | mpz) -> Literal[-1, 0, 1]:
     ...

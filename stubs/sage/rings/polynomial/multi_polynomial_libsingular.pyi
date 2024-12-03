@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from typing import Generic, Iterable, Iterator, Optional, TypeVar
+from typing import Generic, Iterable, Iterator, Optional, Self, TypeAlias, TypeVar
 
 # Strangely, the following import is not made in
 # sage/rings/polynomial/multi_polynomial_libsingular.pyx
-from sage.rings.integer import Integer
 from sage.rings.polynomial.multi_polynomial_ring_base import MPolynomialRing_base
 from sage.rings.polynomial.polynomial_element import Polynomial_generic_dense
 from sage.rings.ring import Ring
@@ -37,6 +36,8 @@ class MPolynomialRing_libsingular(MPolynomialRing_base):
 
 ρ = TypeVar('ρ')
 
+_dict: TypeAlias = dict  # because dict will be shadowed by a class method
+
 
 class MPolynomial_libsingular(Generic[ρ]):
 
@@ -65,7 +66,7 @@ class MPolynomial_libsingular(Generic[ρ]):
     def __int__(self) -> int:
         ...
 
-    def __iter__(self) -> Iterator[Integer, Self]:
+    def __iter__(self) -> Iterator[tuple[ρ, Self]]:
         ...
 
     def __le__(self, other: object) -> bool:
@@ -102,7 +103,7 @@ class MPolynomial_libsingular(Generic[ρ]):
         # defined in sage.rings.polynomial.multi_polynomial.MPolynomial
         ...
 
-    def coefficient(self, degrees: dict[Self, int]) -> Self:
+    def coefficient(self, degrees: _dict[Self, int]) -> Self:
         ...
 
     def constant_coefficient(self) -> ρ:
@@ -119,10 +120,10 @@ class MPolynomial_libsingular(Generic[ρ]):
     def derivative(self, x: Self, n: int = 1) -> Self:
         ...
 
-    def dict(self) -> dict[tuple[int, ...], ρ]:
+    def dict(self) -> _dict[tuple[int, ...], ρ]:
         ...
 
-    def factor(self) -> Factorization:
+    def factor(self) -> Factorization[ρ]:
         ...
 
     def is_constant(self) -> bool:
@@ -159,7 +160,10 @@ class MPolynomial_libsingular(Generic[ρ]):
     def reduce(self, i: Iterable[Self]) -> Self:
         ...
 
-    def subs(self, fixed: Optional[dict[Self, ρ]] = None, **kw) -> Self:
+    # def subs(self, fixed: Optional[_dict[Self, ρ]] = None, **kw) -> Self:
+    #     ...
+
+    def subs(self, **kw) -> Self:
         ...
 
     def variables(self) -> tuple[Self]:

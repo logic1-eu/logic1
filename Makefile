@@ -22,6 +22,7 @@ test-doc:
 	cd doc && make test
 
 mypy:
+	mypy --explicit-package-bases stubs
 	mypy logic1
 
 test: mypy pytest

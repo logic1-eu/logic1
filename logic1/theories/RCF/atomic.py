@@ -4,7 +4,7 @@ from enum import auto, Enum
 from fractions import Fraction
 from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
 
-from gmpy2 import mpq
+from gmpy2 import mpq, sign
 from sage.all import QQ
 # Importing QQ from sage.rings.rational_fields causes problems. Notably, a
 # fresh instance of RationalField is assigned to QQ in sage.all.
@@ -155,27 +155,38 @@ The unique instance of :class:`.VariableSet`.
 """
 
 
-class TSQ(Enum):
-    """Information whether a certain term is has a *trivial square sum*
-    property.
-
-    .. seealso:: :meth:`.Term.is_definite`
+class DEFINITE(Enum):
+    """Information whether a certain term has positive or negative definiteness
+    properties; typically as a result of a heuristic test as in
+    :meth:`.Term.is_definite`.
     """
+
+    NEGATIVE = auto()
+    """The polynomial negative definite, i.e., negative for all real choices of
+    variables.
+    """
+
+    NEGATIVE_SEMI = auto()
+    """The polynomial negative semi-definite, i.e., non-positive for all real
+    choices of variables.
+    """
+
     NONE = auto()
     """None of the other cases holds..
     """
 
-    STRICT = auto()
-    """All other integer coefficients, including the absolute summand, are
-    strictly positive. All exponents are even. This is sufficient for a term to
-    be positive definite, i.e., positive for all real choices of variables.
+    POSITIVE = auto()
+    """The polynomial positive definite, i.e., positive for all real choices of
+    variables.
     """
 
-    WEAK = auto()
-    """The absolute summand is zero. All other integer coefficients are
-    strictly positive. All exponents are even. This is sufficient for a term to
-    be positive semi-definite, i.e., non-negative for all real choices of
-    variables.
+    POSITIVE_SEMI = auto()
+    """The polynomial positive semi-definite, i.e., non-negative for all real
+    choices of variables.
+    """
+
+    ZERO = auto()
+    """The polynomial is the zero polynomial.
     """
 
 
@@ -475,31 +486,37 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return self.poly.is_constant()
 
-    def is_definite(self) -> TSQ:
-        """A fast heuristic test whether this term is positive or non-negative
-        for all real choices of variables.
+    def is_definite(self) -> DEFINITE:
+        """A fast heuristic test for definitetess properties of this term. This
+        is based on *trivial square sum* properties of coefficient signs and
+        exponents.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
+        >>> Term(0).is_definite()
+        <DEFINITE.ZERO: 6>
         >>> f = x**2 + y**2
         >>> f.is_definite()
-        <TSQ.WEAK: 3>
-        >>> g = x**2 + y**2 + 1
+        <DEFINITE.POSITIVE_SEMI: 5>
+        >>> g = -x**2 - y**2 - 1
         >>> g.is_definite()
-        <TSQ.STRICT: 2>
+        <DEFINITE.NEGATIVE: 1>
         >>> h = (x + y) ** 2
         >>> h.is_definite()
-        <TSQ.NONE: 1>
+        <DEFINITE.NONE: 3>
         """
+        if self.is_zero():
+            return DEFINITE.ZERO
+        ls = sign(self.lc())
         for exponent, coefficient in self.poly.dict().items():
-            if coefficient < 0:
-                return TSQ.NONE
+            if coefficient.sign() != ls:
+                return DEFINITE.NONE
             for e in exponent:
                 if e % 2 == 1:
-                    return TSQ.NONE
+                    return DEFINITE.NONE
         if self.poly.constant_coefficient() == 0:
-            return TSQ.WEAK
-        return TSQ.STRICT
+            return DEFINITE.POSITIVE_SEMI if ls == 1 else DEFINITE.NEGATIVE_SEMI
+        return DEFINITE.POSITIVE if ls == 1 else DEFINITE.NEGATIVE
 
     def is_monomial(self) -> bool:
         """Return :obj:`True` if this term is a monomial.

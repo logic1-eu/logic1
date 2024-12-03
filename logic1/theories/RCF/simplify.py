@@ -10,11 +10,11 @@ from math import prod
 from operator import xor
 from typing import Final, Iterable, Iterator, Optional, Self
 
-from gmpy2 import mpfr, mpq
+from gmpy2 import mpfr, mpq, sign
 
 from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
-from .atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne, Term, TSQ, Variable
+from .atomic import AtomicFormula, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
 from .typing import Formula
 
 from ...support.tracing import trace  # noqa
@@ -652,8 +652,10 @@ class Simplify(abc.simplify.Simplify[
         """
         # MyPy does not recognize that And[Any, Any, Any] is an instance of
         # Hashable. https://github.com/python/mypy/issues/11470
-        return self._simpl_at(
+        res = self._simpl_at(
             atom, context, self._options.explode_always)  # type: ignore[arg-type]
+        assert all(atom.lhs.lc() == 1 for atom in res.atoms())
+        return res
 
     @lru_cache(maxsize=CACHE_SIZE)
     def _simpl_at(self,
@@ -667,120 +669,120 @@ class Simplify(abc.simplify.Simplify[
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
         """
-        def _simpl_at_eq_ne(rel, lhs, context):
+        def _simpl_at_eq_ne(rel: type[Eq | Ne], lhs: Term) -> Formula:
 
-            def split_tsq(term):
+            def split_definite(term):
                 args = []
                 for _, power_product in term:
                     if explode_always:
                         args.append(fac_junctor(*(rel(v, 0) for v in power_product.vars())))
                     else:
                         args.append(rel(prod(power_product.vars()), 0))
-                return tsq_junctor(*args)
+                return definite_junctor(*args)
 
             if rel is Eq:
-                tsq_junctor = And
-                fac_junctor = Or
+                definite_junctor: type[And | Or] = And
+                fac_junctor: type[And | Or] = Or
             else:
                 assert rel is Ne
-                tsq_junctor = Or
+                definite_junctor = Or
                 fac_junctor = And
-            tsq = lhs.is_definite()
-            if tsq == TSQ.STRICT:
-                return tsq_junctor.definite_element()
-            unit, factors = lhs.factor()
-            primitive_lhs = Term(unit)
+            definite = lhs.is_definite()
+            # Definiteness tests on original left hand side
+            if definite in (DEFINITE.NEGATIVE, DEFINITE.POSITIVE):
+                return definite_junctor.definite_element()
+            _, factors = lhs.factor()
+            square_free_lhs = Term(1)
             for factor in factors:
-                # Square-free part
-                primitive_lhs *= factor
-            primitive_tsq = primitive_lhs.is_definite()
-            if primitive_tsq == TSQ.STRICT:
-                return tsq_junctor.definite_element()
-            if primitive_tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
-                return split_tsq(primitive_lhs)
-            if tsq == TSQ.WEAK and (explode_always or context == tsq_junctor):
-                return split_tsq(lhs)
+                square_free_lhs *= factor
+            # Definiteness tests on square-free part:
+            square_free_definite = square_free_lhs.is_definite()
+            if square_free_definite in (DEFINITE.NEGATIVE, DEFINITE.POSITIVE):
+                return definite_junctor.definite_element()
+            if explode_always or context == definite_junctor:
+                if square_free_definite in (DEFINITE.NEGATIVE_SEMI, DEFINITE.POSITIVE_SEMI):
+                    return split_definite(square_free_lhs)
+                if definite in (DEFINITE.NEGATIVE_SEMI, DEFINITE.POSITIVE_SEMI):
+                    return split_definite(lhs)
             if explode_always or context == fac_junctor:
-                args = (rel(factor, 0) for factor in factors if not factor.is_constant())
+                args = (rel(factor, 0) for factor in factors)
                 return fac_junctor(*args)
-            return rel(primitive_lhs, 0)
+            return rel(square_free_lhs, 0)
 
-        def tsq_test_ge(f: Term, context: Optional[type[And | Or]]) -> Optional[Formula]:
-            if f.is_definite() in (TSQ.STRICT, TSQ.WEAK):
-                return _T()
-            neg_tsq = (-f).is_definite()
-            if neg_tsq == TSQ.STRICT:
-                return _F()
-            if neg_tsq == TSQ.WEAK:
-                return _simpl_at_eq_ne(Eq, f, context)
-            return None
+        def _simpl_at_ge(lhs: Term) -> Formula:
 
-        def _simpl_at_ge(lhs, context):
-            # TSQ tests on original left hand side
-            hit = tsq_test_ge(lhs, context)
+            def definiteness_test(f: Term) -> Optional[Formula]:
+                definite = f.is_definite()
+                if definite in (DEFINITE.POSITIVE, DEFINITE.POSITIVE_SEMI):
+                    return _T()
+                if definite is DEFINITE.NEGATIVE:
+                    return _F()
+                if definite is DEFINITE.NEGATIVE_SEMI:
+                    return _simpl_at_eq_ne(Eq, f)
+                if definite is DEFINITE.NONE:
+                    return None
+                assert False
+
+            # Definiteness tests on original left hand side:
+            hit = definiteness_test(lhs)
             if hit is not None:
                 return hit
             # Factorize
             unit, factors = lhs.factor()
+            sgn = sign(unit)
             even_factors = []
-            odd_factor = Term(unit)
+            even_factor = Term(1)
+            odd_factor = Term(1)
             for factor, multiplicity in factors.items():
-                if factor.is_definite() is TSQ.STRICT:
+                if factor.is_definite() is DEFINITE.POSITIVE:
                     continue
                 if multiplicity % 2 == 0:
                     even_factors.append(factor)
+                    even_factor *= factor
                 else:
                     odd_factor *= factor
-            even_factor = prod(even_factors)
-            signed_remaining_squarefree_part = odd_factor * even_factor
-            # TSQ tests on factorization
-            if odd_factor.is_definite() in (TSQ.STRICT, TSQ.WEAK):
+            remaining_squarefree_part = odd_factor * even_factor
+            # Definiteness tests on factorization
+            if (sgn * odd_factor).is_definite() in (DEFINITE.POSITIVE, DEFINITE.POSITIVE_SEMI):
                 return _T()
-            neg_tsq = (-odd_factor).is_definite()
-            if neg_tsq == TSQ.STRICT:
-                return _simpl_at_eq_ne(Eq, even_factor, context)
-            if neg_tsq == TSQ.WEAK:
-                return _simpl_at_eq_ne(Eq, signed_remaining_squarefree_part, context)
-            hit = tsq_test_ge(signed_remaining_squarefree_part, context)
+            if (sgn * odd_factor).is_definite() is DEFINITE.NEGATIVE:
+                return _simpl_at_eq_ne(Eq, even_factor)
+            if (sgn * odd_factor).is_definite() is DEFINITE.NEGATIVE_SEMI:
+                return _simpl_at_eq_ne(Eq, sgn * remaining_squarefree_part)
+            hit = definiteness_test(sgn * remaining_squarefree_part)
+            # Definiteness tests on signed remaining squarefree part:
             if hit is not None:
                 return hit
-            # TSQ tests have failed
-            if unit < 0:
-                rel = Le
-                odd_factor = -odd_factor
-            else:
-                rel = Ge
-            if context is Or or explode_always:
+            # All definiteness tests have failed.
+            rel = Ge if sgn == 1 else Le
+            if explode_always or context is Or:
                 odd_part = rel(odd_factor, 0)
                 even_part = (Eq(f, 0) for f in even_factors)
                 return Or(odd_part, *even_part)
-            return rel(odd_factor * even_factor ** 2, 0)
+            return rel(remaining_squarefree_part * even_factor, 0)
 
         lhs = atom.lhs - atom.rhs
         if lhs.is_constant():
             # In the following if-condition, the __bool__ method of atom.op
             # will be called.
             return _T() if atom.op(lhs, 0) else _F()
-        lhs /= lhs.content()
-        match atom:
-            case Eq():
-                return _simpl_at_eq_ne(Eq, lhs, context)
-            case Ne():
-                return _simpl_at_eq_ne(Ne, lhs, context)
-            case Ge():
-                return _simpl_at_ge(lhs, context)
-            case Le():
-                return _simpl_at_ge(-lhs, context)
-            case Gt():
-                if context is not None:
-                    context = context.dual()
-                return Not(_simpl_at_ge(-lhs, context)).to_nnf()
-            case Lt():
-                if context is not None:
-                    context = context.dual()
-                return Not(_simpl_at_ge(lhs, context)).to_nnf()
-            case _:
-                assert False
+        if isinstance(atom, Eq):
+            return _simpl_at_eq_ne(Eq, lhs)
+        if isinstance(atom, Ne):
+            return _simpl_at_eq_ne(Ne, lhs)
+        if isinstance(atom, Ge):
+            return _simpl_at_ge(lhs)
+        if isinstance(atom, Le):
+            return _simpl_at_ge(-lhs)
+        if isinstance(atom, Gt):
+            if context is not None:
+                context = context.dual()
+            return Not(_simpl_at_ge(-lhs)).to_nnf()
+        if isinstance(atom, Lt):
+            if context is not None:
+                context = context.dual()
+            return Not(_simpl_at_ge(lhs)).to_nnf()
+        assert False, atom
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
