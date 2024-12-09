@@ -65,7 +65,7 @@ class InternalRepresentation(
     _equations: UnionFind = field(default_factory=UnionFind)
     _inequations: set[Ne] = field(default_factory=set)
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.RESTART:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
@@ -95,7 +95,7 @@ class InternalRepresentation(
             for ne in self._inequations:
                 if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-        return abc.simplify.Restart.OTHERS
+        return abc.simplify.RESTART.OTHERS
 
     def extract(self, gand: type[And | Or], ref: InternalRepresentation) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.

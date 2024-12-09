@@ -639,7 +639,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
                     phi = expand_eps_at(atom, tp.nsp, x)
                     recurse = lambda atom: vs_at(atom, TestPoint(tp.prd, NSP.NONE), x)  # noqa E731
-                    return phi.transform_atoms(recurse)
+                    return phi.traverse(map_atoms=recurse)
                 case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
                     return vs_inf_at(atom, tp.nsp, x)
                 case _:
@@ -755,9 +755,10 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
         x = eset.variable
         new_nodes = []
         for tp in eset.test_points:
-            new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
+            new_formula = self.formula.traverse(map_atoms=lambda atom: vs_at(atom, tp, x))
             # requires discussion: guard will be simplified twice
-            new_formula = simplify(And(tp.guard(assumptions), new_formula), assume=assumptions.atoms)
+            new_formula = simplify(And(tp.guard(assumptions), new_formula),
+                                   assume=assumptions.atoms)
             if new_formula is _T():
                 raise abc.qe.FoundT()
             new_nodes.append(

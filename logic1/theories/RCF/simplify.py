@@ -3,6 +3,7 @@ generating and propagating internal representations during recursion in Real
 Closed fields. This is essentially the *standard simplifier*, which has been
 proposed for Ordered Fields in [DolzmannSturm-1997]_.
 """
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -28,6 +29,7 @@ oo: Final[mpfr] = mpfr('inf')
 @dataclass(frozen=True)
 class Options(abc.simplify.Options):
     explode_always: bool = True
+    lift: bool = True
     prefer_order: bool = True
     prefer_weak: bool = False
 
@@ -151,8 +153,8 @@ class _Substitution:
             yield var, self.find(var)
 
     def as_dict(self) -> dict[Variable, Term]:
-        """Convert this :class:._Substitution` into a dictionary that can used
-        as an argument to subsitution methods.
+        """Convert this :class:._Substitution` into a dictionary that can be
+        used as an argument to subsitution methods.
         """
         return {var: val.as_term() for var, val in self}
 
@@ -227,7 +229,7 @@ class _BasicKnowledge:
 
     def as_atoms(self, ref_range: _Range, gand: type[And | Or], options: Options) \
             -> list[AtomicFormula]:
-        L = []
+        L: list[AtomicFormula] = []
         # range_ cannot be empty because the construction of an empty range
         # raises an exception during `add`.
         if self.range.is_point():
@@ -247,14 +249,14 @@ class _BasicKnowledge:
                 if options.prefer_order and gand is Or:
                     if q == ref_range.start:
                         assert not ref_range.lopen
-                        L.append(self._compose_atom(Le, self.term, q))
+                        L.append(Le(self.term - q, 0))
                     elif q == ref_range.end:
                         assert not ref_range.ropen
-                        L.append(self._compose_atom(Ge, self.term, q))
+                        L.append(Ge(self.term - q, 0))
                     else:
-                        L.append(self._compose_atom(Eq, self.term, q))
+                        L.append(Eq(self.term - q, 0))
                 else:
-                    L.append(self._compose_atom(Eq, self.term, q))
+                    L.append(Eq(self.term - q, 0))
         else:
             # print(f'{t=}, {ref_ivl=}, {ivl=}')
             #
@@ -267,23 +269,23 @@ class _BasicKnowledge:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(self._compose_atom(Ge, self.term, self.range.start))
+                        L.append(Ge(self.term - self.range.start, 0))
                     else:
-                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                        L.append(Gt(self.term - self.range.start, 0))
                 else:
                     if self.range.lopen:
-                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                        L.append(Gt(self.term - self.range.start, 0))
                     else:
-                        L.append(self._compose_atom(Ge, self.term, self.range.start))
+                        L.append(Ge(self.term - self.range.start, 0))
             elif ref_range.start == self.range.start:
                 if not ref_range.lopen and self.range.lopen:
                     assert isinstance(self.range.start, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(self._compose_atom(Gt, self.term, self.range.start))
+                        L.append(Gt(self.term - self.range.start, 0))
                     else:
-                        L.append(self._compose_atom(Ne, self.term, self.range.start))
+                        L.append(Ne(self.term - self.range.start, 0))
             else:
                 assert False
             if self.range.end < ref_range.end:
@@ -292,28 +294,28 @@ class _BasicKnowledge:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(self._compose_atom(Le, self.term, self.range.end))
+                        L.append(Le(self.term - self.range.end, 0))
                     else:
-                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                        L.append(Lt(self.term - self.range.end, 0))
                 else:
                     if self.range.ropen:
-                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                        L.append(Lt(self.term - self.range.end, 0))
                     else:
-                        L.append(self._compose_atom(Le, self.term, self.range.end))
+                        L.append(Le(self.term - self.range.end, 0))
             elif ref_range.end == self.range.end:
                 if not ref_range.ropen and self.range.ropen:
                     assert isinstance(self.range.end, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(self._compose_atom(Lt, self.term, self.range.end))
+                        L.append(Lt(self.term - self.range.end, 0))
                     else:
-                        L.append(self._compose_atom(Ne, self.term, self.range.end))
+                        L.append(Ne(self.term - self.range.end, 0))
             else:
                 assert False
         for q in self.range.exc:
             if q not in ref_range.exc:
-                L.append(self._compose_atom(Ne, self.term, q))
+                L.append(Ne(self.term - q, 0))
         return L
 
     def as_subst_values(self) -> tuple[_SubstValue, _SubstValue]:
@@ -330,13 +332,6 @@ class _BasicKnowledge:
             c2 = self.term.monomial_coefficient(x2)
             return (_SubstValue(c1, x1), _SubstValue(-c2, x2))
 
-    @staticmethod
-    @lru_cache(maxsize=CACHE_SIZE)
-    def _compose_atom(rel: type[AtomicFormula], t: Term, q: mpq) -> AtomicFormula:
-        lhs = t - q
-        lhs /= lhs.content()
-        return rel(lhs, 0)
-
     def is_substitution(self) -> bool:
         if not self.range.is_point():
             return False
@@ -348,7 +343,7 @@ class _BasicKnowledge:
         return False
 
     def subs(self, sigma: dict[Variable, Term]) -> Optional[Self]:
-        G = [key - val for key, val in sigma.items()]
+        G = (key - val for key, val in sigma.items())
         t = self.term.reduce(G)
         if t.is_constant():
             if t.constant_coefficient() in self.range:
@@ -363,33 +358,25 @@ class _BasicKnowledge:
 
     @classmethod
     @lru_cache(maxsize=CACHE_SIZE)
-    def from_atom(cls, f: AtomicFormula) -> Self:
+    def from_atom(cls, atom: AtomicFormula) -> Self:
         r"""Convert AtomicFormula into _BasicKnowledge.
 
         We assume that :data:`f` has gone through :meth:`_simpl_at` so that
-        its right hand side is zero.
+        its left hand side is monic and its right hand side is zero.
 
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
-        >>> f = 6*a**2 + 12*a*b + 6*b**2 + 3 <= 0
-        >>> bknowl = _BasicKnowledge.from_atom(f); bknowl
-        _BasicKnowledge(term=a^2 + 2*a*b + b^2,
-            range=_Range(lopen=True, start=mpfr('-inf'), end=mpq(-1,2), ropen=False, exc=set()))
-        >>> g = InternalRepresentation._compose_atom(f.op, bknowl.term, bknowl.range.end); g
-        2*a^2 + 4*a*b + 2*b^2 + 1 <= 0
-        >>> (f.lhs.poly / g.lhs.poly)
-        3
+        >>> f = a**2 + mpq(1,2)*a*b - 6*b**2 + mpq(1,3) <= 0
+        >>> _BasicKnowledge.from_atom(f)
+        _BasicKnowledge(term=a^2 + 1/2*a*b - 6*b^2, range=_Range(lopen=True,
+            start=mpfr('-inf'), end=mpq(-1,3), ropen=False, exc=set()))
         """
-        rel = f.op
-        lhs = f.lhs
-        lc = lhs.lc()
-        if lc < 0:
-            rel = rel.converse()
-        lhs /= lc
+        rel = atom.op
+        lhs = atom.lhs
         q = -lhs.constant_coefficient()
         term = lhs + q
-        # rel is the (possibly conversed) relation of atom, term is the monic
-        # parametric part, and q is the negative constant coefficient.
+        # rel is the relation of atom, term is the monic parametric part, and q
+        # is the negative constant coefficient.
         if rel is Eq:
             range_ = _Range(False, q, q, False, set())
         elif rel is Ne:
@@ -404,7 +391,11 @@ class _BasicKnowledge:
             range_ = _Range(True, -oo, q, True, set())
         else:
             assert False, rel
-        return cls(term, range_)
+        bknowl = cls(term, range_)
+        # This classmethod is essentially a constructor. We eventually call
+        # __post_init__() instead of adding assertion earlier.
+        bknowl.__post_init__()
+        return bknowl
 
 
 @dataclass
@@ -468,17 +459,18 @@ class InternalRepresentation(
     _knowl: _Knowledge = field(default_factory=_Knowledge)
     _subst: _Substitution = field(default_factory=_Substitution)
 
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.RESTART:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         if gand is Or:
             atoms = (atom.to_complement() for atom in atoms)
-        restart = abc.simplify.Restart.NONE
+        restart = abc.simplify.RESTART.NONE
         for atom in atoms:
             # print(f'{atom=}')
             # print(f'{self=}')
             # assert all(v not in self._subst.as_dict() for v in atom.fvars())
             assert not atom.lhs.is_constant()
+            assert atom.lhs.lc() == 1, atom
             maybe_bknowl = _BasicKnowledge.from_atom(atom).subs(self._subst.as_dict())
             if maybe_bknowl is None:
                 continue
@@ -486,11 +478,11 @@ class InternalRepresentation(
             if self._knowl.is_known(maybe_bknowl):
                 if bknowl.is_substitution():
                     self._propagate(bknowl)
-                    restart = abc.simplify.Restart.ALL
+                    restart = abc.simplify.RESTART.ALL
                 else:
                     self._knowl.add(bknowl)
-                    if restart is not abc.simplify.Restart.ALL:
-                        restart = abc.simplify.Restart.OTHERS
+                    if restart is not abc.simplify.RESTART.ALL:
+                        restart = abc.simplify.RESTART.OTHERS
             # print(f'{self=}')
             # print()
         return restart
@@ -508,13 +500,6 @@ class InternalRepresentation(
             for bknowl in self._knowl:
                 if bknowl.is_substitution():
                     stack.append(bknowl)
-
-    @staticmethod
-    @lru_cache(maxsize=CACHE_SIZE)
-    def _compose_atom(rel: type[AtomicFormula], t: Term, q: mpq) -> AtomicFormula:
-        num = mpq(q.numerator)
-        den = mpq(q.denominator)
-        return rel(den * t - num, 0)
 
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
@@ -543,23 +528,20 @@ class InternalRepresentation(
                 t: Term = var
                 q = val.coefficient
             else:
-                t = mpq(val.coefficient.denominator) * var \
-                    - mpq(val.coefficient.numerator) * val.variable
-                if t.lc() < 0:
-                    t = -t
+                t = var - val.as_term()
                 q = mpq(0)
             if self._options.prefer_order and gand is Or and t in knowl:
                 ref_range = knowl[t]
                 if q == ref_range.start:
                     assert not ref_range.lopen
-                    L.append(self._compose_atom(Le, t, q))
+                    L.append(Le(t - q, 0))
                 elif q == ref_range.end:
                     assert not ref_range.ropen
-                    L.append(self._compose_atom(Ge, t, q))
+                    L.append(Ge(t - q, 0))
                 else:
-                    L.append(self._compose_atom(Eq, t, q))
+                    L.append(Eq(t - q, 0))
             else:
-                L.append(self._compose_atom(Eq, t, q))
+                L.append(Eq(t - q, 0))
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
@@ -597,15 +579,23 @@ class InternalRepresentation(
         return result
 
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
-        G = {key - val for key, val in self._subst.as_dict().items()}
+        """Apply the substitution part of `self` to atom. The result is an atom
+        with monic left hand side and zero right hand side.
+        """
+        G = (key - val for key, val in self._subst.as_dict().items())
         assert atom.rhs == 0
         lhs = atom.lhs.reduce(G)
-        atom = atom.op(lhs, 0)
-        if atom.lhs.is_constant():
-            return Eq(0, 0) if bool(atom) else Eq(1, 0)
-        if atom.lhs.lc() < 0:
-            atom = atom.op.converse()(-atom.lhs, 0)
-        return atom
+        if lhs.is_constant():
+            return Eq(0, 0) if atom.op(lhs, 0) else Eq(1, 0)
+        # At the time of writing this procedure _simpl_at is applied to the
+        # result immediately. Nevertheless, we keep the left hand side monic
+        # also here.
+        if lhs.lc() < 0:
+            op = atom.op.converse()
+            lhs = -lhs
+        else:
+            op = atom.op
+        return op(lhs / lhs.lc(), 0)
 
 
 @dataclass(frozen=True)
@@ -645,6 +635,23 @@ class Simplify(abc.simplify.Simplify[
                 case _:
                     assert False, simplified_atom
         return ir
+
+    def _post_process(self, f: Formula) -> Formula:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> simplify(8*x + 12*y == 4)
+        2*x + 3*y - 1 == 0
+        >>> simplify(8*x + 12*y == 4, lift=False)
+        x + 3/2*y - 1/2 == 0
+        """
+        @lru_cache(maxsize=CACHE_SIZE)
+        def lift_atom(atom: AtomicFormula) -> AtomicFormula:
+            return atom.op(atom.lhs / atom.lhs.content(), 0)
+
+        if self._options.lift is False:
+            return f
+        return f.traverse(map_atoms=lift_atom, sort_levels=True)
 
     def simpl_at(self, atom: AtomicFormula, context: Optional[type[And] | type[Or]]) -> Formula:
         """Implements the abstract method

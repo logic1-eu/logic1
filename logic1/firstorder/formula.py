@@ -997,7 +997,8 @@ class Formula(Generic[α, τ, χ, σ]):
                 nnf_arg = self.arg.to_nnf(to_positive=to_positive, _not=_not)
                 return nnf_op(self.var, nnf_arg)
             case Equivalent():
-                rewrite: Formula[α, τ, χ, σ] = And(Implies(*self.args), Implies(self.rhs, self.lhs))
+                rewrite: Formula[α, τ, χ, σ] = And(Implies(*self.args),
+                                                   Implies(self.rhs, self.lhs))
                 return rewrite.to_nnf(to_positive=to_positive, _not=_not)
             case Implies():
                 if isinstance(self.rhs, Or):
@@ -1060,16 +1061,20 @@ class Formula(Generic[α, τ, χ, σ]):
         prenex_normal_form: PrenexNormalForm[α, τ, χ, σ] = PrenexNormalForm()
         return prenex_normal_form(self, prefer_universal, is_nnf)
 
-    def transform_atoms(self, tr: Callable[..., Formula[α, τ, χ, σ]]) -> Formula[α, τ, χ, σ]:
+    def traverse(self, *,
+                 map_atoms: Callable[..., Formula[α, τ, χ, σ]] = lambda atom: atom,
+                 sort_levels: bool = False) -> Formula[α, τ, χ, σ]:
         """Apply `tr` to all atomic formulas.
 
         Replaces each atomic subformula of `self` with the :class:`Formula`
-        `tr(self)`.
+        `map_atoms(self)`. If `sort_levels' is :obj:`True`, all subformulas
+        built from commutative  boolean operators (:class:`.And`, :class:`.Or`,
+        :class:`.Equivalent`) are sorted after the application of `map_atoms`.
 
         >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>> f = And(x == y, y < z)
-        >>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
+        >>> f.traverse(map_atoms=lambda atom: atom.op(atom.lhs - atom.rhs, 0))
         And(x - y == 0, y - z < 0)
         """
         # Getting rid of the "..." argument of Callable requires ParamSpecs.
@@ -1077,15 +1082,21 @@ class Formula(Generic[α, τ, χ, σ]):
         # problems with AtomicFormula in that position.
         match self:
             case All() | Ex():
-                return self.op(self.var, self.arg.transform_atoms(tr))
-            case And() | Or() | Not() | Implies() | Equivalent() | _F() | _T():
-                args = (arg.transform_atoms(tr) for arg in self.args)
+                arg = self.arg.traverse(map_atoms=map_atoms, sort_levels=sort_levels)
+                return self.op(self.var, arg)
+            case And() | Or() | Equivalent():
+                argl = list(arg.traverse(map_atoms=map_atoms, sort_levels=sort_levels)
+                            for arg in self.args)
+                if sort_levels:
+                    argl.sort()
+                return self.op(*argl)
+            case Not() | Implies() | _F() | _T():
+                args = (arg.traverse_atoms(map_atoms=map_atoms, sort_levels=sort_levels)
+                        for arg in self.args)
                 return self.op(*args)
             case AtomicFormula():
-                return tr(self)
+                return map_atoms(self)
             case _:
-                # Atomic formulas are caught by the final method
-                # AtomicFormula.transform_atoms.
                 assert False, type(self)
 
 

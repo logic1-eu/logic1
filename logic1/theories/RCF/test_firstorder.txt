@@ -161,7 +161,7 @@ And(Or(a != 0, F, Ex(y, a - y != 0)), Or(All(y, a - y == 0), And(a == 0, T)))
 And(Or(Not(a == 0), Not(T), Ex(y, Not(a - y == 0))),
     Or(All(y, a - y == 0), And(a == 0, T)))
 
-transform_atoms:
+traverse:
 >>> f = And(x == y, y < z)
->>> f.transform_atoms(lambda atom: atom.op(atom.lhs - atom.rhs, 0))
+>>> f.traverse(map_atoms=lambda atom: atom.op(atom.lhs - atom.rhs, 0))
 And(x - y == 0, y - z < 0)

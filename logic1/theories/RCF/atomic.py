@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from enum import auto, Enum
 from fractions import Fraction
-from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
+from functools import lru_cache
+from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Optional, Self
 
 from gmpy2 import mpq, sign
 from sage.all import QQ
@@ -25,6 +26,9 @@ from ...firstorder import _T, _F
 from ...support.excepthook import NoTraceException
 
 from ...support.tracing import trace  # noqa
+
+
+CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 class _PolynomialRing:
@@ -204,8 +208,10 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
         which is wrapped by ``self``.
         """
-        if self.polynomial_ring.sage_ring is not self._poly.parent():
-            self.polynomial_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
+        parent = self._poly.parent()
+        if parent is not self.polynomial_ring.sage_ring:
+            gens = parent.gens()
+            self.polynomial_ring.ensure_vars(map(str, gens))
             self._poly = self.polynomial_ring(self._poly)
         return self._poly
 
@@ -226,27 +232,27 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         # it makes no sense to compare terms with general objects. We have
         # Eq.__bool__, which supports some comparisons in boolean contexts.
         # Same for __ne__.
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
-            lhs = - lhs
-        return Eq(lhs, Term(0))
+            lhs = -lhs
+        return Eq(lhs, 0)
 
     def __ge__(self, other: Term | int) -> Ge | Le:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
             return Le(-lhs, 0)
         return Ge(lhs, 0)
 
     def __gt__(self, other: Term | int) -> Gt | Lt:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
-            return Lt(- lhs, 0)
+            return Lt(-lhs, 0)
         return Gt(lhs, 0)
 
     def __hash__(self) -> int:
         return hash(self.poly)
 
-    def __init__(self, arg: Fraction | Integer | int | MPolynomial[Rational]
+    def __init__(self, arg: Fraction | int | Integer | MPolynomial[Rational]
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
             self.poly = arg
@@ -270,13 +276,13 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             yield mpq(coefficient), Term(power_product)
 
     def __le__(self, other: Term | int | mpq) -> Ge | Le:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
             return Ge(-lhs, 0)
         return Le(lhs, 0)
 
     def __lt__(self, other: Term | int | mpq) -> Gt | Lt:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
             return Gt(-lhs, 0)
         return Lt(lhs, 0)
@@ -290,7 +296,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
 
     def __ne__(  # type: ignore[override]
             self, other: Term | int | mpq) -> Ne:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
             lhs = -lhs
         return Ne(lhs, Term(0))
@@ -447,6 +453,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return Term(self.poly.derivative(x.poly, n))
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
 
@@ -604,9 +611,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return Term(quotient), Term(remainder)
 
     def reduce(self, G: Iterable[Term]) -> Term:
-        """Reduce self modulo G. The result (c, p) describes a polynomial q = c
-        * p over Q. c >= 0 is the content of of q, and p is a polynomial over
-        Z. If c == 0, then p == 0.
+        """Reduce self modulo G.
         """
         poly = self.poly.reduce([g.poly for g in G])
         return Term(poly)
