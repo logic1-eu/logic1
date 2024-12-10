@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from math import prod
 from operator import xor
-from typing import Final, Iterable, Iterator, Optional, Self
+from typing import Collection, Final, Iterable, Iterator, Optional, Self
 
 from gmpy2 import mpfr, mpq, sign
 
@@ -152,11 +152,15 @@ class _Substitution:
         for var in self.parents:
             yield var, self.find(var)
 
-    def as_dict(self) -> dict[Variable, Term]:
-        """Convert this :class:._Substitution` into a dictionary that can be
-        used as an argument to subsitution methods.
+    def as_gb(self, ignore: Optional[Variable] = None) -> list[Term]:
+        """Convert this :class:._Substitution` into a Gröbner basis that can be
+        used as an argument to reduction methods.
         """
-        return {var: val.as_term() for var, val in self}
+        G = []
+        for var, val in self:
+            if ignore is None or var != ignore:
+                G.append(var - val.as_term())
+        return G
 
     def copy(self) -> Self:
         return self.__class__(self.parents.copy())
@@ -342,8 +346,7 @@ class _BasicKnowledge:
             return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
         return False
 
-    def subs(self, sigma: dict[Variable, Term]) -> Optional[Self]:
-        G = (key - val for key, val in sigma.items())
+    def reduce(self, G: Iterable[Term]) -> Optional[Self]:
         t = self.term.reduce(G)
         if t.is_constant():
             if t.constant_coefficient() in self.range:
@@ -435,10 +438,10 @@ class _Knowledge:
         range_ = range_.intersection(bknowl.range)
         return bknowl.__class__(bknowl.term, range_)
 
-    def subs(self, subst: dict[Variable, Term]) -> Self:
+    def reduce(self, G: Collection[Term]) -> Self:
         knowl = self.__class__()
         for bknowl in self:
-            maybe_bknowl = bknowl.subs(subst)
+            maybe_bknowl = bknowl.reduce(G)
             if maybe_bknowl is None:
                 continue
             knowl.add(maybe_bknowl)
@@ -471,7 +474,7 @@ class InternalRepresentation(
             # assert all(v not in self._subst.as_dict() for v in atom.fvars())
             assert not atom.lhs.is_constant()
             assert atom.lhs.lc() == 1, atom
-            maybe_bknowl = _BasicKnowledge.from_atom(atom).subs(self._subst.as_dict())
+            maybe_bknowl = _BasicKnowledge.from_atom(atom).reduce(self._subst.as_gb())
             if maybe_bknowl is None:
                 continue
             bknowl = self._knowl.prune(maybe_bknowl)
@@ -496,7 +499,7 @@ class InternalRepresentation(
                 val1, val2 = bknowl.as_subst_values()
                 self._subst.union(val1, val2)
             stack = []
-            self._knowl = self._knowl.subs(self._subst.as_dict())
+            self._knowl = self._knowl.reduce(self._subst.as_gb())
             for bknowl in self._knowl:
                 if bknowl.is_substitution():
                     stack.append(bknowl)
@@ -505,7 +508,7 @@ class InternalRepresentation(
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
 
-        knowl = ref._knowl.subs(self._subst.as_dict())
+        knowl = ref._knowl.reduce(self._subst.as_gb())
         # print(f'extract: {ref._knowl=}\n'
         #       f'         {self._knowl=}\n'
         #       f'         {self._subst=}\n'
@@ -522,8 +525,8 @@ class InternalRepresentation(
                 continue
             known_subst.union(_SubstValue(mpq(1), var), val)
             # print(f'{known_subst=}')
-            subst = {v: q for v, q in self._subst.as_dict().items() if v != var}
-            knowl = ref._knowl.subs(subst)
+            G = self._subst.as_gb(ignore=var)
+            knowl = ref._knowl.reduce(G)
             if val.variable is None:
                 t: Term = var
                 q = val.coefficient
@@ -582,7 +585,7 @@ class InternalRepresentation(
         """Apply the substitution part of `self` to atom. The result is an atom
         with monic left hand side and zero right hand side.
         """
-        G = (key - val for key, val in self._subst.as_dict().items())
+        G = self._subst.as_gb()
         assert atom.rhs == 0
         lhs = atom.lhs.reduce(G)
         if lhs.is_constant():
@@ -659,10 +662,8 @@ class Simplify(abc.simplify.Simplify[
         """
         # MyPy does not recognize that And[Any, Any, Any] is an instance of
         # Hashable. https://github.com/python/mypy/issues/11470
-        res = self._simpl_at(
+        return self._simpl_at(
             atom, context, self._options.explode_always)  # type: ignore[arg-type]
-        assert all(atom.lhs.lc() == 1 for atom in res.atoms())
-        return res
 
     @lru_cache(maxsize=CACHE_SIZE)
     def _simpl_at(self,
