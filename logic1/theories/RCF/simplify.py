@@ -133,6 +133,15 @@ class _SubstValue:
     coefficient: mpq
     variable: Optional[Variable]
 
+    def __eq__(self, other: Self) -> bool:  # type: ignore[override]
+        if self.coefficient != other.coefficient:
+            return False
+        if self.variable is None and other.variable is None:
+            return True
+        if self.variable is None or other.variable is None:
+            return False
+        return Term.equal(self.variable, other.variable)
+
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
 
@@ -158,7 +167,7 @@ class _Substitution:
         """
         G = []
         for var, val in self:
-            if ignore is None or var != ignore:
+            if ignore is None or not Term.equal(var, ignore):
                 G.append(var - val.as_term())
         return G
 
@@ -360,7 +369,6 @@ class _BasicKnowledge:
         return self.__class__(t, range_)
 
     @classmethod
-    @lru_cache(maxsize=CACHE_SIZE)
     def from_atom(cls, atom: AtomicFormula) -> Self:
         r"""Convert AtomicFormula into _BasicKnowledge.
 

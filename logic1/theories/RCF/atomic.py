@@ -53,7 +53,7 @@ class _PolynomialRing:
         new_vars.sort()
         self.sage_ring = self.MPolynomialRing_factory(new_vars, order=self.sage_ring.term_order())
 
-    def ensure_vars(self, vars_: Iterable[str]) -> None:
+    def add_vars(self, vars_: Iterable[str]) -> None:
 
         def sort_key(s: str) -> tuple[str, int]:
             base = s.rstrip('0123456789')
@@ -121,7 +121,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         """
         match index:
             case str():
-                self.polynomial_ring.ensure_vars((index,))
+                self.polynomial_ring.add_vars((index,))
                 return Variable(self.polynomial_ring(index))
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
@@ -147,10 +147,14 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return Variable(self.polynomial_ring(v))
 
     def pop(self) -> None:
+        from . import cache_clear
         self.polynomial_ring.pop()
+        cache_clear()
 
     def push(self) -> None:
+        from . import cache_clear
         self.polynomial_ring.push()
+        cache_clear()
 
 
 VV = VariableSet()
@@ -198,6 +202,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
 
     polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
+    _hash: Optional[int] = None
     _poly: MPolynomial[Rational]
 
     # The property should be private. We might want a method to_sage()
@@ -210,15 +215,16 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         parent = self._poly.parent()
         if parent is not self.polynomial_ring.sage_ring:
-            gens = parent.gens()
-            self.polynomial_ring.ensure_vars(map(str, gens))
-            self._poly = self.polynomial_ring(self._poly)
+            poly_gens = parent.gens()
+            # Make sure that the manager process in parallel qe knows all
+            # variables. Otherwise the following line could be replaced with an
+            # assertion.
+            self.polynomial_ring.add_vars(map(str, poly_gens))
+            # We currently coerce manually in: reduce, subs, derivative,
+            # pseudo_quo_rem. The following line might cleaner:
+            #
+            # self._poly = self.polynomial_ring(self._poly)
         return self._poly
-
-    @poly.setter
-    def poly(self, value: MPolynomial[Rational]):
-        # self._poly = value  # old
-        self._poly = self.polynomial_ring(value)  # new
 
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
@@ -250,14 +256,16 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        return hash(self.poly)
+        if self._hash is None:
+            self._hash = hash(self.poly)
+        return self._hash
 
     def __init__(self, arg: Fraction | int | Integer | MPolynomial[Rational]
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
-            self.poly = arg
+            self._poly = arg
         elif isinstance(arg, (Fraction, int, Integer, mpq, Rational, UPolynomial)):
-            self.poly = self.polynomial_ring(arg)
+            self._poly = self.polynomial_ring(arg)
         else:
             raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
 
@@ -451,7 +459,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :external:meth:`MPolynomial.derivative()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
         """
-        return Term(self.poly.derivative(x.poly, n))
+        return Term(self.poly.derivative(self.polynomial_ring(x.poly), n))
+
+    @staticmethod
+    def equal(t1: Term, t2: Term) -> bool:
+        return hash(t1) == hash(t2) and t1.poly == t2.poly
 
     @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
@@ -605,15 +617,16 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :meth:`Polynomial.pseudo_quo_rem()
             <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
         """
-        self1 = self.poly.polynomial(x.poly)
-        other1 = other.poly.polynomial(x.poly)
+        self1 = self.poly.polynomial(self.polynomial_ring(x.poly))
+        other1 = other.poly.polynomial(self.polynomial_ring(x.poly))
         quotient, remainder = self1.pseudo_quo_rem(other1)
         return Term(quotient), Term(remainder)
 
     def reduce(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G.
         """
-        poly = self.poly.reduce([g.poly for g in G])
+        # Sage requires that g.poly can be coerced to self.poly.parent().
+        poly = self.polynomial_ring(self.poly).reduce([g.poly for g in G])
         return Term(poly)
 
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
@@ -665,7 +678,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
                     sage_keywords[str(variable.poly)] = substitute
                 case _:
                     assert False, (self, d)
-        return Term(self.poly.subs(**sage_keywords))
+        return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements

@@ -893,7 +893,7 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
     def init_env(cls, ring_vars: list[str]):
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
         """
-        polynomial_ring.ensure_vars(ring_vars)
+        polynomial_ring.add_vars(ring_vars)
 
     def init_env_arg(self) -> list[str]:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.
