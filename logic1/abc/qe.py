@@ -603,6 +603,8 @@ class Options:
     """The minimal timespan (in s) between to log outputs in certain loops.
     """
 
+    _workers: int = 0
+
 
 @dataclass
 class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
@@ -794,6 +796,10 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 raise ValueError(f'negative number of workers')
             self.workers = cpu_count + workers
         self.options = self.create_options(**options)
+        # The following line is a quick fix for making then number of workers
+        # available in instences of Node clases of theories. This requires more
+        # thinking.
+        self.options._workers = self.workers
         save_level = logger.getEffectiveLevel()
         try:
             logger.setLevel(self.options.log_level)

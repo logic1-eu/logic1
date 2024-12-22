@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import auto, Enum
+from logging import Logger
 from typing import ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias
 from typing import reveal_type  # noqa
 
@@ -505,19 +506,19 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                             case GENERIC.NONE:
                                 if not is_valid(a != 0, assumptions.atoms):
                                     continue
-                                abc.qe.logger.debug(f'{degree}-Gauss')
+                                self.logger().debug(f'{degree}-Gauss')
                             case GENERIC.MONOMIAL:
                                 if len(a.monomials()) > 1:
                                     continue
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
-                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                self.logger().debug(f'{degree}-Gauss assuming {a != 0}')
                             case GENERIC.FULL:
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
-                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                self.logger().debug(f'{degree}-Gauss assuming {a != 0}')
                         self.variables.remove(x)
                         test_points = []
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
@@ -545,6 +546,12 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 return True
             case _:
                 assert False, self.options.generic
+
+    def logger(self) -> Logger:
+        if self.options._workers == 0:
+            return abc.qe.logger
+        else:
+            return abc.qe.multiprocessing_logger
 
     def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
