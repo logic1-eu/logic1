@@ -15,7 +15,7 @@ from gmpy2 import mpfr, mpq, sign
 
 from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
-from .atomic import AtomicFormula, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
+from .atomic import AtomicFormula, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, SortKey, Term, Variable
 from .typing import Formula
 
 from ...support.tracing import trace  # noqa
@@ -140,7 +140,7 @@ class _SubstValue:
             return True
         if self.variable is None or other.variable is None:
             return False
-        return Term.equal(self.variable, other.variable)
+        return self.variable.sort_key() == other.variable.sort_key()
 
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
@@ -155,11 +155,11 @@ class _SubstValue:
 
 @dataclass(unsafe_hash=True)
 class _Substitution:
-    parents: dict[Variable, _SubstValue] = field(default_factory=dict)
+    parents: dict[SortKey[Variable], _SubstValue] = field(default_factory=dict)
 
     def __iter__(self) -> Iterator[tuple[Variable, _SubstValue]]:
-        for var in self.parents:
-            yield var, self.find(var)
+        for key in self.parents:
+            yield key.term, self.internal_find(key.term)
 
     def as_gb(self, ignore: Optional[Variable] = None) -> list[Term]:
         """Convert this :class:._Substitution` into a Gröbner basis that can be
@@ -167,7 +167,7 @@ class _Substitution:
         """
         G = []
         for var, val in self:
-            if ignore is None or not Term.equal(var, ignore):
+            if ignore is None or var.sort_key() != ignore.sort_key():
                 G.append(var - val.as_term())
         return G
 
@@ -180,13 +180,14 @@ class _Substitution:
     def internal_find(self, v: Optional[Variable]) -> _SubstValue:
         if v is None:
             return _SubstValue(mpq(1), None)
+        sort_key = Variable.sort_key(v)
         try:
-            parent = self.parents[v]
+            parent = self.parents[sort_key]
         except KeyError:
             return _SubstValue(mpq(1), v)
         root = self.internal_find(parent.variable)
         root = _SubstValue(parent.coefficient * root.coefficient, root.variable)
-        self.parents[v] = root
+        self.parents[sort_key] = root
         return root
 
     def union(self, val1: _SubstValue, val2: _SubstValue) -> None:
@@ -195,17 +196,21 @@ class _Substitution:
         c1 = val1.coefficient * root1.coefficient
         c2 = val2.coefficient * root2.coefficient
         if root1.variable is not None and root2.variable is not None:
-            if root1.variable == root2.variable:
+            sort_key1 = Variable.sort_key(root1.variable)
+            sort_key2 = Variable.sort_key(root2.variable)
+            if sort_key1 == sort_key2:
                 if c1 != c2:
-                    self.parents[root1.variable] = _SubstValue(mpq(0), None)
-            elif Variable.sort_key(root1.variable) < Variable.sort_key(root2.variable):
-                self.parents[root2.variable] = _SubstValue(c1 / c2, root1.variable)
+                    self.parents[sort_key1] = _SubstValue(mpq(0), None)
+            elif sort_key1 < sort_key2:  # type: ignore
+                self.parents[sort_key2] = _SubstValue(c1 / c2, root1.variable)
             else:
-                self.parents[root1.variable] = _SubstValue(c2 / c1, root2.variable)
+                self.parents[sort_key1] = _SubstValue(c2 / c1, root2.variable)
         elif root1.variable is None and root2.variable is not None:
-            self.parents[root2.variable] = _SubstValue(c1 / c2, None)
+            sort_key2 = Variable.sort_key(root2.variable)
+            self.parents[sort_key2] = _SubstValue(c1 / c2, None)
         elif root1.variable is not None and root2.variable is None:
-            self.parents[root1.variable] = _SubstValue(c2 / c1, None)
+            sort_key1 = Variable.sort_key(root1.variable)
+            self.parents[sort_key1] = _SubstValue(c2 / c1, None)
         else:
             if c1 != c2:
                 raise InternalRepresentation.Inconsistent()

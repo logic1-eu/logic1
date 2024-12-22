@@ -92,7 +92,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 VV = VariableSet()
 
 
-class Variable(firstorder.Variable['Variable', Never]):
+class Variable(firstorder.Variable['Variable', Never, str]):
 
     wrapped_variable_set: VariableSet = VV
 
@@ -135,12 +135,11 @@ class Variable(firstorder.Variable['Variable', Never]):
         """
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
-    @staticmethod
-    def sort_key(term: Variable) -> str:
+    def sort_key(self) -> str:
         """A sort key suitable for ordering instances of this class. Implements
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
-        return term.string
+        return self.string
 
     def subs(self, d: dict[Variable, Variable]) -> Variable:
         """Simultaneous substitution of variables for variables.
@@ -320,6 +319,7 @@ class Eq(AtomicFormula):
         return self.lhs.string == self.rhs.string
 
     def __init__(self, lhs: Variable, rhs: Variable) -> None:
+        super().__init__()
         for arg in (lhs, rhs):
             if not isinstance(arg, Variable):
                 raise ValueError(
@@ -341,6 +341,7 @@ class Ne(AtomicFormula):
         return self.lhs.string != self.rhs.string
 
     def __init__(self, lhs: Variable, rhs: Variable) -> None:
+        super().__init__()
         for arg in (lhs, rhs):
             if not isinstance(arg, Variable):
                 raise ValueError(
@@ -387,6 +388,7 @@ class C(AtomicFormula):
         """Implements abstract method
         :meth:`firstorder.formula.Formula.__init__`.
         """
+        super().__init__()
         self.args = (index,)
 
     def __new__(cls, index: Index):
@@ -416,6 +418,7 @@ class C_(AtomicFormula):
         """Implements abstract method
         :meth:`firstorder.formula.Formula.__init__`.
         """
+        super().__init__()
         self.args = (index,)
 
     def __new__(cls, index: Index):

@@ -9,11 +9,16 @@ from __future__ import annotations
 from abc import abstractmethod
 import inspect
 from types import FrameType
-from typing import Any, final, Generic, Iterator, Sequence
+from typing import Any, final, Generic, Iterator, Sequence, TypeVar
 
 from .formula import α, τ, χ, σ, Formula
 
 from ..support.tracing import trace  # noqa
+
+
+κ = TypeVar('κ')
+"""A type variable denoting a sort key.
+"""
 
 
 class VariableSet(Generic[χ]):
@@ -127,7 +132,7 @@ class VariableSet(Generic[χ]):
         ...
 
 
-class Term(Generic[τ, χ, σ]):
+class Term(Generic[τ, χ, σ, κ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on terms required by :class:`.Formula`. The methods are
     supposed to be implemented for the various theories. We need a type
@@ -152,9 +157,8 @@ class Term(Generic[τ, χ, σ]):
         """
         ...
 
-    @staticmethod
     @abstractmethod
-    def sort_key(term: τ) -> Any:
+    def sort_key(self) -> κ:
         """A sort key suitable for ordering instances of :data:`τ
         <.firstorder.atomic.τ>`.
 
@@ -199,7 +203,7 @@ class Term(Generic[τ, χ, σ]):
         ...
 
 
-class Variable(Term[χ, χ, σ]):
+class Variable(Term[χ, χ, σ, κ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on variables required by Formula. The methods are supposed
     to be implemented for the various theories.

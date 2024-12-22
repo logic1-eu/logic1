@@ -64,6 +64,7 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
         All(a, All(b, Ex(x, a*x + b >= 0)))
         """
         assert self.op in (Ex, All)  # in lack of abstract class properties
+        super().__init__()
         if not isinstance(arg, Formula):
             raise ValueError(f'{arg!r} is not a Formula')
         match vars_:
@@ -142,7 +143,7 @@ class Prefix(deque[tuple[type[All | Ex], list[χ]]]):
     """
 
     def __init__(self, *blocks: tuple[type[All[α, τ, χ, σ] | Ex[α, τ, χ, σ]], list[χ]]) -> None:
-        return super().__init__(blocks)
+        super().__init__(blocks)
 
     def __str__(self) -> str:
         return '  '.join(q.__name__ + ' ' + str(vars_) for q, vars_ in self)

@@ -31,6 +31,11 @@ class Equivalent(BooleanFormula[α, τ, χ, σ]):
     >>> Equivalent(x >= 0, Or(x > 0, x == 0))
     Equivalent(x >= 0, Or(x > 0, x == 0))
     """
+
+    def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
+        super().__init__()
+        self.args = (lhs, rhs)
+
     @property
     def lhs(self) -> Formula[α, τ, χ, σ]:
         """The left-hand side of the equivalence.
@@ -51,9 +56,6 @@ class Equivalent(BooleanFormula[α, τ, χ, σ]):
         """
         return self.args[1]
 
-    def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
-        self.args = (lhs, rhs)
-
 
 @final
 class Implies(BooleanFormula[α, τ, χ, σ]):
@@ -71,6 +73,11 @@ class Implies(BooleanFormula[α, τ, χ, σ]):
         * :meth:`\\<\\<, __lshift__() <.formula.Formula.__lshift__>` -- \
             infix notation of converse :class:`Implies`
     """  # noqa
+
+    def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
+        super().__init__()
+        self.args = (lhs, rhs)
+
     @property
     def lhs(self) -> Formula[α, τ, χ, σ]:
         """The left-hand side of the implication.
@@ -90,9 +97,6 @@ class Implies(BooleanFormula[α, τ, χ, σ]):
             * :attr:`op <.formula.Formula.op>` -- operator
         """
         return self.args[1]
-
-    def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
-        self.args = (lhs, rhs)
 
 
 @final
@@ -116,6 +120,30 @@ class And(BooleanFormula[α, τ, χ, σ]):
         * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
         * :attr:`op <.formula.Formula.op>` -- operator
     """
+
+    def __init__(self, *args: Formula[α, τ, χ, σ]) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> And(a >= 0, a != 0)
+        And(a >= 0, a != 0)
+        """
+        super().__init__()
+        args_flat = []
+        for arg in args:
+            if isinstance(arg, And):
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        self.args = tuple(args_flat)
+
+    def __new__(cls, *args: Formula[α, τ, χ, σ]):
+        if not args:
+            return T
+        if len(args) == 1:
+            return args[0]
+        return super().__new__(cls)
+
     @classmethod
     def dual(cls) -> type[Or[α, τ, χ, σ]]:
         r"""A class method yielding the class :class:`Or`, which implements
@@ -153,28 +181,6 @@ class And(BooleanFormula[α, τ, χ, σ]):
         """
         return _T()
 
-    def __new__(cls, *args: Formula[α, τ, χ, σ]):
-        if not args:
-            return T
-        if len(args) == 1:
-            return args[0]
-        return super().__new__(cls)
-
-    def __init__(self, *args: Formula[α, τ, χ, σ]) -> None:
-        """
-        >>> from logic1.theories.RCF import *
-        >>> a, = VV.get('a')
-        >>> And(a >= 0, a != 0)
-        And(a >= 0, a != 0)
-        """
-        args_flat = []
-        for arg in args:
-            if isinstance(arg, And):
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        self.args = tuple(args_flat)
-
 
 @final
 class Or(BooleanFormula[α, τ, χ, σ]):
@@ -197,6 +203,30 @@ class Or(BooleanFormula[α, τ, χ, σ]):
         * :attr:`args <.formula.Formula.op>` -- all arguments as a tuple
         * :attr:`op <.formula.Formula.op>` -- operator
     """
+
+    def __init__(self, *args: Formula[α, τ, χ, σ]) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> Or(a > 0, a == 0)
+        Or(a > 0, a == 0)
+        """
+        super().__init__()
+        args_flat = []
+        for arg in args:
+            if isinstance(arg, Or):
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        self.args = tuple(args_flat)
+
+    def __new__(cls, *args: Formula[α, τ, χ, σ]):
+        if not args:
+            return F
+        if len(args) == 1:
+            return args[0]
+        return super().__new__(cls)
+
     @classmethod
     def dual(cls) -> type[And[α, τ, χ, σ]]:
         r"""A class method yielding the class :class:`And`, which implements
@@ -234,28 +264,6 @@ class Or(BooleanFormula[α, τ, χ, σ]):
         """
         return _F()
 
-    def __new__(cls, *args: Formula[α, τ, χ, σ]):
-        if not args:
-            return F
-        if len(args) == 1:
-            return args[0]
-        return super().__new__(cls)
-
-    def __init__(self, *args: Formula[α, τ, χ, σ]) -> None:
-        """
-        >>> from logic1.theories.RCF import *
-        >>> a, = VV.get('a')
-        >>> Or(a > 0, a == 0)
-        Or(a > 0, a == 0)
-        """
-        args_flat = []
-        for arg in args:
-            if isinstance(arg, Or):
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        self.args = tuple(args_flat)
-
 
 @final
 class Not(BooleanFormula[α, τ, χ, σ]):
@@ -272,6 +280,17 @@ class Not(BooleanFormula[α, τ, χ, σ]):
         * :meth:`~, __invert__() <.formula.Formula.__invert__>` -- \
             short notation of :class:`Not`
     """
+
+    def __init__(self, arg: Formula[α, τ, χ, σ]) -> None:
+        """
+        >>> from logic1.theories.RCF import *
+        >>> a, = VV.get('a')
+        >>> Not(a == 0)
+        Not(a == 0)
+        """
+        super().__init__()
+        self.args = (arg, )
+
     @property
     def arg(self) -> Formula[α, τ, χ, σ]:
         """The one argument of the operator :math:`\\neg`.
@@ -281,15 +300,6 @@ class Not(BooleanFormula[α, τ, χ, σ]):
             * :attr:`op <.formula.Formula.op>` -- operator
         """
         return self.args[0]
-
-    def __init__(self, arg: Formula[α, τ, χ, σ]) -> None:
-        """
-        >>> from logic1.theories.RCF import *
-        >>> a, = VV.get('a')
-        >>> Not(a == 0)
-        Not(a == 0)
-        """
-        self.args = (arg, )
 
 
 def involutive_not(arg: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
@@ -325,16 +335,10 @@ class _T(BooleanFormula[α, τ, χ, σ]):
     # support subclassing. We do not use a module because we need _T to be a
     # subclass itself.
 
-    @classmethod
-    def dual(cls) -> type[_F[α, τ, χ, σ]]:
-        r"""A class method yielding the class :class:`_F`, which implements
-        the dual operator :math:`\bot` of :math:`\top`.
-        """
-        return _F
-
     _instance: Optional[_T[α, τ, χ, σ]] = None
 
     def __init__(self) -> None:
+        super().__init__()
         self.args = ()
 
     def __new__(cls):
@@ -344,6 +348,13 @@ class _T(BooleanFormula[α, τ, χ, σ]):
 
     def __repr__(self) -> str:
         return 'T'
+
+    @classmethod
+    def dual(cls) -> type[_F[α, τ, χ, σ]]:
+        r"""A class method yielding the class :class:`_F`, which implements
+        the dual operator :math:`\bot` of :math:`\top`.
+        """
+        return _F
 
 
 T: _T['AtomicFormula', 'Term', 'Variable', object] = _T()
@@ -373,16 +384,10 @@ class _F(BooleanFormula[α, τ, χ, σ]):
     # support subclassing. We do not use a module because we need _F to be a
     # subclass itself.
 
-    @classmethod
-    def dual(cls) -> type[_T[α, τ, χ, σ]]:
-        r"""A class method yielding the class :class:`_T`, which implements
-        the dual operator :math:`\top` of :math:`\bot`.
-        """
-        return _T
-
     _instance: Optional[_F[α, τ, χ, σ]] = None
 
     def __init__(self) -> None:
+        super().__init__()
         self.args = ()
 
     def __new__(cls):
@@ -392,6 +397,13 @@ class _F(BooleanFormula[α, τ, χ, σ]):
 
     def __repr__(self) -> str:
         return 'F'
+
+    @classmethod
+    def dual(cls) -> type[_T[α, τ, χ, σ]]:
+        r"""A class method yielding the class :class:`_T`, which implements
+        the dual operator :math:`\top` of :math:`\bot`.
+        """
+        return _T
 
 
 F: _F['AtomicFormula', 'Term', 'Variable', object] = _F()

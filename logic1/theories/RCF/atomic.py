@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
-from functools import lru_cache
-from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Optional, Self
+from functools import lru_cache, total_ordering
+from typing import (
+    Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self,
+    TypeVar)
 
 from gmpy2 import mpq, sign
 from sage.all import QQ
@@ -29,6 +32,12 @@ from ...support.tracing import trace  # noqa
 
 
 CACHE_SIZE: Final[Optional[int]] = 2**16
+
+
+τ = TypeVar('τ', bound='Term')
+"""A type variable denoting a type of terms with upper bound
+:class:`logic1.theories.RCF.Term`.
+"""
 
 
 class _PolynomialRing:
@@ -61,12 +70,14 @@ class _PolynomialRing:
             n = int(index) if index else -1
             return base, n
 
-        new_vars = [str(g) for g in self.sage_ring.gens()]
+        new_vars = []
+        for g in self.sage_ring.gens():
+            new_vars.append(str(g))
         have_appended = False
         for v in vars_:
             if v not in new_vars:
-                have_appended = True
                 new_vars.append(v)
+                have_appended = True
         if have_appended:
             new_vars.sort(key=sort_key)
             self.sage_ring = self.MPolynomialRing_factory(
@@ -198,7 +209,38 @@ class DEFINITE(Enum):
     """
 
 
-class Term(firstorder.Term['Term', 'Variable', int]):
+@dataclass
+class SortKey(Generic[τ]):
+
+    term: τ
+
+    def __eq__(self, other: Self) -> bool:  # type: ignore[override]
+        if hash(self.term) != hash(other.term):
+            return False
+        return self.term._poly == other.term._poly
+
+    def __ge__(self, other: Self) -> bool:
+        return self.term._poly >= other.term._poly
+
+    def __gt__(self, other: Self) -> bool:
+        return self.term._poly > other.term._poly
+
+    def __hash__(self) -> int:
+        return hash(self.term)
+
+    def __le__(self, other: Self) -> bool:
+        return self.term._poly <= other.term._poly
+
+    def __lt__(self, other: Self) -> bool:
+        return self.term._poly < other.term._poly
+
+    def __ne__(self, other: Self) -> bool:  # type: ignore[override]
+        if hash(self.term) != hash(other.term):
+            return True
+        return self.term._poly != other.term._poly
+
+
+class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
@@ -461,10 +503,6 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return Term(self.poly.derivative(self.polynomial_ring(x.poly), n))
 
-    @staticmethod
-    def equal(t1: Term, t2: Term) -> bool:
-        return hash(t1) == hash(t2) and t1.poly == t2.poly
-
     @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
@@ -649,12 +687,11 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
 
-    @staticmethod
-    def sort_key(term: Term) -> MPolynomial[Rational]:
+    def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. ImplementTerm(remainder)s
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
-        return term.poly
+        return SortKey(self)
 
     def subs(self, d: Mapping[Variable, Term | int | mpq]) -> Term:
         """Simultaneous substitution of terms for variables.
@@ -693,7 +730,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
 
 
 # discuss: Variable inherits __init__, and we can create Variable(3), Variable(term.poly), etc.
-class Variable(Term, firstorder.Variable['Variable', int]):
+class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
     VV: ClassVar[VariableSet] = VV
 
@@ -741,7 +778,22 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             case _:
                 assert False, self
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AtomicFormula):
+            return False
+        if self.op != other.op:
+            return False
+        if self.lhs.sort_key() != other.lhs.sort_key():
+            return False
+        if self.rhs.sort_key() != other.rhs.sort_key():
+            return False
+        return True
+
+    def __hash__(self) -> int:
+        return super().__hash__()
+
     def __init__(self, lhs: Term | int, rhs: Term | int):
+        super().__init__()
         if not isinstance(self, (Eq, Ne, Ge, Gt, Le, Lt)):
             raise NoTraceException('Instantiate one of Eq, Ne, Ge, Gt, Le, Lt instead')
         if not isinstance(lhs, Term):
@@ -755,16 +807,18 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         equal to other. Implements abstract method
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
         """
-        match other:
-            case AtomicFormula():
-                if self.lhs != other.lhs:
-                    return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
-                if self.rhs != other.rhs:
-                    return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
-                L = [Eq, Ne, Le, Lt, Ge, Gt]
-                return L.index(self.op) <= L.index(other.op)
-            case _:
-                return True
+        if not isinstance(other, AtomicFormula):
+            return True
+        self_sort_key = self.lhs.sort_key()
+        other_sort_key = other.lhs.sort_key()
+        if self_sort_key != other_sort_key:
+            return self_sort_key <= other_sort_key
+        self_sort_key = self.rhs.sort_key()
+        other_sort_key = other.rhs.sort_key()
+        if self_sort_key != other_sort_key:
+            return self_sort_key <= other_sort_key
+        L = [Eq, Ne, Le, Lt, Ge, Gt]
+        return L.index(self.op) <= L.index(other.op)
 
     def __repr__(self) -> str:
         if self.lhs.poly.is_constant() and self.rhs.poly.is_constant():

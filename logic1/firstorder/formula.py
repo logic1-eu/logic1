@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 import functools
-from typing import Any, Callable, Final, Generic, Iterable, Iterator, Self, TypeVar
+from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TypeVar
 from typing_extensions import TypeIs
 
 from ..support.tracing import trace  # noqa
@@ -64,6 +64,8 @@ class Formula(Generic[α, τ, χ, σ]):
         by static type checkers but are not relevant for the either
         interactive use or use as a library.
     """
+
+    _hash: Optional[int]
 
     @property
     def op(self) -> type[Self]:
@@ -127,8 +129,12 @@ class Formula(Generic[α, τ, χ, σ]):
         if self is other:
             return True
         if not isinstance(other, Formula):
-            return NotImplemented
-        return self.op == other.op and self.args == other.args
+            return False
+        if self.op is not other.op:
+            return False
+        if hash(self) != hash(other):
+            return False
+        return self.args == other.args
 
     def __getnewargs__(self) -> tuple[Any, ...]:
         return self.args
@@ -143,14 +149,16 @@ class Formula(Generic[α, τ, χ, σ]):
         Recall from the Python documentation that PYTHONHASHSEED should not be
         fixed in general.
         """
-        return hash((tuple(str(cls) for cls in self.op.mro()), self.args))
+        if self._hash is None:
+            self._hash = hash((tuple(str(cls) for cls in self.op.mro()), self.args))
+        return self._hash
 
     @abstractmethod
     def __init__(self, *args: object) -> None:
         """This abstract base class is not supposed to have instances itself.
         Technically this is enforced via this abstract initializer.
         """
-        ...
+        self._hash = None
 
     def __invert__(self) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`~ <object.__invert__>` operator to apply
@@ -196,10 +204,10 @@ class Formula(Generic[α, τ, χ, σ]):
         """
         return Implies(other, self)
 
-    def __ne__(self, other: object) -> bool:
-        """A recursive test for unequality of the `self` and `other`.
-        """
-        return not self == other
+    # def __ne__(self, other: object) -> bool:
+    #     """A recursive test for unequality of the `self` and `other`.
+    #     """
+    #     return not self == other
 
     def __or__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`| <object.__or__>` operator to apply :class:`Or`.
@@ -293,7 +301,7 @@ class Formula(Generic[α, τ, χ, σ]):
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
-            variables.sort(key=variables[0].sort_key)
+            variables.sort(key=lambda v: v.sort_key())
         f = self
         for v in reversed(variables):
             f = All(v, f)
@@ -544,7 +552,7 @@ class Formula(Generic[α, τ, χ, σ]):
         """
         variables = list(set(self.fvars()) - set(ignore))
         if variables:
-            variables.sort(key=variables[0].sort_key)
+            variables.sort(key=lambda v: v.sort_key())
         f = self
         for v in reversed(variables):
             f = Ex(v, f)
