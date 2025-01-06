@@ -548,7 +548,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 assert False, self.options.generic
 
     def logger(self) -> Logger:
-        if self.options._workers == 0:
+        if self.options.workers == 0:
             return abc.qe.logger
         else:
             return abc.qe.multiprocessing_logger
@@ -787,12 +787,12 @@ class Options(abc.qe.Options):
     variable :data:`.abc.qe.ω` of :class:`.abc.qe.QuantifierElimination`.
     """
 
-    clustering: CLUSTERING = CLUSTERING.FULL
+    clustering: CLUSTERING
     """The clustering strategy used by :class:`.VirtualSubstitution`. See
     [Kosta-2016]_ for details on clustering.
     """
 
-    generic: GENERIC = GENERIC.NONE
+    generic: GENERIC
     """The degree of genericity used by :class:`.VirtualSubstitution`. See
     [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_ for details on generic
     quantifier elimination.
@@ -821,7 +821,7 @@ class Options(abc.qe.Options):
     [c > 0, b != 0]
     """
 
-    traditional_guards: bool = True
+    traditional_guards: bool
     """`traditional_guards=False` strictly follows the construction of guards
     as described in [Kosta-2016]_.
 
@@ -839,6 +839,14 @@ class Options(abc.qe.Options):
        And(b != 0, Or(c == 0, a == 0)),
        And(a != 0, 4*a*c - b^2 <= 0))
     """
+
+    def __init__(self, /, clustering: CLUSTERING = CLUSTERING.FULL,
+                 generic: GENERIC = GENERIC.NONE, traditional_guards: bool = True, **kwargs) \
+            -> None:
+        super().__init__(**kwargs)
+        self.clustering = clustering
+        self.generic = generic
+        self.traditional_guards = traditional_guards
 
 
 @dataclass

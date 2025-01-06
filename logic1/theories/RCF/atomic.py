@@ -386,10 +386,10 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return Term(self.poly - other)
 
     def __truediv__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly / other.poly)
         if isinstance(other, mpq):
             return Term(self.poly / Rational(other))
+        if isinstance(other, Term):
+            return Term(self.poly / other.poly)
         # x*y / x would yield y as a Sage rational function and raise and
         # exception.
         return Term(self.poly / other)
@@ -638,6 +638,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomials>`
         """
         return [Term(monomial) for monomial in self.poly.monomials()]
+
+    def normalize(self) -> Term:
+        return Term(self.poly / self.poly.lc())
 
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
