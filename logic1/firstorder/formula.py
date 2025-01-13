@@ -5,6 +5,8 @@ import functools
 from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TypeVar
 from typing_extensions import TypeIs
 
+from IPython.lib import pretty
+
 from ..support.tracing import trace  # noqa
 
 
@@ -790,6 +792,16 @@ class Formula(Generic[α, τ, χ, σ]):
                 as_latex = as_latex[:-1]
             as_latex += '{}\\dots'
         return f'$\\displaystyle {as_latex}$'
+
+    def _repr_pretty_(self, p: pretty.RepresentationPrinter, cycle: bool) -> None:
+        assert not cycle
+        op = self.__class__.__name__
+        with p.group(len(op) + 1, op + '(', ')'):
+            for idx, arg in enumerate(self.args):
+                if idx:
+                    p.text(',')
+                    p.breakable()
+                p.pretty(arg)
 
     def simplify(self) -> Formula[α, τ, χ, σ]:
         """Fast basic simplification. The result is equivalent to `self`. The

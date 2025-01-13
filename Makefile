@@ -4,14 +4,17 @@ ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 .PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
 		coverage coverage_html clean veryclean conda-build
 
+cython:
+	python setup.py build_ext --inplace
+
 pytest:
-	pytest -n 8 --exitfirst --doctest-modules $(ignores)
+	pytest -n 8 --doctest-cython --exitfirst --doctest-modules $(ignores)
 
 pytest-fast:
 	PYTHONOPTIMIZE=TRUE pytest -n 8 --disable-warnings --exitfirst --doctest-modules $(ignores)
 
 pytest-seq:
-	pytest --exitfirst --doctest-modules $(ignores)
+	pytest --doctest-cython --exitfirst --doctest-modules $(ignores)
 
 pytest-full:
 	pytest -n 8 --doctest-modules $(ignores)

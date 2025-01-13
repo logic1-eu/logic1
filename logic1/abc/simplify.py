@@ -152,13 +152,12 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
           simplifying `f` to :data:`.T` or :data:`.F`, respectively. Returns
           :data:`None` in the sense of "don't know" otherwise.
         """
-        match self.simplify(f, assume):
-            case _T():
-                return True
-            case _F():
-                return False
-            case _:
-                return None
+        f = self.simplify(f, assume)
+        if f is _T():
+            return True
+        if f is _F():
+            return False
+        return None
 
     def _post_process(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """A hook for post-processing the final result in subclasses.
@@ -216,6 +215,16 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         """Simplify the negation normal form `f`, which starts with either
         :class:`.And` or :class:`.Or`, modulo `ir`.
         """
+
+        # def log(msg: str):
+        #     from IPython.lib import pretty
+        #     print('+' + (78 - len(msg)) * '-' + ' ' + msg)
+        #     pretty_f = pretty.pretty(f, newline='\n|   ')
+        #     pretty_nodes = pretty.pretty(ir._subst.nodes, newline='\n| ' + len('ir._subst.nodes=') * ' ')
+        #     pretty_ref_nodes = pretty.pretty(ref._subst.nodes, newline='\n| ' + len('ref._subst.nodes=') * ' ')
+        #     print(f'| f={pretty_f}\n| {ir._knowl=!s}\n| ir._subst.nodes={pretty_nodes}\n| {ref._knowl=!s}\n| ref._subst.nodes={pretty_ref_nodes}')
+        #     print('+' + 79 * '-')
+
         ref = ir
         ir = ir.next_()
         gand = f.op
@@ -295,13 +304,11 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         except ir.Inconsistent:
             return _F()
         final_atoms = list(ir.extract(And, ref))
-        match len(final_atoms):
-            case 0:
-                return _T()
-            case 1:
-                return final_atoms[0]
-            case _:
-                assert False, final_atoms
+        if len(final_atoms) == 0:
+            return _T()
+        if len(final_atoms) == 1:
+            return final_atoms[0]
+        assert False, final_atoms
 
     def _simpl_quantified(self, f: QuantifiedFormula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         """Simplify the negation normal form `f`, which starts with either
