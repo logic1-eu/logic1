@@ -5,7 +5,7 @@ ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 		coverage coverage_html clean veryclean conda-build
 
 cython:
-	python setup.py build_ext --inplace
+	python cython-setup.py build_ext --inplace
 
 cython-clean:
 	/bin/rm logic1/theories/RCF/substitution.c logic1/theories/RCF/substitution.cpython-311-darwin.so
