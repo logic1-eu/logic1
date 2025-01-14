@@ -15,14 +15,12 @@ from gmpy2 import mpfr, mpq, sign
 
 from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
-from .atomic import AtomicFormula, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
+from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
 from .substitution import _SubstValue, _Substitution  # type: ignore
 from .typing import Formula
 
 from ...support.tracing import trace  # noqa
 
-
-CACHE_SIZE: Final[Optional[int]] = 2**16
 
 oo: Final[mpfr] = mpfr('inf')
 

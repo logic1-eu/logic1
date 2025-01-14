@@ -7,6 +7,9 @@ ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 cython:
 	python setup.py build_ext --inplace
 
+cython-clean:
+	/bin/rm logic1/theories/RCF/substitution.c logic1/theories/RCF/substitution.cpython-311-darwin.so
+
 pytest:
 	pytest -n 8 --doctest-cython --exitfirst --doctest-modules $(ignores)
 

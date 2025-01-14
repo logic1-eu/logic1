@@ -1,23 +1,14 @@
-# cython: profile=True
-# type: ignore
 from __future__ import annotations
 
-import cython
+from dataclasses import dataclass, field
 from functools import lru_cache
 from gmpy2 import mpq
 from typing import Final, Iterator, Optional, Self
 
-from .atomic import Eq, SortKey, Term, Variable
+from .atomic import CACHE_SIZE, Eq, SortKey, Term, Variable
 
 
-CACHE_SIZE: Final[Optional[int]] = 2**16
-
-
-class _dummy:
-    pass
-
-
-@cython.cclass
+@dataclass(frozen=True)
 class _SubstValue:
     coefficient: mpq
     variable: Optional[Variable]
@@ -31,13 +22,6 @@ class _SubstValue:
             return False
         return self.variable.sort_key() == other.variable.sort_key()
 
-    def __hash__(self) -> int:
-        return hash((self.coefficient, self.variable))
-
-    def __init__(self, coefficient: mpq, variable: Optional[Variable]) -> None:
-        self.coefficient = coefficient
-        self.variable = variable
-
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
 
@@ -49,51 +33,30 @@ class _SubstValue:
             return self.coefficient * self.variable
 
 
-@cython.cclass
+@dataclass
 class _Node:
     coefficient: mpq
     variable: Optional[Variable]
     parent: Optional[_Node]
 
-    def __init__(self, coefficient: mpq, variable: Optional[Variable],
-                 parent: Optional[_Node]) -> None:
-        self.coefficient = coefficient
-        self.variable = variable
-        self.parent = parent
 
-    def __repr__(self) -> str:
-        return f'_Node({self.coefficient}, {self.variable}, {self.parent})'
-
-
-@cython.cclass
+@dataclass
 class _Root:
     coefficient: mpq
     node: _Node
 
-    def __init__(self, coefficient: mpq, node: _Node):
-        self.coefficient = coefficient
-        self.node = node
 
-
-@cython.cclass
+@dataclass
 class _Substitution:
-    nodes: dict[SortKey[Variable], _Node]
-    constant_node: Final[_Node]
-
-    def __init__(self, nodes=None) -> None:
-        self.nodes = nodes if nodes is not None else dict()
-        self.constant_node = _Node(mpq(1), None, None)
+    nodes: dict[SortKey[Variable], _Node] = field(default_factory=dict)
+    constant_node: Final[_Node] = field(default_factory=lambda: _Node(mpq(1), None, None))
 
     def __iter__(self) -> Iterator[tuple[Variable, _SubstValue]]:
-        node: _Node
         for key, node in self.nodes.items():
             if node.parent is None:
                 continue
             root = self.find2(node)
             yield key.term, _SubstValue(root.coefficient, root.node.variable)
-
-    def __repr__(self) -> str:
-        return f'_Substitution({self.nodes}, {self.constant_node})'
 
     def as_gb(self, ignore: Optional[Variable] = None) -> list[Term]:
         """Convert this :class:._Substitution` into a Gröbner basis that can be
@@ -115,7 +78,6 @@ class _Substitution:
         root = self.find1(v)
         return _SubstValue(root.coefficient, root.node.variable)
 
-    @cython.cfunc
     def find1(self, v: Optional[Variable]) -> _Root:
         if v is None:
             return _Root(mpq(1), self.constant_node)
@@ -127,7 +89,6 @@ class _Substitution:
             node = self.nodes[key] = _Node(mpq(1), v, None)
         return self.find2(node)
 
-    @cython.cfunc
     def find2(self, node: _Node) -> _Root:
         if node.variable is None:
             return _Root(mpq(1), node)

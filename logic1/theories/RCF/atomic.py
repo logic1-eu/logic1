@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
-from functools import lru_cache, total_ordering
+from functools import lru_cache
 from typing import (
     Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self,
     TypeVar)
@@ -31,13 +31,27 @@ from ...support.excepthook import NoTraceException
 from ...support.tracing import trace  # noqa
 
 
-CACHE_SIZE: Final[Optional[int]] = 2**16
-
-
 τ = TypeVar('τ', bound='Term')
 """A type variable denoting a type of terms with upper bound
 :class:`logic1.theories.RCF.Term`.
 """
+
+CACHE_SIZE: Final[Optional[int]] = 2**16
+
+
+def _caches():
+    from .simplify import Simplify
+    from .substitution import _SubstValue
+    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at]
+
+
+def cache_clear():
+    for cache in _caches():
+        cache.cache_clear()
+
+
+def cache_info():
+    return {cache.__wrapped__: cache.cache_info() for cache in _caches()}
 
 
 class _PolynomialRing:

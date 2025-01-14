@@ -70,7 +70,7 @@ class _Root:
     coefficient: mpq
     node: _Node
 
-    def __cinit__(self, coefficient: mpq, node: _Node):
+    def __cinit__(self, coefficient: mpq, node: _Node) -> None:
         self.coefficient = coefficient
         self.node = node
 
