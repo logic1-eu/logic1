@@ -5,8 +5,9 @@ simplifier*, which has been proposed for Ordered Fields in
 [DolzmannSturm-1997]_.
 """
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import deque
+from dataclasses import dataclass
 from enum import auto, Enum
 from typing import Generic, Iterable, Optional, Self, TypeVar
 
@@ -26,11 +27,26 @@ from ..support.tracing import trace  # noqa
 
 ρ = TypeVar('ρ', bound='InternalRepresentation')
 
+ω = TypeVar('ω', bound='Options')
+"""A type variable denoting a options for
+:meth:`.Simplify.simplify` with upper bound :class:`.Options`.
+"""
 
-class Restart(Enum):
+
+class RESTART(Enum):
+    """Used for the return value of :meth:`.InternalRepresentation:add`.
+    """
     NONE = auto()
+    """No formulas of the current level require resimplification.
+    """
+
     OTHERS = auto()
+    """Non-atoms of the current level require resimplification.
+    """
+
     ALL = auto()
+    """All formulas of the current level require resimplification.
+    """
 
 
 class InternalRepresentation(Generic[α, τ, χ, σ]):
@@ -38,54 +54,76 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
     :data:`ρ` in :class:`.abc.simplify.Simplify`. It specifies an interface
     comprising methods required there.
 
-    The principal idea is that a :class:`InternalRepresentation` should hold
-    two abstract pieces of information, *reference* and *current*. Both
-    *reference* and *current* hold  information that is equivalent to a
-    conjunction of atomic formulas. In the course of recursive simplification
-    in
-    :class:`.abc.simplify.Simplify`, *reference*  is inherited from above;
-    *current* starts with the information from *reference* and is enriched
-    with information from all atomic formulas on the toplevel of the
-    subformula currently under consideration.
+    The principal idea is that a :class:`InternalRepresentation` should holds
+    information that corresponds to a conjunction of atomic formulas. In the
+    course of recursive simplification in:class:`.abc.simplify.Simplify`,
+    instances of this class are inherited from higher levels and are enriched
+    with information from all atomic formulas on the toplevel of the subformula
+    currently under consideration.
     """
 
     class Inconsistent(Exception):
+        """Indicates that an instance of :class:`InternalRepresentation`
+        contains inconsistent information. This exception is typically handled
+        in :class:`.abc.Simplify` and its derived classes, where appropriate
+        values are returned.
+        """
         pass
 
     @abstractmethod
-    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> Restart:
-        """Add *current* information originating from `atoms`.
-        If `gand` is :class:`.And`, consider ``atoms``. If `gand` is
-        :class:`.Or`, consider ``(Not(at) for at in atoms)``. This is where
-        simplification is supposed to take place.
+    def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> RESTART:
+        """Add information originating from `atoms`. If `gand` is
+        :class:`.And`, consider ``atoms``. If `gand` is :class:`.Or`, consider
+        ``(Not(at) for at in atoms)``. Simplification among atoms is supposed
+        to take place here.
         """
         ...
 
     @abstractmethod
-    def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]]) -> Iterable[α]:
-        """Comapare *current* and *reference* to identify and extract
-        information that must be represented on the toplevel of the
-        subformula currently under consideration. If `gand` is :class:`.And`,
-        the result represents a conjunction.  If `gand` is :class:`.Or`,  it
-        represents a disjunction.
+    def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], ref: Self) -> Iterable[α]:
+        """Comapare `self`and `ref` to identify and extract information that
+        must be represented on the toplevel of the subformula currently under
+        consideration. If `gand` is :class:`.And`, the result represents a
+        conjunction.  If `gand` is :class:`.Or`,  it represents a disjunction.
         """
         ...
 
     @abstractmethod
     def next_(self, remove: Optional[χ] = None) -> Self:
-        """Copy  *current* to *reference*, removing all information involving
-        the variable `remove`. If not :obj:`None`, the variable `remove` is
-        quantified in the current recursion step.
+        """Create a copy of `self`, optionally removing all information
+        involving the variable `remove`.
         """
         ...
 
+    def restart(self, ir: Self) -> Self:
+        assert False
 
-class Simplify(Generic[α, τ, χ, σ, ρ]):
+    def transform_atom(self, atom: α) -> α:
+        return atom
+
+
+class Options(ABC):
+    """This class holds options that can be provided to
+    :meth:`.Simplify.simplify`. Theories subclassing
+    :class:`.Simplify` can add further options by subclassing
+    :class:`.Options`.
+
+    This is an upper bound for the type variable :data:`.ω`.
+    """
+    pass
+
+
+@dataclass(frozen=True)
+class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
     """Deep simplification following [DolzmannSturm-1997]_.
 
     .. seealso::
       Derived classes in various theories: :class:`.RCF.simplify.Simplify`,
       :class:`.Sets.simplify.Simplify`
+    """
+
+    _options: ω
+    """The options that have been passed to :meth:`.simplify`.
     """
 
     @abstractmethod
@@ -94,8 +132,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         """
         ...
 
-    def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
-            -> Optional[bool]:
+    def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Optional[bool]:
         """Simplification-based heuristic test for vailidity of a formula.
 
         .. admonition:: Mathematical definition
@@ -115,13 +152,17 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
           simplifying `f` to :data:`.T` or :data:`.F`, respectively. Returns
           :data:`None` in the sense of "don't know" otherwise.
         """
-        match self.simplify(f, assume):
-            case _T():
-                return True
-            case _F():
-                return False
-            case _:
-                return None
+        f = self.simplify(f, assume)
+        if f is _T():
+            return True
+        if f is _F():
+            return False
+        return None
+
+    def _post_process(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
+        """A hook for post-processing the final result in subclasses.
+        """
+        return f
 
     @abstractmethod
     def simpl_at(self, atom: α, context: Optional[type[And[α, τ, χ, σ]] | type[Or[α, τ, χ, σ]]]) \
@@ -153,33 +194,46 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
         except InternalRepresentation.Inconsistent:
             return _T()
         f = f.to_nnf(to_positive=True)
-        return self._simpl_nnf(f, ir)
+        f = self._simpl_nnf(f, ir)
+        f = self._post_process(f)
+        return f
 
     def _simpl_nnf(self, f: Formula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
+        """Simplify the negation normal form `f` modulo `ir`.
+        """
         if Formula.is_atomic(f):
-            ir = ir.next_()
             return self._simpl_atomic(f, ir)
         if Formula.is_and(f) or Formula.is_or(f):
-            ir = ir.next_()
             return self._simpl_and_or(f, ir)
         if Formula.is_quantified_formula(f):
-            ir = ir.next_(remove=f.var)
             return self._simpl_quantified(f, ir)
         if Formula.is_true(f) or Formula.is_false(f):
             return f
         assert False, f
 
     def _simpl_and_or(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
+        """Simplify the negation normal form `f`, which starts with either
+        :class:`.And` or :class:`.Or`, modulo `ir`.
         """
-        `f` must be in negation normal form (NNF).
-        """
+
+        # def log(msg: str):
+        #     from IPython.lib import pretty
+        #     print('+' + (78 - len(msg)) * '-' + ' ' + msg)
+        #     pretty_f = pretty.pretty(f, newline='\n|   ')
+        #     pretty_nodes = pretty.pretty(ir._subst.nodes, newline='\n| ' + len('ir._subst.nodes=') * ' ')
+        #     pretty_ref_nodes = pretty.pretty(ref._subst.nodes, newline='\n| ' + len('ref._subst.nodes=') * ' ')
+        #     print(f'| f={pretty_f}\n| {ir._knowl=!s}\n| ir._subst.nodes={pretty_nodes}\n| {ref._knowl=!s}\n| ref._subst.nodes={pretty_ref_nodes}')
+        #     print('+' + 79 * '-')
+
+        ref = ir
+        ir = ir.next_()
         gand = f.op
         queue = deque(f.args)
         simplified_others: set[Formula[α, τ, χ, σ]] = set()
         while queue:
             arg = queue.popleft()
             if Formula.is_atomic(arg):
-                simplified_arg = self.simpl_at(self.transform_atom(arg, ir), gand)
+                simplified_arg = self.simpl_at(ir.transform_atom(arg), context=gand)
             else:
                 simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):
@@ -199,8 +253,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                 new_atoms = {simplified_arg}
                 new_others = set()
             else:
-                assert isinstance(simplified_arg, gand.dual()) \
-                    or Formula.is_quantified_formula(simplified_arg)
+                assert isinstance(simplified_arg, (gand.dual(), QuantifiedFormula))
                 new_atoms = set()
                 new_others = {simplified_arg}
             if new_atoms:
@@ -208,28 +261,41 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
                     restart = ir.add(gand, new_atoms)
                 except ir.Inconsistent:
                     return gand.definite_element()
-                if restart is Restart.NONE:
+                if restart is RESTART.NONE:  # Save resimp if ir has not changed
                     simplified_others = simplified_others.union(new_others)
-                else:  # Save resimp if ir has not changed
+                elif restart is RESTART.OTHERS:
                     for simplified_other in simplified_others:
                         if simplified_other not in queue:
                             queue.append(simplified_other)
                     simplified_others = new_others  # subtle but correct
-                    if restart is Restart.ALL:
-                        pass
+                else:
+                    assert restart is RESTART.ALL
+                    for simplified_other in simplified_others:
+                        if simplified_other not in queue:
+                            queue.append(simplified_other)
+                    simplified_others = new_others
+                    for atom in ir.extract(gand, ref):
+                        if atom not in queue:
+                            queue.appendleft(atom)
+                    # queue = deque(f.args)
+                    ir = ref.restart(ir)
             else:
                 simplified_others = simplified_others.union(new_others)
-        final_atoms = list(ir.extract(gand))
+        final_atoms = list(ir.extract(gand, ref))
         final_atoms.sort()
         final_others = list(simplified_others)
         final_others.sort()
         return gand(*final_atoms, *final_others)
 
     def _simpl_atomic(self, atom: α, ir: ρ) -> Formula[α, τ, χ, σ]:
-        # This method is called for toplevel atoms and for atoms whose context
-        # is a quantifier. Atoms with context And, Or are handled directly in
-        # _simpl_and_or. At the moment a quantifier context is treated the same
-        # way as a toplevel context.
+        """Simplify `atom`, which either stands on the toplevel or is the
+        argument formula of a quantifier, modulo `ir`. At the moment, there is
+        no difference made between these two cases. Argument atoms of
+        :class:`.And`, :class:`.Or` are handled directly in
+        :meth:`._simpl_and_or`.
+        """
+        ref = ir
+        ir = ir.next_()
         f = self.simpl_at(atom, context=None)
         if not Formula.is_atomic(f):
             return self._simpl_nnf(f, ir)
@@ -237,21 +303,17 @@ class Simplify(Generic[α, τ, χ, σ, ρ]):
             ir.add(And, [f])
         except ir.Inconsistent:
             return _F()
-        final_atoms = list(ir.extract(And))
-        match len(final_atoms):
-            case 0:
-                return _T()
-            case 1:
-                return final_atoms[0]
-            case _:
-                assert False, final_atoms
+        final_atoms = list(ir.extract(And, ref))
+        if len(final_atoms) == 0:
+            return _T()
+        if len(final_atoms) == 1:
+            return final_atoms[0]
+        assert False, final_atoms
 
     def _simpl_quantified(self, f: QuantifiedFormula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
+        """Simplify the negation normal form `f`, which starts with either
+        :class:`.Ex` or :class:`.All`, modulo `ir`.
         """
-        `f` must be in negation normal form (NNF).
-        """
+        ir = ir.next_(remove=f.var)
         simplified_arg = self._simpl_nnf(f.arg, ir)
         return f.op(f.var, simplified_arg)
-
-    def transform_atom(self, atom: α, ir: ρ) -> α:
-        return atom

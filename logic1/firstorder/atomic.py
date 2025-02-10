@@ -9,11 +9,16 @@ from __future__ import annotations
 from abc import abstractmethod
 import inspect
 from types import FrameType
-from typing import Any, final, Generic, Iterator, Sequence
+from typing import Any, final, Generic, Iterator, Sequence, TypeVar
 
 from .formula import α, τ, χ, σ, Formula
 
 from ..support.tracing import trace  # noqa
+
+
+κ = TypeVar('κ')
+"""A type variable denoting a sort key.
+"""
 
 
 class VariableSet(Generic[χ]):
@@ -97,13 +102,15 @@ class VariableSet(Generic[χ]):
         try:
             assert isinstance(frame, FrameType)
             module = frame.f_globals['__name__']
-            assert module == '__main__', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is module {module}'
+            if module != '__main__':
+                raise RuntimeError(
+                    f'expecting imp to be called from the top level of module __main__; '
+                    f'context is module {module}')
             function = frame.f_code.co_name
-            assert function == '<module>', \
-                f'expecting imp to be called from the top level of module __main__; ' \
-                f'context is function {function} in module {module}'
+            if function != '<module>':
+                raise RuntimeError(
+                    f'expecting imp to be called from the top level of module __main__; '
+                    f'context is function {function} in module {module}')
             for v in vars_:
                 frame.f_globals[str(v)] = v
         finally:
@@ -125,7 +132,7 @@ class VariableSet(Generic[χ]):
         ...
 
 
-class Term(Generic[τ, χ, σ]):
+class Term(Generic[τ, χ, σ, κ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on terms required by :class:`.Formula`. The methods are
     supposed to be implemented for the various theories. We need a type
@@ -150,9 +157,8 @@ class Term(Generic[τ, χ, σ]):
         """
         ...
 
-    @staticmethod
     @abstractmethod
-    def sort_key(term: τ) -> Any:
+    def sort_key(self) -> κ:
         """A sort key suitable for ordering instances of :data:`τ
         <.firstorder.atomic.τ>`.
 
@@ -197,7 +203,7 @@ class Term(Generic[τ, χ, σ]):
         ...
 
 
-class Variable(Term[χ, χ, σ]):
+class Variable(Term[χ, χ, σ, κ]):
     """This abstract class specifies an interface via the definition of
     abstract methods on variables required by Formula. The methods are supposed
     to be implemented for the various theories.
@@ -249,6 +255,12 @@ class AtomicFormula(Formula[α, τ, χ, σ]):
         corresponding recursive first-order method :meth:`.Formula.as_latex`.
         """
         ...
+
+    def as_redlog(self) -> str:
+        """Redlog representation as a string. This method is required by the
+        corresponding recursive first-order method :meth:`.Formula.as_redlog`.
+        """
+        raise NotImplementedError()
 
     @final
     def atoms(self: α) -> Iterator[α]:

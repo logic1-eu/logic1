@@ -1,14 +1,28 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
-import sage.all as sage  # type: ignore[import-untyped]
-from sage.all import QQ, Rational
-from sage.rings.polynomial.multi_polynomial_libsingular import (  # type: ignore[import-untyped]
-    MPolynomial_libsingular as Polynomial)
-from sage.rings.polynomial.polynomial_element import (  # type: ignore[import-untyped]
-    Polynomial_generic_dense as UnivariatePolynomial)
-from typing import Any, ClassVar, Final, Iterable, Iterator, Mapping, Self
+from functools import lru_cache
+from typing import (
+    Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self,
+    TypeVar)
+
+from gmpy2 import mpq, sign
+from sage.all import QQ
+# Importing QQ from sage.rings.rational_fields causes problems. Notably, a
+# fresh instance of RationalField is assigned to QQ in sage.all.
+from sage.misc.latex import latex as sage_latex
+from sage.rings.integer import Integer
+from sage.rings.polynomial.multi_polynomial_libsingular import (
+    MPolynomial_libsingular as MPolynomial,
+    MPolynomialRing_libsingular as MPolynomialRing)
+from sage.rings.polynomial.polynomial_ring_constructor import (
+    PolynomialRing as sage_PolynomialRing)
+from sage.rings.polynomial.polynomial_element import (
+    Polynomial_generic_dense as UPolynomial)
+from sage.rings.polynomial.term_order import TermOrder
+from sage.rings.rational import Rational
 
 from ... import firstorder
 from ...firstorder import _T, _F
@@ -17,16 +31,39 @@ from ...support.excepthook import NoTraceException
 from ...support.tracing import trace  # noqa
 
 
-class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
+τ = TypeVar('τ', bound='Term')
+"""A type variable denoting a type of terms with upper bound
+:class:`logic1.theories.RCF.Term`.
+"""
 
-    sage_ring: sage.PolynomialRing
+CACHE_SIZE: Final[Optional[int]] = 2**16
+
+
+def _caches():
+    from .simplify import Simplify
+    from .substitution import _SubstValue
+    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at]
+
+
+def cache_clear():
+    for cache in _caches():
+        cache.cache_clear()
+
+
+def cache_info():
+    return {cache.__wrapped__: cache.cache_info() for cache in _caches()}
+
+
+class _PolynomialRing:
+
+    sage_ring: MPolynomialRing
+    stack: list[MPolynomialRing]
 
     def __call__(self, obj):
         return self.sage_ring(obj)
 
     def __init__(self, term_order='deglex'):
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, 'unused_', implementation='singular', order=term_order)
+        self.sage_ring = self.MPolynomialRing_factory('unused_', order=term_order)
         self.stack = []
 
     def __repr__(self):
@@ -37,10 +74,9 @@ class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
         assert var not in new_vars
         new_vars.append(var)
         new_vars.sort()
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
+        self.sage_ring = self.MPolynomialRing_factory(new_vars, order=self.sage_ring.term_order())
 
-    def ensure_vars(self, vars_: Iterable[str]) -> None:
+    def add_vars(self, vars_: Iterable[str]) -> None:
 
         def sort_key(s: str) -> tuple[str, int]:
             base = s.rstrip('0123456789')
@@ -48,32 +84,36 @@ class PolynomialRing:  # Is this private? Rename to _PolynomialRing?
             n = int(index) if index else -1
             return base, n
 
-        new_vars = [str(g) for g in self.sage_ring.gens()]
+        new_vars = []
+        for g in self.sage_ring.gens():
+            new_vars.append(str(g))
         have_appended = False
         for v in vars_:
             if v not in new_vars:
-                have_appended = True
                 new_vars.append(v)
+                have_appended = True
         if have_appended:
             new_vars.sort(key=sort_key)
-            self.sage_ring = sage.PolynomialRing(
-                sage.ZZ, new_vars, implementation='singular', order=self.sage_ring.term_order())
+            self.sage_ring = self.MPolynomialRing_factory(
+                new_vars, order=self.sage_ring.term_order())
 
-    def get_vars(self) -> tuple[Polynomial, ...]:
-        gens = self.sage_ring.gens()
-        gens = (g for g in gens if str(g) != 'unused_')
+    def get_vars(self) -> tuple[MPolynomial[Integer], ...]:
+        gens = (g for g in self.sage_ring.gens() if str(g) != 'unused_')
         return tuple(gens)
+
+    @staticmethod
+    def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
+        return sage_PolynomialRing(QQ, names, order=order, implementation='singular')
 
     def pop(self) -> None:
         self.sage_ring = self.stack.pop()
 
     def push(self) -> None:
         self.stack.append(self.sage_ring)
-        self.sage_ring = sage.PolynomialRing(
-            sage.ZZ, 'unused_', implementation='singular', order=self.sage_ring.term_order())
+        self.sage_ring = self.MPolynomialRing_factory('unused_', order=self.sage_ring.term_order())
 
 
-polynomial_ring = PolynomialRing()
+polynomial_ring = _PolynomialRing()
 
 
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
@@ -91,10 +131,10 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             -- import variables into global namespace
     """
 
-    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
+    polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
     @property
-    def stack(self) -> list[sage.PolynomialRing]:
+    def stack(self) -> list[MPolynomialRing]:
         """Implements abstract property
         :attr:`.firstorder.atomic.VariableSet.stack`.
         """
@@ -106,7 +146,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         """
         match index:
             case str():
-                self.polynomial_ring.ensure_vars((index,))
+                self.polynomial_ring.add_vars((index,))
                 return Variable(self.polynomial_ring(index))
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
@@ -132,10 +172,14 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return Variable(self.polynomial_ring(v))
 
     def pop(self) -> None:
+        from . import cache_clear
         self.polynomial_ring.pop()
+        cache_clear()
 
     def push(self) -> None:
+        from . import cache_clear
         self.polynomial_ring.push()
+        cache_clear()
 
 
 VV = VariableSet()
@@ -144,56 +188,105 @@ The unique instance of :class:`.VariableSet`.
 """
 
 
-class TSQ(Enum):
-    """Information whether a certain term is has a *trivial square sum*
-    property.
-
-    .. seealso:: :meth:`.Term.is_definite`
+class DEFINITE(Enum):
+    """Information whether a certain term has positive or negative definiteness
+    properties; typically as a result of a heuristic test as in
+    :meth:`.Term.is_definite`.
     """
+
+    NEGATIVE = auto()
+    """The polynomial negative definite, i.e., negative for all real choices of
+    variables.
+    """
+
+    NEGATIVE_SEMI = auto()
+    """The polynomial negative semi-definite, i.e., non-positive for all real
+    choices of variables.
+    """
+
     NONE = auto()
     """None of the other cases holds..
     """
 
-    STRICT = auto()
-    """All other integer coefficients, including the absolute summand, are
-    strictly positive. All exponents are even. This is sufficient for a term to
-    be positive definite, i.e., positive for all real choices of variables.
-    """
-
-    WEAK = auto()
-    """The absolute summand is zero. All other integer coefficients are
-    strictly positive. All exponents are even. This is sufficient for a term to
-    be positive semi-definite, i.e., non-negative for all real choices of
+    POSITIVE = auto()
+    """The polynomial positive definite, i.e., positive for all real choices of
     variables.
     """
 
+    POSITIVE_SEMI = auto()
+    """The polynomial positive semi-definite, i.e., non-negative for all real
+    choices of variables.
+    """
 
-class Term(firstorder.Term['Term', 'Variable', int]):
+    ZERO = auto()
+    """The polynomial is the zero polynomial.
+    """
 
-    polynomial_ring: ClassVar[PolynomialRing] = polynomial_ring
 
-    _poly: Polynomial
+@dataclass
+class SortKey(Generic[τ]):
+
+    term: τ
+
+    def __eq__(self, other: Self) -> bool:  # type: ignore[override]
+        if hash(self.term) != hash(other.term):
+            return False
+        return self.term._poly == other.term._poly
+
+    def __ge__(self, other: Self) -> bool:
+        return self.term._poly >= other.term._poly
+
+    def __gt__(self, other: Self) -> bool:
+        return self.term._poly > other.term._poly
+
+    def __hash__(self) -> int:
+        return hash(self.term)
+
+    def __le__(self, other: Self) -> bool:
+        return self.term._poly <= other.term._poly
+
+    def __lt__(self, other: Self) -> bool:
+        return self.term._poly < other.term._poly
+
+    def __ne__(self, other: Self) -> bool:  # type: ignore[override]
+        if hash(self.term) != hash(other.term):
+            return True
+        return self.term._poly != other.term._poly
+
+
+class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
+
+    polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
+
+    _hash: Optional[int] = None
+    _poly: MPolynomial[Rational]
 
     # The property should be private. We might want a method to_sage()
     @property
-    def poly(self) -> Polynomial:
+    def poly(self) -> MPolynomial[Rational]:
         """
         An instance of :class:`MPolynomial_libsingular
         <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
         which is wrapped by ``self``.
         """
-        if self.polynomial_ring.sage_ring is not self._poly.parent():
-            self.polynomial_ring.ensure_vars(str(g) for g in self._poly.parent().gens())
-            self._poly = self.polynomial_ring(self._poly)
+        parent = self._poly.parent()
+        if parent is not self.polynomial_ring.sage_ring:
+            poly_gens = parent.gens()
+            # Make sure that the manager process in parallel qe knows all
+            # variables. Otherwise the following line could be replaced with an
+            # assertion.
+            self.polynomial_ring.add_vars(map(str, poly_gens))
+            # We currently coerce manually in: reduce, subs, derivative,
+            # pseudo_quo_rem. The following line might cleaner:
+            #
+            # self._poly = self.polynomial_ring(self._poly)
         return self._poly
-
-    @poly.setter
-    def poly(self, value: Polynomial):
-        self._poly = value
 
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly + other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly + Rational(other))
         return Term(self.poly + other)
 
     def __eq__(self, other: Term | int) -> Eq:  # type: ignore[override]
@@ -201,37 +294,38 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         # it makes no sense to compare terms with general objects. We have
         # Eq.__bool__, which supports some comparisons in boolean contexts.
         # Same for __ne__.
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
-            lhs = - lhs
-        return Eq(lhs, Term(0))
+            lhs = -lhs
+        return Eq(lhs, 0)
 
     def __ge__(self, other: Term | int) -> Ge | Le:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
             return Le(-lhs, 0)
         return Ge(lhs, 0)
 
     def __gt__(self, other: Term | int) -> Gt | Lt:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+        lhs = self - other
         if lhs.lc() < 0:
-            return Lt(- lhs, 0)
+            return Lt(-lhs, 0)
         return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        return hash(self.poly)
+        if self._hash is None:
+            self._hash = hash(self.poly)
+        return self._hash
 
-    def __init__(self, arg: Polynomial | sage.Integer | int | UnivariatePolynomial) -> None:
-        match arg:
-            case Polynomial():
-                self.poly = arg
-            case sage.Integer() | int() | UnivariatePolynomial():
-                self.poly = self.polynomial_ring(arg)
-            case _:
-                raise ValueError(
-                    f'arguments must be polynomial or integer; {arg} is {type(arg)}')
+    def __init__(self, arg: Fraction | int | Integer | MPolynomial[Rational]
+                 | mpq | Rational | UPolynomial) -> None:
+        if isinstance(arg, MPolynomial):
+            self._poly = arg
+        elif isinstance(arg, (Fraction, int, Integer, mpq, Rational, UPolynomial)):
+            self._poly = self.polynomial_ring(arg)
+        else:
+            raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
 
-    def __iter__(self) -> Iterator[tuple[int, Term]]:
+    def __iter__(self) -> Iterator[tuple[mpq, Term]]:
         """Iterate over the polynomial representation of the term, yielding
         pairs of coefficients and power products.
 
@@ -239,37 +333,40 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
         >>> [(abs(coef), power_product) for coef, power_product in t]
-        [(1, x^2), (2, x*y), (1, y^2), (4, x), (4, y), (4, 1)]
+        [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x),
+         (mpq(4,1), y), (mpq(4,1), 1)]
         """
         for coefficient, power_product in self.poly:
-            yield int(coefficient), Term(power_product)
+            yield mpq(coefficient), Term(power_product)
 
-    def __le__(self, other: Term | int) -> Ge | Le:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+    def __le__(self, other: Term | int | mpq) -> Ge | Le:
+        lhs = self - other
         if lhs.lc() < 0:
-            return Ge(- lhs, 0)
+            return Ge(-lhs, 0)
         return Le(lhs, 0)
 
-    def __lt__(self, other: Term | int) -> Gt | Lt:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+    def __lt__(self, other: Term | int | mpq) -> Gt | Lt:
+        lhs = self - other
         if lhs.lc() < 0:
-            return Gt(- lhs, 0)
+            return Gt(-lhs, 0)
         return Lt(lhs, 0)
 
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly * other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly * Rational(other))
         return Term(self.poly * other)
 
     def __ne__(  # type: ignore[override]
-            self, other: Term | int) -> Ne:
-        lhs = self - (other if isinstance(other, Term) else Term(other))
+            self, other: Term | int | mpq) -> Ne:
+        lhs = self - other
         if lhs.lc() < 0:
-            lhs = - lhs
+            lhs = -lhs
         return Ne(lhs, Term(0))
 
     def __neg__(self) -> Term:
-        return Term(- self.poly)
+        return Term(-self.poly)
 
     def __pow__(self, other: object) -> Term:
         return Term(self.poly ** other)
@@ -278,26 +375,37 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         return str(self.poly)
 
     def __radd__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__add__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) + self.poly)
         return Term(other + self.poly)
 
     def __rmul__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__mul__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) * self.poly)
         return Term(other * self.poly)
 
     def __rsub__(self, other: object) -> Term:
-        # We know that other is not a :class:`Term`, see :meth:`__sub__`.
+        assert not isinstance(object, Term)
+        if isinstance(other, mpq):
+            return Term(Rational(other) - self.poly)
         return Term(other - self.poly)
 
     def __sub__(self, other: object) -> Term:
         if isinstance(other, Term):
-            return self + (- other)
+            return Term(self.poly - other.poly)
+        if isinstance(other, mpq):
+            return Term(self.poly - Rational(other))
         return Term(self.poly - other)
 
     def __truediv__(self, other: object) -> Term:
-        # x*y / x yields y as a Sage rational function and throws here.
+        if isinstance(other, mpq):
+            return Term(self.poly / Rational(other))
         if isinstance(other, Term):
             return Term(self.poly / other.poly)
+        # x*y / x would yield y as a Sage rational function and raise and
+        # exception.
         return Term(self.poly / other)
 
     def __xor__(self, other: object) -> Term:
@@ -305,10 +413,10 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
-    def as_int(self) -> int:
+    def as_fraction(self) -> mpq:
         if not self.is_constant():
             raise ValueError(f'{self} is not constant')
-        return int(self.poly)
+        return self.constant_coefficient()
 
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
@@ -320,7 +428,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         >>> t.as_latex()
         'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
         """
-        return str(sage.latex(self.poly))
+        return str(sage_latex(self.poly))
 
     def as_variable(self) -> Variable:
         if not self.is_variable():
@@ -346,22 +454,22 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         d_poly = {key.poly: value for key, value in degrees.items()}
         return Term(self.poly.coefficient(d_poly))
 
-    def constant_coefficient(self) -> int:
+    def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this term.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
         >>> t.constant_coefficient()
-        4
+        mpq(4,1)
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.constant_coefficient()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.constant_coefficient>`
         """
-        return int(self.poly.constant_coefficient())
+        return mpq(self.poly.constant_coefficient())
 
-    def content(self) -> int:
+    def content(self) -> mpq:
         """Return the content of this term, which is defined as the gcd of its
         integer coefficients.
 
@@ -369,13 +477,15 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2 - (x**2 + y**2)
         >>> t.content()
-        2
+        mpq(2,1)
 
         .. seealso::
             :external:meth:`MPolynomial.content()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.content>`
         """
-        return int(self.poly.content())
+        content = self.poly.content()
+        assert content > 0 or (content == 0 and self == 0)
+        return mpq(content)
 
     def degree(self, x: Variable) -> int:
         """Return the degree in `x` of this term.
@@ -405,38 +515,38 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :external:meth:`MPolynomial.derivative()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
         """
-        return Term(self.poly.derivative(x.poly, n))
+        return Term(self.poly.derivative(self.polynomial_ring(x.poly), n))
 
-    # discuss bug:
-    # >>> (2*x).factor()
-    def factor(self) -> tuple[Term, Term, dict[Term, int]]:
-        """Return the factorization of this term.
+    @lru_cache(maxsize=CACHE_SIZE)
+    def factor(self) -> tuple[mpq, dict[Term, int]]:
+        """A polynomial factorization of this term.
+
+        :returns: A pair `(unit, D)`, where `unit` is a rational number, the
+          keys of `D` are irreducible factors, and the corresponding values are
+          their multiplicities. All irreducible factors are monic. Note that
+          the return value is uniquely determined by this specification.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
-        >>> t = x**2 - y**2
+        >>> t = -x**2 + y**2
         >>> t.factor()
-        (1, 1, {x - y: 1, x + y: 1})
+        (mpq(-1,1), {x - y: 1, x + y: 1})
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.factor()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.factor>`
         """
         F = self.poly.factor()
-        unit = Term(F.unit())
-        content = Term(1)
-        assert unit in (-1, 1), (self, F, unit)
+        assert F.unit().is_constant()
+        unit = mpq(F.unit().constant_coefficient())
         D = dict()
         for poly, multiplicity in F:
-            term = Term(poly)
-            if term.lc() < 0:
-                term = -term
-                unit = -unit
-            if term.is_constant():
-                content *= term
-            else:
-                D[term] = multiplicity
-        return unit, content, D
+            assert not poly.is_constant()
+            lc = poly.lc()
+            poly /= lc
+            unit *= mpq(lc)
+            D[Term(poly)] = multiplicity
+        return unit, D
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
@@ -447,31 +557,42 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return self.poly.is_constant()
 
-    def is_definite(self) -> TSQ:
-        """A fast heuristic test whether this term is positive or non-negative
-        for all real choices of variables.
+    def is_definite(self) -> DEFINITE:
+        """A fast heuristic test for definitetess properties of this term. This
+        is based on *trivial square sum* properties of coefficient signs and
+        exponents.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
+        >>> Term(0).is_definite()
+        <DEFINITE.ZERO: 6>
         >>> f = x**2 + y**2
         >>> f.is_definite()
-        <TSQ.WEAK: 3>
-        >>> g = x**2 + y**2 + 1
+        <DEFINITE.POSITIVE_SEMI: 5>
+        >>> g = -x**2 - y**2 - 1
         >>> g.is_definite()
-        <TSQ.STRICT: 2>
+        <DEFINITE.NEGATIVE: 1>
         >>> h = (x + y) ** 2
         >>> h.is_definite()
-        <TSQ.NONE: 1>
+        <DEFINITE.NONE: 3>
         """
+        if self.is_zero():
+            return DEFINITE.ZERO
+        ls = sign(self.lc())
         for exponent, coefficient in self.poly.dict().items():
-            if coefficient < 0:
-                return TSQ.NONE
+            if coefficient.sign() != ls:
+                return DEFINITE.NONE
             for e in exponent:
                 if e % 2 == 1:
-                    return TSQ.NONE
+                    return DEFINITE.NONE
         if self.poly.constant_coefficient() == 0:
-            return TSQ.WEAK
-        return TSQ.STRICT
+            return DEFINITE.POSITIVE_SEMI if ls == 1 else DEFINITE.NEGATIVE_SEMI
+        return DEFINITE.POSITIVE if ls == 1 else DEFINITE.NEGATIVE
+
+    def is_monomial(self) -> bool:
+        """Return :obj:`True` if this term is a monomial.
+        """
+        return self.poly.is_monomial()
 
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
@@ -487,7 +608,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return self.poly.is_zero()
 
-    def lc(self) -> int:
+    def lc(self) -> mpq:
         """Leading coefficient of this term with respect to the degree
         lexicographical term order :mod:`deglex
         <sage.rings.polynomial.term_order>`.
@@ -496,13 +617,25 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         >>> x, y = VV.get('x', 'y')
         >>> f = 2*x*y**2 + 3*x**2 + 1
         >>> f.lc()
-        2
+        mpq(2,1)
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.lc()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.lc>`
         """
-        return int(self.poly.lc())
+        return mpq(self.poly.lc())
+
+    def monomial_coefficient(self, mon: Term) -> mpq:
+        """Return the coefficient in the base ring of the monomial mon in self,
+        where mon must have the same parent as self.
+
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.monomial_coefficient()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomial_coefficient>`
+        """
+        if not mon.is_monomial():
+            raise ValueError(f'{mon} is not a monomial')
+        return mpq(self.poly.monomial_coefficient(mon.poly))
 
     def monomials(self) -> list[Term]:
         """List of monomials of this term. A monomial is defined here as a
@@ -520,25 +653,8 @@ class Term(firstorder.Term['Term', 'Variable', int]):
         """
         return [Term(monomial) for monomial in self.poly.monomials()]
 
-    def quo_rem(self, other: Term) -> tuple[Term, Term]:
-        """Quotient and remainder of this term and `other`.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x, y = VV.get('x', 'y')
-        >>> f = 2*y*x**2 + x + 1
-        >>> f.quo_rem(x)
-        (2*x*y + 1, 1)
-        >>> f.quo_rem(y)
-        (2*x^2, x + 1)
-        >>> f.quo_rem(3*x)
-        (0, 2*x^2*y + x + 1)
-
-        .. seealso::
-            :external:meth:`MPolynomial_libsingular.quo_rem()
-            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
-        """
-        quo, rem = self.poly.quo_rem(other.poly)
-        return Term(quo), Term(rem)
+    def normalize(self) -> Term:
+        return Term(self.poly / self.poly.lc())
 
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
@@ -556,19 +672,45 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :meth:`Polynomial.pseudo_quo_rem()
             <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
         """
-        self1 = self.poly.polynomial(x.poly)
-        other1 = other.poly.polynomial(x.poly)
+        self1 = self.poly.polynomial(self.polynomial_ring(x.poly))
+        other1 = other.poly.polynomial(self.polynomial_ring(x.poly))
         quotient, remainder = self1.pseudo_quo_rem(other1)
         return Term(quotient), Term(remainder)
 
-    @staticmethod
-    def sort_key(term: Term) -> Polynomial:
-        """A sort key suitable for ordering instances of this class. Implements
+    def reduce(self, G: Iterable[Term]) -> Term:
+        """Reduce self modulo G.
+        """
+        # Sage requires that g.poly can be coerced to self.poly.parent().
+        poly = self.polynomial_ring(self.poly).reduce([g.poly for g in G])
+        return Term(poly)
+
+    def quo_rem(self, other: Term) -> tuple[Term, Term]:
+        """Quotient and remainder of this term and `other`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = 2*y*x**2 + x + 1
+        >>> f.quo_rem(x)
+        (2*x*y + 1, 1)
+        >>> f.quo_rem(y)
+        (2*x^2, x + 1)
+        >>> f.quo_rem(3*x)  # would yield (0, 2*x^2*y + x + 1) over ZZ
+        (2/3*x*y + 1/3, 1)
+
+        .. seealso::
+            :external:meth:`MPolynomial_libsingular.quo_rem()
+            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
+        """
+        quo, rem = self.poly.quo_rem(other.poly)
+        return Term(quo), Term(rem)
+
+    def sort_key(self) -> SortKey[Self]:
+        """A sort key suitable for ordering instances of this class. ImplementTerm(remainder)s
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
-        return term.poly
+        return SortKey(self)
 
-    def subs(self, d: Mapping[Variable, Term | int]) -> Term:
+    def subs(self, d: Mapping[Variable, Term | int | mpq]) -> Term:
         """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import VV
@@ -581,56 +723,16 @@ class Term(firstorder.Term['Term', 'Variable', int]):
             :external:meth:`MPolynomial_libsingular.subs()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
         """
-        sage_keywords = dict()
+        sage_keywords: dict[str, MPolynomial[Rational] | int | mpq] = dict()
         for variable, substitute in d.items():
             match substitute:
                 case Term():
                     sage_keywords[str(variable.poly)] = substitute.poly
-                case int():
+                case int() | mpq():
                     sage_keywords[str(variable.poly)] = substitute
                 case _:
                     assert False, (self, d)
-        return Term(self.poly.subs(**sage_keywords))
-
-    def subsq(self, sigma: dict[Variable, Term | int | Fraction | Rational]) \
-            -> tuple[Fraction, Term]:
-        content, term = self._subsq_rat(sigma)
-        content_as_fraction = Fraction(int(content.numer()), int(content.denom()))
-        return content_as_fraction, term
-
-    def _subsq_rat(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) \
-            -> tuple[Rational, Term]:
-        """Simultaneous substitution of terms, integers, or fractions for
-        variables. The result (c, p) describes a polynomial q = c * p over Q.
-        c is the content of of q, and p is a polynomial over Z.
-        """
-        sage_keywords: dict[str, Polynomial | Rational] = dict()
-        for variable, pseudo_term in sigma.items():
-            match pseudo_term:
-                case Term():
-                    sage_keywords[str(variable)] = pseudo_term.poly
-                case int() | Fraction():
-                    sage_keywords[str(variable)] = Rational(pseudo_term)
-                case Rational():
-                    sage_keywords[str(variable)] = pseudo_term
-                case _:
-                    assert False, type(pseudo_term)
-        poly = self.poly.change_ring(QQ).subs(**sage_keywords)
-        # poly is now a sage polynomial over QQ or a Rational.
-        match poly:
-            case Polynomial():
-                content = poly.content()
-                try:
-                    poly = poly / content
-                except ZeroDivisionError:
-                    pass
-            case Rational():
-                content = Rational((1, poly.denom()))
-                poly = poly.numer()
-            case _:
-                assert False, type(poly)
-        poly = polynomial_ring(poly)
-        return content, Term(poly)
+        return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
@@ -645,7 +747,7 @@ class Term(firstorder.Term['Term', 'Variable', int]):
 
 
 # discuss: Variable inherits __init__, and we can create Variable(3), Variable(term.poly), etc.
-class Variable(Term, firstorder.Variable['Variable', int]):
+class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
     VV: ClassVar[VariableSet] = VV
 
@@ -693,7 +795,22 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             case _:
                 assert False, self
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, AtomicFormula):
+            return False
+        if self.op != other.op:
+            return False
+        if self.lhs.sort_key() != other.lhs.sort_key():
+            return False
+        if self.rhs.sort_key() != other.rhs.sort_key():
+            return False
+        return True
+
+    def __hash__(self) -> int:
+        return super().__hash__()
+
     def __init__(self, lhs: Term | int, rhs: Term | int):
+        super().__init__()
         if not isinstance(self, (Eq, Ne, Ge, Gt, Le, Lt)):
             raise NoTraceException('Instantiate one of Eq, Ne, Ge, Gt, Le, Lt instead')
         if not isinstance(lhs, Term):
@@ -707,16 +824,18 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         equal to other. Implements abstract method
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
         """
-        match other:
-            case AtomicFormula():
-                if self.lhs != other.lhs:
-                    return Term.sort_key(self.lhs) <= Term.sort_key(other.lhs)
-                if self.rhs != other.rhs:
-                    return Term.sort_key(self.rhs) <= Term.sort_key(other.rhs)
-                L = [Eq, Ne, Le, Lt, Ge, Gt]
-                return L.index(self.op) <= L.index(other.op)
-            case _:
-                return True
+        if not isinstance(other, AtomicFormula):
+            return True
+        self_sort_key = self.lhs.sort_key()
+        other_sort_key = other.lhs.sort_key()
+        if self_sort_key != other_sort_key:
+            return self_sort_key <= other_sort_key
+        self_sort_key = self.rhs.sort_key()
+        other_sort_key = other.rhs.sort_key()
+        if self_sort_key != other_sort_key:
+            return self_sort_key <= other_sort_key
+        L = [Eq, Ne, Le, Lt, Ge, Gt]
+        return L.index(self.op) <= L.index(other.op)
 
     def __repr__(self) -> str:
         if self.lhs.poly.is_constant() and self.rhs.poly.is_constant():
@@ -741,6 +860,14 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
+
+    def as_redlog(self) -> str:
+        """Latex representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+        """
+        SYMBOL: Final = {
+            Eq: '=', Ne: '<>', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
+        return f'({self.lhs!r} {SYMBOL[self.op]} {self.rhs!r})'
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of
@@ -814,49 +941,12 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
         return D[cls]
 
-    def subs(self, sigma: Mapping[Variable, Term | int]) -> Self:
+    def subs(self, sigma: Mapping[Variable, Term | int | mpq]) -> Self:
         """Formal simultaneous term substitution into the two argument terms of
         the atomic formula. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         return self.op(self.lhs.subs(sigma), self.rhs.subs(sigma))
-
-    def subsq(self, sigma: Mapping[Variable, Term | int | Fraction | Rational]) -> Self:
-        """Simultaneous substitution of terms, integers, or fractions for
-        variables. The resulting left hand side term is generally a primitive
-        polynomial over the integers, and the resulting right hand side is
-        zero. The result is equivalent to the result of formal term
-        substitution into the two argument terms of the atomic formula when
-        admitting rational coefficients.
-        """
-        sage_keywords: dict[str, Polynomial | Rational] = dict()
-        for variable, pseudo_term in sigma.items():
-            match pseudo_term:
-                case Term(poly=poly):
-                    sage_keywords[str(variable)] = poly
-                case int() | Fraction():
-                    sage_keywords[str(variable)] = Rational(pseudo_term)
-                case Rational():
-                    sage_keywords[str(variable)] = pseudo_term
-                case _:
-                    assert False, type(pseudo_term)
-        lhs = self.lhs.poly - self.rhs.poly
-        lhs = self.lhs.poly.change_ring(QQ).subs(**sage_keywords)
-        # lhs is either a sage polynomial over QQ or a Rational.
-        match lhs:
-            case Polynomial():
-                try:
-                    lhs = lhs / lhs.content()
-                except ZeroDivisionError:
-                    pass
-            case Rational():
-                lhs = lhs.numerator()
-            case _:
-                assert False, type(lhs)
-        lhs = polynomial_ring(lhs)
-        # The AtomicFormula constructor will call the Term constructor on lhs
-        # and rhs.
-        return self.op(lhs, 0)
 
 
 class Eq(AtomicFormula):

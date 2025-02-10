@@ -10,3 +10,22 @@ u2 == 0
 >>> simplify(And(y - 40 <= 0, Or(And(9*x + 400*y - 20050 <= 0, y - 40 == 0),
 ...          And(9*x + 400*y - 20050 > 0, x - 450 == 0))))
 And(y - 40 == 0, x - 450 <= 0)
+
+# derived from testseries5 in test_simplify_motor.txt
+>>> i2, n, p1, q, td = VV.get('i2', 'n', 'p1', 'q', 'td')
+>>> evil = And(2*p1 - 7 >= 0, 80*i2 + 250*p1 + 2*q - 1457 == 0, i2 == 0, n >= 0, q - 40 <= 0, q >= 0,
+...            Or(And(400*q + 9*td - 20050 <= 0, q == 0),
+...               And(400*q + 9*td - 20050 > 0, 9*td - 20050 == 0)))
+>>> simplify(evil)
+And(q >= 0, q - 40 <= 0, 2*p1 - 7 >= 0, 250*p1 + 2*q - 1457 == 0, n >= 0,
+i2 == 0, Or(And(9*td - 20050 == 0, q > 0), And(9*td - 20050 <= 0, q == 0,
+250*p1 - 1457 == 0)))
+
+# Sage factorization over QQ does not always yield primitive factors:
+>>> VV.imp('a', 'b')
+>>> t = 2*a**2 + 4*a*b + 2*b**2 - 1
+>>> sage_factorization = t.poly.factor()
+>>> sage_factorization.unit(), list(sage_factorization)
+(1, [(2*a^2 + 4*a*b + 2*b^2 - 1, 1)])
+>>> t.factor()
+(mpq(2,1), {a^2 + 2*a*b + b^2 - 1/2: 1})

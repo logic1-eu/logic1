@@ -1,7 +1,8 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+>>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
+>>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
 >>> simplify(And(a == 0, Or(b != 0, And(c <= 0, Or(d > 0, a == 0)))))
@@ -111,6 +112,16 @@ True
 False
 >>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])  # return None
 
+# Examples by NF during the development of simpl_and_or:
+>>> simplify(And(x + y == 0, Or(And(x == 0, y != 0), And(x != 0, y == 0))))
+F
+>>> simplify(And(x**2 + y == 0, Or(And(x == 0, y != 0), And(x != 0, y == 0))))
+F
+
+# The following example shows that it is necessary to resest the ir in
+# simpl_and_or when new substitutions have been found
+>>> simplify(And(x**2 + y**2 + z > 0, z == 1))
+z - 1 == 0
 
 #  Regressions of problems during development
 
@@ -129,3 +140,21 @@ Or(100*n - 10*td - 2500*z - 36519 == 0, a == 0)
 
 >>> simplify(-16 * (a-1)**2 * (a+1)**3 <= 0)
 a + 1 >= 0
+
+# derived from p9
+>>> f1 = Or(x6 < 0, x5 - x6 != 0,
+...         And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+...         And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+...         And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0)),
+...         And(Or(x2 < 0, x1 - x2 + x3 != 0), Or(x2 >= 0, x1 + x2 + x3 != 0)))
+>>> simplify(f1)
+Or(x6 < 0, x5 - x6 != 0, x4 != 0, x3 + x6 != 0, And(Or(x6 == 0, x2 - x6 != 0),
+Or(x6 > 0, x2 != 0)), And(Or(x2 < 0, x1 - x2 - x6 != 0), Or(x2 >= 0, x1 + x2 -
+x6 != 0)))
+
+>>> f2 = And(-x5 <= 0,
+...          Or(-x5 + x6 > 0, And(-x5 == 0, x6 == 0)),
+...          Or(x6 == 0, And(x6 < 0, x6 == 0)),
+...          Or(And(x5 < 0, x4 + x5 + x6 == 0), And(x5 >= 0, x4 - x5 + x6 == 0)))
+>>> simplify(f2)
+And(x6 == 0, x5 == 0, x4 == 0)

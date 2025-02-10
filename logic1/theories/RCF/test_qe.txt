@@ -55,40 +55,42 @@ Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
 >>> p9_0 = p9_1 & p9_2 & p9_3 & p9_4 & p9_5 & p9_6 & p9_7 & p9_8 & p9_9
 
 >>> p9 = All(x1, p9_0 >> ((x1 == x10) & (x2 == x11)))
->>> qe(p9, clustering=CLUSTERING.NONE)
-And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x10 < 0, x9 - x10
+>>> p9_cnone = qe(p9, clustering=CLUSTERING.NONE); p9_cnone
+And(Or(x2 < 0, And(x3 + x10 - x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10
 + x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
 >= 0, x7 + x8 + x9 != 0)), And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 +
 x7 + x8 != 0)), And(Or(x6 < 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 !=
 0)), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
 And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
-0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x2 - x11
-== 0, x2 + x3 + x10 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0, x9
-+ x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x3 + x10
++ x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0,
+x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
 x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8 >= 0, x7 + x8 + x9 != 0)),
 And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 != 0)), And(Or(x5 < 0, x4 - x5 +
 x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
 Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
 x2 + x3 + x4 != 0))))
->>> qe(p9, clustering=CLUSTERING.FULL)
-And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x10 < 0, x9 - x10
+>>> p9_cfull = qe(p9, clustering=CLUSTERING.FULL); p9_cfull
+And(Or(x2 < 0, And(x3 + x10 - x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10
 + x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
 >= 0, x7 + x8 + x9 != 0)), And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 +
 x7 + x8 != 0)), And(Or(x6 < 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 !=
 0)), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
 And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
-0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x2 - x11
-== 0, x2 + x3 + x10 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0, x9
-+ x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x2 > 0, And(x3 + x10
++ x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0,
+x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
 x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8 >= 0, x7 + x8 + x9 != 0)),
 And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 != 0)), And(Or(x5 < 0, x4 - x5 +
 x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
 Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
 x2 + x3 + x4 != 0))))
+>>> p9_cnone == p9_cfull
+True
 
 # Davenport-Heintz (Result is d == 1 or d == -1)
 >>> davenport_heintz = Ex(c, All((b, a),
@@ -144,3 +146,16 @@ Or(y <= 0, y - 3 >= 0, y - 1 == 0, y^2 - 4*y <= 0)
 T
 >>> qe(mp.all(), clustering=CLUSTERING.FULL)
 T
+
+# Hongs's Example:
+>>> qe(All(x, Ex(y, And(x**2 + x*y + b > 0, x + a*y**2 + b <= 0))));
+Traceback (most recent call last):
+...
+logic1.support.excepthook.NoTraceException: Failed - 1 failure nodes
+>>> qe(Ex(y, And(x**2 + x*y + b > 0, x + a*y**2 + b <= 0)))
+Or(And(x > 0, Or(a*x^4 + 2*a*b*x^2 + a*b^2 + b*x^2 + x^3 < 0, And(a*x^4 +
+2*a*b*x^2 + a*b^2 + b*x^2 + x^3 == 0, Or(a*x^3 + a*b*x > 0, And(a <= 0, Or(a ==
+0, x^2 + b == 0)))))), And(a != 0, a*b + a*x <= 0, Or(x^2 + b > 0, a^2*x^4 +
+2*a^2*b*x^2 + a^2*b^2 + a*b*x^2 + a*x^3 < 0), Or(a*x < 0, a^2*x^4 + 2*a^2*b*x^2
++ a^2*b^2 + a*b*x^2 + a*x^3 > 0)), And(Or(x < 0, And(x == 0, b > 0)), Or(a < 0,
+And(b + x <= 0, a == 0))))

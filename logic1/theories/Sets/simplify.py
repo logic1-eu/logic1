@@ -18,7 +18,7 @@ from .typing import Formula
 from ...support.tracing import trace  # noqa
 
 
-@dataclass(frozen=True)
+@dataclass(unsafe_hash=True)
 class UnionFind:
     _parents: dict[Variable, Variable] = field(default_factory=dict)
 
@@ -48,6 +48,7 @@ class UnionFind:
             yield Eq(self.find(y), y)
 
 
+@dataclass
 class InternalRepresentation(
         abc.simplify.InternalRepresentation[AtomicFormula, Variable, Variable, Never]):
     """Implements the abstract methods
@@ -58,33 +59,13 @@ class InternalRepresentation(
     :class:`.Sets.simplify.Simplify` for instantiating the type variable
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
-    _ref_min_card: Index
-    _ref_max_card: Index
-    _ref_equations: UnionFind
-    _ref_inequations: set[Ne]
+    _options: abc.simplify.Options
+    _min_card: Index = 1
+    _max_card: Index = oo
+    _equations: UnionFind = field(default_factory=UnionFind)
+    _inequations: set[Ne] = field(default_factory=set)
 
-    _cur_min_card: Index
-    _cur_max_card: Index
-    _cur_equations: UnionFind
-    _cur_inequations: set[Ne]
-
-    def __init__(self) -> None:
-        self._ref_min_card = 1
-        self._ref_max_card = oo
-        self._ref_equations = UnionFind()
-        self._ref_inequations = set()
-        self._cur_min_card = 1
-        self._cur_max_card = oo
-        self._cur_equations = UnionFind()
-        self._cur_inequations = set()
-
-    def __repr__(self) -> str:
-        return (f'InternalRepresentation([{self._ref_min_card}..{self._ref_max_card}], '
-                f'{self._ref_equations}, {self._ref_inequations} | '
-                f'[{self._cur_min_card}..{self._cur_max_card}], '
-                f'{self._cur_equations}, {self._cur_inequations})')
-
-    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.Restart:
+    def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.RESTART:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         for atom in atoms:
@@ -93,50 +74,50 @@ class InternalRepresentation(
             # Collect information
             match atom:
                 case C(index=n):
-                    if n > self._cur_min_card:
-                        self._cur_min_card = n
-                    if self._cur_min_card > self._cur_max_card:
+                    if n > self._min_card:
+                        self._min_card = n
+                    if self._min_card > self._max_card:
                         raise InternalRepresentation.Inconsistent()
                 case C_(index=n):
-                    if n - 1 < self._cur_max_card:
-                        self._cur_max_card = n - 1
-                    if self._cur_min_card > self._cur_max_card:
+                    if n - 1 < self._max_card:
+                        self._max_card = n - 1
+                    if self._min_card > self._max_card:
                         raise InternalRepresentation.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
-                    self._cur_equations.union(lhs, rhs)
+                    self._equations.union(lhs, rhs)
                 case Ne(lhs=lhs, rhs=rhs):
-                    self._cur_inequations.add(atom)
+                    self._inequations.add(atom)
                 case _:
                     assert False
-            for ne in self._cur_inequations:
-                if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
+            for ne in self._inequations:
+                if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-            for ne in self._cur_inequations:
-                if self._cur_equations.find(ne.lhs) == self._cur_equations.find(ne.rhs):
+            for ne in self._inequations:
+                if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-        return abc.simplify.Restart.OTHERS
+        return abc.simplify.RESTART.OTHERS
 
-    def extract(self, gand: type[And | Or]) -> list[AtomicFormula]:
+    def extract(self, gand: type[And | Or], ref: InternalRepresentation) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
         def canonicalize(ne: Ne) -> Ne:
-            ne_subs = ne.subs({ne.lhs: self._cur_equations.find(ne.lhs),
-                               ne.rhs: self._cur_equations.find(ne.rhs)})
+            ne_subs = ne.subs({ne.lhs: self._equations.find(ne.lhs),
+                               ne.rhs: self._equations.find(ne.rhs)})
             if Variable.sort_key(ne_subs.lhs) <= Variable.sort_key(ne_subs.rhs):
                 return ne_subs
             else:
                 return Ne(ne_subs.rhs, ne_subs.lhs)
 
         L: list[AtomicFormula] = []
-        if self._cur_min_card > self._ref_min_card:
-            L.append(C(self._cur_min_card))
-        if self._cur_max_card < self._ref_max_card:
-            L.append(C_(self._cur_max_card + 1))
-        for eq in self._cur_equations.equations():
-            if self._ref_equations.find(eq.lhs) != self._ref_equations.find(eq.rhs):
+        if self._min_card > ref._min_card:
+            L.append(C(self._min_card))
+        if self._max_card < ref._max_card:
+            L.append(C_(self._max_card + 1))
+        for eq in self._equations.equations():
+            if ref._equations.find(eq.lhs) != ref._equations.find(eq.rhs):
                 L.append(eq)
-        canonical_ref_inequations = {canonicalize(ne) for ne in self._ref_inequations}
-        for ne in self._cur_inequations:
+        canonical_ref_inequations = {canonicalize(ne) for ne in ref._inequations}
+        for ne in self._inequations:
             ne = canonicalize(ne)
             if ne not in canonical_ref_inequations:
                 L.append(ne)
@@ -147,28 +128,22 @@ class InternalRepresentation(
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.next_`.
         """
-        result = self.__class__()
-        result._ref_min_card = self._cur_min_card
-        result._ref_max_card = self._cur_max_card
         if remove is None:
-            result._ref_equations = self._cur_equations.copy()
-            result._ref_inequations = self._cur_inequations.copy()
+            equations = self._equations.copy()
+            inequations = self._inequations.copy()
         else:
-            result._ref_equations = UnionFind()
-            for eq in self._cur_equations.equations():
+            equations = UnionFind()
+            for eq in self._equations.equations():
                 if remove not in eq.fvars():
-                    result._ref_equations.union(eq.lhs, eq.rhs)
-            result._ref_inequations = {ne for ne in self._cur_inequations
-                                       if remove not in ne.fvars()}
-        result._cur_min_card = result._ref_min_card
-        result._cur_max_card = result._ref_max_card
-        result._cur_equations = result._ref_equations.copy()
-        result._cur_inequations = result._ref_inequations.copy()
-        return result
+                    equations.union(eq.lhs, eq.rhs)
+            inequations = {ne for ne in self._inequations if remove not in ne.fvars()}
+        return self.__class__(self._options, self._min_card, self._max_card,
+                              equations, inequations)
 
 
-class Simplify(
-        abc.simplify.Simplify[AtomicFormula, Variable, Variable, Never, InternalRepresentation]):
+@dataclass(frozen=True)
+class Simplify(abc.simplify.Simplify[
+        AtomicFormula, Variable, Variable, Never, InternalRepresentation, abc.simplify.Options]):
     """Deep simplification in the style of [DolzmannSturm-1997]_. Implements
     the abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at
@@ -180,12 +155,14 @@ class Simplify(
     which should be called via :func:`.is_valid`, as described below.
     """
 
+    _options: abc.simplify.Options = field(default_factory=abc.simplify.Options)
+
     def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
             -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
-        ir = InternalRepresentation()
+        ir = InternalRepresentation(self._options)
         for atom in assume:
             simplified_atom = self.simpl_at(atom, And)
             match simplified_atom:
@@ -206,7 +183,9 @@ class Simplify(
         return atom.simplify()
 
 
-simplify = Simplify().simplify
+def simplify(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+    return Simplify().simplify(f, assume)
 
 
-is_valid = Simplify().is_valid
+def is_valid(f: Formula, assume: Iterable[AtomicFormula] = []) -> Optional[bool]:
+    return Simplify().is_valid(f, assume)

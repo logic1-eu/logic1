@@ -1,0 +1,316 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+
+>>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
+
+
+# redlog.gqe:
+
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.NONE)
+Traceback (most recent call last):
+...
+logic1.support.excepthook.NoTraceException: GENERIC.NONE is not supported - use redlog.qe instead
+
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.MONOMIAL)
+([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
+
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.FULL)
+([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
+
+
+# redlog.qe
+
+>>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0))
+Or(And(c == 0, b == 0, a + 1 == 0),
+   And(b != 0, a + 1 == 0),
+   And(a + 1 != 0, 4*a*c - b^2 + 4*c <= 0))
+
+>>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), [b != 0])
+Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0)
+
+Hong's Example:
+>>> redlog.qe(All(x, Ex(y, And(x**2 + x*y + b > 0, x + a*y**2 + b <= 0))))
+And(b > 0, a < 0)
+
+From test_qe.txt:
+>>> phi_6 = Ex(x, And(a * x + b <= 0, x <= b))
+>>> redlog.qe(phi_6)
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
+
+Period 9:
+>>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
+
+>>> p9_1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
+>>> p9_2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)
+>>> p9_3 = (x4 >= 0) & (x5 == x4 - x3) | (x4 < 0) & (x5 == -x4 - x3)
+>>> p9_4 = (x5 >= 0) & (x6 == x5 - x4) | (x5 < 0) & (x6 == -x5 - x4)
+>>> p9_5 = (x6 >= 0) & (x7 == x6 - x5) | (x6 < 0) & (x7 == -x6 - x5)
+>>> p9_6 = (x7 >= 0) & (x8 == x7 - x6) | (x7 < 0) & (x8 == -x7 - x6)
+>>> p9_7 = (x8 >= 0) & (x9 == x8 - x7) | (x8 < 0) & (x9 == -x8 - x7)
+>>> p9_8 = (x9 >= 0) &  (x10 == x9 - x8) | (x9 < 0) & (x10 == -x9 - x8)
+>>> p9_9 = (x10 >= 0) & (x11 == x10 - x9) | (x10 < 0) & (x11 == -x10 - x9)
+
+>>> p9_0 = p9_1 & p9_2 & p9_3 & p9_4 & p9_5 & p9_6 & p9_7 & p9_8 & p9_9
+
+>>> p9 = All(x1, p9_0 >> ((x1 == x10) & (x2 == x11)))
+
+>>> redlog.qe(p9)
+And(Or(x2 < 0, And(x2 - x11 == 0, x2 - x3 - x10 == 0), And(Or(x9 < 0, x8 - x9 +
+x10 != 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0),
+Or(x8 >= 0, x7 + x8 + x9 != 0)), And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0,
+x6 + x7 + x8 != 0)), And(Or(x6 < 0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7
+!= 0)), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0)), And(Or(x10 < 0, x9 - x10
++ x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0))), Or(x2 > 0, And(x2 - x11 == 0,
+x2 + x3 + x10 == 0), And(Or(x9 < 0, x8 - x9 + x10 != 0), Or(x9 >= 0, x8 + x9 +
+x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8 >= 0, x7 + x8 + x9 != 0)),
+And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
+0, x5 - x6 + x7 != 0), Or(x6 >= 0, x5 + x6 + x7 != 0)), And(Or(x5 < 0, x4 - x5 +
+x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0)), And(Or(x10 < 0, x9 - x10 + x11 != 0), Or(x10 >= 0, x9 + x10
++ x11 != 0))))
+
+Try some large output:
+>>> vl = sorted(set(p9.fvars()), key=Term.sort_key)
+>>> redlog.qe(All(vl[0:5], p9))
+And(Or(x6 != 0, x5 > 0, x2 < 0, And(x2 + x5 == 0, x2 - x3 - x5 == 0), And(Or(x5
+== 0, x4 + x5 != 0), Or(x5 < 0, x4 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0))), Or(x6 != 0, x5 > 0, x2 > 0, And(x2 + x5 == 0, x2 + x3 + x5
+== 0), And(Or(x5 == 0, x4 + x5 != 0), Or(x5 < 0, x4 != 0)), And(Or(x4 < 0, x3 -
+x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 !=
+0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 < 0, x5 - x6 > 0, 2*x5 - x6
+< 0, 3*x5 - x6 < 0, x4 - x5 + x6 != 0, x2 < 0, And(x2 - x5 == 0, x2 - x3 - 3*x5
++ x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0,
+x5 < 0, x5 - x6 > 0, 2*x5 - x6 < 0, 3*x5 - x6 < 0, x4 - x5 + x6 != 0, x2 > 0,
+And(x2 - x5 == 0, x2 + x3 + 3*x5 - x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0))), Or(x6 < 0, x5 < 0, x5 - x6 > 0, 2*x5 - x6 < 0, 3*x5 - x6 >
+0, x4 - x5 + x6 != 0, x2 < 0, And(x2 + 5*x5 - 2*x6 == 0, x2 - x3 - 3*x5 + x6 ==
+0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0,
+x5 < 0, x5 - x6 > 0, 2*x5 - x6 < 0, 3*x5 - x6 > 0, x4 - x5 + x6 != 0, x2 > 0,
+And(x2 + 5*x5 - 2*x6 == 0, x2 + x3 + 3*x5 - x6 == 0), And(Or(x4 < 0, x3 - x4 +
+x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 < 0, x5 - x6 > 0, 2*x5 - x6 > 0,
+x4 - x5 + x6 != 0, x2 < 0, And(x2 + 3*x5 - 2*x6 == 0, x2 - x3 + x5 - x6 == 0),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 < 0, x5 -
+x6 > 0, 2*x5 - x6 > 0, x4 - x5 + x6 != 0, x2 > 0, And(x2 + 3*x5 - 2*x6 == 0, x2
++ x3 - x5 + x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 +
+x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))),
+Or(x6 < 0, x5 > 0, x5 + x6 < 0, x2 < 0, And(x2 - x5 - 2*x6 == 0, x2 - x3 - x5 -
+x6 == 0), And(Or(x5 == 0, x4 + x5 + x6 != 0), Or(x5 < 0, x4 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 > 0, x5 +
+x6 < 0, x2 > 0, And(x2 - x5 - 2*x6 == 0, x2 + x3 + x5 + x6 == 0), And(Or(x5 ==
+0, x4 + x5 + x6 != 0), Or(x5 < 0, x4 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 !=
+0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >=
+0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 > 0, x5 + x6 > 0, x2 < 0, And(x2 + x5 ==
+0, x2 - x3 - x5 - x6 == 0), And(Or(x5 == 0, x4 + x5 + x6 != 0), Or(x5 < 0, x4 +
+x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0,
+x5 > 0, x5 + x6 > 0, x2 > 0, And(x2 + x5 == 0, x2 + x3 + x5 + x6 == 0),
+And(Or(x5 == 0, x4 + x5 + x6 != 0), Or(x5 < 0, x4 + x6 != 0)), And(Or(x4 < 0, x3
+- x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 !=
+0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 3*x6 < 0, x5 - 2*x6 > 0,
+x5 - x6 < 0, x2 < 0, And(x2 - x5 + 4*x6 == 0, x2 - x3 + x5 - 3*x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 3*x6 < 0, x5 - 2*x6
+> 0, x5 - x6 < 0, x2 > 0, And(x2 - x5 + 4*x6 == 0, x2 + x3 - x5 + 3*x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 3*x6 > 0, x5 - 2*x6
+> 0, x5 - x6 < 0, x2 < 0, And(x2 + x5 - 2*x6 == 0, x2 - x3 + x5 - 3*x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 3*x6 > 0, x5 - 2*x6
+> 0, x5 - x6 < 0, x2 > 0, And(x2 + x5 - 2*x6 == 0, x2 + x3 - x5 + 3*x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 2*x6 < 0, x5 - x6 <
+0, 2*x5 - 3*x6 < 0, x2 < 0, And(x2 + x5 - 2*x6 == 0, x2 - x3 - x5 + x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 2*x6 < 0, x5 - x6 <
+0, 2*x5 - 3*x6 < 0, x2 > 0, And(x2 + x5 - 2*x6 == 0, x2 + x3 + x5 - x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 2*x6 < 0, x5 - x6 <
+0, 2*x5 - 3*x6 > 0, 3*x5 - 5*x6 < 0, x2 < 0, And(x2 - x5 + 2*x6 == 0, x2 - x3 +
+3*x5 - 5*x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6
+!= 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0,
+x5 - 2*x6 < 0, x5 - x6 < 0, 2*x5 - 3*x6 > 0, 3*x5 - 5*x6 < 0, x2 > 0, And(x2 -
+x5 + 2*x6 == 0, x2 + x3 - 3*x5 + 5*x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 != 0),
+Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0,
+x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4
+!= 0))), Or(x6 < 0, x5 - 2*x6 < 0, x5 - x6 < 0, 2*x5 - 3*x6 > 0, 3*x5 - 5*x6 >
+0, x2 < 0, And(x2 + 5*x5 - 8*x6 == 0, x2 - x3 + 3*x5 - 5*x6 == 0), And(Or(x5 <
+0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 +
+x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 < 0, x5 - 2*x6 < 0, x5 - x6 < 0, 2*x5 -
+3*x6 > 0, 3*x5 - 5*x6 > 0, x2 > 0, And(x2 + 5*x5 - 8*x6 == 0, x2 + x3 - 3*x5 +
+5*x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 < 0, x5 +
+x6 < 0, 2*x5 + x6 < 0, x4 - x5 + x6 != 0, x2 < 0, And(x2 + x5 == 0, x2 - x3 - x5
+- x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0,
+x5 < 0, x5 + x6 < 0, 2*x5 + x6 < 0, x4 - x5 + x6 != 0, x2 > 0, And(x2 + x5 == 0,
+x2 + x3 + x5 + x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4
++ x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 !=
+0))), Or(x6 > 0, x5 < 0, x5 + x6 < 0, 2*x5 + x6 > 0, 3*x5 + x6 < 0, x4 - x5 + x6
+!= 0, x2 < 0, And(x2 - x5 == 0, x2 - x3 + 3*x5 + x6 == 0), And(Or(x4 < 0, x3 -
+x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 !=
+0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 < 0, x5 + x6 < 0, 2*x5 + x6
+> 0, 3*x5 + x6 < 0, x4 - x5 + x6 != 0, x2 > 0, And(x2 - x5 == 0, x2 + x3 - 3*x5
+- x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0,
+x5 < 0, x5 + x6 < 0, 2*x5 + x6 > 0, 3*x5 + x6 > 0, x4 - x5 + x6 != 0, x2 < 0,
+And(x2 + 5*x5 + 2*x6 == 0, x2 - x3 + 3*x5 + x6 == 0), And(Or(x4 < 0, x3 - x4 +
+x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 < 0, x5 + x6 < 0, 2*x5 + x6 > 0,
+3*x5 + x6 > 0, x4 - x5 + x6 != 0, x2 > 0, And(x2 + 5*x5 + 2*x6 == 0, x2 + x3 -
+3*x5 - x6 == 0), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 !=
+0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6
+> 0, x5 > 0, x5 + x6 != 0, x2 < 0, And(x2 + x6 == 0, x2 - x3 + x5 + x6 == 0),
+And(Or(x5 == 0, x4 + x5 + x6 != 0), Or(x5 < 0, x4 + x6 != 0)), And(Or(x4 < 0, x3
+- x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 !=
+0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 > 0, x5 + x6 != 0, x2 > 0,
+And(x2 + x6 == 0, x2 + x3 - x5 - x6 == 0), And(Or(x5 == 0, x4 + x5 + x6 != 0),
+Or(x5 < 0, x4 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 +
+x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 !=
+0))), Or(x6 > 0, x5 + x6 != 0, x2 < 0, And(x2 - x6 == 0, x2 - x3 - x5 - x6 ==
+0), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)),
+And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 <
+0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 !=
+0, x2 > 0, And(x2 - x6 == 0, x2 + x3 + x5 + x6 == 0), And(Or(x5 < 0, x4 - x5 +
+x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
+Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
+x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x5 + 2*x6 < 0, 2*x5 + 3*x6 < 0,
+3*x5 + 5*x6 < 0, x2 < 0, And(x2 - x5 - 2*x6 == 0, x2 - x3 - 3*x5 - 5*x6 == 0),
+And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 <
+0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 +
+x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x5 + 2*x6 <
+0, 2*x5 + 3*x6 < 0, 3*x5 + 5*x6 < 0, x2 > 0, And(x2 - x5 - 2*x6 == 0, x2 + x3 +
+3*x5 + 5*x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6
+!= 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)),
+And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0,
+x5 + x6 > 0, x5 + 2*x6 < 0, 2*x5 + 3*x6 < 0, 3*x5 + 5*x6 > 0, x2 < 0, And(x2 +
+5*x5 + 8*x6 == 0, x2 - x3 - 3*x5 - 5*x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 !=
+0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >=
+0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 +
+x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x5 + 2*x6 < 0, 2*x5 + 3*x6 < 0, 3*x5 + 5*x6
+> 0, x2 > 0, And(x2 + 5*x5 + 8*x6 == 0, x2 + x3 + 3*x5 + 5*x6 == 0), And(Or(x5 <
+0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 +
+x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x5 + 2*x6 < 0, 2*x5 +
+3*x6 > 0, x2 < 0, And(x2 + 3*x5 + 4*x6 == 0, x2 - x3 + x5 + x6 == 0), And(Or(x5
+< 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4
++ x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x5 + 2*x6 < 0, 2*x5 +
+3*x6 > 0, x2 > 0, And(x2 + 3*x5 + 4*x6 == 0, x2 + x3 - x5 - x6 == 0), And(Or(x5
+< 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4
++ x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6 > 0, x5 + x6 > 0, x2 < 0, And(x2 + x5 ==
+0, x2 - x3 - x5 - x6 == 0), And(Or(x5 < 0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 +
+x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5 !=
+0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0))), Or(x6
+> 0, x5 + x6 > 0, x2 > 0, And(x2 + x5 == 0, x2 + x3 + x5 + x6 == 0), And(Or(x5 <
+0, x4 - x5 + x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 +
+x5 != 0), Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0),
+Or(x3 >= 0, x2 + x3 + x4 != 0))))
+
+
+# redlog.simplify
+
+doi:10.1006/jsco.1997.0123, Sect. 5.3:
+>>> redlog.simplify(And(a == 0, Or(b != 0, And(c <= 0, Or(d > 0, a == 0)))))
+And(a == 0, Or(c <= 0, b != 0))
+>>> redlog.simplify(And(a == 0, Or(b == 0, And(c == 0, d >= 0)), Or(d != 0, a != 0)))
+And(d != 0, a == 0, Or(b == 0, And(d > 0, c == 0)))
+
+Test implicit negation and extended Boolean operators:
+>>> redlog.simplify(T)
+T
+>>> redlog.simplify(Not(T))
+F
+>>> redlog.simplify(Eq(1, 0))
+F
+>>> redlog.simplify(Not(Eq(1, 0)))
+T
+>>> redlog.simplify(a == 0)
+a == 0
+>>> redlog.simplify(Not(a == 0))
+a != 0
+
+Test assumption:
+>>> redlog.simplify(Or(a > b, Equivalent(a == 0, Ex(a, a > b))), assume=[a == 0])
+Or(b < 0, Ex(a, a - b > 0))
+
+>>> redlog.simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
+Ex(a, a - 5 > 0)
+
+Test explode_always:
+>>> redlog.simplify(And(a * b == 0, c == 0))
+And(c == 0, Or(b == 0, a == 0))
+>>> redlog.simplify(And(a * b == 0, c == 0), explode_always=False)
+And(c == 0, a*b == 0)
+>>> redlog.simplify(Or(a * b == 0, c == 0), explode_always=False)
+Or(c == 0, b == 0, a == 0)
+
+Test prefer_weak:
+>>> assert redlog.simplify(And(a != 0, Or(b == 0, a >= 0)))\
+...     == redlog.simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak = False)
+
+>>> redlog.simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=False)  # default
+And(a != 0, Or(b == 0, a > 0))
+>>> redlog.simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=False)  # default
+And(a != 0, Or(b == 0, a > 0))
+>>> redlog.simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+>>> redlog.simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+
+>>> redlog.simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=False)  # default
+Or(a == 0, And(b == 0, a > 0))
+>>> redlog.simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=False)  # default
+Or(a == 0, And(b == 0, a > 0))
+>>> redlog.simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=True)
+Or(a == 0, And(b == 0, a >= 0))
+>>> redlog.simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=True)
+Or(a == 0, And(b == 0, a >= 0))
+
+Test prefer_order:
+>>> assert redlog.simplify(Or(a > 0, And(b == 0, a != 0)))\
+...     == redlog.simplify(Or(a > 0, And(b == 0, a != 0)), prefer_order=True)
+
+>>> redlog.simplify(Or(a > 0, And(b == 0, a < 0)), prefer_order=True)  # default
+Or(a > 0, And(b == 0, a < 0))
+>>> redlog.simplify(Or(a > 0, And(b == 0, a != 0)), prefer_order=True)  # default
+Or(a > 0, And(b == 0, a < 0))
+>>> redlog.simplify(Or(a > 0, And(b == 0, a < 0)), prefer_order=False)
+Or(a > 0, And(b == 0, a != 0))
+>>> redlog.simplify(Or(a > 0, And(b == 0, a != 0)), prefer_order=False)
+Or(a > 0, And(b == 0, a != 0))
+
+>>> redlog.simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=True)  # default
+And(a >= 0, Or(b == 0, a > 0))
+>>> redlog.simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=True)  # default
+And(a >= 0, Or(b == 0, a > 0))
+>>> redlog.simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+And(a >= 0, Or(b == 0, a != 0))
+>>> redlog.simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+And(a >= 0, Or(b == 0, a != 0))
+
+# Do not prefer order over equality
+>>> redlog.simplify(And(a <= 0, Or(b != 0, a == 0)), prefer_order=True)
+And(a <= 0, Or(b != 0, a == 0))
+>>> redlog.simplify(And(a <= 0, Or(b != 0, a >= 0)), prefer_order=True)
+And(a <= 0, Or(b != 0, a == 0))

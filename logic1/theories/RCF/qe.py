@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import auto, Enum
+from logging import Logger
 from typing import ClassVar, Iterable, Iterator, Literal, Optional, TypeAlias
 from typing import reveal_type  # noqa
 
@@ -505,19 +506,19 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                             case GENERIC.NONE:
                                 if not is_valid(a != 0, assumptions.atoms):
                                     continue
-                                abc.qe.logger.debug(f'{degree}-Gauss')
+                                self.logger().debug(f'{degree}-Gauss')
                             case GENERIC.MONOMIAL:
                                 if len(a.monomials()) > 1:
                                     continue
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
-                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                self.logger().debug(f'{degree}-Gauss assuming {a != 0}')
                             case GENERIC.FULL:
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
-                                abc.qe.logger.debug(f'{degree}-Gauss assuming {a != 0}')
+                                self.logger().debug(f'{degree}-Gauss assuming {a != 0}')
                         self.variables.remove(x)
                         test_points = []
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
@@ -545,6 +546,12 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 return True
             case _:
                 assert False, self.options.generic
+
+    def logger(self) -> Logger:
+        if self.options.workers == 0:
+            return abc.qe.logger
+        else:
+            return abc.qe.multiprocessing_logger
 
     def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
@@ -639,7 +646,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
                     phi = expand_eps_at(atom, tp.nsp, x)
                     recurse = lambda atom: vs_at(atom, TestPoint(tp.prd, NSP.NONE), x)  # noqa E731
-                    return phi.transform_atoms(recurse)
+                    return phi.traverse(map_atoms=recurse)
                 case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
                     return vs_inf_at(atom, tp.nsp, x)
                 case _:
@@ -755,9 +762,10 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
         x = eset.variable
         new_nodes = []
         for tp in eset.test_points:
-            new_formula = self.formula.transform_atoms(lambda atom: vs_at(atom, tp, x))
+            new_formula = self.formula.traverse(map_atoms=lambda atom: vs_at(atom, tp, x))
             # requires discussion: guard will be simplified twice
-            new_formula = simplify(And(tp.guard(assumptions), new_formula), assume=assumptions.atoms)
+            new_formula = simplify(And(tp.guard(assumptions), new_formula),
+                                   assume=assumptions.atoms)
             if new_formula is _T():
                 raise abc.qe.FoundT()
             new_nodes.append(
@@ -779,12 +787,12 @@ class Options(abc.qe.Options):
     variable :data:`.abc.qe.ω` of :class:`.abc.qe.QuantifierElimination`.
     """
 
-    clustering: CLUSTERING = CLUSTERING.FULL
+    clustering: CLUSTERING
     """The clustering strategy used by :class:`.VirtualSubstitution`. See
     [Kosta-2016]_ for details on clustering.
     """
 
-    generic: GENERIC = GENERIC.NONE
+    generic: GENERIC
     """The degree of genericity used by :class:`.VirtualSubstitution`. See
     [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_ for details on generic
     quantifier elimination.
@@ -813,7 +821,7 @@ class Options(abc.qe.Options):
     [c > 0, b != 0]
     """
 
-    traditional_guards: bool = True
+    traditional_guards: bool
     """`traditional_guards=False` strictly follows the construction of guards
     as described in [Kosta-2016]_.
 
@@ -831,6 +839,14 @@ class Options(abc.qe.Options):
        And(b != 0, Or(c == 0, a == 0)),
        And(a != 0, 4*a*c - b^2 <= 0))
     """
+
+    def __init__(self, /, clustering: CLUSTERING = CLUSTERING.FULL,
+                 generic: GENERIC = GENERIC.NONE, traditional_guards: bool = True, **kwargs) \
+            -> None:
+        super().__init__(**kwargs)
+        self.clustering = clustering
+        self.generic = generic
+        self.traditional_guards = traditional_guards
 
 
 @dataclass
@@ -892,7 +908,7 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[
     def init_env(cls, ring_vars: list[str]):
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
         """
-        polynomial_ring.ensure_vars(ring_vars)
+        polynomial_ring.add_vars(ring_vars)
 
     def init_env_arg(self) -> list[str]:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.

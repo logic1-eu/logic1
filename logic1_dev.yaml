@@ -16,7 +16,9 @@ channels:
 dependencies:
   - python=3.11
   - coverage
+  - pytest-cython
   - jupyter
+  - line_profiler
   - more-itertools
   - mypy
   - pip

@@ -100,7 +100,7 @@ Quantifier Elimination
     *******
 
     .. autoclass:: Options
-      :members: log_level, log_rate
+      :members: log_level, log_rate, workers
       :special-members:
 
     Quantifier Elimination
@@ -127,7 +127,6 @@ Quantifier Elimination
       read-only input parameters of
       :meth:`__call__`:
 
-      .. autoattribute:: workers
       .. autoattribute:: options
 
       The third and last group of attributes holds comprehensive timing

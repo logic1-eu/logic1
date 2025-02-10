@@ -595,13 +595,53 @@ class Options:
     This is an upper bound for the type variable :data:`.ω`.
     """
 
-    log_level: int = logging.NOTSET
+    log_level: int
     """The `log_level` of the logger used by :class:`.QuantifierElimination`.
     """
 
-    log_rate: float = 0.5
+    log_rate: float
     """The minimal timespan (in s) between to log outputs in certain loops.
     """
+
+    workers: int
+    """The number of worker processes used. For more information see the
+    documentation of the parameter `workers` of :meth:`.__call__`.
+
+    :param workers:
+      Specifies the number of processes to be used in parallel:
+
+      * The default value `workers=0` uses a sequential implementation,
+        which avoids overhead when input problems are small. For all other
+        values, there are additional processes started.
+
+      * A positive value `workers=n > 0` uses `n + 2` processes: the master
+        process, `n` worker processes, and a proxy processes that manages
+        shared data.
+
+        .. note::
+          `workers=1` uses the parallel implementation with only one
+          worker. Algorithmically this is similar to the sequential version
+          with `workers=0` but comes at the cost of 2 additional processes.
+
+      * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
+        many workers.  It follows that `workers=-2` exactly allocates all
+        of CPUs of the machine, and workers=-3 is an interesting choice,
+        which leaves one CPU free for smooth interaction with the machine.
+    """
+
+    def __init__(self, log_level: int = logging.NOTSET, log_rate: float = 0.5,
+                 workers: int = 0) -> None:
+        self.log_level = log_level
+        self.log_rate = log_rate
+        if workers >= 0:
+            self.workers = workers
+        else:
+            cpu_count = os.cpu_count()
+            if cpu_count is None:
+                raise ValueError(f'{os.cpu_count()=}, i.e. undetermined')
+            if cpu_count + workers < 1:
+                raise ValueError(f'negative number of workers')
+            self.workers = cpu_count + workers
 
 
 @dataclass
@@ -610,10 +650,6 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
     """
 
     # Attribute group 1 - arguments of :meth:`.__call__`:
-    workers: int = 0
-    """The number of worker processes used. For more information see the
-    documentation of the parameter `workers` of :meth:`.__call__`.
-    """
 
     options: Optional[ω] = None
     """The options that have been passed to :meth:`.__call__`.
@@ -729,8 +765,8 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
     """The total time spent in :meth:`.__call__`.
     """
 
-    def __call__(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = [],
-                 workers: int = 0, **options) -> Optional[Formula[α, τ, χ, σ]]:
+    def __call__(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = [], **options) \
+            -> Optional[Formula[α, τ, χ, σ]]:
         """The entry point of the callable class
         :class:`.QuantifierElimination`.
 
@@ -740,27 +776,6 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         :param assume:
           A list of atomic formulas that are assumed to hold. The return value
           is equivalent modulo those assumptions.
-
-        :param workers:
-          Specifies the number of processes to be used in parallel:
-
-          * The default value `workers=0` uses a sequential implementation,
-            which avoids overhead when input problems are small. For all other
-            values, there are additional processes started.
-
-          * A positive value `workers=n > 0` uses `n + 2` processes: the master
-            process, `n` worker processes, and a proxy processes that manages
-            shared data.
-
-            .. note::
-              `workers=1` uses the parallel implementation with only one
-              worker. Algorithmically this is similar to the sequential version
-              with `workers=0` but comes at the cost of 2 additional processes.
-
-          * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-            many workers.  It follows that `workers=-2` exactly allocates all
-            of CPUs of the machine, and workers=-3 is an interesting choice,
-            which leaves one CPU free for smooth interaction with the machine.
 
         :param `**options`:
           Keyword arguments with keywords corresponding to attributes of the
@@ -784,21 +799,12 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         # and saves some code.
         QuantifierElimination.__init__(self)  # dicuss: NF is :-(
         self._assumptions = self.create_assumptions(assume)
-        if workers >= 0:
-            self.workers = workers
-        else:
-            cpu_count = os.cpu_count()
-            if cpu_count is None:
-                raise ValueError(f'{os.cpu_count()=}, i.e. undetermined')
-            if cpu_count + workers < 1:
-                raise ValueError(f'negative number of workers')
-            self.workers = cpu_count + workers
         self.options = self.create_options(**options)
         save_level = logger.getEffectiveLevel()
         try:
             logger.setLevel(self.options.log_level)
             logger.info(f'{self.options}')
-            result = self.quantifier_eliminiation(f, workers)
+            result = self.quantifier_eliminiation(f)
             logger.info('finished')
         except KeyboardInterrupt:
             logger.info('keyboard interrupt')
@@ -926,7 +932,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
             while still_running:
                 for sentinel in mp.connection.wait(still_running):
                     still_running.remove(sentinel)
-                num_finished = self.workers - len(still_running)
+                num_finished = self.options.workers - len(still_running)
                 pl = 'es' if num_finished > 1 else ''
                 logger.debug(f'{num_finished} worker process{pl} finished, '
                              f'{len(still_running)} running')
@@ -956,10 +962,10 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
             sentinels: list[int] = []
             log_level = logger.getEffectiveLevel()
             reference_time = delta_time_formatter.get_reference_time()
-            logger.debug(f'starting worker processes in {range(self.workers)}')
+            logger.debug(f'starting worker processes in {range(self.options.workers)}')
             born_processes = manager.Value('i', 0)
             timer.reset()
-            for i in range(self.workers):
+            for i in range(self.options.workers):
                 process = mp.Process(
                     target=self.parallel_process_block_worker,
                     args=(working_nodes, success_nodes, failure_nodes,
@@ -977,8 +983,8 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                         born = born_processes.value
                 self.time_start_first_worker = timer.get()
                 logger.debug(f'{self.time_start_first_worker=:.3f}')
-                if self.workers > 1:
-                    while born < self.workers:
+                if self.options.workers > 1:
+                    while born < self.options.workers:
                         time.sleep(0.0001)
                         with m_lock:
                             born = born_processes.value
@@ -986,7 +992,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 else:
                     self.time_start_all_workers = self.time_start_first_worker
                 logger.debug(f'{self.time_start_all_workers=:.3f}')
-                workers_running = self.workers
+                workers_running = self.options.workers
                 log_timer = Timer()
                 while workers_running > 0:
                     if logger.isEnabledFor(logging.INFO):
@@ -1012,7 +1018,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
             self.time_multiprocessing = timer.get() - self.time_start_first_worker
             logger.debug(f'{self.time_multiprocessing=:.3f}')
             new_assumptions = []
-            for i in range(self.workers):
+            for i in range(self.options.workers):
                 new_assumptions.extend(final_assumptions.get().atoms)
             self._assumptions.extend(new_assumptions)
             if found_t.value > 0:
@@ -1108,8 +1114,9 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         multiprocessing_logger.debug(f'worker process {i} exiting')
 
     def process_block(self) -> None:
+        assert self.options is not None
         logger.debug(f'entering {self.process_block.__name__}')
-        if self.workers > 0:
+        if self.options.workers > 0:
             return self.parallel_process_block()
         return self.sequential_process_block()
 
@@ -1183,9 +1190,10 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
 
     # discuss: We probably do not want to print
     def timings(self, precision: int = 7) -> None:
-        match self.workers:
+        assert self.options is not None
+        match self.options.workers:
             case 0:
-                print(f'{self.workers=}')
+                print(f'{self.options.workers=}')
                 print(f'{self.time_syncmanager_enter=}')
                 print(f'{self.time_start_first_worker=}')
                 print(f'{self.time_start_all_workers=}')
@@ -1197,7 +1205,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 print(f'{self.time_syncmanager_exit=}')
                 print(f'{self.time_total=:.{precision}}')
             case _:
-                print(f'{self.workers=}')
+                print(f'{self.options.workers=}')
                 print(f'{self.time_syncmanager_enter=:.{precision}f}')
                 print(f'{self.time_start_first_worker=:.{precision}f}')
                 print(f'{self.time_start_all_workers=:.{precision}f}')
@@ -1208,7 +1216,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 print(f'{self.time_syncmanager_exit=:.{precision}f}')
                 print(f'{self.time_total=:.{precision}f}')
 
-    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ], workers: int):
+    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ]):
         """Quantifier elimination main loop.
         """
         logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
