@@ -31,7 +31,7 @@ Variables, Terms, Atoms
     The unique instance of :class:`.VariableSet`.
 
 
-  .. autoclass:: TSQ
+  .. autoclass:: DEFINITE
     :members:
 
 

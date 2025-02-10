@@ -74,8 +74,8 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
     def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> RESTART:
         """Add information originating from `atoms`. If `gand` is
         :class:`.And`, consider ``atoms``. If `gand` is :class:`.Or`, consider
-        ``(Not(at) for at in atoms)``. Simplification among atoms
-         is supposed to take place here.
+        ``(Not(at) for at in atoms)``. Simplification among atoms is supposed
+        to take place here.
         """
         ...
 

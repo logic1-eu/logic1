@@ -211,7 +211,7 @@ going to describe the occurring classes starting at the top.
 
     .. automethod:: to_pnf
 
-    .. automethod:: transform_atoms
+    .. automethod:: traverse
 
 
 Boolean Formulas
