@@ -279,7 +279,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             # We currently coerce manually in: reduce, subs, derivative,
             # pseudo_quo_rem. The following line might cleaner:
             #
-            # self._poly = self.polynomial_ring(self._poly)
+            # TEMPORARY HACK. There is an issue with the derivative of x**2 + 1
+            self._poly = self.polynomial_ring(self._poly)
         return self._poly
 
     def __add__(self, other: object) -> Term:
