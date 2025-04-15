@@ -406,20 +406,6 @@ class InternalRepresentation(
             # print()
         return restart
 
-    def _propagate(self, bknowl: _BasicKnowledge) -> None:
-        # print(f'_propagate: {self=}, {bknowl=}')
-        assert bknowl.is_substitution()
-        stack = [bknowl]
-        while stack:
-            for bknowl in stack:
-                val1, val2 = bknowl.as_subst_values()
-                self._subst.union(val1, val2)
-            stack = []
-            self._knowl = self._knowl.reduce(self._subst.as_gb())
-            for bknowl in self._knowl:
-                if bknowl.is_substitution():
-                    stack.append(bknowl)
-
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
