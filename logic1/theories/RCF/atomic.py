@@ -195,18 +195,14 @@ class DEFINITE(Enum):
     :meth:`.Term.is_definite`.
     """
 
-    NEGATIVE = auto()
-    """The polynomial negative definite, i.e., negative for all real choices of
-    variables.
+    # This is an ordered Enum, the order of the following properties should not
+    # be changed.
+    UNKNOWN = auto()
+    """It has not been derived that any the other cases holds.
     """
 
-    NEGATIVE_SEMI = auto()
-    """The polynomial negative semi-definite, i.e., non-positive for all real
-    choices of variables.
-    """
-
-    NONE = auto()
-    """None of the other cases holds..
+    ZERO = auto()
+    """The polynomial is the zero polynomial.
     """
 
     POSITIVE = auto()
@@ -219,9 +215,220 @@ class DEFINITE(Enum):
     choices of variables.
     """
 
-    ZERO = auto()
-    """The polynomial is the zero polynomial.
+    NEGATIVE = auto()
+    """The polynomial negative definite, i.e., negative for all real choices of
+    variables.
     """
+
+    NEGATIVE_SEMI = auto()
+    """The polynomial negative semi-definite, i.e., non-positive for all real
+    choices of variables.
+    """
+
+    # The following is an implementation of OrderedEnum as described in
+    # https://docs.python.org/3/howto/enum.html#orderedenum
+    def __ge__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value >= other.value
+        return NotImplemented
+
+    def __gt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value > other.value
+        return NotImplemented
+
+    def __le__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value <= other.value
+        return NotImplemented
+
+    def __lt__(self, other):
+        if self.__class__ is other.__class__:
+            return self.value < other.value
+        return NotImplemented
+
+    @staticmethod
+    def add(x: DEFINITE, y: DEFINITE) -> DEFINITE:
+        """Compute DEFINITE of a sum from DEFINITE of the summands.
+
+        >>> l = list(DEFINITE)
+
+        >>> for x in l:
+        ...     for y in l:
+        ...             print(f'{x.name} + {y.name} = {DEFINITE.add(x,y).name}')
+        ...
+        UNKNOWN + UNKNOWN = UNKNOWN
+        UNKNOWN + ZERO = UNKNOWN
+        UNKNOWN + POSITIVE = UNKNOWN
+        UNKNOWN + POSITIVE_SEMI = UNKNOWN
+        UNKNOWN + NEGATIVE = UNKNOWN
+        UNKNOWN + NEGATIVE_SEMI = UNKNOWN
+        ZERO + UNKNOWN = UNKNOWN
+        ZERO + ZERO = ZERO
+        ZERO + POSITIVE = POSITIVE
+        ZERO + POSITIVE_SEMI = POSITIVE_SEMI
+        ZERO + NEGATIVE = NEGATIVE
+        ZERO + NEGATIVE_SEMI = NEGATIVE_SEMI
+        POSITIVE + UNKNOWN = UNKNOWN
+        POSITIVE + ZERO = POSITIVE
+        POSITIVE + POSITIVE = POSITIVE
+        POSITIVE + POSITIVE_SEMI = POSITIVE
+        POSITIVE + NEGATIVE = UNKNOWN
+        POSITIVE + NEGATIVE_SEMI = UNKNOWN
+        POSITIVE_SEMI + UNKNOWN = UNKNOWN
+        POSITIVE_SEMI + ZERO = POSITIVE_SEMI
+        POSITIVE_SEMI + POSITIVE = POSITIVE
+        POSITIVE_SEMI + POSITIVE_SEMI = POSITIVE_SEMI
+        POSITIVE_SEMI + NEGATIVE = UNKNOWN
+        POSITIVE_SEMI + NEGATIVE_SEMI = UNKNOWN
+        NEGATIVE + UNKNOWN = UNKNOWN
+        NEGATIVE + ZERO = NEGATIVE
+        NEGATIVE + POSITIVE = UNKNOWN
+        NEGATIVE + POSITIVE_SEMI = UNKNOWN
+        NEGATIVE + NEGATIVE = NEGATIVE
+        NEGATIVE + NEGATIVE_SEMI = NEGATIVE
+        NEGATIVE_SEMI + UNKNOWN = UNKNOWN
+        NEGATIVE_SEMI + ZERO = NEGATIVE_SEMI
+        NEGATIVE_SEMI + POSITIVE = UNKNOWN
+        NEGATIVE_SEMI + POSITIVE_SEMI = UNKNOWN
+        NEGATIVE_SEMI + NEGATIVE = NEGATIVE
+        NEGATIVE_SEMI + NEGATIVE_SEMI = NEGATIVE_SEMI
+
+        This addition is commutative:
+        >>> all(DEFINITE.add(x, y) is DEFINITE.add(y, x) for x in l for y in l)
+        True
+
+        DEFINITE.zero is a (unique) neutral element:
+        >>> all(DEFINITE.add(x, DEFINITE.ZERO) is x for x in l)
+        True
+        """
+        x, y = sorted([x, y])
+        if x is DEFINITE.UNKNOWN:
+            return DEFINITE.UNKNOWN
+        if x is DEFINITE.ZERO:
+            return y
+        if x is DEFINITE.POSITIVE:
+            if y is DEFINITE.POSITIVE or y is DEFINITE.POSITIVE_SEMI:
+                return DEFINITE.POSITIVE
+            assert y is DEFINITE.NEGATIVE or y is DEFINITE.NEGATIVE_SEMI, (x, y)
+            return DEFINITE.UNKNOWN
+        if x is DEFINITE.POSITIVE_SEMI:
+            if y is DEFINITE.POSITIVE_SEMI:
+                return DEFINITE.POSITIVE_SEMI
+            assert y is DEFINITE.NEGATIVE or y is DEFINITE.NEGATIVE_SEMI, (x, y)
+            return DEFINITE.UNKNOWN
+        if x is DEFINITE.NEGATIVE:
+            assert y is DEFINITE.NEGATIVE or y is DEFINITE.NEGATIVE_SEMI, (x, y)
+            return DEFINITE.NEGATIVE
+        assert x is DEFINITE.NEGATIVE_SEMI, (x, y)
+        assert y is DEFINITE.NEGATIVE_SEMI, (x, y)
+        return DEFINITE.NEGATIVE_SEMI
+
+    @staticmethod
+    def from_constant(q: int | mpq | Rational) -> DEFINITE:
+        """Compute DEFINITE of a number.
+
+        >>> print(DEFINITE.from_constant(mpq(42)))
+        DEFINITE.POSITIVE
+
+        >>> print(DEFINITE.from_constant(mpq(-4711)))
+        DEFINITE.NEGATIVE
+
+        >>> print(DEFINITE.from_constant(mpq(0)))
+        DEFINITE.ZERO
+        """
+        assert isinstance(q, (int, mpq, Rational)), q
+        if q > 0:
+            return DEFINITE.POSITIVE
+        if q < 0:
+            return DEFINITE.NEGATIVE
+        assert q == 0, q
+        return DEFINITE.ZERO
+
+    @staticmethod
+    def mul(x: DEFINITE, y: DEFINITE) -> DEFINITE:
+        """Compute DEFINITE of a product from DEFINITE of the factors.
+
+        >>> l = list(DEFINITE)
+
+        The multiplication table:
+        >>> for x in l:
+        ...     for y in l:
+        ...             print(f'{x.name} * {y.name} = {DEFINITE.mul(x,y).name}')
+        ...
+        UNKNOWN * UNKNOWN = UNKNOWN
+        UNKNOWN * ZERO = ZERO
+        UNKNOWN * POSITIVE = UNKNOWN
+        UNKNOWN * POSITIVE_SEMI = UNKNOWN
+        UNKNOWN * NEGATIVE = UNKNOWN
+        UNKNOWN * NEGATIVE_SEMI = UNKNOWN
+        ZERO * UNKNOWN = ZERO
+        ZERO * ZERO = ZERO
+        ZERO * POSITIVE = ZERO
+        ZERO * POSITIVE_SEMI = ZERO
+        ZERO * NEGATIVE = ZERO
+        ZERO * NEGATIVE_SEMI = ZERO
+        POSITIVE * UNKNOWN = UNKNOWN
+        POSITIVE * ZERO = ZERO
+        POSITIVE * POSITIVE = POSITIVE
+        POSITIVE * POSITIVE_SEMI = POSITIVE_SEMI
+        POSITIVE * NEGATIVE = NEGATIVE
+        POSITIVE * NEGATIVE_SEMI = NEGATIVE_SEMI
+        POSITIVE_SEMI * UNKNOWN = UNKNOWN
+        POSITIVE_SEMI * ZERO = ZERO
+        POSITIVE_SEMI * POSITIVE = POSITIVE_SEMI
+        POSITIVE_SEMI * POSITIVE_SEMI = POSITIVE_SEMI
+        POSITIVE_SEMI * NEGATIVE = NEGATIVE_SEMI
+        POSITIVE_SEMI * NEGATIVE_SEMI = NEGATIVE_SEMI
+        NEGATIVE * UNKNOWN = UNKNOWN
+        NEGATIVE * ZERO = ZERO
+        NEGATIVE * POSITIVE = NEGATIVE
+        NEGATIVE * POSITIVE_SEMI = NEGATIVE_SEMI
+        NEGATIVE * NEGATIVE = POSITIVE
+        NEGATIVE * NEGATIVE_SEMI = POSITIVE_SEMI
+        NEGATIVE_SEMI * UNKNOWN = UNKNOWN
+        NEGATIVE_SEMI * ZERO = ZERO
+        NEGATIVE_SEMI * POSITIVE = NEGATIVE_SEMI
+        NEGATIVE_SEMI * POSITIVE_SEMI = NEGATIVE_SEMI
+        NEGATIVE_SEMI * NEGATIVE = POSITIVE_SEMI
+        NEGATIVE_SEMI * NEGATIVE_SEMI = POSITIVE_SEMI
+
+        This multiplication is commutative:
+        >>> all(DEFINITE.mul(x, y) is DEFINITE.mul(y, x) for x in l for y in l)
+        True
+
+        DEFINITE.POSITIVE is a (unique) neutral element:
+        >>> all(DEFINITE.mul(x, DEFINITE.POSITIVE) is x for x in l)
+        True
+        """
+        x, y = sorted([x, y])
+        if x is DEFINITE.UNKNOWN:
+            if y is DEFINITE.ZERO:
+                return DEFINITE.ZERO
+            return DEFINITE.UNKNOWN
+        if x is DEFINITE.ZERO:
+            return DEFINITE.ZERO
+        if x is DEFINITE.POSITIVE:
+            return y
+        if x is DEFINITE.POSITIVE_SEMI:
+            if y is DEFINITE.POSITIVE_SEMI:
+                return DEFINITE.POSITIVE_SEMI
+            assert y is DEFINITE.NEGATIVE or y is DEFINITE.NEGATIVE_SEMI, (x, y)
+            return DEFINITE.NEGATIVE_SEMI
+        if x is DEFINITE.NEGATIVE:
+            if y is DEFINITE.NEGATIVE:
+                return DEFINITE.POSITIVE
+            assert y is DEFINITE.NEGATIVE_SEMI, (x, y)
+            return DEFINITE.POSITIVE_SEMI
+        assert x is DEFINITE.NEGATIVE_SEMI, (x, y)
+        assert y is DEFINITE.NEGATIVE_SEMI, (x, y)
+        return DEFINITE.POSITIVE_SEMI
+
+    @staticmethod
+    def square(x: DEFINITE) -> DEFINITE:
+        if x is DEFINITE.UNKNOWN:
+            return DEFINITE.POSITIVE_SEMI
+        return DEFINITE.mul(x, x)
 
 
 @dataclass
@@ -559,37 +766,49 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return self.poly.is_constant()
 
-    def is_definite(self) -> DEFINITE:
+    def is_definite(self, assume: Mapping[Variable, DEFINITE] = {}) -> DEFINITE:
         """A fast heuristic test for definitetess properties of this term. This
         is based on *trivial square sum* properties of coefficient signs and
         exponents.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
-        >>> Term(0).is_definite()
-        <DEFINITE.ZERO: 6>
+        >>> print(Term(0).is_definite())
+        DEFINITE.ZERO
         >>> f = x**2 + y**2
-        >>> f.is_definite()
-        <DEFINITE.POSITIVE_SEMI: 5>
+        >>> print(f.is_definite())
+        DEFINITE.POSITIVE_SEMI
         >>> g = -x**2 - y**2 - 1
-        >>> g.is_definite()
-        <DEFINITE.NEGATIVE: 1>
-        >>> h = (x + y) ** 2
-        >>> h.is_definite()
-        <DEFINITE.NONE: 3>
+        >>> print(g.is_definite())
+        DEFINITE.NEGATIVE
+        >>> h = (x - y) ** 2
+        >>> print(h.is_definite())
+        DEFINITE.UNKNOWN
+        >>> print(h.is_definite(assume={x: DEFINITE.POSITIVE, y: DEFINITE.NEGATIVE}))
+        DEFINITE.POSITIVE
+        >>> print(h.is_definite(assume={x: DEFINITE.NEGATIVE_SEMI, y: DEFINITE.POSITIVE_SEMI}))
+        DEFINITE.POSITIVE_SEMI
         """
-        if self.is_zero():
-            return DEFINITE.ZERO
-        ls = sign(self.lc())
+        # Start with the neutral element of DEFINITE.add().
+        poly_result = DEFINITE.ZERO
+        gens = self.poly.parent().gens()
         for exponent, coefficient in self.poly.dict().items():
-            if coefficient.sign() != ls:
-                return DEFINITE.NONE
-            for e in exponent:
-                if e % 2 == 1:
-                    return DEFINITE.NONE
-        if self.poly.constant_coefficient() == 0:
-            return DEFINITE.POSITIVE_SEMI if ls == 1 else DEFINITE.NEGATIVE_SEMI
-        return DEFINITE.POSITIVE if ls == 1 else DEFINITE.NEGATIVE
+            # Start with either POSITIVE or NEGATIVE, depending on the coefficient.
+            term_result = DEFINITE.from_constant(coefficient)
+            for g, e in zip(gens, exponent):
+                if e == 0:
+                    # In contrast to a variable with even degree, an absent
+                    # variable yields the neutral element of DEFINITE.mul().
+                    ge_result = DEFINITE.POSITIVE
+                else:
+                    ge_result = assume.get(Variable(g), DEFINITE.UNKNOWN)
+                    if e % 2 == 0:
+                        ge_result = DEFINITE.square(ge_result)
+                term_result = DEFINITE.mul(term_result, ge_result)
+            poly_result = DEFINITE.add(poly_result, term_result)
+            if poly_result is DEFINITE.UNKNOWN:
+                return DEFINITE.UNKNOWN
+        return poly_result
 
     def is_monomial(self) -> bool:
         """Return :obj:`True` if this term is a monomial.

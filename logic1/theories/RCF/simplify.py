@@ -482,6 +482,20 @@ class InternalRepresentation(
                     subst.union(_SubstValue(mpq(1), var), val)
         return self.__class__(self._options, knowl, subst)
 
+    def _propagate(self, bknowl: _BasicKnowledge) -> None:
+        # print(f'_propagate: {self=}, {bknowl=}')
+        assert bknowl.is_substitution()
+        stack = [bknowl]
+        while stack:
+            for bknowl in stack:
+                val1, val2 = bknowl.as_subst_values()
+                self._subst.union(val1, val2)
+            stack = []
+            self._knowl = self._knowl.reduce(self._subst.as_gb())
+            for bknowl in self._knowl:
+                if bknowl.is_substitution():
+                    stack.append(bknowl)
+
     def restart(self, ir: Self) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.restart`.
         """
@@ -643,7 +657,7 @@ class Simplify(abc.simplify.Simplify[
                     return _F()
                 if definite is DEFINITE.NEGATIVE_SEMI:
                     return _simpl_at_eq_ne(Eq, f)
-                if definite is DEFINITE.NONE:
+                if definite is DEFINITE.UNKNOWN:
                     return None
                 assert False
 

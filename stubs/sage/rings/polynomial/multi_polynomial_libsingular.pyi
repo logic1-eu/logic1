@@ -126,6 +126,9 @@ class MPolynomial_libsingular(Generic[ρ]):
     def dict(self) -> _dict[tuple[int, ...], ρ]:
         ...
 
+    def exponents(self) -> list[tuple[int, ...]]:
+        ...
+
     def factor(self) -> Factorization[ρ]:
         ...
 
