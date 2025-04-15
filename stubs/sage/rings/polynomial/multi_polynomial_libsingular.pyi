@@ -26,6 +26,9 @@ class MPolynomialRing_libsingular(MPolynomialRing_base):
     #  sage.structure.sage_object.SageObject,
     #  object]
 
+    def __call__(self, other: object) -> MPolynomial_libsingular:
+        ...
+
     def gens(self) -> tuple[MPolynomial_libsingular]:
         # In reality, gens is inherited from
         # sage.structure.parent_gens.ParentWithGens. There is an attribute

@@ -12,6 +12,7 @@ from gmpy2 import mpq, sign
 from sage.all import QQ
 # Importing QQ from sage.rings.rational_fields causes problems. Notably, a
 # fresh instance of RationalField is assigned to QQ in sage.all.
+from sage.rings.fraction_field import FractionField  # type: ignore[import-untyped]
 from sage.misc.latex import latex as sage_latex
 from sage.rings.integer import Integer
 from sage.rings.polynomial.multi_polynomial_libsingular import (
@@ -948,6 +949,34 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         :meth:`.firstorder.atomic.AtomicFormula.subs`.
         """
         return self.op(self.lhs.subs(sigma), self.rhs.subs(sigma))
+
+    def subsq(self, sigma: Mapping[Variable, tuple[Term | int | mpq, Term | int | mpq]],
+              is_positive: bool = False) -> Self:
+
+        def cast(x: Term | int | mpq) -> MPolynomial:
+            if isinstance(x, Term):
+                return x.poly
+            else:
+                return ring(x)
+
+        def subs1(p: MPolynomial, d: dict) -> Any:
+            return p.subs(**d)  # type: ignore
+
+        ring = polynomial_ring.sage_ring
+        FF = FractionField(ring)
+        d = {str(x): FF(cast(num), cast(den)) for x, (num, den) in sigma.items()}
+        lhq = subs1(ring(self.lhs.poly), d)
+        rhq = subs1(ring(self.rhs.poly), d)
+        if is_positive or isinstance(self, (Eq, Ne)):
+            lhp = lhq.numerator()
+            rhp = rhq.numerator()
+        else:
+            assert isinstance(self, (Le, Lt, Ge, Gt))
+            lhp = (lhq * lhq.denominator() ** 2).numerator()
+            rhp = (rhq * rhq.denominator() ** 2).numerator()
+        assert lhp.parent() in (ring, QQ)
+        assert rhp.parent() in (ring, QQ)
+        return self.op(Term(lhp), Term(rhp))
 
 
 class Eq(AtomicFormula):
