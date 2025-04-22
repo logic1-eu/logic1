@@ -1120,6 +1120,37 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
             return self.parallel_process_block()
         return self.sequential_process_block()
 
+    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ]):
+        """Quantifier elimination main loop.
+        """
+        logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
+        f = f.to_pnf()
+        bound_variables = set(f.bvars())
+        for atom in self.assumptions:
+            if not bound_variables.isdisjoint(atom.fvars()):
+                raise ValueError(f'invalid assumption on bound variables in {atom}')
+        self.matrix, self.blocks = f.matrix()
+        while self.blocks:
+            try:
+                self.pop_block()
+                self.process_block()
+            except FoundT:
+                logger.info('found T')
+                if self.working_nodes is None:
+                    logger.info(WorkingNodeList().final_statistics())
+                else:
+                    logger.info(self.working_nodes.final_statistics())
+                    self.working_nodes = None
+                self.success_nodes = NodeList(nodes=[self.create_true_node()])
+            else:
+                if self.failure_nodes:
+                    n = len(self.failure_nodes.nodes)
+                    raise NoTraceException(f'Failed - {n} failure nodes')
+            self.collect_success_nodes()
+        self.final_simplification()
+        logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
+        return self.result
+
     def sequential_process_block(self) -> None:
         assert self.options is not None
         assert self.root_nodes is not None
@@ -1215,30 +1246,3 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=:.{precision}f}')
                 print(f'{self.time_total=:.{precision}f}')
-
-    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ]):
-        """Quantifier elimination main loop.
-        """
-        logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
-        f = f.to_pnf()
-        self.matrix, self.blocks = f.matrix()
-        while self.blocks:
-            try:
-                self.pop_block()
-                self.process_block()
-            except FoundT:
-                logger.info('found T')
-                if self.working_nodes is None:
-                    logger.info(WorkingNodeList().final_statistics())
-                else:
-                    logger.info(self.working_nodes.final_statistics())
-                    self.working_nodes = None
-                self.success_nodes = NodeList(nodes=[self.create_true_node()])
-            else:
-                if self.failure_nodes:
-                    n = len(self.failure_nodes.nodes)
-                    raise NoTraceException(f'Failed - {n} failure nodes')
-            self.collect_success_nodes()
-        self.final_simplification()
-        logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
-        return self.result

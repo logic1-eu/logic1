@@ -159,3 +159,12 @@ Or(And(x > 0, Or(a*x^4 + 2*a*b*x^2 + a*b^2 + b*x^2 + x^3 < 0, And(a*x^4 +
 2*a^2*b*x^2 + a^2*b^2 + a*b*x^2 + a*x^3 < 0), Or(a*x < 0, a^2*x^4 + 2*a^2*b*x^2
 + a^2*b^2 + a*b*x^2 + a*x^3 > 0)), And(Or(x < 0, And(x == 0, b > 0)), Or(a < 0,
 And(b + x <= 0, a == 0))))
+
+# Assumptions on bound variables:
+>>> qe(Ex(x, And(a > 0, x > 9, b == 0)), assume={x < 8, a > 1})
+Traceback (most recent call last):
+...
+ValueError: invalid assumption on bound variables in x - 8 < 0
+
+>>> qe(Ex(y, And(a > 0, y > 9, b == 0)), assume={x < 8, a > 1})
+b == 0
