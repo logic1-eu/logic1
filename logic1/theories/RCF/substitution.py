@@ -58,6 +58,12 @@ class _Substitution:
             root = self.find2(node)
             yield key.term, _SubstValue(root.coefficient, root.node.variable)
 
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def as_dict(self) -> dict[Variable, Term]:
+        return {var: val.as_term() for var, val in self}
+
     def as_gb(self, ignore: Optional[Variable] = None) -> list[Term]:
         """Convert this :class:._Substitution` into a Gröbner basis that can be
         used as an argument to reduction methods.
