@@ -274,14 +274,20 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
                         if simplified_other not in queue:
                             queue.append(simplified_other)
                     simplified_others = new_others
-                    for atom in ir.extract(gand, ref):
-                        if atom not in queue:
-                            queue.appendleft(atom)
+                    try:
+                        for atom in ir.extract(gand, ref):
+                            if atom not in queue:
+                                queue.appendleft(atom)
+                    except ir.Inconsistent:
+                        return gand.definite_element()
                     # queue = deque(f.args)
                     ir = ref.restart(ir)
             else:
                 simplified_others = simplified_others.union(new_others)
-        final_atoms = list(ir.extract(gand, ref))
+        try:
+            final_atoms = list(ir.extract(gand, ref))
+        except ir.Inconsistent:
+            return gand.definite_element()
         final_atoms.sort()
         final_others = list(simplified_others)
         final_others.sort()
@@ -301,9 +307,9 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
             return self._simpl_nnf(f, ir)
         try:
             ir.add(And, [f])
+            final_atoms = list(ir.extract(And, ref))
         except ir.Inconsistent:
             return _F()
-        final_atoms = list(ir.extract(And, ref))
         if len(final_atoms) == 0:
             return _T()
         if len(final_atoms) == 1:

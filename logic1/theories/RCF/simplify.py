@@ -37,7 +37,7 @@ class Options(abc.simplify.Options):
 class _Range:
     r"""Non-empty range IVL \ EXC, where IVL is an interval with boundaries in
     Q extended by {-oo, oo}, and EXC is a finite subset of the interior of
-    IVL. Raises InternalRepresentation.Inconsistent if IVL \ EXC gets empty.
+    IVL. Raises ValueError if IVL \ EXC gets empty.
     """
 
     lopen: bool = True
@@ -137,25 +137,13 @@ class _Range:
             return self.__class__(lopen=lopen, start=start, end=end, ropen=ropen, exc=exc)
 
     def __post_init__(self) -> None:
-        if self.start > self.end:
-            raise InternalRepresentation.Inconsistent()
-        if (self.lopen or self.ropen) and self.start == self.end:
-            raise InternalRepresentation.Inconsistent()
         assert self.lopen or self.start is not -oo, self
         assert self.ropen or self.end is not oo, self
         assert all(self.start < x < self.end for x in self.exc), self
-
-    def __str__(self) -> str:
-        left = '(' if self.lopen else '['
-        start = '-oo' if self.start == -oo else str(self.start)
-        end = 'oo' if self.end == oo else str(self.end)
-        right = ')' if self.ropen else ']'
-        exc_entries = {str(q) for q in self.exc}
-        if exc_entries:
-            exc = f' \\ {{{", ".join(exc_entries)}}}'
-        else:
-            exc = ''
-        return f'{left}{start}, {end}{right}{exc}'
+        if self.start > self.end:
+            raise ValueError("_Range cannot be empty")
+        if (self.lopen or self.ropen) and self.start == self.end:
+            raise ValueError("_Range cannot be empty")
 
     def __pow__(self, n: int) -> Self:
         """Exponentiation. Computes {x ** n for x in self}. Note that this is
@@ -205,6 +193,18 @@ class _Range:
         end = self.end ** n
         exc = {p ** n for p in self.exc}
         return self.__class__(self.lopen, start, end, self.ropen, exc)
+
+    def __str__(self) -> str:
+        left = '(' if self.lopen else '['
+        start = '-oo' if self.start == -oo else str(self.start)
+        end = 'oo' if self.end == oo else str(self.end)
+        right = ')' if self.ropen else ']'
+        exc_entries = {str(q) for q in self.exc}
+        if exc_entries:
+            exc = f' \\ {{{", ".join(exc_entries)}}}'
+        else:
+            exc = ''
+        return f'{left}{start}, {end}{right}{exc}'
 
     def abs(self) -> Self:
         if self.start >= 0:
@@ -354,7 +354,7 @@ class _Range:
         for exponent, coefficient in f.poly.dict().items():
             term_result = _Range.from_constant(mpq(coefficient))
             for g, e in zip(gens, exponent):
-                ge_result = knowl.get(Term(g), R) ** e
+                ge_result = knowl.get(Term(g)) ** e
                 term_result = term_result * ge_result
             poly_result = poly_result + term_result
             if poly_result == R:
@@ -384,7 +384,7 @@ class _Range:
         else:
             end, ropen = other.end, other.ropen
             if self.end < other.start:
-                raise ValueError()
+                raise ValueError("union is not a _Range")
             if self.end == other.start and self.ropen and other.lopen:
                 assert isinstance(self.end, mpq)
                 final_exc.add(self.end)
@@ -411,17 +411,18 @@ class _BasicKnowledge:
             -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
         # range_ cannot be empty because the construction of an empty range
-        # raises an exception during `add`.
-        if self.range.is_point():
-            # Pick the one point of self.range.
-            q = self.range.start
+        # raises a ValueError.
+        this_range = self.range
+        if this_range.is_point():
+            # Pick the one point of this_range.
+            q = this_range.start
             assert isinstance(q, mpq)
             if ref_range.is_point():
                 assert q == ref_range.start
                 # throw away the point q, which is equal to the point
-                # describe by ref_range
+                # described by ref_range
             else:
-                assert q in ref_range
+                assert q in ref_range, f'{q=!s}, {ref_range=!s}'
                 # When gand is And, the equation q = 0 is generally
                 # preferable. Otherwise, q = 0 would become q != 0
                 # via subsequent negation, and we want to take
@@ -441,59 +442,59 @@ class _BasicKnowledge:
             # print(f'{t=}, {ref_ivl=}, {ivl=}')
             #
             # We know that ref_range is a proper interval, too, because
-            # self.range is a subset of ref_range.
+            # this_range is a subset of ref_range.
             assert not ref_range.is_point()
-            if ref_range.start < self.range.start:
-                assert isinstance(self.range.start, mpq)
-                if self.range.start in ref_range.exc:
+            if ref_range.start < this_range.start:
+                assert isinstance(this_range.start, mpq)
+                if this_range.start in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(Ge(self.term - self.range.start, 0))
+                        L.append(Ge(self.term - this_range.start, 0))
                     else:
-                        L.append(Gt(self.term - self.range.start, 0))
+                        L.append(Gt(self.term - this_range.start, 0))
                 else:
-                    if self.range.lopen:
-                        L.append(Gt(self.term - self.range.start, 0))
+                    if this_range.lopen:
+                        L.append(Gt(self.term - this_range.start, 0))
                     else:
-                        L.append(Ge(self.term - self.range.start, 0))
-            elif ref_range.start == self.range.start:
-                if not ref_range.lopen and self.range.lopen:
-                    assert isinstance(self.range.start, mpq)
+                        L.append(Ge(self.term - this_range.start, 0))
+            elif ref_range.start == this_range.start:
+                if not ref_range.lopen and this_range.lopen:
+                    assert isinstance(this_range.start, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(Gt(self.term - self.range.start, 0))
+                        L.append(Gt(self.term - this_range.start, 0))
                     else:
-                        L.append(Ne(self.term - self.range.start, 0))
+                        L.append(Ne(self.term - this_range.start, 0))
             else:
-                assert False
-            if self.range.end < ref_range.end:
-                assert isinstance(self.range.end, mpq)
-                if self.range.end in ref_range.exc:
+                assert False, f'{ref_range=!s}, {this_range=!s}'
+            if this_range.end < ref_range.end:
+                assert isinstance(this_range.end, mpq)
+                if this_range.end in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(Le(self.term - self.range.end, 0))
+                        L.append(Le(self.term - this_range.end, 0))
                     else:
-                        L.append(Lt(self.term - self.range.end, 0))
+                        L.append(Lt(self.term - this_range.end, 0))
                 else:
-                    if self.range.ropen:
-                        L.append(Lt(self.term - self.range.end, 0))
+                    if this_range.ropen:
+                        L.append(Lt(self.term - this_range.end, 0))
                     else:
-                        L.append(Le(self.term - self.range.end, 0))
-            elif ref_range.end == self.range.end:
-                if not ref_range.ropen and self.range.ropen:
-                    assert isinstance(self.range.end, mpq)
+                        L.append(Le(self.term - this_range.end, 0))
+            elif ref_range.end == this_range.end:
+                if not ref_range.ropen and this_range.ropen:
+                    assert isinstance(this_range.end, mpq)
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(Lt(self.term - self.range.end, 0))
+                        L.append(Lt(self.term - this_range.end, 0))
                     else:
-                        L.append(Ne(self.term - self.range.end, 0))
+                        L.append(Ne(self.term - this_range.end, 0))
             else:
                 assert False
-        for q in self.range.exc:
+        for q in this_range.exc:
             if q not in ref_range.exc:
                 L.append(Ne(self.term - q, 0))
         return L
@@ -581,15 +582,13 @@ class _Knowledge:
 
     dict_: dict[Term, _Range] = field(default_factory=dict)
 
-    def __contains__(self, t: Term) -> bool:
-        return t in self.dict_
-
-    def __getitem__(self, t: Term) -> _Range:
-        return self.dict_[t]
-
     def __iter__(self) -> Iterator[_BasicKnowledge]:
+        # Used in InternalRepresentation.extract().
         for t, range_ in self.dict_.items():
-            yield _BasicKnowledge(t, range_)
+            if t.is_variable():
+                yield _BasicKnowledge(t, range_)
+            else:
+                yield _BasicKnowledge(t, self.get(t))
 
     def __str__(self) -> str:
         entries = [str(key) + ' in ' + str(range) for key, range in self.dict_.items()]
@@ -602,22 +601,38 @@ class _Knowledge:
     def copy(self) -> Self:
         return self.__class__(self.dict_.copy())
 
-    def get(self, key: Term, default: _Range = _Range(True, -oo, oo, True, set())) -> _Range:
-        return self.dict_.get(key, default)
+    def get(self, key: Term) -> _Range:
+        explcit_range = self.dict_.get(key, _Range(True, -oo, oo, True))
+        if key.is_variable():
+            return explcit_range
+        implicit_range = self._term_as_range(key)
+        try:
+            return explcit_range.intersection(implicit_range)
+        except ValueError:
+            raise InternalRepresentation.Inconsistent()
 
     def is_known(self, bknowl: _BasicKnowledge) -> bool:
+        """Return True iff bknowl can be derived from self. Raise Inconsistent
+        when detecting that bknowl.range would become empty.
+        """
         bknowl = self.prune(bknowl)
         return self.get(bknowl.term) != bknowl.range
 
     def prune(self, bknowl: _BasicKnowledge) -> _BasicKnowledge:
+        """Prune bknowl via intersection with self. Raise Inconsistent if
+        bknowl.range would become empty.
+        """
+        range_ = self.get(bknowl.term)
         try:
-            range_ = self.dict_[bknowl.term]
-        except KeyError:
-            return bknowl
-        range_ = range_.intersection(bknowl.range)
+            range_ = range_.intersection(bknowl.range)
+        except ValueError:
+            raise InternalRepresentation.Inconsistent()
         return bknowl.__class__(bknowl.term, range_)
 
     def reduce(self, G: Collection[Term]) -> Self:
+        """Reduce all _BasicKnowledge.term in self modulo G. There is no
+        Gröbner basis computed here.
+        """
         knowl = self.__class__()
         for bknowl in self:
             maybe_bknowl = bknowl.reduce(G)
@@ -625,6 +640,46 @@ class _Knowledge:
                 continue
             knowl.add(maybe_bknowl)
         return knowl
+
+    def _term_as_range(self, f: Term) -> _Range:
+        """
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> K = _Knowledge()
+        >>> print(K._term_as_range(Term(0)))
+        [0, 0]
+        >>> print(K._term_as_range(x))
+        (-oo, oo)
+        >>> f = x**2 + y**2
+        >>> print(K._term_as_range(f))
+        [0, oo)
+        >>> g = -x**2 - y**2 - 1
+        >>> print(K._term_as_range(g))
+        (-oo, -1]
+        >>> h = (x - y) ** 2
+        >>> print(K._term_as_range(h))
+        (-oo, oo)
+        >>> K = _Knowledge({x: _Range(True, mpq(0), oo, True),
+        ...                 y: _Range(True, -oo, mpq(0), True)})
+        >>> print(K._term_as_range(h))
+        (0, oo)
+        >>> K = _Knowledge({x: _Range(True, -oo, mpq(0), False),
+        ...                 y: _Range(False, mpq(0), oo, True)})
+        >>> print(K._term_as_range(h, ))
+        [0, oo)
+        """
+        R = _Range(True, -oo, oo, True, set())
+        poly_result = _Range.from_constant(mpq(0))
+        gens = f.poly.parent().gens()
+        for exponent, coefficient in f.poly.dict().items():
+            term_result = _Range.from_constant(mpq(coefficient))
+            for g, e in zip(gens, exponent):
+                ge_result = self.dict_.get(Term(g), R) ** e
+                term_result = term_result * ge_result
+            poly_result = poly_result + term_result
+            if poly_result == R:
+                return R
+        return poly_result
 
 
 @dataclass
@@ -674,14 +729,21 @@ class InternalRepresentation(
         """
 
         knowl = ref._knowl.reduce(self._subst.as_gb())
-        # print(f'extract: {ref._knowl=}\n'
-        #       f'         {self._knowl=}\n'
-        #       f'         {self._subst=}\n'
-        #       f'         {knowl=}')
+        # print(f'extract: {ref._knowl=!s}\n'
+        #       f'         {self._knowl=!s}\n'
+        #       f'         {self._subst=!s}\n'
+        #       f'         {knowl=!s}')
         L: list[AtomicFormula] = []
         for bknowl in self._knowl:
             ref_range = knowl.get(bknowl.term)
+            if not bknowl.term.is_variable():
+                implicit_range = self._knowl._term_as_range(bknowl.term)
+                try:
+                    ref_range = ref_range.intersection(implicit_range)
+                except ValueError:
+                    raise InternalRepresentation.Inconsistent()
             L.extend(bknowl.as_atoms(ref_range, gand, self._options))
+        # print(f'{L=!s}')
         known_subst = ref._subst.copy()
         # print(f'{known_subst=}')
         items = sorted(self._subst, key=lambda item: Term.sort_key(item[0]))
@@ -698,8 +760,8 @@ class InternalRepresentation(
             else:
                 t = var - val.as_term()
                 q = mpq(0)
-            if self._options.prefer_order and gand is Or and t in knowl:
-                ref_range = knowl[t]
+            if self._options.prefer_order and gand is Or:
+                ref_range = knowl.get(t)
                 if q == ref_range.start:
                     assert not ref_range.lopen
                     L.append(Le(t - q, 0))
