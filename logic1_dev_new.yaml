@@ -3,18 +3,17 @@
 # You might want to adapt the name to your preferences.
 #
 # Install and activate as follows:
-#   $ conda env create -f logic1_dev.yaml
-#   $ conda activate logic1_dev
+#   $ conda env create -f logic1_dev_new.yaml
+#   $ conda activate logic1_dev_new
 #
 # Further packages can be added interactively anytime later on.
 #
 # https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-environments.html
 #
-name: logic1_dev
+name: logic1_dev_new
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
   - coverage
   - pytest-cython
   - jupyter
@@ -26,7 +25,7 @@ dependencies:
   - pytest
   - pytest-xdist
   - rattler-build
-  - sage=10.0
+  - sage
   - setuptools_scm
   - snakeviz
   - sphinx
