@@ -8,7 +8,7 @@ from typing import (
     Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self,
     TypeVar)
 
-from gmpy2 import mpq, sign
+from gmpy2 import mpq
 from sage.all import QQ
 # Importing QQ from sage.rings.rational_fields causes problems. Notably, a
 # fresh instance of RationalField is assigned to QQ in sage.all.
@@ -818,7 +818,10 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
         """
-        return self.poly.is_generator()
+        try:
+            return self.poly.is_gen()
+        except AttributeError:
+            return self.poly.is_generator()
 
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.

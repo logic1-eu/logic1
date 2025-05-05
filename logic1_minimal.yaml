@@ -14,8 +14,8 @@ name: logic1_minimal
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python=3.12
   - more-itertools
   - pyeda
-  - sage
+  - sage=10.6
   - typing-extensions

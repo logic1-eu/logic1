@@ -135,6 +135,9 @@ class MPolynomial_libsingular(Generic[ρ]):
     def is_constant(self) -> bool:
         ...
 
+    def is_gen(self) -> bool:
+        ...
+
     def is_generator(self) -> bool:
         ...
 
