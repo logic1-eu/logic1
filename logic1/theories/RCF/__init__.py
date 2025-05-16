@@ -3,6 +3,7 @@
 
 from .atomic import cache_clear, cache_info, Eq, Ne, Ge, Le, Gt, Lt, Term, Variable, VV
 from .bnf import cnf, dnf
+from .chm import chm
 from .parser import l1
 from .qe import CLUSTERING, GENERIC, qe
 from . import redlog
@@ -12,6 +13,8 @@ __all__ = [
     'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term', 'Variable', 'VV',
 
     'cnf', 'dnf',
+
+    'chm',
 
     'l1',
 
