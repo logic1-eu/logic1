@@ -1,7 +1,10 @@
 # type: ignore
 
-from setuptools import setup
+from setuptools import setup, Extension
 from Cython.Build import cythonize
 
-setup(ext_modules=cythonize([
-    'logic1/theories/RCF/substitution.pyx']))
+setup(ext_modules=cythonize([Extension(
+    'logic1.theories.RCF.range',
+    sources=['logic1/theories/RCF/range.pyx'],
+    include_dirs=['/Users/sturm/miniforge3/envs/logic1_dev/lib/python3.12/site-packages/gmpy2'])],
+    annotate=True))

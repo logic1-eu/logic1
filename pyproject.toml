@@ -6,8 +6,11 @@ authors = [
   {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
+license = "GPL-2.0-or-later"
+license-files = ["./LICENSE"]
 maintainers = [
   {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Lorenz Leutgeb", email = "lorenz@mpi-inf.mpg.de"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
 readme = "README.md"
@@ -15,19 +18,25 @@ dependencies = [
   "more-itertools",
   "pyeda",
 ]
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.12,<3.13"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering",
-  "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
-  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
   "Typing :: Typed"
 ]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8"]
+requires = ["setuptools>=64", "setuptools-scm>=8", "Cython>=3.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.local.cythonize.flags]
+annotate = true
+inplace = true
+
+[tool.setuptools]
+ext-modules = [{name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"], include-dirs = ["/Users/sturm/miniforge3/envs/logic1_dev/lib/python3.12/site-packages/gmpy2"] } ]
 
 [tool.setuptools.packages.find]
 include = ["logic1*"]

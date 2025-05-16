@@ -24,3 +24,8 @@ dist
 
 # rattler-build
 output
+
+# Cython
+*.so
+*.c
+/logic1/**/*.html

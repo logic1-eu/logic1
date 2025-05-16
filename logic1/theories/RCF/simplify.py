@@ -9,9 +9,9 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from math import prod
 from operator import xor
-from typing import Collection, Final, Iterable, Iterator, Optional, Self
+from typing import Collection, Iterable, Iterator, Optional, Self
 
-from gmpy2 import context, InvalidOperationError, mpfr, mpq, sign
+from gmpy2 import mpq, sign
 
 from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
@@ -19,10 +19,8 @@ from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne,
 from .substitution import _SubstValue, _Substitution  # type: ignore
 from .typing import Formula
 
+from .range import EndPoint_Finite, _Range, oo, ZERO  # type: ignore
 from ...support.tracing import trace  # noqa
-
-
-oo: Final[mpfr] = mpfr('inf')
 
 
 @dataclass(frozen=True)
@@ -31,370 +29,6 @@ class Options(abc.simplify.Options):
     lift: bool = True
     prefer_order: bool = True
     prefer_weak: bool = False
-
-
-@dataclass
-class _Range:
-    r"""Non-empty range IVL \ EXC, where IVL is an interval with boundaries in
-    Q extended by {-oo, oo}, and EXC is a finite subset of the interior of
-    IVL. Raises ValueError if IVL \ EXC gets empty.
-    """
-
-    lopen: bool = True
-    start: mpq | mpfr = -oo
-    end: mpq | mpfr = oo
-    ropen: bool = True
-    exc: set[mpq] = field(default_factory=set)
-
-    def __add__(self, other: Self) -> Self:
-        r"""The Minkowski sum.
-
-        >>> _Range(True, mpq(1), mpq(3), False, {mpq(2)}) + \
-        ...     _Range(True, mpq(4), mpq(6), False, {mpq(5)})
-        _Range(lopen=True, start=mpq(5,1), end=mpq(9,1), ropen=False, exc=set())
-
-        >>> _Range.from_constant(mpq(1)) + _Range(True, mpq(4), mpq(6), False, {mpq(5)})
-        _Range(lopen=True, start=mpq(5,1), end=mpq(7,1), ropen=False, exc={mpq(6,1)})
-        """
-        start = self.start + other.start
-        lopen = self.lopen or other.lopen
-        end = self.end + other.end
-        ropen = self.ropen or other.ropen
-        if self.is_point():
-            assert isinstance(self.start, mpq)
-            exc = {point + self.start for point in other.exc}
-        elif other.is_point():
-            assert isinstance(other.start, mpq)
-            exc = {point + other.start for point in self.exc}
-        else:
-            exc = set()
-        return self.__class__(lopen=lopen, start=start, end=end, ropen=ropen, exc=exc)
-
-    def __contains__(self, q: mpq) -> bool:
-        if q < self.start or (self.lopen and q == self.start):
-            return False
-        if self.end < q or (self.ropen and q == self.end):
-            return False
-        if q in self.exc:
-            return False
-        return True
-
-    def __mul__(self, other: Self) -> Self:
-        r"""The Minkowski product.
-
-        >>> _Range.from_constant(mpq(0)) * \
-        ...     _Range(True, mpq(-1), mpq(1), False, {mpq(0)})
-        _Range(lopen=False, start=mpq(0,1), end=mpq(0,1), ropen=False, exc=set())
-
-        >>> _Range(True, mpq(1), mpq(3), False, {mpq(2)}) * \
-        ...     _Range(True, mpq(4), mpq(6), False, {mpq(5)})
-        _Range(lopen=True, start=mpq(4,1), end=mpq(18,1), ropen=False, exc=set())
-
-        >>> _Range.from_constant(mpq(2)) * _Range(True, mpq(4), mpq(6), False, {mpq(5)})
-        _Range(lopen=True, start=mpq(8,1), end=mpq(12,1), ropen=False, exc={mpq(10,1)})
-
-        >>> _Range(False, mpq(-1), mpq(3), False, {mpq(2)}) * \
-        ...     _Range(True, mpq(-6), mpq(-4), True, {mpq(-5)})
-        _Range(lopen=True, start=mpq(-18,1), end=mpq(6,1), ropen=True, exc=set())
-
-        >>> _Range(True, -oo, oo, True, set()) * _Range(True, -oo, mpq(0), True, set())
-        _Range(lopen=True, start=mpfr('-inf'), end=mpfr('inf'), ropen=True, exc=set())
-
-        >>> _Range(True, mpq(-1), mpq(1), False, {mpq(0)}) * \
-        ...     _Range(False, mpq(-1), mpq(1), True, set())
-        _Range(lopen=False, start=mpq(-1,1), end=mpq(1,1), ropen=True, exc=set())
-
-        >>> _Range(False, mpq(1), mpq(2), False, set()) * \
-        ...     _Range(False, mpq(-1), mpq(1), False, {mpq(0)})
-        _Range(lopen=False, start=mpq(-2,1), end=mpq(2,1), ropen=False, exc={mpq(0,1)})
-        """
-        def mul(x: mpq | mpfr, y: mpq | mpfr) -> mpq | mpfr:
-            try:
-                return x * y
-            except InvalidOperationError:
-                assert x == mpq(0) or y == mpq(0)
-                return mpq(0)
-
-        if self.is_zero() or other.is_zero():
-            return self.from_constant(mpq(0))
-        with context(trap_invalid=True):
-            L = [(mul(self.start, other.start), self.lopen or other.lopen),
-                 (mul(self.start, other.end), self.lopen or other.ropen),
-                 (mul(self.end, other.start), self.ropen or other.lopen),
-                 (mul(self.end, other.end), self.ropen or other.ropen)]
-            start, lopen = min(L)
-            end, ropen = max(L, key=lambda x: (x[0], not x[1]))
-            if self.is_point():
-                assert isinstance(self.start, mpq)
-                exc = {point * self.start for point in other.exc}
-            elif other.is_point():
-                assert isinstance(other.start, mpq)
-                exc = {point * other.start for point in self.exc}
-            elif mpq(0) not in self and mpq(0) not in other and start < mpq(0) < end:
-                exc = {mpq(0)}
-            else:
-                exc = set()
-            return self.__class__(lopen=lopen, start=start, end=end, ropen=ropen, exc=exc)
-
-    def __post_init__(self) -> None:
-        assert self.lopen or self.start is not -oo, self
-        assert self.ropen or self.end is not oo, self
-        assert all(self.start < x < self.end for x in self.exc), self
-        if self.start > self.end:
-            raise ValueError("_Range cannot be empty")
-        if (self.lopen or self.ropen) and self.start == self.end:
-            raise ValueError("_Range cannot be empty")
-
-    def __pow__(self, n: int) -> Self:
-        """Exponentiation. Computes {x ** n for x in self}. Note that this is
-        not based on Minkowski multiplication :meth:`__mul__`.
-
-        >>> _Range(True, mpq(0), oo, True, {mpq(1), mpq(2)}) ** 0
-        _Range(lopen=False, start=mpq(1,1), end=mpq(1,1), ropen=False, exc=set())
-
-        >>> _Range(False, mpq(-2), mpq(1), True, {mpq(-1)}) ** 2
-        _Range(lopen=False, start=mpq(0,1), end=mpq(4,1), ropen=False, exc={mpq(1,1)})
-
-        >>> _Range(True, mpq(-1), mpq(2), False, {mpq(1)}) ** 2
-        _Range(lopen=False, start=mpq(0,1), end=mpq(4,1), ropen=False, exc={mpq(1,1)})
-
-        >>> _Range(False, mpq(-3), mpq(2), False, {mpq(1)}) ** 2
-        _Range(lopen=False, start=mpq(0,1), end=mpq(9,1), ropen=False, exc=set())
-
-        >>> _Range(False, mpq(-3), mpq(2), False, {mpq(-1), mpq(1)}) ** 2
-        _Range(lopen=False, start=mpq(0,1), end=mpq(9,1), ropen=False, exc={mpq(1,1)})
-
-        >>> _Range(False, mpq(1), mpq(2), True) ** 3
-        _Range(lopen=False, start=mpq(1,1), end=mpq(8,1), ropen=True, exc=set())
-
-        >>> r = _Range(True, mpq(-3), mpq(-1), False, {mpq(-2)})
-        >>> r ** 1
-        _Range(lopen=True, start=mpq(-3,1), end=mpq(-1,1), ropen=False, exc={mpq(-2,1)})
-        >>> r ** 2
-        _Range(lopen=False, start=mpq(1,1), end=mpq(9,1), ropen=True, exc={mpq(4,1)})
-
-        >>> r = _Range(True, mpq(-3), mpq(2), False, {mpq(-2)})
-        >>> r ** 2
-        _Range(lopen=False, start=mpq(0,1), end=mpq(9,1), ropen=True, exc=set())
-        >>> r ** 3
-        _Range(lopen=True, start=mpq(-27,1), end=mpq(8,1), ropen=False, exc={mpq(-8,1)})
-
-        >>> _Range(False, mpq(-1), mpq(2), False, {mpq(0), mpq(1)}) ** 2
-        _Range(lopen=True, start=mpq(0,1), end=mpq(4,1), ropen=False, exc=set())
-
-        >>> _Range(True, mpq(-1), mpq(2), False, {mpq(0), mpq(1)}) ** 2
-        _Range(lopen=True, start=mpq(0,1), end=mpq(4,1), ropen=False, exc={mpq(1,1)})
-        """
-        if n == 0:
-            return self.from_constant(mpq(1))
-        if n % 2 == 0:
-            self = self.abs()
-        start = self.start ** n
-        end = self.end ** n
-        exc = {p ** n for p in self.exc}
-        return self.__class__(self.lopen, start, end, self.ropen, exc)
-
-    def __str__(self) -> str:
-        left = '(' if self.lopen else '['
-        start = '-oo' if self.start == -oo else str(self.start)
-        end = 'oo' if self.end == oo else str(self.end)
-        right = ')' if self.ropen else ']'
-        exc_entries = {str(q) for q in self.exc}
-        if exc_entries:
-            exc = f' \\ {{{", ".join(exc_entries)}}}'
-        else:
-            exc = ''
-        return f'{left}{start}, {end}{right}{exc}'
-
-    def abs(self) -> Self:
-        if self.start >= 0:
-            return self
-        if self.end <= 0:
-            return self.__class__(
-                self.ropen, -self.end, -self.start, self.lopen, {-p for p in self.exc})
-        non_negative = self.__class__(
-            mpq(0) in self.exc, mpq(0), self.end, self.ropen, {p for p in self.exc if p > mpq(0)})
-        abs_of_negative = self.__class__(
-            True, mpq(0), -self.start, self.lopen, {-p for p in self.exc if p < mpq(0)})
-        return non_negative.union(abs_of_negative)
-
-    @classmethod
-    def from_constant(cls, q: mpq) -> Self:
-        return cls(lopen=False, start=q, end=q, ropen=False, exc=set())
-
-    def intersection(self, other: Self) -> Self:
-        if self.start < other.start:
-            lopen = other.lopen
-            start = other.start
-        elif other.start < self.start:
-            lopen = self.lopen
-            start = self.start
-        else:
-            assert self.start == other.start
-            start = self.start
-            lopen = self.lopen or other.lopen
-        if self.end < other.end:
-            end = self.end
-            ropen = self.ropen
-        elif other.end < self.end:
-            end = other.end
-            ropen = other.ropen
-        else:
-            assert self.end == other.end
-            end = self.end
-            ropen = self.ropen or other.ropen
-        # Fix the case that ivl is closed on either side and the corresponding
-        # endpoint is in self.exc or other.exc
-        if start in self.exc or start in other.exc:
-            lopen = True
-        if end in self.exc or end in other.exc:
-            ropen = True
-        exc = set()
-        for x in self.exc:
-            if start < x < end:
-                exc.add(x)
-        for x in other.exc:
-            if start < x < end:
-                exc.add(x)
-        return self.__class__(lopen, start, end, ropen, exc)
-
-    def is_disjoint(self, other: Self) -> bool:
-        if self.end < other.start:
-            return True
-        if self.end == other.start and (self.lopen or other.lopen):
-            return True
-        if self.start > other.end:
-            return True
-        if self.start == other.end and (self.ropen or other.ropen):
-            return True
-        if self.is_point() and self.start in other.exc:
-            return True
-        if other.is_point() and other.start in self.exc:
-            return True
-        return False
-
-    def is_point(self) -> bool:
-        # It is assumed and has been asserted that the interval is not empty.
-        return self.start == self.end
-
-    def is_subset(self, other: Self) -> bool:
-        if self.start < other.start:
-            return False
-        if self.start == other.start and not self.lopen and other.lopen:
-            return False
-        if self.end > other.end:
-            return False
-        if self.end == other.end and not self.ropen and other.ropen:
-            return False
-        for q in other.exc:
-            if q in self:
-                return False
-        return True
-
-    def is_zero(self) -> bool:
-        return self.is_point() and self.start == mpq(0)
-
-    def minkowski_pow(self, n: int) -> Self:
-        """Compute a superset of the n-fold Minkowski product.
-
-        >>> r = _Range(False, mpq(1), mpq(2), True)
-        >>> r.minkowski_pow(0)
-        _Range(lopen=False, start=mpq(1,1), end=mpq(1,1), ropen=False, exc=set())
-        >>> r.minkowski_pow(1)
-        _Range(lopen=False, start=mpq(1,1), end=mpq(2,1), ropen=True, exc=set())
-        >>> r.minkowski_pow(6)
-        _Range(lopen=False, start=mpq(1,1), end=mpq(64,1), ropen=True, exc=set())
-
-        >>> r = _Range(True, -oo, oo, True, set())
-        >>> r.minkowski_pow(6)
-        _Range(lopen=True, start=mpfr('-inf'), end=mpfr('inf'), ropen=True, exc=set())
-
-        >>> r = _Range(True, -oo, 0, True, set())
-        >>> r.minkowski_pow(2)
-        _Range(lopen=True, start=mpq(0,1), end=mpfr('inf'), ropen=True, exc=set())
-        >>> r.minkowski_pow(3)
-        _Range(lopen=True, start=mpfr('-inf'), end=mpq(0,1), ropen=True, exc=set())
-
-        .. seealso:: :meth:`__mul__ <.simplifiy._Range.__mul__>` -- Minkowski product
-        """
-        if n == 0:
-            return self.from_constant(mpq(1))
-        result = self.minkowski_pow(n // 2)
-        result = result * result
-        if n % 2 == 1:
-            result = result * self
-        return result
-
-    @staticmethod
-    def from_term(f: Term, knowl: _Knowledge) -> _Range:
-        """
-        >>> from logic1.theories.RCF import VV
-        >>> x, y = VV.get('x', 'y')
-        >>> print(_Range.from_term(Term(0), _Knowledge()))
-        [0, 0]
-        >>> f = x**2 + y**2
-        >>> print(_Range.from_term(f, _Knowledge()))
-        [0, oo)
-        >>> g = -x**2 - y**2 - 1
-        >>> print(_Range.from_term(g, _Knowledge()))
-        (-oo, -1]
-        >>> h = (x - y) ** 2
-        >>> print(_Range.from_term(h, _Knowledge()))
-        (-oo, oo)
-        >>> print(_Range.from_term(h, _Knowledge(
-        ...    {x: _Range(True, mpq(0), oo, True), y: _Range(True, -oo, mpq(0), True)})))
-        (0, oo)
-        >>> print(_Range.from_term(h, _Knowledge(
-        ...    {x: _Range(True, -oo, mpq(0), False), y: _Range(False, mpq(0), oo, True)})))
-        [0, oo)
-        """
-        R = _Range(True, -oo, oo, True, set())
-        poly_result = _Range.from_constant(mpq(0))
-        gens = f.poly.parent().gens()
-        for exponent, coefficient in f.poly.dict().items():
-            term_result = _Range.from_constant(mpq(coefficient))
-            for g, e in zip(gens, exponent):
-                ge_result = knowl.get(Term(g)) ** e
-                term_result = term_result * ge_result
-            poly_result = poly_result + term_result
-            if poly_result == R:
-                return R
-        return poly_result
-
-    def transform(self, scale: mpq, shift: mpq) -> Self:
-        if scale >= 0:
-            lopen = self.lopen
-            start = scale * self.start + shift
-            end = scale * self.end + shift
-            ropen = self.ropen
-        else:
-            lopen = self.ropen
-            start = scale * self.end + shift
-            end = scale * self.start + shift
-            ropen = self.lopen
-        exc = {scale * point + shift for point in self.exc}
-        return self.__class__(lopen, start, end, ropen, exc)
-
-    def union(self, other: Self) -> Self:
-        if (other.start, other.lopen) < (self.start, self.lopen):
-            self, other = other, self
-        final_exc = set()
-        if (other.end, not other.ropen) < (self.end, not self.ropen):
-            end, ropen = self.end, self.ropen
-        else:
-            end, ropen = other.end, other.ropen
-            if self.end < other.start:
-                raise ValueError("union is not a _Range")
-            if self.end == other.start and self.ropen and other.lopen:
-                assert isinstance(self.end, mpq)
-                final_exc.add(self.end)
-        for p in self.exc:
-            if p not in other:
-                final_exc.add(p)
-        for p in other.exc:
-            if p not in self:
-                final_exc.add(p)
-        return self.__class__(self.lopen, self.start, end, ropen, final_exc)
 
 
 @dataclass
@@ -407,6 +41,9 @@ class _BasicKnowledge:
         assert self.term.lc() == 1, self
         assert self.term.constant_coefficient() == 0
 
+    def __str__(self) -> str:
+        return f'{self.__class__.__name__}({self.term!s}, {self.range!s})'
+
     def as_atoms(self, ref_range: _Range, gand: type[And | Or], options: Options) \
             -> list[AtomicFormula]:
         L: list[AtomicFormula] = []
@@ -416,7 +53,7 @@ class _BasicKnowledge:
         if this_range.is_point():
             # Pick the one point of this_range.
             q = this_range.start
-            assert isinstance(q, mpq)
+            assert q.finite
             if ref_range.is_point():
                 assert q == ref_range.start
                 # throw away the point q, which is equal to the point
@@ -430,14 +67,14 @@ class _BasicKnowledge:
                 if options.prefer_order and gand is Or:
                     if q == ref_range.start:
                         assert not ref_range.lopen
-                        L.append(Le(self.term - q, 0))
+                        L.append(Le(self.term - q.finite_value, 0))
                     elif q == ref_range.end:
                         assert not ref_range.ropen
-                        L.append(Ge(self.term - q, 0))
+                        L.append(Ge(self.term - q.finite_value, 0))
                     else:
-                        L.append(Eq(self.term - q, 0))
+                        L.append(Eq(self.term - q.finite_value, 0))
                 else:
-                    L.append(Eq(self.term - q, 0))
+                    L.append(Eq(self.term - q.finite_value, 0))
         else:
             # print(f'{t=}, {ref_ivl=}, {ivl=}')
             #
@@ -445,67 +82,70 @@ class _BasicKnowledge:
             # this_range is a subset of ref_range.
             assert not ref_range.is_point()
             if ref_range.start < this_range.start:
-                assert isinstance(this_range.start, mpq)
+                try:
+                    assert this_range.start.finite, (this_range, ref_range, gand)
+                except AttributeError:
+                    raise AttributeError((f'{this_range.start=}'))
                 if this_range.start in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(Ge(self.term - this_range.start, 0))
+                        L.append(Ge(self.term - this_range.start.finite_value, 0))
                     else:
-                        L.append(Gt(self.term - this_range.start, 0))
+                        L.append(Gt(self.term - this_range.start.finite_value, 0))
                 else:
                     if this_range.lopen:
-                        L.append(Gt(self.term - this_range.start, 0))
+                        L.append(Gt(self.term - this_range.start.finite_value, 0))
                     else:
-                        L.append(Ge(self.term - this_range.start, 0))
+                        L.append(Ge(self.term - this_range.start.finite_value, 0))
             elif ref_range.start == this_range.start:
                 if not ref_range.lopen and this_range.lopen:
-                    assert isinstance(this_range.start, mpq)
+                    assert this_range.start.finite
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(Gt(self.term - this_range.start, 0))
+                        L.append(Gt(self.term - this_range.start.finite_value, 0))
                     else:
-                        L.append(Ne(self.term - this_range.start, 0))
+                        L.append(Ne(self.term - this_range.start.finite_value, 0))
             else:
                 assert False, f'{ref_range=!s}, {this_range=!s}'
             if this_range.end < ref_range.end:
-                assert isinstance(this_range.end, mpq)
+                assert this_range.end.finite
                 if this_range.end in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
                     if xor(options.prefer_weak, gand is Or):
-                        L.append(Le(self.term - this_range.end, 0))
+                        L.append(Le(self.term - this_range.end.finite_value, 0))
                     else:
-                        L.append(Lt(self.term - this_range.end, 0))
+                        L.append(Lt(self.term - this_range.end.finite_value, 0))
                 else:
                     if this_range.ropen:
-                        L.append(Lt(self.term - this_range.end, 0))
+                        L.append(Lt(self.term - this_range.end.finite_value, 0))
                     else:
-                        L.append(Le(self.term - this_range.end, 0))
+                        L.append(Le(self.term - this_range.end.finite_value, 0))
             elif ref_range.end == this_range.end:
                 if not ref_range.ropen and this_range.ropen:
-                    assert isinstance(this_range.end, mpq)
+                    assert this_range.end.finite
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
-                        L.append(Lt(self.term - this_range.end, 0))
+                        L.append(Lt(self.term - this_range.end.finite_value, 0))
                     else:
-                        L.append(Ne(self.term - this_range.end, 0))
+                        L.append(Ne(self.term - this_range.end.finite_value, 0))
             else:
                 assert False
         for q in this_range.exc:
             if q not in ref_range.exc:
-                L.append(Ne(self.term - q, 0))
+                L.append(Ne(self.term - q.finite_value, 0))
         return L
 
     def as_subst_values(self) -> tuple[_SubstValue, _SubstValue]:
         assert self.is_substitution()
         mons = self.term.monomials()
         if len(mons) == 1:
-            assert isinstance(self.range.start, mpq)
+            assert self.range.start.finite
             return (_SubstValue(mpq(1), self.term.as_variable()),
-                    _SubstValue(self.range.start, None))
+                    _SubstValue(self.range.start.finite_value, None))
         else:
             x1 = mons[0].as_variable()
             x2 = mons[1].as_variable()
@@ -520,13 +160,13 @@ class _BasicKnowledge:
         if len(mons) == 1:
             return mons[0].is_variable()
         if len(mons) == 2:
-            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == 0
+            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == ZERO
         return False
 
     def reduce(self, G: Iterable[Term]) -> Optional[Self]:
         t = self.term.reduce(G)
         if t.is_constant():
-            if t.constant_coefficient() in self.range:
+            if EndPoint_Finite(t.constant_coefficient()) in self.range:
                 return None
             raise InternalRepresentation.Inconsistent()
         lc = t.lc()
@@ -546,28 +186,28 @@ class _BasicKnowledge:
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = a**2 + mpq(1,2)*a*b - 6*b**2 + mpq(1,3) <= 0
-        >>> _BasicKnowledge.from_atom(f)
-        _BasicKnowledge(term=a^2 + 1/2*a*b - 6*b^2, range=_Range(lopen=True,
-            start=mpfr('-inf'), end=mpq(-1,3), ropen=False, exc=set()))
+        >>> print(_BasicKnowledge.from_atom(f))
+        _BasicKnowledge(a^2 + 1/2*a*b - 6*b^2, (-oo, -1/3])
         """
         rel = atom.op
         lhs = atom.lhs
         q = -lhs.constant_coefficient()
         term = lhs + q
+        ep = EndPoint_Finite(q)
         # rel is the relation of atom, term is the monic parametric part, and q
         # is the negative constant coefficient.
         if rel is Eq:
-            range_ = _Range(False, q, q, False, set())
+            range_ = _Range(False, ep, ep, False, set())
         elif rel is Ne:
-            range_ = _Range(True, -oo, oo, True, {q})
+            range_ = _Range(True, -oo, oo, True, {ep})
         elif rel is Ge:
-            range_ = _Range(False, q, oo, True, set())
+            range_ = _Range(False, ep, oo, True, set())
         elif rel is Le:
-            range_ = _Range(True, -oo, q, False, set())
+            range_ = _Range(True, -oo, ep, False, set())
         elif rel is Gt:
-            range_ = _Range(True, q, oo, True, set())
+            range_ = _Range(True, ep, oo, True, set())
         elif rel is Lt:
-            range_ = _Range(True, -oo, q, True, set())
+            range_ = _Range(True, -oo, ep, True, set())
         else:
             assert False, rel
         bknowl = cls(term, range_)
@@ -584,11 +224,8 @@ class _Knowledge:
 
     def __iter__(self) -> Iterator[_BasicKnowledge]:
         # Used in InternalRepresentation.extract().
-        for t, range_ in self.dict_.items():
-            if t.is_variable():
-                yield _BasicKnowledge(t, range_)
-            else:
-                yield _BasicKnowledge(t, self.get(t))
+        for t in self.dict_:
+            yield _BasicKnowledge(t, self.get(t))
 
     def __str__(self) -> str:
         entries = [str(key) + ' in ' + str(range) for key, range in self.dict_.items()]
@@ -659,20 +296,20 @@ class _Knowledge:
         >>> h = (x - y) ** 2
         >>> print(K._term_as_range(h))
         (-oo, oo)
-        >>> K = _Knowledge({x: _Range(True, mpq(0), oo, True),
-        ...                 y: _Range(True, -oo, mpq(0), True)})
+        >>> K = _Knowledge({x: _Range(True, ZERO, oo, True),
+        ...                 y: _Range(True, -oo, ZERO, True)})
         >>> print(K._term_as_range(h))
         (0, oo)
-        >>> K = _Knowledge({x: _Range(True, -oo, mpq(0), False),
-        ...                 y: _Range(False, mpq(0), oo, True)})
+        >>> K = _Knowledge({x: _Range(True, -oo, ZERO, False),
+        ...                 y: _Range(False, ZERO, oo, True)})
         >>> print(K._term_as_range(h, ))
         [0, oo)
         """
-        R = _Range(True, -oo, oo, True, set())
-        poly_result = _Range.from_constant(mpq(0))
+        R = _Range(True, -oo, oo, True)
+        poly_result = _Range.from_constant(ZERO)
         gens = f.poly.parent().gens()
         for exponent, coefficient in f.poly.dict().items():
-            term_result = _Range.from_constant(mpq(coefficient))
+            term_result = _Range.from_constant(EndPoint_Finite(mpq(coefficient)))
             for g, e in zip(gens, exponent):
                 ge_result = self.dict_.get(Term(g), R) ** e
                 term_result = term_result * ge_result
@@ -762,10 +399,10 @@ class InternalRepresentation(
                 q = mpq(0)
             if self._options.prefer_order and gand is Or:
                 ref_range = knowl.get(t)
-                if q == ref_range.start:
+                if EndPoint_Finite(q) == ref_range.start:
                     assert not ref_range.lopen
                     L.append(Le(t - q, 0))
-                elif q == ref_range.end:
+                elif EndPoint_Finite(q) == ref_range.end:
                     assert not ref_range.ropen
                     L.append(Ge(t - q, 0))
                 else:
@@ -818,7 +455,8 @@ class InternalRepresentation(
             else:
                 t = var - val.coefficient * val.variable
                 q = mpq(0)
-            bknowl = _BasicKnowledge(t, _Range(False, q, q, False, set()))
+            range_ = _Range(False, EndPoint_Finite(q), EndPoint_Finite(q), False)
+            bknowl = _BasicKnowledge(t, range_)
             result._propagate(bknowl)
         return result
 
