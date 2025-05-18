@@ -1,9 +1,11 @@
-# ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt --ignore-glob=*parallel*
-ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt\
-#           --ignore=logic1/theories/RCF/range.pyx\
-#           --ignore=logic1/theories/RCF/test_qe.txt\
-#           --ignore=logic1/theories/RCF/test_simplify_motor.txt\
-#           --ignore=logic1/theories/RCF/test_qe_parallel.txt
+ ign_cython = --ignore=logic1/theories/RCF/range.pyx
+ ign_parallel = --ignore-glob=*parallel*
+ ign_redlog = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt --ignore=logic1/theories/RCF/redlog.py
+ ign_slow = --ignore=logic1/theories/RCF/test_simplify_motor.txt\
+ 	--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt\
+ 	--ignore=logic1/theories/RCF/test_qe.txt
+
+ignores = $(ign_slow)
 
 .PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
 		coverage coverage_html clean veryclean conda-build
