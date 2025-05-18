@@ -1,5 +1,11 @@
-# ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt --ignore-glob=*parallel*
-ignores = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
+ ign_cython = --ignore=logic1/theories/RCF/range.pyx
+ ign_parallel = --ignore-glob=*parallel*
+ ign_redlog = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt --ignore=logic1/theories/RCF/redlog.py
+ ign_slow = --ignore=logic1/theories/RCF/test_simplify_motor.txt\
+ 	--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt\
+ 	--ignore=logic1/theories/RCF/test_qe.txt
+
+ignores = $(ign_slow)
 
 .PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
 		coverage coverage_html clean veryclean conda-build
@@ -8,10 +14,13 @@ cython:
 	python cython-setup.py build_ext --inplace
 
 cython-clean:
-	/bin/rm logic1/theories/RCF/substitution.c logic1/theories/RCF/substitution.cpython-311-darwin.so
+	/bin/rm -f logic1/theories/RCF/range.c logic1/theories/RCF/range.html logic1/theories/RCF/range.cpython-312-darwin.so
+
+cython-html:
+	cd logic1/theories/RCF && open range.html
 
 pytest:
-	pytest -n 8 --doctest-cython --exitfirst --doctest-modules $(ignores)
+	pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules $(ignores)
 
 pytest-fast:
 	PYTHONOPTIMIZE=TRUE pytest -n 8 --disable-warnings --exitfirst --doctest-modules $(ignores)
