@@ -19,7 +19,7 @@ from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne,
 from .substitution import _SubstValue, _Substitution  # type: ignore
 from .typing import Formula
 
-from .range import EndPoint_Finite, _Range, oo, ZERO  # type: ignore
+from .range import EndPoint, _Range, oo, ZERO  # type: ignore
 from ...support.tracing import trace  # noqa
 
 
@@ -53,7 +53,7 @@ class _BasicKnowledge:
         if this_range.is_point():
             # Pick the one point of this_range.
             q = this_range.start
-            assert q.finite
+            assert q.is_finite()
             if ref_range.is_point():
                 assert q == ref_range.start
                 # throw away the point q, which is equal to the point
@@ -83,7 +83,7 @@ class _BasicKnowledge:
             assert not ref_range.is_point()
             if ref_range.start < this_range.start:
                 try:
-                    assert this_range.start.finite, (this_range, ref_range, gand)
+                    assert this_range.start.is_finite(), (this_range, ref_range, gand)
                 except AttributeError:
                     raise AttributeError((f'{this_range.start=}'))
                 if this_range.start in ref_range.exc:
@@ -100,7 +100,7 @@ class _BasicKnowledge:
                         L.append(Ge(self.term - this_range.start.finite_value, 0))
             elif ref_range.start == this_range.start:
                 if not ref_range.lopen and this_range.lopen:
-                    assert this_range.start.finite
+                    assert this_range.start.is_finite()
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -110,7 +110,7 @@ class _BasicKnowledge:
             else:
                 assert False, f'{ref_range=!s}, {this_range=!s}'
             if this_range.end < ref_range.end:
-                assert this_range.end.finite
+                assert this_range.end.is_finite()
                 if this_range.end in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
@@ -125,7 +125,7 @@ class _BasicKnowledge:
                         L.append(Le(self.term - this_range.end.finite_value, 0))
             elif ref_range.end == this_range.end:
                 if not ref_range.ropen and this_range.ropen:
-                    assert this_range.end.finite
+                    assert this_range.end.is_finite()
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -143,7 +143,7 @@ class _BasicKnowledge:
         assert self.is_substitution()
         mons = self.term.monomials()
         if len(mons) == 1:
-            assert self.range.start.finite
+            assert self.range.start.is_finite()
             return (_SubstValue(mpq(1), self.term.as_variable()),
                     _SubstValue(self.range.start.finite_value, None))
         else:
@@ -166,7 +166,7 @@ class _BasicKnowledge:
     def reduce(self, G: Iterable[Term]) -> Optional[Self]:
         t = self.term.reduce(G)
         if t.is_constant():
-            if EndPoint_Finite(t.constant_coefficient()) in self.range:
+            if EndPoint(t.constant_coefficient()) in self.range:
                 return None
             raise InternalRepresentation.Inconsistent()
         lc = t.lc()
@@ -193,7 +193,7 @@ class _BasicKnowledge:
         lhs = atom.lhs
         q = -lhs.constant_coefficient()
         term = lhs + q
-        ep = EndPoint_Finite(q)
+        ep = EndPoint(q)
         # rel is the relation of atom, term is the monic parametric part, and q
         # is the negative constant coefficient.
         if rel is Eq:
@@ -309,7 +309,7 @@ class _Knowledge:
         poly_result = _Range.from_constant(ZERO)
         gens = f.poly.parent().gens()
         for exponent, coefficient in f.poly.dict().items():
-            term_result = _Range.from_constant(EndPoint_Finite(mpq(coefficient)))
+            term_result = _Range.from_constant(EndPoint(mpq(coefficient)))
             for g, e in zip(gens, exponent):
                 ge_result = self.dict_.get(Term(g), R) ** e
                 term_result = term_result * ge_result
@@ -399,10 +399,10 @@ class InternalRepresentation(
                 q = mpq(0)
             if self._options.prefer_order and gand is Or:
                 ref_range = knowl.get(t)
-                if EndPoint_Finite(q) == ref_range.start:
+                if EndPoint(q) == ref_range.start:
                     assert not ref_range.lopen
                     L.append(Le(t - q, 0))
-                elif EndPoint_Finite(q) == ref_range.end:
+                elif EndPoint(q) == ref_range.end:
                     assert not ref_range.ropen
                     L.append(Ge(t - q, 0))
                 else:
@@ -455,7 +455,7 @@ class InternalRepresentation(
             else:
                 t = var - val.coefficient * val.variable
                 q = mpq(0)
-            range_ = _Range(False, EndPoint_Finite(q), EndPoint_Finite(q), False)
+            range_ = _Range(False, EndPoint(q), EndPoint(q), False)
             bknowl = _BasicKnowledge(t, range_)
             result._propagate(bknowl)
         return result

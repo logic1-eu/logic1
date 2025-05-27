@@ -12,7 +12,7 @@ import cython
 # from cython.cimports.gmpy2 import import_gmpy2, mpq, mpq_t, mpfr
 from cython.cimports.gmpy2 import *
 
-cdef extern from "gmp.h":  # noqa
+cdef extern from "gmp.h":
     void mpq_add(mpq_t sum, const mpq_t addend1, const mpq_t addend2)
     int mpq_cmp(const mpq_t op1, const mpq_t op2)
     int mpq_equal(const mpq_t op1, const mpq_t op2)
@@ -22,165 +22,129 @@ cdef extern from "gmp.h":  # noqa
     void mpq_set_z(mpq_t rop, const mpz_t op)
     int mpq_sgn(const mpq_t op)
 
-cdef extern from "mpfr.h":  # noqa
-    int mpfr_add(mpfr_t rop, mpfr_t op1, mpfr_t op2, mpfr_rnd_t rnd)
-    int mpfr_add_q(mpfr_t rop, mpfr_t op1, mpq_t op2, mpfr_rnd_t rnd)
-    int mpfr_equal_p(mpfr_t op1, mpfr_t op2)
-    int mpfr_less_p(mpfr_t op1, mpfr_t op2)
-    int mpfr_mul(mpfr_t rop, mpfr_t op1, mpfr_t op2, mpfr_rnd_t rnd)
-    int mpfr_mul_q(mpfr_t rop, mpfr_t op1, mpq_t op2, mpfr_rnd_t rnd)
-    int mpfr_sgn(mpfr_t op)
-
 import_gmpy2()
 
-MPQ_ZERO: Final[mpq] = mpq(0)
+mpq_ZERO: Final[mpq] = mpq(0)
 
 
 @cython.total_ordering
 class EndPoint:
+    # This class assumed to remain immutable.
 
-    finite: cython.bint = cython.declare(cython.bint, visibility='readonly')
     finite_value: Optional[mpq] = cython.declare(Optional[mpq], visibility='readonly')
-    infinite_value: Optional[mpfr] = cython.declare(Optional[mpfr], visibility='readonly')
+    infinite_sign: cython.int = cython.declare(cython.int, visibility='readonly')
 
     def __add__(self, other: EndPoint) -> EndPoint:
-        if self.finite and other.finite:
+        if self.is_finite() and other.is_finite():
             f1 = MPQ(self.finite_value)
             f2 = MPQ(other.finite_value)
             sum_ = GMPy_MPQ_New(NULL)
             mpq_add(MPQ(sum_), f1, f2)
-            return EndPoint_Finite(sum_)
-        elif self.finite and not other.finite:
-            f1 = MPQ(self.finite_value)
-            i2 = MPFR(other.infinite_value)
-            sum_ = GMPy_MPFR_New(0, NULL)
-            mpfr_add_q(MPFR(sum_), i2, f1, MPFR_RNDN)
-            return EndPoint_Infinite(sum_)
-        elif not self.finite and other.finite:
-            i1 = MPFR(self.infinite_value)
-            f2 = MPQ(other.finite_value)
-            sum_ = GMPy_MPFR_New(0, NULL)
-            mpfr_add_q(MPFR(sum_), i1, f2, MPFR_RNDN)
-            return EndPoint_Infinite(sum_)
+            return EndPoint.__new__(EndPoint, sum_)
+        elif self.is_finite() and not other.is_finite():
+            return other
+        elif not self.is_finite() and other.is_finite():
+            return self
         else:
-            i1 = MPFR(self.infinite_value)
-            i2 = MPFR(other.infinite_value)
-            sum_ = GMPy_MPFR_New(0, NULL)
-            mpfr_add(MPFR(sum_), i1, i2, MPFR_RNDN)
-            return EndPoint_Infinite(sum_)
+            if self.infinite_sign != other.infinite_sign:
+                raise ValueError(f'addition between {self!s} and {other!s} is not supported')
+            return self
 
-    def __cinit__(self, finite: cython.bint, finite_value: Optional[mpq],
-                  infinite_value: Optional[mpfr]) -> None:
-        self.finite = finite
+    def __cinit__(self, finite_value: Optional[mpq], infinite_sign: cython.int = 1) -> None:
+        assert finite_value is None or infinite_sign == 1
+        assert infinite_sign == 1 or infinite_sign == -1
         self.finite_value = finite_value
-        self.infinite_value = infinite_value
+        self.infinite_sign = infinite_sign
 
     def __eq__(self, other: EndPoint) -> cython.bint:
-        if self.finite != other.finite:
+        if self.is_finite() != other.is_finite():
             return False
-        if self.finite:
+        if self.is_finite():
             return mpq_equal(MPQ(self.finite_value), MPQ(other.finite_value))
         else:
-            return mpfr_equal_p(MPFR(self.infinite_value), MPFR(other.infinite_value))
+            return self.infinite_sign == other.infinite_sign
 
     def __hash__(self) -> int:
-        return hash((self.finite, self.finite_value, self.infinite_value))
+        return hash((self.finite_value, self.infinite_sign))
 
     def __lt__(self, other: EndPoint) -> cython.bint:
-        if self.finite and other.finite:
+        if self.is_finite() and other.is_finite():
             return mpq_cmp(MPQ(self.finite_value), MPQ(other.finite_value)) < 0
-        elif self.finite and not other.finite:
-            return 0 < mpfr_sgn(MPFR(other.infinite_value))
-        elif not self.finite and other.finite:
-            return mpfr_sgn(MPFR(self.infinite_value)) < 0
+        elif self.is_finite() and not other.is_finite():
+            return other.infinite_sign == 1
+        elif not self.is_finite() and other.is_finite():
+            return self.infinite_sign == -1
         else:
-            return mpfr_less_p(MPFR(self.infinite_value), MPFR(other.infinite_value))
+            return self.infinite_sign < other.infinite_sign
 
     def __mul__(self, other: EndPoint) -> EndPoint:
         # Treat multiplication with zero as a special case, defining oo * 0 =
         # -oo * 0 = 0.
-        if self.finite and mpq_equal(MPQ(self.finite_value), MPQ(MPQ_ZERO)):
+        if self.is_finite() and mpq_equal(MPQ(self.finite_value), MPQ(mpq_ZERO)):
             return self
-        elif other.finite and mpq_equal(MPQ(other.finite_value), MPQ(MPQ_ZERO)):
+        if other.is_finite() and mpq_equal(MPQ(other.finite_value), MPQ(mpq_ZERO)):
             return other
         # Complete case distinction on the regular cases:
-        if self.finite and other.finite:
+        if self.is_finite() and other.is_finite():
             f1 = MPQ(self.finite_value)
             f2 = MPQ(other.finite_value)
             product = GMPy_MPQ_New(NULL)
             mpq_mul(MPQ(product), f1, f2)
-            return EndPoint_Finite(product)
-        elif self.finite and not other.finite:
-            f1 = MPQ(self.finite_value)
-            i2 = MPFR(other.infinite_value)
-            product = GMPy_MPFR_New(0, NULL)
-            mpfr_mul_q(MPFR(product), i2, f1, MPFR_RNDN)
-            return EndPoint_Infinite(product)
-        elif not self.finite and other.finite:
-            i1 = MPFR(self.infinite_value)
-            f2 = MPQ(other.finite_value)
-            product = GMPy_MPFR_New(0, NULL)
-            mpfr_mul_q(MPFR(product), i1, f2, MPFR_RNDN)
-            return EndPoint_Infinite(product)
+            return EndPoint.__new__(EndPoint, product)
+        elif self.is_finite() and not other.is_finite():
+            finite_sign: cython.int = mpq_sgn(MPQ(self.finite_value))
+            return EndPoint.__new__(EndPoint, None, finite_sign * other.infinite_sign)
+        elif not self.is_finite() and other.is_finite():
+            finite_sign: cython.int = mpq_sgn(MPQ(other.finite_value))
+            return EndPoint.__new__(EndPoint, None, finite_sign * self.infinite_sign)
         else:
-            i1 = MPFR(self.infinite_value)
-            i2 = MPFR(other.infinite_value)
-            product = GMPy_MPFR_New(0, NULL)
-            mpfr_mul(MPFR(product), i1, i2, MPFR_RNDN)
-            return EndPoint_Infinite(product)
+            return EndPoint.__new__(EndPoint, None, self.infinite_sign * other.infinite_sign)
 
     def __neg__(self) -> EndPoint:
-        if self.finite:
-            return EndPoint_Finite(-self.finite_value)
+        if self.is_finite():
+            return EndPoint.__new__(EndPoint, -self.finite_value)
         else:
-            return EndPoint_Infinite(-self.infinite_value)
+            return EndPoint.__new__(EndPoint, None, -self.infinite_sign)
 
     def __pow__(self, n: int) -> EndPoint:
-        if self.finite:
-            return EndPoint_Finite(self.finite_value ** n)
+        if self.is_finite():
+            return EndPoint.__new__(EndPoint, self.finite_value ** n)
         else:
-            return EndPoint_Infinite(self.infinite_value ** n)
+            return EndPoint.__new__(EndPoint, None, self.infinite_sign ** n)
 
     def __repr__(self) -> str:
-        return f'EndPoint({self.finite=!r}, {self.finite_value=!r}, {self.infinite_value=!r})'
+        return f'EndPoint({self.finite_value=!r}, {self.infinite_sign=!r})'
 
     def __str__(self) -> str:
-        if self.finite:
+        if self.is_finite():
             return str(self.finite_value)
-        if self.infinite_value == mpfr('inf'):
+        elif self.infinite_sign == 1:
             return 'oo'
-        if self.infinite_value == -mpfr('inf'):
+        else:
+            assert self.infinite_sign == -1
             return '-oo'
-        raise ValueError(self)
+
+    @cython.ccall
+    def is_finite(self) -> cython.bint:
+        return self.finite_value is not None
 
     @cython.cfunc
     def sgn(self) -> cython.int:
-        if self.finite:
+        if self.is_finite():
             return mpq_sgn(MPQ(self.finite_value))
         else:
-            return mpfr_sgn(MPFR(self.infinite_value))
+            return self.infinite_sign
 
 
-@cython.ccall
-def EndPoint_Finite(value: mpq) -> EndPoint:
-    return EndPoint.__new__(EndPoint, True, value, None)
-
-
-@cython.cfunc
-def EndPoint_Infinite(value: mpfr) -> EndPoint:
-    assert value == mpfr('inf') or value == -mpfr('inf'), value
-    return EndPoint.__new__(EndPoint, False, None, value)
-
-
-oo: Final[EndPoint] = EndPoint_Infinite(mpfr('inf'))
-ZERO: Final[EndPoint] = EndPoint_Finite(mpq(0))
+oo: Final[EndPoint] = EndPoint(None, 1)
+ZERO: Final[EndPoint] = EndPoint(mpq_ZERO)
 
 
 @cython.final
 @cython.cclass
 class _Range:
     r"""Non-empty range IVL \ EXC, where IVL is an interval with boundaries in
-    Q extended by {-oo, oo}, and EXC is a finite subset of the interior of
+    Q extended by {-oo, oo}, and EXC is a is_finite() subset of the interior of
     IVL. Raises ValueError if IVL \ EXC gets empty.
     """
 
@@ -191,11 +155,14 @@ class _Range:
     exc: set[EndPoint] = cython.declare(object, visibility='readonly')
 
     def __add__(self, other: _Range) -> _Range:
+        return self.x__add__(other)
+
+    def x__add__(self, other: _Range) -> _Range:
         r"""The Minkowski sum.
 
         >>> def EP(*args):
         ...     from gmpy2 import mpq
-        ...     return EndPoint_Finite(mpq(*args))
+        ...     return EndPoint(mpq(*args))
 
         >>> print(_Range(True, EP(1), EP(3), False, {EP(2)})
         ...     + _Range(True, EP(4), EP(6), False, {EP(5)}))
@@ -209,17 +176,20 @@ class _Range:
         end = self.end + other.end
         ropen = self.ropen or other.ropen
         if self.is_point():
-            assert self.start.finite
+            assert self.start.is_finite()
             exc = {point + self.start for point in other.exc}
         elif other.is_point():
-            assert other.start.finite
+            assert other.start.is_finite()
             exc = {point + other.start for point in self.exc}
         else:
             exc = set()
         return _Range(lopen=lopen, start=start, end=end, ropen=ropen, exc=exc)
 
     def __contains__(self, ep: EndPoint) -> cython.bint:
-        assert ep.finite
+        return self.x__contains__(ep)
+
+    def x__contains__(self, ep: EndPoint) -> cython.bint:
+        assert ep.is_finite()
         if ep < self.start or (self.lopen and ep == self.start):
             return False
         if self.end < ep or (self.ropen and ep == self.end):
@@ -235,9 +205,9 @@ class _Range:
         if self.is_zero() or other.is_zero():
             return _Range.from_constant(ZERO)
         elif self.is_point():
-            return other.transform(self.start.finite_value, MPQ_ZERO)
+            return other.scale(self.start)
         elif other.is_point():
-            return self.transform(other.start.finite_value, MPQ_ZERO)
+            return self.scale(other.start)
         negate = False
         if self.end.sgn() <= 0:
             self = -self
@@ -331,8 +301,12 @@ class _Range:
 
     def __init__(self, lopen: cython.bint = True, start: EndPoint = -oo, end: EndPoint = oo,
                  ropen: cython.bint = True, exc: set = set()) -> None:
-        assert lopen or start is not -oo, self
-        assert ropen or end is not oo, self
+        self.x__init__(lopen, start, end, ropen, exc)
+
+    def x__init__(self, lopen: cython.bint = True, start: EndPoint = -oo, end: EndPoint = oo,
+                 ropen: cython.bint = True, exc: set = set()) -> None:
+        assert lopen or start != -oo, self
+        assert ropen or end != oo, self
         assert all(start < x < end for x in exc), self
         if start > end:
             raise ValueError("_Range cannot be empty")
@@ -353,7 +327,7 @@ class _Range:
 
         >>> def EP(*args):
         ...     from gmpy2 import mpq
-        ...     return EndPoint_Finite(mpq(*args))
+        ...     return EndPoint(mpq(*args))
 
         >>> print(_Range(True, ZERO, oo, True, {EP(1), EP(2)}) ** 0)
         [1, 1]
@@ -393,7 +367,7 @@ class _Range:
         (0, 4] \ {1}
         """
         if n == 0:
-            return self.from_constant(EndPoint_Finite(mpq(1)))
+            return self.from_constant(EndPoint(mpq(1)))
         if n % 2 == 0:
             self = self.abs()
         start = self.start ** n
@@ -430,7 +404,7 @@ class _Range:
 
     @classmethod
     def from_constant(cls, ep: EndPoint) -> _Range:
-        assert ep.finite
+        assert ep.is_finite()
         return _Range(lopen=False, start=ep, end=ep, ropen=False, exc=set())
 
     def intersection(self, other: _Range) -> _Range:
@@ -512,7 +486,7 @@ class _Range:
 
         >>> def EP(*args):
         ...     from gmpy2 import mpq
-        ...     return EndPoint_Finite(mpq(*args))
+        ...     return EndPoint(mpq(*args))
 
         >>> r = _Range(False, EP(1), EP(2), True)
         >>> print(r.minkowski_pow(0))
@@ -535,7 +509,7 @@ class _Range:
         .. seealso:: :meth:`__mul__ <.simplifiy._Range.__mul__>` -- Minkowski product
         """
         if n == 0:
-            return self.from_constant(EndPoint_Finite(mpq(1)))
+            return self.from_constant(EndPoint(mpq(1)))
         result = self.minkowski_pow(n // 2)
         result = result * result
         if n % 2 == 1:
@@ -578,10 +552,19 @@ class _Range:
     #             return R
     #     return poly_result
 
+    @cython.cfunc
+    def scale(self, ep: EndPoint) -> _Range:
+        assert ep != ZERO
+        exc = {ep * point for point in self.exc}
+        if ep > ZERO:
+            return _Range(self.lopen, ep * self.start, ep * self.end, self.ropen, exc)
+        else:
+            return _Range(self.ropen, ep * self.end, ep * self.start, self.lopen, exc)
+
     @cython.ccall
     def transform(self, scale_mpq: mpq, shift_mpq: mpq) -> _Range:
-        scale = EndPoint_Finite(scale_mpq)
-        shift = EndPoint_Finite(shift_mpq)
+        scale = EndPoint(scale_mpq)
+        shift = EndPoint(shift_mpq)
         if scale > ZERO:
             lopen = self.lopen
             start = scale * self.start + shift
@@ -609,7 +592,7 @@ class _Range:
             if self.end < other.start:
                 raise ValueError("union is not a _Range")
             if self.end == other.start and self.ropen and other.lopen:
-                assert self.end.finite
+                assert self.end.is_finite()
                 final_exc.add(self.end)
         for p in self.exc:
             if p not in other:

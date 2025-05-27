@@ -14,7 +14,8 @@ cython:
 	python cython-setup.py build_ext --inplace
 
 cython-clean:
-	/bin/rm -f logic1/theories/RCF/range.c logic1/theories/RCF/range.html logic1/theories/RCF/range.cpython-312-darwin.so
+	/bin/rm -f logic1/theories/RCF/range.c logic1/theories/RCF/range.html logic1/theories/RCF/range.cpython-*-darwin.so
+	/bin/rm -f logic1/theories/RCF/substitution.c logic1/theories/RCF/substitution.html logic1/theories/RCF/substitution.cpython-*-darwin.so
 
 cython-html:
 	cd logic1/theories/RCF && open range.html
@@ -26,7 +27,7 @@ pytest-fast:
 	PYTHONOPTIMIZE=TRUE pytest -n 8 --disable-warnings --exitfirst --doctest-modules $(ignores)
 
 pytest-seq:
-	pytest --doctest-cython --durations --exitfirst --doctest-modules $(ignores)
+	pytest  --durations=0 --doctest-cython --exitfirst --doctest-modules $(ignores)
 
 pytest-full:
 	pytest -n 8 --doctest-modules $(ignores)
