@@ -1,6 +1,6 @@
-# cython: profile=True
-# cython: linetrace=True
-# distutils: define_macros=CYTHON_TRACE_NOGIL=1
+# cython: profile=False
+# cython: linetrace=False
+# distutils: define_macros=CYTHON_TRACE_NOGIL=0
 # type: ignore
 
 from __future__ import annotations
