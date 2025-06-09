@@ -53,7 +53,7 @@ class _BasicKnowledge:
         if this_range.is_point():
             # Pick the one point of this_range.
             q = this_range.start
-            assert q.is_finite()
+            assert q.finite_value is not None
             if ref_range.is_point():
                 assert q == ref_range.start
                 # throw away the point q, which is equal to the point
@@ -83,7 +83,7 @@ class _BasicKnowledge:
             assert not ref_range.is_point()
             if ref_range.start < this_range.start:
                 try:
-                    assert this_range.start.is_finite(), (this_range, ref_range, gand)
+                    assert this_range.start.finite_value is not None, (this_range, ref_range, gand)
                 except AttributeError:
                     raise AttributeError((f'{this_range.start=}'))
                 if this_range.start in ref_range.exc:
@@ -100,7 +100,7 @@ class _BasicKnowledge:
                         L.append(Ge(self.term - this_range.start.finite_value, 0))
             elif ref_range.start == this_range.start:
                 if not ref_range.lopen and this_range.lopen:
-                    assert this_range.start.is_finite()
+                    assert this_range.start.finite_value is not None
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -110,7 +110,7 @@ class _BasicKnowledge:
             else:
                 assert False, f'{ref_range=!s}, {this_range=!s}'
             if this_range.end < ref_range.end:
-                assert this_range.end.is_finite()
+                assert this_range.end.finite_value is not None
                 if this_range.end in ref_range.exc:
                     # When gand is Or, weak and strong are dualized via
                     # subsequent negation.
@@ -125,7 +125,7 @@ class _BasicKnowledge:
                         L.append(Le(self.term - this_range.end.finite_value, 0))
             elif ref_range.end == this_range.end:
                 if not ref_range.ropen and this_range.ropen:
-                    assert this_range.end.is_finite()
+                    assert this_range.end.finite_value is not None
                     # When gand is Or, Ne will become Eq via subsequent
                     # nagation. This is generally preferable.
                     if options.prefer_order and gand is And:
@@ -143,7 +143,7 @@ class _BasicKnowledge:
         assert self.is_substitution()
         mons = self.term.monomials()
         if len(mons) == 1:
-            assert self.range.start.is_finite()
+            assert self.range.start.finite_value is not None
             return (_SubstValue(mpq(1), self.term.as_variable()),
                     _SubstValue(self.range.start.finite_value, None))
         else:
@@ -312,8 +312,8 @@ class _Knowledge:
             term_result = _Range.from_constant(EndPoint(mpq(coefficient)))
             for g, e in zip(gens, exponent):
                 ge_result = self.dict_.get(Term(g), R) ** e
-                term_result = term_result * ge_result
-            poly_result = poly_result + term_result
+                term_result *= ge_result
+            poly_result += term_result
             if poly_result == R:
                 return R
         return poly_result
