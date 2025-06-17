@@ -19,13 +19,14 @@ from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne,
 from .substitution import _SubstValue, _Substitution  # type: ignore
 from .typing import Formula
 
-from .range import EndPoint, _Range, oo, ZERO  # type: ignore
+from .range import EndPoint, EP_INF, EP_ZERO, _Range, RANGE_R  # type: ignore
 from ...support.tracing import trace  # noqa
 
 
 @dataclass(frozen=True)
 class Options(abc.simplify.Options):
     explode_always: bool = True
+    implicit_ranges: bool = True
     lift: bool = True
     prefer_order: bool = True
     prefer_weak: bool = False
@@ -160,7 +161,7 @@ class _BasicKnowledge:
         if len(mons) == 1:
             return mons[0].is_variable()
         if len(mons) == 2:
-            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == ZERO
+            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == EP_ZERO
         return False
 
     def reduce(self, G: Iterable[Term]) -> Optional[Self]:
@@ -199,15 +200,15 @@ class _BasicKnowledge:
         if rel is Eq:
             range_ = _Range(False, ep, ep, False, set())
         elif rel is Ne:
-            range_ = _Range(True, -oo, oo, True, {ep})
+            range_ = _Range(True, -EP_INF, EP_INF, True, {ep})
         elif rel is Ge:
-            range_ = _Range(False, ep, oo, True, set())
+            range_ = _Range(False, ep, EP_INF, True, set())
         elif rel is Le:
-            range_ = _Range(True, -oo, ep, False, set())
+            range_ = _Range(True, -EP_INF, ep, False, set())
         elif rel is Gt:
-            range_ = _Range(True, ep, oo, True, set())
+            range_ = _Range(True, ep, EP_INF, True, set())
         elif rel is Lt:
-            range_ = _Range(True, -oo, ep, True, set())
+            range_ = _Range(True, -EP_INF, ep, True, set())
         else:
             assert False, rel
         bknowl = cls(term, range_)
@@ -220,6 +221,7 @@ class _BasicKnowledge:
 @dataclass
 class _Knowledge:
 
+    options: Options
     dict_: dict[Term, _Range] = field(default_factory=dict)
 
     def __iter__(self) -> Iterator[_BasicKnowledge]:
@@ -236,15 +238,17 @@ class _Knowledge:
         self.dict_[bknowl.term] = bknowl.range
 
     def copy(self) -> Self:
-        return self.__class__(self.dict_.copy())
+        return self.__class__(self.options, self.dict_.copy())
 
     def get(self, key: Term) -> _Range:
-        explcit_range = self.dict_.get(key, _Range(True, -oo, oo, True))
+        explicit_range = self.dict_.get(key, RANGE_R)
+        if not self.options.implicit_ranges:
+            return explicit_range
         if key.is_variable():
-            return explcit_range
+            return explicit_range
         implicit_range = self._term_as_range(key)
         try:
-            return explcit_range.intersection(implicit_range)
+            return explicit_range.intersection(implicit_range)
         except ValueError:
             raise InternalRepresentation.Inconsistent()
 
@@ -270,7 +274,7 @@ class _Knowledge:
         """Reduce all _BasicKnowledge.term in self modulo G. There is no
         Gröbner basis computed here.
         """
-        knowl = self.__class__()
+        knowl = self.__class__(self.options)
         for bknowl in self:
             maybe_bknowl = bknowl.reduce(G)
             if maybe_bknowl is None:
@@ -282,7 +286,7 @@ class _Knowledge:
         """
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
-        >>> K = _Knowledge()
+        >>> K = _Knowledge(Options())
         >>> print(K._term_as_range(Term(0)))
         [0, 0]
         >>> print(K._term_as_range(x))
@@ -296,26 +300,26 @@ class _Knowledge:
         >>> h = (x - y) ** 2
         >>> print(K._term_as_range(h))
         (-oo, oo)
-        >>> K = _Knowledge({x: _Range(True, ZERO, oo, True),
-        ...                 y: _Range(True, -oo, ZERO, True)})
+        >>> K = _Knowledge(Options(),
+        ...                {x: _Range(True, EP_ZERO, EP_INF, True),
+        ...                 y: _Range(True, -EP_INF, EP_ZERO, True)})
         >>> print(K._term_as_range(h))
         (0, oo)
-        >>> K = _Knowledge({x: _Range(True, -oo, ZERO, False),
-        ...                 y: _Range(False, ZERO, oo, True)})
-        >>> print(K._term_as_range(h, ))
+        >>> K = _Knowledge(Options(),
+        ...                {x: _Range(True, -EP_INF, EP_ZERO, False),
+        ...                 y: _Range(False, EP_ZERO, EP_INF, True)})
+        >>> print(K._term_as_range(h,))
         [0, oo)
         """
-        R = _Range(True, -oo, oo, True)
-        poly_result = _Range.from_constant(ZERO)
-        gens = f.poly.parent().gens()
-        for exponent, coefficient in f.poly.dict().items():
-            term_result = _Range.from_constant(EndPoint(mpq(coefficient)))
-            for g, e in zip(gens, exponent):
-                ge_result = self.dict_.get(Term(g), R) ** e
+        poly_result = _Range.from_constant(EP_ZERO)
+        for monomial, coefficient in f.summands():
+            term_result = _Range.from_constant(EndPoint(coefficient))
+            for g, e in monomial.items():
+                ge_result = self.dict_.get(g, RANGE_R) ** e
                 term_result *= ge_result
             poly_result += term_result
-            if poly_result == R:
-                return R
+            if poly_result == RANGE_R:
+                return RANGE_R
         return poly_result
 
 
@@ -330,8 +334,15 @@ class InternalRepresentation(
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
     _options: Options
-    _knowl: _Knowledge = field(default_factory=_Knowledge)
-    _subst: _Substitution = field(default_factory=_Substitution)
+    _knowl: _Knowledge
+    _subst: _Substitution
+
+    def __init__(self, _options: Options, _knowl: Optional[_Knowledge] = None,
+                 _subst: Optional[_Substitution] = None) -> None:
+        self._options = _options
+        self._knowl = _knowl or _Knowledge(_options)
+        self._subst = _subst or _Substitution()
+        assert self._options == self._knowl.options
 
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.RESTART:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
@@ -373,12 +384,13 @@ class InternalRepresentation(
         L: list[AtomicFormula] = []
         for bknowl in self._knowl:
             ref_range = knowl.get(bknowl.term)
-            if not bknowl.term.is_variable():
-                implicit_range = self._knowl._term_as_range(bknowl.term)
-                try:
-                    ref_range = ref_range.intersection(implicit_range)
-                except ValueError:
-                    raise InternalRepresentation.Inconsistent()
+            if self._options.implicit_ranges:
+                if not bknowl.term.is_variable():
+                    implicit_range = self._knowl._term_as_range(bknowl.term)
+                    try:
+                        ref_range = ref_range.intersection(implicit_range)
+                    except ValueError:
+                        raise InternalRepresentation.Inconsistent()
             L.extend(bknowl.as_atoms(ref_range, gand, self._options))
         # print(f'{L=!s}')
         known_subst = ref._subst.copy()
@@ -420,7 +432,7 @@ class InternalRepresentation(
             knowl = self._knowl.copy()
             subst = self._subst.copy()
         else:
-            knowl = _Knowledge()
+            knowl = _Knowledge(self._options)
             for bknowl in self._knowl:
                 if remove not in bknowl.term.vars():
                     knowl.add(bknowl)
@@ -455,7 +467,7 @@ class InternalRepresentation(
             else:
                 t = var - val.coefficient * val.variable
                 q = mpq(0)
-            range_ = _Range(False, EndPoint(q), EndPoint(q), False)
+            range_ = _Range.from_constant(EndPoint(q))
             bknowl = _BasicKnowledge(t, range_)
             result._propagate(bknowl)
         return result
@@ -581,6 +593,8 @@ class Simplify(abc.simplify.Simplify[
             _, factors = lhs.factor()
             square_free_lhs = Term(1)
             for factor in factors:
+                # factors need not be checked for definiteness because there
+                # will be a recursive call of simplify.
                 square_free_lhs *= factor
             # Definiteness tests on square-free part:
             square_free_definite = square_free_lhs.is_definite()

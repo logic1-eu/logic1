@@ -143,8 +143,8 @@ class EndPoint:
             return self.infinite_sign
 
 
-oo: Final[EndPoint] = EndPoint(None, 1)
-ZERO: Final[EndPoint] = EndPoint(mpq_ZERO)
+EP_INF: Final[EndPoint] = EndPoint(None, 1)
+EP_ZERO: Final[EndPoint] = EndPoint(mpq_ZERO)
 
 
 @cython.final
@@ -224,11 +224,7 @@ class _Range:
         return ret
 
     def __imul__(self, other: _Range) -> _Range:
-        if self.is_zero():
-            return self
-        if other.is_zero():
-            return self.iset(other)
-        elif self.is_point():
+        if self.is_point():
             h = self.start
             self.iset(other)
             return self.iscale(h)
@@ -260,7 +256,7 @@ class _Range:
         assert t2 > 0
         assert s1 <= t1
         if s1 < 0 and t1 < 0:
-            # ZERO is in the interior of both self and other
+            # EP_ZERO is in the interior of both self and other
             l1 = self.lopen or other.ropen
             p1 = self.start * other.end
             l2 = self.ropen or other.lopen
@@ -309,12 +305,12 @@ class _Range:
             #       (       )
             lopen = ((self.lopen or other.lopen) and (self.lopen or other.ropen)
                      and (self.ropen and other.lopen))
-            start = ZERO
+            start = EP_ZERO
             ropen = self.ropen or other.ropen
             end = self.end * other.end
         elif s1 == 0 and t1 > 0:
             lopen = self.lopen or (other.lopen and other.ropen)
-            start = ZERO
+            start = EP_ZERO
             assert s2 > 0
             end = self.end * other.end
             ropen = self.ropen or other.ropen
@@ -325,8 +321,8 @@ class _Range:
             ropen = self.ropen or other.ropen
         else:
             assert False, (s1, s2, t1, t2)
-        if ZERO not in self and ZERO not in other and start < ZERO < end:
-            exc = {ZERO}
+        if EP_ZERO not in self and EP_ZERO not in other and start < EP_ZERO < end:
+            exc = {EP_ZERO}
         else:
             exc = set()
         self.lopen = lopen
@@ -335,10 +331,10 @@ class _Range:
         self.ropen = ropen
         self.exc = exc
 
-    def __init__(self, lopen: cython.bint = True, start: EndPoint = -oo, end: EndPoint = oo,
+    def __init__(self, lopen: cython.bint = True, start: EndPoint = -EP_INF, end: EndPoint = EP_INF,
                  ropen: cython.bint = True, exc: set = set()) -> None:
-        assert lopen or start != -oo, self
-        assert ropen or end != oo, self
+        assert lopen or start != -EP_INF, self
+        assert ropen or end != EP_INF, self
         assert all(start < x < end for x in exc), self
         if start > end:
             raise ValueError("_Range cannot be empty")
@@ -361,7 +357,7 @@ class _Range:
         ...     from gmpy2 import mpq
         ...     return EndPoint(mpq(*args))
 
-        >>> print(_Range(True, ZERO, oo, True, {EP(1), EP(2)}) ** 0)
+        >>> print(_Range(True, EP_ZERO, EP_INF, True, {EP(1), EP(2)}) ** 0)
         [1, 1]
 
         >>> print(_Range(False, EP(-2), EP(1), True, {EP(-1)}) ** 2)
@@ -424,14 +420,14 @@ class _Range:
         return f'{left}{start}, {end}{right}{exc}'
 
     def abs(self) -> _Range:
-        if self.start >= ZERO:
+        if self.start >= EP_ZERO:
             return self
-        if self.end <= ZERO:
+        if self.end <= EP_ZERO:
             return _Range(self.ropen, -self.end, -self.start, self.lopen, {-p for p in self.exc})
         non_negative = _Range(
-            ZERO in self.exc, ZERO, self.end, self.ropen, {p for p in self.exc if p > ZERO})
+            EP_ZERO in self.exc, EP_ZERO, self.end, self.ropen, {p for p in self.exc if p > EP_ZERO})
         abs_of_negative = _Range(
-            True, ZERO, -self.start, self.lopen, {-p for p in self.exc if p < ZERO})
+            True, EP_ZERO, -self.start, self.lopen, {-p for p in self.exc if p < EP_ZERO})
         return non_negative.union(abs_of_negative)
     
     def copy(self) -> _Range:
@@ -514,7 +510,7 @@ class _Range:
 
     @cython.ccall
     def is_zero(self) -> cython.bint:
-        return self.is_point() and self.start == ZERO
+        return self.is_point() and self.start == EP_ZERO
     
     @cython.ccall
     def ineg(self) -> _Range:
@@ -547,11 +543,11 @@ class _Range:
         >>> print(r.minkowski_pow(6))
         [1, 64)
 
-        >>> r = _Range(True, -oo, oo, True, set())
+        >>> r = RANGE_R
         >>> print(r.minkowski_pow(6))
         (-oo, oo)
 
-        >>> r = _Range(True, -oo, EP(0), True, set())
+        >>> r = _Range(True, -EP_INF, EP(0), True, set())
         >>> print(r.minkowski_pow(2))
         (0, oo)
         >>> print(r.minkowski_pow(3))
@@ -567,55 +563,16 @@ class _Range:
             result = result * self
         return result
 
-    # @staticmethod
-    # def from_term(f: Term, knowl: _Knowledge) -> _Range:
-    #     """
-    #     >>> from logic1.theories.RCF import VV
-    #     >>> x, y = VV.get('x', 'y')
-    #     >>> print(_Range.from_term(Term(0), _Knowledge()))
-    #     [0, 0]
-    #     >>> f = x**2 + y**2
-    #     >>> print(_Range.from_term(f, _Knowledge()))
-    #     [0, oo)
-    #     >>> g = -x**2 - y**2 - 1
-    #     >>> print(_Range.from_term(g, _Knowledge()))
-    #     (-oo, -1]
-    #     >>> h = (x - y) ** 2
-    #     >>> print(_Range.from_term(h, _Knowledge()))
-    #     (-oo, oo)
-    #     >>> print(_Range.from_term(h, _Knowledge(
-    #     ...    {x: _Range(True, mpq(0), oo, True), y: _Range(True, -oo, mpq(0), True)})))
-    #     (0, oo)
-    #     >>> print(_Range.from_term(h, _Knowledge(
-    #     ...    {x: _Range(True, -oo, mpq(0), False), y: _Range(False, mpq(0), oo, True)})))
-    #     [0, oo)
-    #     """
-    #     R = _Range(True, -oo, oo, True, set())
-    #     poly_result = _Range.from_constant(mpq(0))
-    #     gens = f.poly.parent().gens()
-    #     for exponent, coefficient in f.poly.dict().items():
-    #         term_result = _Range.from_constant(mpq(coefficient))
-    #         for g, e in zip(gens, exponent):
-    #             ge_result = knowl.get(Term(g)) ** e
-    #             term_result = term_result * ge_result
-    #         poly_result = poly_result + term_result
-    #         if poly_result == R:
-    #             return R
-    #     return poly_result
-
     @cython.cfunc
     def scale(self, ep: EndPoint) -> _Range:
-        assert ep != ZERO
-        exc = {ep * point for point in self.exc}
-        if ep > ZERO:
-            return _Range(self.lopen, ep * self.start, ep * self.end, self.ropen, exc)
-        else:
-            return _Range(self.ropen, ep * self.end, ep * self.start, self.lopen, exc)
+        return self.copy().iscale(ep)
 
     @cython.cfunc
     def iscale(self, ep: EndPoint) -> _Range:
-        assert ep != ZERO
-        if ep > ZERO:
+        s = ep.sgn()
+        if s == 0:
+            return self.iset(RANGE_ZERO)
+        elif s == 1:
             self.start *= ep
             self.end *= ep
         else:
@@ -628,12 +585,12 @@ class _Range:
     def transform(self, scale_mpq: mpq, shift_mpq: mpq) -> _Range:
         scale = EndPoint(scale_mpq)
         shift = EndPoint(shift_mpq)
-        if scale > ZERO:
+        if scale > EP_ZERO:
             lopen = self.lopen
             start = scale * self.start + shift
             end = scale * self.end + shift
             ropen = self.ropen
-        elif scale < ZERO:
+        elif scale < EP_ZERO:
             lopen = self.ropen
             start = scale * self.end + shift
             end = scale * self.start + shift
@@ -664,3 +621,6 @@ class _Range:
             if p not in self:
                 final_exc.add(p)
         return _Range(self.lopen, self.start, end, ropen, final_exc)
+
+RANGE_R: Final[_Range] = _Range(True, -EP_INF, EP_INF, True)
+RANGE_ZERO: Final[_Range] = _Range.from_constant(EP_ZERO)
