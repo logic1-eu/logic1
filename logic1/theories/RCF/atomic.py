@@ -958,6 +958,26 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
                     assert False, (self, d)
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
+    def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
+        """Iterate over the summands of self yielding pairs of monomials and
+        coefficients.
+        """
+        n = self.polynomial_ring.sage_ring.ngens()
+        if n >= 32:
+            for m, c in zip(self.poly.monomials(), self.poly.coefficients()):
+                ret = {}
+                for v in m.variables():
+                    ret[Variable(v)] = int(m.degree(v))
+                yield ret, mpq(c)
+        else:
+            gens = self.polynomial_ring.sage_ring.gens()
+            for e, c in self.poly.iterator_exp_coeff(as_ETuples=False):
+                ret = {}
+                for i in range(n):
+                    if e[i] != 0:
+                        ret[Variable(gens[i])] = int(e[i])
+                yield ret, mpq(c)
+
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
@@ -968,7 +988,6 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         for g in self.poly.variables():
             yield Variable(g)
-
 
 # discuss: Variable inherits __init__, and we can create Variable(3), Variable(term.poly), etc.
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
