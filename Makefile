@@ -15,6 +15,7 @@ cython:
 
 cython-clean:
 	/bin/rm -f logic1/theories/RCF/range.c logic1/theories/RCF/range.html logic1/theories/RCF/range.cpython-*-darwin.so
+	/bin/rm -f logic1/theories/RCF/term.c logic1/theories/RCF/term.html logic1/theories/RCF/term.cpython-*-darwin.so
 	/bin/rm -f logic1/theories/RCF/substitution.c logic1/theories/RCF/substitution.html logic1/theories/RCF/substitution.cpython-*-darwin.so
 
 cython-html:
