@@ -28,4 +28,6 @@ output
 # Cython
 *.so
 *.c
+*.cpp
+
 /logic1/**/*.html

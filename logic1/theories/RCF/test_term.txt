@@ -1,0 +1,254 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF.term import *
+>>> from gmpy2 import mpq
+
+
+# class Ring
+
+# __init__
+>>> R = Ring(['x', 'y'])
+
+# __repr__
+>>> R
+Ring(['x', 'y'])
+
+# __str__
+>>> print(R)
+(QQ),(x,y),(Dp(2))
+
+# copy
+
+# coerce
+>>> S = Ring(['x'])
+
+>>> zero = Term(0)
+>>> zero._coerce(R)
+>>> zero
+0
+>>> zero._parent == R
+True
+
+>>> x = S.get_var_by_index(0)
+>>> x._coerce(R)
+>>> x
+x
+>>> x._parent == R
+True
+
+>>> y = R.get_var_by_index(1)
+>>> y._coerce(S)
+Traceback (most recent call last):
+...
+ValueError: cannot coerce from Ring(['x', 'y']) to Ring(['x'])
+
+>>> S = Ring(['x', 'z'])
+>>> T = Ring(['x', 'y', 'z'])
+>>> z = S.get_var_by_index(1)
+>>> z._coerce(T)
+>>> z._parent == T
+True
+
+#>>> S = Ring(['y', 'x'])
+#>>> x, y = R.get_vars()
+#>>> R, x._parent, y._parent
+#(Ring(['x', 'y']), Ring(['x', 'y']), Ring(['x', 'y']))
+#>>> f = x + y
+#>>> R, x._parent, y._parent, f._parent
+#(Ring(['x', 'y']), Ring(['y', 'x']), Ring(['y', 'x']), Ring(['y', 'x']))
+#>>> f
+#x + y
+#>>> f._parent == R
+#True
+#>>> f._coerce(S)
+#>>> f
+#y + x
+#>>> f._parent == S
+#True
+
+# get_names
+>>> list(R.get_names())
+['x', 'y']
+
+# get_vars
+>>> list(R.get_vars())
+[x, y]
+
+# var
+>>> R.get_var_by_index(0)
+x
+>>> R.get_var_by_index(1)
+y
+>>> R.get_var_by_index(2)
+Traceback (most recent call last):
+...
+AssertionError: Invalid index 2
+>>> R.get_var_by_index(0).__class__.__name__
+'Variable'
+
+
+# class Term
+
+# __add__
+>>> x, y = R.get_vars()
+>>> x + y
+x + y
+>>> y + x
+x + y
+>>> x + 1
+x + 1
+>>> 1 + x
+x + 1
+
+# __eq__
+>>> x == x
+True
+>>> x == y
+False
+
+# __hash__
+>>> d = {x: 1, y: 2}
+>>> d[x]
+1
+
+# __ init__
+>>> Term(Fraction(1, 2))
+1/2
+>>> Term(42)
+42
+>>> Term(mpq(1, 2))
+1/2
+
+# __mul__
+>>> x * y
+x*y
+>>> (x + y) * (y + x)
+x^2 + 2*x*y + y^2
+>>> x * 2
+2*x
+>>> 2 * x
+2*x
+
+# __neg__
+>>> -(x + y)
+-x - y
+
+# __pow__
+>>> f = x + y
+>>> f ** 0
+1
+>>> f ** 1
+x + y
+>>> f ** 2
+x^2 + 2*x*y + y^2
+>>> f ** 5
+x^5 + 5*x^4*y + 10*x^3*y^2 + 10*x^2*y^3 + 5*x*y^4 + y^5
+
+# __repr__
+>>> f = (x + y) ** 2
+>>> f
+x^2 + 2*x*y + y^2
+
+# __str__
+>>> print(f)
+x^2 + 2*x*y + y^2
+>>> print(Term(0))
+0
+>>> print(Term(1))
+1
+>>> print(Term(-1))
+-1
+>>> print(Term(2))
+2
+>>> print(Term(-2))
+-2
+>>> print(x)
+x
+>>> print(x - 2 * y)
+x - 2*y
+>>> print(2 * y - x)
+-x + 2*y
+>>> print((7 * x + y + mpq(-1, 2)) ** 2)
+49*x^2 + 14*x*y + y^2 - 7*x - y + 1/4
+
+# __sub__
+>>> x - y
+x - y
+>>> (x - y) * (x + y)
+x^2 - y^2
+>>> x - 1
+x - 1
+>>> 1 - x
+-x + 1
+
+# _dump
+>>> Term(0)._dump()
+class Term
+    _parent = None
+    _mpq: mpq = mpq(0,1)
+    _poly: cython.pointer[ring] = 0 (0)
+
+>>> (x - x)._dump()
+class Term
+    _parent: Ring = Ring(['x', 'y', 'z'])
+    _mpq: mpq = mpq(0,1)
+    _poly: cython.pointer[ring] = 0 (0)
+
+>>> Term(1)._dump()
+class Term
+        _parent = None
+        _mpq: mpq = mpq(1,1)
+        _poly: cython.pointer[ring] = 0 (0)
+
+# >>> x._dump()
+# class Variable
+#     _parent: Ring = Ring(['x', 'y', 'z'])
+#     _mpq: mpq = mpq(0,1)
+#     _poly: cython.pointer[ring] = 4697981520 (x)
+
+# >>> (x + 1)._dump()
+# class Term
+#     _parent: Ring = Ring(['x', 'y', 'z'])
+#     _mpq: mpq = mpq(0,1)
+#     _poly: cython.pointer[ring] = 4565182320 (x+1)
+
+# is_monomial
+>>> Term(0).is_monomial()
+False
+>>> Term(1).is_monomial()
+True
+>>> x.is_monomial()
+True
+>>> (x + 1).is_monomial()
+False
+>>> (x**2 * y).is_monomial()
+True
+>>> (2 * x**2 * y).is_monomial()
+False
+
+# is_variable
+>>> Term(0).is_variable()
+False
+>>> Term(1).is_variable()
+False
+>>> x.is_variable()
+True
+>>> (x ** 2).is_variable()
+False
+>>> (x * y).is_variable()
+False
+>>> (x + 1).is_variable()
+False
+
+# lc
+>>> f = mpq(-1, 2) * x ** 2 + x * y
+>>> f
+-1/2*x^2 + x*y
+>>> f.lc()
+mpq(-1,2)
+
+# summands
+>>> f = (x + y) ** 5
+>>> list(f.summands())
+[({x: 5}, mpq(1,1)), ({x: 4, y: 1}, mpq(5,1)), ({x: 3, y: 2}, mpq(10,1)),
+ ({x: 2, y: 3}, mpq(10,1)), ({x: 1, y: 4}, mpq(5,1)), ({y: 5}, mpq(1,1))]
+ 
