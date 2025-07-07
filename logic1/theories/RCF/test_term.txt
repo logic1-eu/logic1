@@ -2,94 +2,32 @@
 >>> from logic1.theories.RCF.term import *
 >>> from gmpy2 import mpq
 
+# class VariableSet
 
-# class Ring
+# __getitem__, __repr__
+>>> repr(VV)
+'{...}'
 
-# __init__
->>> R = Ring(['x', 'y'])
+>>> VV['a']
+a
 
-# __repr__
->>> R
-Ring(['x', 'y'])
+>>> repr(VV)
+'{a, ...}'
 
-# __str__
->>> print(R)
-(QQ),(x,y),(Dp(2))
+>>> VV.add_vars(('c', 'b'))
+>>> VV
+{a, b, c, ...}
 
-# copy
-
-# coerce
->>> S = Ring(['x'])
-
->>> zero = Term(0)
->>> zero._coerce(R)
->>> zero
-0
->>> zero._parent == R
-True
-
->>> x = S.get_var_by_index(0)
->>> x._coerce(R)
->>> x
-x
->>> x._parent == R
-True
-
->>> y = R.get_var_by_index(1)
->>> y._coerce(S)
-Traceback (most recent call last):
-...
-ValueError: cannot coerce from Ring(['x', 'y']) to Ring(['x'])
-
->>> S = Ring(['x', 'z'])
->>> T = Ring(['x', 'y', 'z'])
->>> z = S.get_var_by_index(1)
->>> z._coerce(T)
->>> z._parent == T
-True
-
-#>>> S = Ring(['y', 'x'])
-#>>> x, y = R.get_vars()
-#>>> R, x._parent, y._parent
-#(Ring(['x', 'y']), Ring(['x', 'y']), Ring(['x', 'y']))
-#>>> f = x + y
-#>>> R, x._parent, y._parent, f._parent
-#(Ring(['x', 'y']), Ring(['y', 'x']), Ring(['y', 'x']), Ring(['y', 'x']))
-#>>> f
-#x + y
-#>>> f._parent == R
-#True
-#>>> f._coerce(S)
-#>>> f
-#y + x
-#>>> f._parent == S
-#True
-
-# get_names
->>> list(R.get_names())
-['x', 'y']
-
-# get_vars
->>> list(R.get_vars())
-[x, y]
-
-# var
->>> R.get_var_by_index(0)
-x
->>> R.get_var_by_index(1)
-y
->>> R.get_var_by_index(2)
-Traceback (most recent call last):
-...
-AssertionError: Invalid index 2
->>> R.get_var_by_index(0).__class__.__name__
-'Variable'
+>>> VV.fresh()
+G0001
+>>> VV
+{G0001, a, b, c, ...}
 
 
 # class Term
 
 # __add__
->>> x, y = R.get_vars()
+>>> x, y = VV.get('x', 'y')
 >>> x + y
 x + y
 >>> y + x
@@ -104,11 +42,19 @@ x + 1
 True
 >>> x == y
 False
+>>> x - x == Term(0)
+True
+>>> x - x + 1 == Term(1)
+True
 
 # __hash__
 >>> d = {x: 1, y: 2}
 >>> d[x]
 1
+>>> hash(x - x) == hash(Term(0))
+True
+>>> hash(x - x + 1) == hash(Term(1))
+True
 
 # __ init__
 >>> Term(Fraction(1, 2))
@@ -180,6 +126,36 @@ x - 1
 >>> 1 - x
 -x + 1
 
+# as_variable
+>>> t = x + x - x
+>>> type(t)
+<class 'logic1.theories.RCF.term.Term'>
+>>> v = t.as_variable()
+>>> type(v)
+<class 'logic1.theories.RCF.term.Variable'>
+>>> v == t
+True
+
+# _coerce
+>>> c = Term(1)
+>>> c._parent is None
+True
+>>> c._parent == VV._ring
+False
+>>> c._coerce(VV._ring)
+>>> c._parent == VV._ring
+True
+
+>>> f = x + 1
+>>> f._parent == VV._ring
+True
+>>> _ = VV.fresh()
+>>> f._parent == VV._ring
+False
+>>> f._coerce(VV._ring)
+>>> f._parent == VV._ring
+True
+
 # _dump
 >>> Term(0)._dump()
 class Term
@@ -189,27 +165,27 @@ class Term
 
 >>> (x - x)._dump()
 class Term
-    _parent: Ring = Ring(['x', 'y', 'z'])
+    _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
     _mpq: mpq = mpq(0,1)
     _poly: cython.pointer[ring] = 0 (0)
 
 >>> Term(1)._dump()
 class Term
-        _parent = None
-        _mpq: mpq = mpq(1,1)
-        _poly: cython.pointer[ring] = 0 (0)
+    _parent = None
+    _mpq: mpq = mpq(1,1)
+    _poly: cython.pointer[ring] = 0 (0)
 
 # >>> x._dump()
 # class Variable
-#     _parent: Ring = Ring(['x', 'y', 'z'])
+#     _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
 #     _mpq: mpq = mpq(0,1)
-#     _poly: cython.pointer[ring] = 4697981520 (x)
+#     _poly: cython.pointer[ring] = 5776462632 (x)
 
 # >>> (x + 1)._dump()
 # class Term
-#     _parent: Ring = Ring(['x', 'y', 'z'])
+#     _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
 #     _mpq: mpq = mpq(0,1)
-#     _poly: cython.pointer[ring] = 4565182320 (x+1)
+#     _poly: cython.pointer[ring] = 5510505656 (x+1)
 
 # is_monomial
 >>> Term(0).is_monomial()
@@ -251,4 +227,50 @@ mpq(-1,2)
 >>> list(f.summands())
 [({x: 5}, mpq(1,1)), ({x: 4, y: 1}, mpq(5,1)), ({x: 3, y: 2}, mpq(10,1)),
  ({x: 2, y: 3}, mpq(10,1)), ({x: 1, y: 4}, mpq(5,1)), ({y: 5}, mpq(1,1))]
+>>> list(Term(0).summands())
+[]
+>>> list(Term(1).summands())
+[({}, mpq(1,1))]
  
+
+ # class Ring
+
+# __init__
+>>> R = VV._ring
+
+# __repr__
+>>> R
+Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
+
+# __str__
+>>> print(R)
+(QQ),(G0001,G0002,a,b,c,x,y),(Dp(7))
+
+# get_names
+>>> list(R.get_names())
+['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y']
+
+# get_var_by_index
+>>> R.get_var_by_index(2)
+a
+>>> R.get_var_by_index(6)
+y
+>>> R.get_var_by_index(7)
+Traceback (most recent call last):
+...
+AssertionError: Invalid index 7
+>>> R.get_var_by_index(0).__class__.__name__
+'Variable'
+
+# get_var_by_name
+>>> R.get_var_by_name('x')
+x
+>>> R.get_var_by_name('z')
+Traceback (most recent call last):
+...
+AssertionError: Invalid name z
+
+# get_vars
+>>> list(R.get_vars())
+[G0001, G0002, a, b, c, x, y]
+

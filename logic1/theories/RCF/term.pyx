@@ -49,9 +49,6 @@ class Ring:
         ring.ShortOut = 0  # disable Singular's short printing
         self._singular_ring = ring
 
-        global current_ring
-        current_ring = self
-
     def __repr__(self) -> str:
         names = ', '.join(repr(name) for name in self.get_names())
         return f'Ring([{names}])'
@@ -61,13 +58,13 @@ class Ring:
         """
         return rString(self._singular_ring).decode()
 
-    def get_names(self) -> Iterator(str):
+    def get_names(self) -> Iterator[str]:
         SR = self._singular_ring
         for name in SR.names[:SR.N]:
             yield name.decode()
     
     def get_var_by_index(self, index: int) -> Variable:
-        assert index in range(self._singular_ring.N), f'Invalid index {index}'
+        assert 0 <= index < self._singular_ring.N, f'Invalid index {index}'
         _p = p_ISet(1, self._singular_ring)
         p_SetExp(_p, index + 1, 1, self._singular_ring)
         p_Setm(_p, self._singular_ring)
@@ -126,9 +123,6 @@ class Ring:
         print()
     
 
-current_ring = cython.declare(Ring)
-
-
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
@@ -165,9 +159,12 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         self._ring = None
 
     def __repr__(self) -> str:
-        vars_ = self.polynomial_ring.get_vars()
-        s = ', '.join(str(g) for g in (*vars_, '...'))
-        return f'{{{s}}}'
+        if self._ring is None:
+            return '{...}'
+        else:
+            names = self._ring.get_names()
+            s = ', '.join(name for name in (*names, '...'))
+            return f'{{{s}}}'
 
     def add_vars(self, new_names: Iterable[str]) -> None:
 
@@ -178,17 +175,18 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             return base, n
 
         if self._ring is None:
-            names = []
+            names = set()
         else:
-            names = list(self._ring.get_names())
+            names = set(self._ring.get_names())
         have_appended = False
         for name in new_names:
             if name not in names:
-                names.append(name)
+                names.add(name)
                 have_appended = True
         if have_appended:
-            names.sort(key=sort_key)
-            self._ring = Ring(names)
+            names_as_list = list(names)
+            names_as_list.sort(key=sort_key)
+            self._ring = Ring(names_as_list)
 
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
@@ -222,6 +220,11 @@ The unique instance of :class:`.VariableSet`.
 """
 
 
+@cython.cfunc
+def _current_ring() -> Ring:
+    return cython.cast(Ring, VV._ring)
+
+
 @cython.cclass
 class Term:
 
@@ -233,24 +236,24 @@ class Term:
         if not isinstance(other, Term):
             return self + Term(other)
         _other = cython.cast(Term, other)
-        if current_ring is None:
+        if _current_ring() is None:
             assert self._parent is None and _other._parent is None
             return Term(self._mpq + _other._mpq)
-        self._coerce(current_ring)
-        _other._coerce(current_ring)
-        SR = current_ring._singular_ring
+        self._coerce(_current_ring())
+        _other._coerce(_current_ring())
+        SR = _current_ring()._singular_ring
         p1 = p_Copy(self._poly, SR)
         p2 = p_Copy(_other._poly, SR)
         sum = p_Add_q(p1, p2, SR)
-        return term(sum, current_ring)
+        return term(sum, _current_ring())
     
     def __eq__(self, other: Term) -> cython.bint:
-        if current_ring is None:
+        if _current_ring() is None:
             assert self._parent is None and other._parent is None
             return self._mpq == other._mpq
-        self._coerce(current_ring)
-        other._coerce(current_ring)
-        SR = current_ring._singular_ring
+        self._coerce(_current_ring())
+        other._coerce(_current_ring())
+        SR = _current_ring()._singular_ring
         ret: cython.bint = p_EqualPolys(self._poly, other._poly, SR)
         return ret
     
@@ -299,19 +302,19 @@ class Term:
         if not isinstance(other, Term):
             return self * Term(other)
         _other = cython.cast(Term, other)
-        if current_ring is None:
+        if _current_ring() is None:
             assert self._parent is None and _other._parent is None
             return Term(self._mpq * other._mpq)
-        self._coerce(current_ring)
-        other._coerce(current_ring)
-        SR = current_ring._singular_ring
+        self._coerce(_current_ring())
+        other._coerce(_current_ring())
+        SR = _current_ring()._singular_ring
         e1: cython.ulong = p_GetMaxExp(self._poly, SR)
         e2: cython.ulong = p_GetMaxExp(_other._poly, SR)
         e: cython.ulong = e1 + e2
         if unlikely(e > SR.bitmask):
             raise OverflowError(f'exponent overflow {e}')
         prod = pp_Mult_qq(self._poly, _other._poly, SR)
-        return term(prod, current_ring)
+        return term(prod, _current_ring())
     
     def __neg__(self):
         if self._parent is None:
@@ -418,16 +421,16 @@ class Term:
         if not isinstance(other, Term):
             return self - Term(other)
         _other = cython.cast(Term, other)
-        if current_ring is None:
+        if _current_ring() is None:
             assert self._parent is None and _other._parent is None
             return Term(self._mpq - _other._mpq)
-        self._coerce(current_ring)
-        _other._coerce(current_ring)
-        SR = current_ring._singular_ring
+        self._coerce(_current_ring())
+        _other._coerce(_current_ring())
+        SR = _current_ring()._singular_ring
         p1 = p_Copy(self._poly, SR)
         p2 = p_Copy(_other._poly, SR)
         difference = p_Sub(p1, p2, SR)
-        return term(difference, current_ring)
+        return term(difference, _current_ring())
 
     def as_variable(self) -> Variable:
         if not self.is_variable():
@@ -439,20 +442,13 @@ class Term:
         """
         if self._parent is R:
             return
-
+        
         if self._parent is None:
             n = R.mpq_to_number(self._mpq)
             self._poly = p_NSet(n, R._singular_ring)
             self._parent = R
             return
         
-        # discuss
-        # The following two lines once caused infinite recursions
-        # __str()__ -> __eq__() -> _coerce():
-        #
-        # self_names = [str(g) for g in self._parent.get_vars()]
-        # names = [str(g) for g in R.get_vars()]
-
         ind_map: list = []
         names = list(R.get_names())
         for name in self._parent.get_names():
@@ -463,7 +459,7 @@ class Term:
 
         self_SR: cython.pointer[ring] = self._parent._singular_ring
         SR: cython.pointer[ring] = R._singular_ring
-        assert SR != self_SR  # why? discuss
+        assert SR != self_SR
         assert self_SR.N <= SR.N
 
         ret = p_ISet(0, SR)
@@ -483,13 +479,6 @@ class Term:
         self._poly = ret
         self._parent = R
 
-    def copy(self) -> Term:
-        ret = Term(0)
-        ret._parent = self._parent
-        ret._mpq = self._mpq
-        ret._poly = self._poly
-        return ret
-    
     def _dump(self):
         """Dump type and attributes of self, for debugging.
         """

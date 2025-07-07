@@ -61,6 +61,7 @@ class VariableSet(Generic[χ]):
           * :meth:`get` -- obtain several variables simultaneously
           * :meth:`imp` -- import variables into global namespace
         """
+        ...
 
     @final
     def get(self, *args: str) -> tuple[χ, ...]:
