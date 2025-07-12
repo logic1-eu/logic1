@@ -98,6 +98,7 @@ cdef extern from "singular/Singular/libsingular.h":
 
     cdef long SR_INT                                            # integer conversion constant
 
+    void n_Delete(number **n, n_Procs_s *cf)                    # general number destructor
     void *omAlloc0(size_t size)                                 # memory allocation
     char *omStrDup(char *)
     unsigned long p_GetMaxExp(poly *p, ring *r)                 # get the maximal exponent in p
@@ -109,6 +110,7 @@ cdef extern from "singular/Singular/libsingular.h":
     int p_GetExp(poly *p, int v, ring *r)                       # get the exponent at index v of the monomial p in r, v starts at 1
     poly *p_Head(poly *p, ring *r)                              # return new copy of lm(p), coefficient copied, next=NULL, p may be NULL
     poly *p_Init(ring *r)                                       # return new empty monomial
+    int p_IsConstant(poly *, ring *)                            # TRUE if poly is constant
     poly *p_ISet(int i, ring *r)                                # return constant polynomial from int
     poly *p_Neg(poly *p, ring *r)                               # return -p, p is destroyed
     poly *p_NSet(number *n,ring *r)                             # return constant polynomial from number
@@ -116,7 +118,8 @@ cdef extern from "singular/Singular/libsingular.h":
     int p_SetExp(poly *p, int v, int e, ring *r)                # set the exponent e at index v for the monomial p, v starts at 1
     void p_Setm(poly *p, ring *r)                               # if SetExp is called on p, p_Setm needs to be called afterwards to finalize the change.
     char *p_String(poly *p, ring *r, ring *r)                   # return string representation of p
-    poly *p_Sub(poly *p1, poly *p2, const ring *r)                  # subtract p2 from p1, p1 and p2 are destroyed
+    poly *p_Sub(poly *p1, poly *p2, const ring *r)              # subtract p2 from p1, p1 and p2 are destroyed
+    poly *pp_Mult_nn(poly *p, number *n, ring *r)               # return p*n, p is const (i.e. copied)
     poly *pp_Mult_qq(poly *p, poly *q, ring *r)                 # return p*q, does neither destroy p nor q
     poly *pNext(poly *p)                                        # iterate through the monomials of p
     void rChangeCurrRing(ring *r)

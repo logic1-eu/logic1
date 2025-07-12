@@ -64,6 +64,11 @@ True
 >>> Term(mpq(1, 2))
 1/2
 
+# __iter__
+>>> t = (x - y + 2) ** 2
+>>> [(abs(coef), power_product) for coef, power_product in t]
+[(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x), (mpq(4,1), y), (mpq(4,1), 1)]
+
 # __mul__
 >>> x * y
 x*y
@@ -126,6 +131,23 @@ x - 1
 >>> 1 - x
 -x + 1
 
+# __truediv__
+>>> Term(2) / Term(3)
+2/3
+>>> x / 0
+Traceback (most recent call last):
+...
+ZeroDivisionError
+>>> x / x
+Traceback (most recent call last):
+...
+ValueError: non-constant divisor x
+>>> (x + y) ** 2 / 2
+1/2*x^2 + x*y + 1/2*y^2
+
+# as_fraction
+...
+
 # as_variable
 >>> t = x + x - x
 >>> type(t)
@@ -187,6 +209,18 @@ class Term
 #     _mpq: mpq = mpq(0,1)
 #     _poly: cython.pointer[ring] = 5510505656 (x+1)
 
+# is_constant:
+>>> Term(0).is_constant()
+True
+>>> Term(1).is_constant()
+True
+>>> Term(-2).is_constant()
+True
+>>> x.is_constant()
+False
+>>> ((x + y) ** 2).is_constant()
+False
+
 # is_monomial
 >>> Term(0).is_monomial()
 False
@@ -213,6 +247,16 @@ False
 >>> (x * y).is_variable()
 False
 >>> (x + 1).is_variable()
+False
+
+# is_zero
+>>> Term(0).is_zero()
+True
+>>> Term(1).is_zero()
+False
+>>> (x - x).is_zero()
+True
+>>> x.is_zero()
 False
 
 # lc

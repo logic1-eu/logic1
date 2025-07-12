@@ -257,7 +257,7 @@ class Term:
         ret: cython.bint = p_EqualPolys(self._poly, other._poly, SR)
         return ret
     
-    assert hash(mpq(0)) == 0  # so that mpq(0) hashes equally to cython.NULL in __hash__
+    assert hash(mpq(0)) == 0  # ensure that mpq(0) hashes equally to cython.NULL in __hash__
 
     def __hash__(self) -> int:
         if self._parent is None:
@@ -298,6 +298,23 @@ class Term:
         self._mpq = q
         self._parent = None
     
+    def __iter__(self) -> Iterator[tuple[mpq, Term]]:
+        """Iterate over the polynomial representation of the term, yielding
+        pairs of coefficients and power products.
+
+        >>> from gmpy2 import mpq
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> [(abs(coef), power_product) for coef, power_product in t]
+        [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x),
+         (mpq(4,1), y), (mpq(4,1), 1)]
+        """
+        for d, coef in self.summands():
+            power_product = Term(1)
+            for v in d:
+                power_product *= v ** d[v]
+            yield coef, power_product
+            
     def __mul__(self, other: object) -> Term:
         if not isinstance(other, Term):
             return self * Term(other)
@@ -431,6 +448,32 @@ class Term:
         p2 = p_Copy(_other._poly, SR)
         difference = p_Sub(p1, p2, SR)
         return term(difference, _current_ring())
+    
+    def __truediv__(self, other: object) -> Term:
+        """True division. `other` must be a non-zero constant.
+        """
+        # compare sage.src.sage.libs.singular.polynomial.singular_polynomial_div_coeff
+        if not isinstance(other, Term):
+            return self / Term(other)
+        _other = cython.cast(Term, other)
+        if _other.is_zero():
+            raise ZeroDivisionError()
+        if not _other.is_constant():
+            raise ValueError(f'non-constant divisor {_other}')
+        if _current_ring() is None:
+            assert self._parent is None and _other._parent is None
+            return Term(self._mpq / _other._mpq)
+        self._coerce(_current_ring())
+        _other._coerce(_current_ring())
+        SR = _current_ring()._singular_ring
+        n: cython.pointer[number] = p_GetCoeff(_other._poly, SR)
+        n = SR.cf.cfInvers(n, SR.cf)
+        quotient = pp_Mult_nn(self._poly, n, SR)
+        n_Delete(cython.address(n), SR.cf)  # discuss why address
+        return term(quotient, _current_ring())
+        
+    def as_fraction(self) -> mpq:
+        ...
 
     def as_variable(self) -> Variable:
         if not self.is_variable():
@@ -493,6 +536,16 @@ class Term:
         poly = p_String(self._poly, SR, SR).decode()
         print(f'    _poly: cython.pointer[ring] = {a} ({poly})')
 
+    def is_constant(self) -> bool:
+        """Return :obj:`True` if this term is constant.
+        """
+        if self._parent is None:
+            return True
+        elif p_IsConstant(self._poly, self._parent._singular_ring):
+            return True
+        else:
+            return False
+
     def is_monomial(self) -> cython.bint:
         """Return :obj:`True` if this term is a monomial.
         """
@@ -518,6 +571,14 @@ class Term:
         if p_Deg(self._poly, self._parent._singular_ring) != 1:
             return False
         return True
+
+    def is_zero(self) -> bool:
+        """Return :obj:`True` if this term is a zero.
+        """
+        if self._parent is None:
+            return self._mpq == 0
+        else:
+            return self._poly == cython.NULL
 
     def lc(self) -> mpq:
         if self._parent is None:
