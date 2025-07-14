@@ -19,12 +19,23 @@ class Ring:
 
     _singular_ring = cython.declare(cython.pointer[ring])
 
-    def __init__(self, generator_names: list[str]):
+    def __init__(self, generators: Iterable[str]):
+        
+        def sort_key(s: str) -> tuple[str, int]:
+            base = s.rstrip('0123456789')
+            index = s[len(base):]
+            n = int(index) if index else -1
+            return base, n
+
+        generator_names = list(generators)
+        generator_names.sort(key=sort_key)
+
         n: cython.int = len(generator_names)
 
         if n == 0:
             raise ValueError('Ring requires at least one generator')
 
+        assert all(generator_names[i] != generator_names[i - 1] for i in range(1, n))
         names = cython.cast(cython.pp_char, omAlloc0(n * cython.sizeof(cython.p_char)))
         for i in range(n):
             names[i] = omStrDup(generator_names[i].encode())
@@ -48,6 +59,21 @@ class Ring:
             raise ValueError("Failed to allocate Singular ring")
         ring.ShortOut = 0  # disable Singular's short printing
         self._singular_ring = ring
+
+    def __or__(self, other: Ring) -> Ring:
+        if self is other:
+            return self
+        if self._singular_ring.N < other._singular_ring.N:
+            self, other = other, self
+        names = set(self.get_names())
+        is_subset = True
+        for name in other.get_names():
+            if name not in names:
+                names.add(name)
+                is_subset = False
+        if is_subset:
+            return self
+        return Ring(names)
 
     def __repr__(self) -> str:
         names = ', '.join(repr(name) for name in self.get_names())
@@ -138,13 +164,20 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             -- import variables into global namespace
     """
 
-    _ring: Optional[Ring]
     _stack: list[Optional[Ring]]
 
     # required by the abstract parent class
     @property
     def stack(self) -> list[Optional[Ring]]:
         return self._stack
+    
+    @property
+    def _ring(self) -> Optional[Ring]:
+        return self._stack[-1]
+    
+    @_ring.setter
+    def _ring(self, R: Optional[Ring]) -> None:
+        self._stack[-1] = R
     
     def __getitem__(self, name: str) -> Variable:
         """Implements abstract method
@@ -156,7 +189,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return self._ring.get_var_by_name(name)
             
     def __init__(self) -> None:
-        self._ring = None
+        self._stack = [None]
 
     def __repr__(self) -> str:
         if self._ring is None:
@@ -188,13 +221,23 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             names_as_list.sort(key=sort_key)
             self._ring = Ring(names_as_list)
 
+    def _drop(self) -> None:
+        from . import cache_clear
+        if len(self._stack) < 2:
+            raise ValueError('ignoring _drop at bottom of stack')
+        self._stack.pop()
+        cache_clear()
+
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
         ..., G9999, G10000, ... This naming convention is inspired by Lisp's
         gensym(). If the optional argument :data:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        names = set(self._ring.get_names())
+        if self._ring is None:
+            names = set()
+        else:
+            names = set(self._ring.get_names())
         i = 1
         v = f'G{i:04d}{suffix}'
         while v in names:
@@ -202,15 +245,28 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             v = f'G{i:04d}{suffix}'
         self.add_vars((v,))
         return self._ring.get_var_by_name(v)
-
-    def pop(self) -> None:
+    
+    def merge(self) -> None:
         from . import cache_clear
-        ...
+        if len(self._stack) < 2:
+            raise ValueError('ignoring merge at bottom of stack')
+        if self._stack[-1] is not None:
+            names = self._stack[-1].get_names()
+            del self.stack[-1]
+            self.add_vars(names)
+        else:
+            del self.stack[-1]
         cache_clear()
 
+    def pop(self) -> None:
+        raise NotImplementedError()
+
     def push(self) -> None:
+        raise NotImplementedError()
+
+    def stash(self) -> None:
         from . import cache_clear
-        ...
+        self._stack.append(None)
         cache_clear()
 
 
@@ -469,11 +525,19 @@ class Term:
         n: cython.pointer[number] = p_GetCoeff(_other._poly, SR)
         n = SR.cf.cfInvers(n, SR.cf)
         quotient = pp_Mult_nn(self._poly, n, SR)
-        n_Delete(cython.address(n), SR.cf)  # discuss why address
+        n_Delete(cython.address(n), SR.cf)
         return term(quotient, _current_ring())
         
+    def __xor__(self, other: object) -> Term:
+        raise NotImplementedError(
+            "Use ** for exponentiation, not '^', which means xor "
+            "in Python, and has the wrong precedence")
+
     def as_fraction(self) -> mpq:
-        ...
+        # Rename to as_constant
+        if not self.is_constant():
+            raise ValueError(f'{self} is not constant')
+        return self.constant_coefficient()
 
     def as_variable(self) -> Variable:
         if not self.is_variable():
@@ -522,6 +586,23 @@ class Term:
         self._poly = ret
         self._parent = R
 
+    def constant_coefficient(self) -> mpq:
+        """Return the constant coefficient of this Term.
+        """
+        # Compare sage.rings.polynomial.multi_polynomial_libsingular.constant_coefficient
+        if self._parent is None:
+            return self._mpq
+        SR = self._parent._singular_ring
+        p = self._poly
+        if p == cython.NULL:
+            return mpq(0)
+        while p.next:
+            p = pNext(p)
+        if p_LmIsConstant(p, SR):
+            return self._parent.number_to_mpq(p_GetCoeff(p, SR))
+        else:
+            return mpq(0)
+            
     def _dump(self):
         """Dump type and attributes of self, for debugging.
         """
@@ -536,15 +617,13 @@ class Term:
         poly = p_String(self._poly, SR, SR).decode()
         print(f'    _poly: cython.pointer[ring] = {a} ({poly})')
 
-    def is_constant(self) -> bool:
+    def is_constant(self) -> cython.bint:
         """Return :obj:`True` if this term is constant.
         """
         if self._parent is None:
             return True
-        elif p_IsConstant(self._poly, self._parent._singular_ring):
-            return True
         else:
-            return False
+            return p_IsConstant(self._poly, self._parent._singular_ring) == 1
 
     def is_monomial(self) -> cython.bint:
         """Return :obj:`True` if this term is a monomial.
@@ -572,7 +651,7 @@ class Term:
             return False
         return True
 
-    def is_zero(self) -> bool:
+    def is_zero(self) -> cython.bint:
         """Return :obj:`True` if this term is a zero.
         """
         if self._parent is None:

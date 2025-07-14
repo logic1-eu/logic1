@@ -48,7 +48,10 @@ cdef extern from "singular/Singular/libsingular.h":
   
     ctypedef struct p_Procs_s "p_Procs_s"                       # polynomial procs
     
-    ctypedef struct poly "spolyrec"                             # polynomials
+    ctypedef struct poly "spolyrec":                            # polynomials
+        poly *next
+        number *coef
+        unsigned long exp[1]
 
     ctypedef struct ring "ip_sring":                            # rings
         int  *order            # array of orderings
@@ -112,6 +115,7 @@ cdef extern from "singular/Singular/libsingular.h":
     poly *p_Init(ring *r)                                       # return new empty monomial
     int p_IsConstant(poly *, ring *)                            # TRUE if poly is constant
     poly *p_ISet(int i, ring *r)                                # return constant polynomial from int
+    int p_LmIsConstant(poly *p, ring *)                         # like p_IsConstant but p must be != NULL
     poly *p_Neg(poly *p, ring *r)                               # return -p, p is destroyed
     poly *p_NSet(number *n,ring *r)                             # return constant polynomial from number
     int p_SetCoeff(poly *p, number *n, ring *r)                 # set the coefficient n for the current list element p in r

@@ -1,320 +1,484 @@
+"""
 >>> from logic1 import *
 >>> from logic1.theories.RCF.term import *
 >>> from gmpy2 import mpq
 
-# class VariableSet
+"""
 
-# __getitem__, __repr__
->>> repr(VV)
-'{...}'
+class Ring:
+    """
+    The attribute R._singular_ring is not visible in Python.
 
->>> VV['a']
-a
+    Test __init__:
+    >>> R = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
 
->>> repr(VV)
-'{a, ...}'
+    Test __repr__:
+    >>> R
+    Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
 
->>> VV.add_vars(('c', 'b'))
->>> VV
-{a, b, c, ...}
+    Test __str__:
+    >>> print(R)
+    (QQ),(G0001,G0002,a,b,c,x,y),(Dp(7))
 
->>> VV.fresh()
-G0001
->>> VV
-{G0001, a, b, c, ...}
+    Test get_names:
+    >>> list(R.get_names())
+    ['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y']
 
+    Test get_var_by_index:
+    >>> R.get_var_by_index(2)
+    a
+    >>> R.get_var_by_index(6)
+    y
+    >>> R.get_var_by_index(7)
+    Traceback (most recent call last):
+    ...
+    AssertionError: Invalid index 7
+    >>> R.get_var_by_index(0).__class__.__name__
+    'Variable'
 
-# class Term
+    Test get_var_by_name:
+    >>> R.get_var_by_name('x')
+    x
+    >>> R.get_var_by_name('z')
+    Traceback (most recent call last):
+    ...
+    AssertionError: Invalid name z
 
-# __add__
->>> x, y = VV.get('x', 'y')
->>> x + y
-x + y
->>> y + x
-x + y
->>> x + 1
-x + 1
->>> 1 + x
-x + 1
+    Test get_vars:
+    >>> list(R.get_vars())
+    [G0001, G0002, a, b, c, x, y]
 
-# __eq__
->>> x == x
-True
->>> x == y
-False
->>> x - x == Term(0)
-True
->>> x - x + 1 == Term(1)
-True
+    The methods mpq_to_number, number_to_mpq are not visible in Python.
 
-# __hash__
->>> d = {x: 1, y: 2}
->>> d[x]
-1
->>> hash(x - x) == hash(Term(0))
-True
->>> hash(x - x + 1) == hash(Term(1))
-True
+    The method rPrint uses a C function, which prints to stdout in such a way
+    that the output cannot be checked in a doctest.
+    """
 
-# __ init__
->>> Term(Fraction(1, 2))
-1/2
->>> Term(42)
-42
->>> Term(mpq(1, 2))
-1/2
+class VariableSet:
+    """
+    We test stash, merge, and stack early, because many of the subsequent tests
+    rely on those:
+    >>> VV['a']
+    a
+    >>> VV['c']
+    c
+    >>> VV.stash()
+    >>> VV['b']
+    b
+    >>> VV['d']
+    d
+    >>> VV.stack
+    [Ring(['a', 'c']), Ring(['b', 'd'])]
+    >>> VV.merge()
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd'])]
 
-# __iter__
->>> t = (x - y + 2) ** 2
->>> [(abs(coef), power_product) for coef, power_product in t]
-[(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x), (mpq(4,1), y), (mpq(4,1), 1)]
+    Test the property _ring:
+    >>> VV._ring
+    Ring(['a', 'b', 'c', 'd'])
 
-# __mul__
->>> x * y
-x*y
->>> (x + y) * (y + x)
-x^2 + 2*x*y + y^2
->>> x * 2
-2*x
->>> 2 * x
-2*x
+    Test the setter for _ring:
+    >>> VV.stash()
+    >>> VV['will_be_lost']
+    will_be_lost
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd']), Ring(['will_be_lost'])]
+    >>> VV._ring = None
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd']), None]
+    >>> VV._drop()
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd'])]
 
-# __neg__
->>> -(x + y)
--x - y
+    Test __getitem__:
+    >>> VV.stash()
+    >>> repr(VV)
+    '{...}'
+    >>> VV['a']
+    a
 
-# __pow__
->>> f = x + y
->>> f ** 0
-1
->>> f ** 1
-x + y
->>> f ** 2
-x^2 + 2*x*y + y^2
->>> f ** 5
-x^5 + 5*x^4*y + 10*x^3*y^2 + 10*x^2*y^3 + 5*x*y^4 + y^5
+    Test __init__:
+    >>> VariableSet()
+    {...}
 
-# __repr__
->>> f = (x + y) ** 2
->>> f
-x^2 + 2*x*y + y^2
+    Test __repr__:
+    >>> repr(VV)
+    '{a, ...}'
 
-# __str__
->>> print(f)
-x^2 + 2*x*y + y^2
->>> print(Term(0))
-0
->>> print(Term(1))
-1
->>> print(Term(-1))
--1
->>> print(Term(2))
-2
->>> print(Term(-2))
--2
->>> print(x)
-x
->>> print(x - 2 * y)
-x - 2*y
->>> print(2 * y - x)
--x + 2*y
->>> print((7 * x + y + mpq(-1, 2)) ** 2)
-49*x^2 + 14*x*y + y^2 - 7*x - y + 1/4
+    Test add_vars:
+    >>> VV.add_vars(('c', 'b'))
+    >>> VV
+    {a, b, c, ...}
 
-# __sub__
->>> x - y
-x - y
->>> (x - y) * (x + y)
-x^2 - y^2
->>> x - 1
-x - 1
->>> 1 - x
--x + 1
+    Test fresh:
+    >>> VV.fresh()
+    G0001
+    >>> VV
+    {G0001, a, b, c, ...}
+    >>> VV['d']
+    d
+    >>> VV.fresh()
+    G0002
 
-# __truediv__
->>> Term(2) / Term(3)
-2/3
->>> x / 0
-Traceback (most recent call last):
-...
-ZeroDivisionError
->>> x / x
-Traceback (most recent call last):
-...
-ValueError: non-constant divisor x
->>> (x + y) ** 2 / 2
-1/2*x^2 + x*y + 1/2*y^2
+    Test merge:
+    >>> VV.stash()
+    >>> VV.fresh()
+    G0001
 
-# as_fraction
-...
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd']), Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd']), Ring(['G0001'])]
+    >>> VV.merge()
+    >>> VV.stack
+    [Ring(['a', 'b', 'c', 'd']), Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
+    >>> VV.merge()
+    >>> VV.stack
+    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
 
-# as_variable
->>> t = x + x - x
->>> type(t)
-<class 'logic1.theories.RCF.term.Term'>
->>> v = t.as_variable()
->>> type(v)
-<class 'logic1.theories.RCF.term.Variable'>
->>> v == t
-True
+    Test merge at bottom of stack:
+    >>> VV.merge()
+    Traceback (most recent call last):
+    ...
+    ValueError: ignoring merge at bottom of stack
+    >>> VV.stack
+    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
 
-# _coerce
->>> c = Term(1)
->>> c._parent is None
-True
->>> c._parent == VV._ring
-False
->>> c._coerce(VV._ring)
->>> c._parent == VV._ring
-True
+    Test _drop:
+    >>> VV.stash()
+    >>> VV['will_be_lost']
+    will_be_lost
+    >>> VV.stack
+    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd']), Ring(['will_be_lost'])]
+    >>> VV._drop()
+    >>> VV.stack
+    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
 
->>> f = x + 1
->>> f._parent == VV._ring
-True
->>> _ = VV.fresh()
->>> f._parent == VV._ring
-False
->>> f._coerce(VV._ring)
->>> f._parent == VV._ring
-True
+    Test _drop at bottom of stack:
+    >>> VV._drop()
+    Traceback (most recent call last):
+    ...
+    ValueError: ignoring _drop at bottom of stack
 
-# _dump
->>> Term(0)._dump()
-class Term
-    _parent = None
-    _mpq: mpq = mpq(0,1)
-    _poly: cython.pointer[ring] = 0 (0)
+    Test get, which is inherited from logic1.firstorder.atomic.VariableSet:
+    >>> VV.get('d', 'e')
+    (d, e)
 
->>> (x - x)._dump()
-class Term
-    _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
-    _mpq: mpq = mpq(0,1)
-    _poly: cython.pointer[ring] = 0 (0)
+    The method imp also inherited from logic1.firstorder.atomic.VariableSet
+    cannot be tested because we are not interactive here.
 
->>> Term(1)._dump()
-class Term
-    _parent = None
-    _mpq: mpq = mpq(1,1)
-    _poly: cython.pointer[ring] = 0 (0)
+    >>> VV.stack
+    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd', 'e'])]
 
-# >>> x._dump()
-# class Variable
-#     _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
-#     _mpq: mpq = mpq(0,1)
-#     _poly: cython.pointer[ring] = 5776462632 (x)
+    """
 
-# >>> (x + 1)._dump()
-# class Term
-#     _parent: Ring = Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
-#     _mpq: mpq = mpq(0,1)
-#     _poly: cython.pointer[ring] = 5510505656 (x+1)
+class Term:
+    """
+    We stash any exisiting Ring so that our tests here are independent of
+    previous tests in this file:
+    >>> VV.stash()
 
-# is_constant:
->>> Term(0).is_constant()
-True
->>> Term(1).is_constant()
-True
->>> Term(-2).is_constant()
-True
->>> x.is_constant()
-False
->>> ((x + y) ** 2).is_constant()
-False
+    Test __add__:
+    >>> x, y = VV.get('x', 'y')
+    >>> x + y
+    x + y
+    >>> y + x
+    x + y
+    >>> x + 1
+    x + 1
 
-# is_monomial
->>> Term(0).is_monomial()
-False
->>> Term(1).is_monomial()
-True
->>> x.is_monomial()
-True
->>> (x + 1).is_monomial()
-False
->>> (x**2 * y).is_monomial()
-True
->>> (2 * x**2 * y).is_monomial()
-False
+    Test __radd__:
+    >>> 1 + x
+    x + 1
 
-# is_variable
->>> Term(0).is_variable()
-False
->>> Term(1).is_variable()
-False
->>> x.is_variable()
-True
->>> (x ** 2).is_variable()
-False
->>> (x * y).is_variable()
-False
->>> (x + 1).is_variable()
-False
+    Test __eq__:
+    >>> x == x
+    True
+    >>> x == y
+    False
+    >>> x - x == Term(0)
+    True
+    >>> x - x + 1 == Term(1)
+    True
 
-# is_zero
->>> Term(0).is_zero()
-True
->>> Term(1).is_zero()
-False
->>> (x - x).is_zero()
-True
->>> x.is_zero()
-False
+    The following is an invariant required by __hash__. It is asserted on the
+    toplevel of the class. We double-check here:
+    >>> hash(mpq(0)) == 0
+    True
 
-# lc
->>> f = mpq(-1, 2) * x ** 2 + x * y
->>> f
--1/2*x^2 + x*y
->>> f.lc()
-mpq(-1,2)
+    Test __hash__:
+    >>> d = {x: 1, y: 2}
+    >>> d[x]
+    1
+    >>> hash(x - x) == hash(Term(0))
+    True
+    >>> hash(x - x + 1) == hash(Term(1))
+    True
 
-# summands
->>> f = (x + y) ** 5
->>> list(f.summands())
-[({x: 5}, mpq(1,1)), ({x: 4, y: 1}, mpq(5,1)), ({x: 3, y: 2}, mpq(10,1)),
- ({x: 2, y: 3}, mpq(10,1)), ({x: 1, y: 4}, mpq(5,1)), ({y: 5}, mpq(1,1))]
->>> list(Term(0).summands())
-[]
->>> list(Term(1).summands())
-[({}, mpq(1,1))]
- 
+    Test __ init__:
+    >>> Term(Fraction(1, 2))
+    1/2
+    >>> Term(42)
+    42
+    >>> Term(mpq(1, 2))
+    1/2
 
- # class Ring
+    Test __iter__:
+    >>> t = (x - y + 2) ** 2
+    >>> [(abs(coef), power_product) for coef, power_product in t]
+    [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x), (mpq(4,1), y), (mpq(4,1), 1)]
 
-# __init__
->>> R = VV._ring
+    Test __mul__:
+    >>> x * y
+    x*y
+    >>> (x + y) * (y + x)
+    x^2 + 2*x*y + y^2
+    >>> x * 2
+    2*x
 
-# __repr__
->>> R
-Ring(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
+    Test __rmul__:
+    >>> 2 * x
+    2*x
 
-# __str__
->>> print(R)
-(QQ),(G0001,G0002,a,b,c,x,y),(Dp(7))
+    Test __neg__:
+    >>> -(x + y)
+    -x - y
 
-# get_names
->>> list(R.get_names())
-['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y']
+    Test __pow__:
+    >>> f = x + y
+    >>> f ** 0
+    1
+    >>> f ** 1
+    x + y
+    >>> f ** 2
+    x^2 + 2*x*y + y^2
+    
+    The following is for repeated squaring:
+    >>> f ** 5
+    x^5 + 5*x^4*y + 10*x^3*y^2 + 10*x^2*y^3 + 5*x*y^4 + y^5
 
-# get_var_by_index
->>> R.get_var_by_index(2)
-a
->>> R.get_var_by_index(6)
-y
->>> R.get_var_by_index(7)
-Traceback (most recent call last):
-...
-AssertionError: Invalid index 7
->>> R.get_var_by_index(0).__class__.__name__
-'Variable'
+    Test __repr__:
+    >>> f = (x + y) ** 2
+    >>> f
+    x^2 + 2*x*y + y^2
 
-# get_var_by_name
->>> R.get_var_by_name('x')
-x
->>> R.get_var_by_name('z')
-Traceback (most recent call last):
-...
-AssertionError: Invalid name z
+    Test __str__:
+    >>> print(f)
+    x^2 + 2*x*y + y^2
+    >>> print(Term(0))
+    0
+    >>> print(Term(1))
+    1
+    >>> print(Term(-1))
+    -1
+    >>> print(Term(2))
+    2
+    >>> print(Term(-2))
+    -2
+    >>> print(x)
+    x
+    >>> print(x - 2 * y)
+    x - 2*y
+    >>> print(2 * y - x)
+    -x + 2*y
+    >>> print((7 * x + y + mpq(-1, 2)) ** 2)
+    49*x^2 + 14*x*y + y^2 - 7*x - y + 1/4
 
-# get_vars
->>> list(R.get_vars())
-[G0001, G0002, a, b, c, x, y]
+    Test __sub__:
+    >>> x - y
+    x - y
+    >>> (x - y) * (x + y)
+    x^2 - y^2
+    >>> x - 1
+    x - 1
 
+    Test __rsub__:
+    >>> 1 - x
+    -x + 1
+
+    Test __truediv__:
+    >>> Term(2) / Term(3)
+    2/3
+    >>> x / 0
+    Traceback (most recent call last):
+    ...
+    ZeroDivisionError
+    >>> x / x
+    Traceback (most recent call last):
+    ...
+    ValueError: non-constant divisor x
+    >>> (x + y) ** 2 / 2
+    1/2*x^2 + x*y + 1/2*y^2
+
+    Test as_fraction
+    ...
+
+    Test as_variable:
+    >>> t = x + x - x
+    >>> type(t)
+    <class 'logic1.theories.RCF.term.Term'>
+    >>> v = t.as_variable()
+    >>> type(v)
+    <class 'logic1.theories.RCF.term.Variable'>
+    >>> v == t
+    True
+
+    Test _coerce:
+    >>> c = Term(1)
+    >>> c._parent is None
+    True
+    >>> c._parent == VV._ring
+    False
+    >>> c._coerce(VV._ring)
+    >>> c._parent == VV._ring
+    True
+
+    >>> f = x + 1
+    >>> f._parent == VV._ring
+    True
+    >>> _ = VV.fresh()
+    >>> f._parent == VV._ring
+    False
+    >>> f._coerce(VV._ring)
+    >>> f._parent == VV._ring
+    True
+
+    >>> VV.stash()
+    >>> will_be_lost = VV['will_be_lost']
+    >>> VV._drop()
+    >>> will_be_lost._coerce(VV._ring)
+    Traceback (most recent call last):
+    ...
+    ValueError: cannot coerce from Ring(['will_be_lost']) to Ring(['G0001', 'x', 'y'])
+
+    Test constant_coefficient:
+    >>> Term(0).constant_coefficient()
+    mpq(0,1)
+    >>> Term(-2).constant_coefficient()
+    mpq(-2,1)
+
+    >>> (x - x).constant_coefficient()
+    mpq(0,1)
+    >>> f = 3 * x**2
+    >>> f.constant_coefficient()
+    mpq(0,1)
+    >>> f = 3 * x**2 - 2 * y + 7 * x**2 * y**2 + 5
+    >>> f.constant_coefficient()
+    mpq(5,1)
+
+    Test _dump:
+    >>> Term(0)._dump()
+    class Term
+        _parent = None
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = 0 (0)
+
+    >>> (x - x)._dump()
+    class Term
+        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = 0 (0)
+
+    >>> Term(1)._dump()
+    class Term
+        _parent = None
+        _mpq: mpq = mpq(1,1)
+        _poly: cython.pointer[ring] = 0 (0)
+
+    >>> x._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x)
+
+    >>> (x + 1)._dump()  # doctest: +ELLIPSIS
+    class Term
+        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x+1)
+
+    Test is_constant::
+    >>> Term(0).is_constant()
+    True
+    >>> Term(1).is_constant()
+    True
+    >>> Term(-2).is_constant()
+    True
+    >>> (x - x).is_constant()
+    True
+    >>> x.is_constant()
+    False
+    >>> ((x + y) ** 2).is_constant()
+    False
+
+    Test is_monomial:
+    >>> Term(0).is_monomial()
+    False
+    >>> Term(1).is_monomial()
+    True
+    >>> (x - x).is_monomial()
+    False
+    >>> (x - x + 1).is_monomial()
+    True
+    >>> x.is_monomial()
+    True
+    >>> (x + 1).is_monomial()
+    False
+    >>> (x**2 * y).is_monomial()
+    True
+    >>> (2 * x**2 * y).is_monomial()
+    False
+
+    Test is_variable:
+    >>> Term(0).is_variable()
+    False
+    >>> Term(1).is_variable()
+    False
+    >>> (x - x).is_variable()
+    False
+    >>> (x - x + 1).is_variable()
+    False
+    >>> x.is_variable()
+    True
+    >>> (x ** 2).is_variable()
+    False
+    >>> (x * y).is_variable()
+    False
+    >>> (x + 1).is_variable()
+    False
+
+    Test is_zero:
+    >>> Term(0).is_zero()
+    True
+    >>> Term(1).is_zero()
+    False
+    >>> (x - x).is_zero()
+    True
+    >>> x.is_zero()
+    False
+
+    Test lc:
+    >>> Term(0).lc()
+    mpq(0,1)
+    >>> Term(1).lc()
+    mpq(1,1)
+    >>> (x - x).lc()
+    mpq(0,1)
+    >>> (x - x + 1).lc()
+    mpq(1,1)
+    >>> f = mpq(-1, 2) * x ** 2 + x * y
+    >>> f
+    -1/2*x^2 + x*y
+    >>> f.lc()
+    mpq(-1,2)
+
+    Test summands:
+    >>> f = (x + y) ** 5
+    >>> list(f.summands())
+    [({x: 5}, mpq(1,1)), ({x: 4, y: 1}, mpq(5,1)), ({x: 3, y: 2}, mpq(10,1)),
+     ({x: 2, y: 3}, mpq(10,1)), ({x: 1, y: 4}, mpq(5,1)), ({y: 5}, mpq(1,1))]
+    >>> list(Term(0).summands())
+    []
+    >>> list(Term(1).summands())
+    [({}, mpq(1,1))]
+
+    """
+    
