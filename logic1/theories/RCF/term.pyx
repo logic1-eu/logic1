@@ -20,15 +20,8 @@ class Ring:
     _singular_ring = cython.declare(cython.pointer[ring])
 
     def __init__(self, generators: Iterable[str]):
-        
-        def sort_key(s: str) -> tuple[str, int]:
-            base = s.rstrip('0123456789')
-            index = s[len(base):]
-            n = int(index) if index else -1
-            return base, n
-
         generator_names = list(generators)
-        generator_names.sort(key=sort_key)
+        generator_names.sort(key=Ring.sort_key)
 
         n: cython.int = len(generator_names)
 
@@ -147,6 +140,13 @@ class Ring:
     def rPrint(self):
         rPrint(self._singular_ring)
         print()
+
+    @staticmethod
+    def sort_key(s: str) -> tuple[str, int]:
+        base = s.rstrip('0123456789')
+        index = s[len(base):]
+        n = int(index) if index else -1
+        return base, n
     
 
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
@@ -164,20 +164,20 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             -- import variables into global namespace
     """
 
-    _stack: list[Optional[Ring]]
+    _stack: list[set[str]]
 
     # required by the abstract parent class
     @property
-    def stack(self) -> list[Optional[Ring]]:
+    def stack(self) -> list[set[str]]:
         return self._stack
     
     @property
-    def _ring(self) -> Optional[Ring]:
+    def _used(self) -> set[str]:
         return self._stack[-1]
     
-    @_ring.setter
-    def _ring(self, R: Optional[Ring]) -> None:
-        self._stack[-1] = R
+    @_used.setter
+    def _used(self, names: set[str]) -> None:
+        self._stack[-1] = names
     
     def __getitem__(self, name: str) -> Variable:
         """Implements abstract method
@@ -185,48 +185,22 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         """
         if not isinstance(name, str):
             raise ValueError(f'expecting string as index; {name} is {type(name)}')
-        self.add_vars((name,))
-        return self._ring.get_var_by_name(name)
+        R = Ring([name])
+        self._used.add(name)
+        return R.get_var_by_index(0)
             
     def __init__(self) -> None:
-        self._stack = [None]
+        self._stack = [set()]
 
     def __repr__(self) -> str:
-        if self._ring is None:
-            return '{...}'
-        else:
-            names = self._ring.get_names()
-            s = ', '.join(name for name in (*names, '...'))
-            return f'{{{s}}}'
-
-    def add_vars(self, new_names: Iterable[str]) -> None:
-
-        def sort_key(s: str) -> tuple[str, int]:
-            base = s.rstrip('0123456789')
-            index = s[len(base):]
-            n = int(index) if index else -1
-            return base, n
-
-        if self._ring is None:
-            names = set()
-        else:
-            names = set(self._ring.get_names())
-        have_appended = False
-        for name in new_names:
-            if name not in names:
-                names.add(name)
-                have_appended = True
-        if have_appended:
-            names_as_list = list(names)
-            names_as_list.sort(key=sort_key)
-            self._ring = Ring(names_as_list)
+        names = sorted(self._used, key=Ring.sort_key)
+        s = ', '.join(name for name in (*names, '...'))
+        return f'{{{s}}}'
 
     def _drop(self) -> None:
-        from . import cache_clear
-        if len(self._stack) < 2:
+        if len(self._stack) <= 1:
             raise ValueError('ignoring _drop at bottom of stack')
         self._stack.pop()
-        cache_clear()
 
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
@@ -234,29 +208,18 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         gensym(). If the optional argument :data:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
-        if self._ring is None:
-            names = set()
-        else:
-            names = set(self._ring.get_names())
         i = 1
         v = f'G{i:04d}{suffix}'
-        while v in names:
+        while v in self._used:
             i += 1
             v = f'G{i:04d}{suffix}'
-        self.add_vars((v,))
-        return self._ring.get_var_by_name(v)
+        return self[v]
     
     def merge(self) -> None:
-        from . import cache_clear
-        if len(self._stack) < 2:
+        if len(self._stack) <= 1:
             raise ValueError('ignoring merge at bottom of stack')
-        if self._stack[-1] is not None:
-            names = self._stack[-1].get_names()
-            del self.stack[-1]
-            self.add_vars(names)
-        else:
-            del self.stack[-1]
-        cache_clear()
+        self.stack[-2].update(self._stack[-1])
+        self.stack.pop()
 
     def pop(self) -> None:
         raise NotImplementedError()
@@ -265,20 +228,13 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         raise NotImplementedError()
 
     def stash(self) -> None:
-        from . import cache_clear
-        self._stack.append(None)
-        cache_clear()
+        self._stack.append(set())
 
 
 VV: Final = VariableSet()
 """
 The unique instance of :class:`.VariableSet`.
 """
-
-
-@cython.cfunc
-def _current_ring() -> Ring:
-    return cython.cast(Ring, VV._ring)
 
 
 @cython.cclass
@@ -292,26 +248,21 @@ class Term:
         if not isinstance(other, Term):
             return self + Term(other)
         _other = cython.cast(Term, other)
-        if _current_ring() is None:
-            assert self._parent is None and _other._parent is None
+        parent = self._coerce_to_common_parent(_other)
+        if parent is None:
             return Term(self._mpq + _other._mpq)
-        self._coerce(_current_ring())
-        _other._coerce(_current_ring())
-        SR = _current_ring()._singular_ring
+        SR = cython.cast(Ring, parent)._singular_ring
         p1 = p_Copy(self._poly, SR)
         p2 = p_Copy(_other._poly, SR)
         sum = p_Add_q(p1, p2, SR)
-        return term(sum, _current_ring())
+        return term(sum, parent)
     
     def __eq__(self, other: Term) -> cython.bint:
-        if _current_ring() is None:
-            assert self._parent is None and other._parent is None
+        parent = self._coerce_to_common_parent(other)
+        if parent is None:
             return self._mpq == other._mpq
-        self._coerce(_current_ring())
-        other._coerce(_current_ring())
-        SR = _current_ring()._singular_ring
-        ret: cython.bint = p_EqualPolys(self._poly, other._poly, SR)
-        return ret
+        SR = cython.cast(Ring, parent)._singular_ring
+        return p_EqualPolys(self._poly, other._poly, SR) == 1
     
     assert hash(mpq(0)) == 0  # ensure that mpq(0) hashes equally to cython.NULL in __hash__
 
@@ -364,6 +315,10 @@ class Term:
         >>> [(abs(coef), power_product) for coef, power_product in t]
         [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x),
          (mpq(4,1), y), (mpq(4,1), 1)]
+
+        .. seealso::
+            `The Sage implementation on GitHub
+            <https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/multi_polynomial_libsingular.pyx>`
         """
         for d, coef in self.summands():
             power_product = Term(1)
@@ -375,19 +330,17 @@ class Term:
         if not isinstance(other, Term):
             return self * Term(other)
         _other = cython.cast(Term, other)
-        if _current_ring() is None:
-            assert self._parent is None and _other._parent is None
-            return Term(self._mpq * other._mpq)
-        self._coerce(_current_ring())
-        other._coerce(_current_ring())
-        SR = _current_ring()._singular_ring
+        parent = self._coerce_to_common_parent(_other)
+        if parent is None:
+            return Term(self._mpq * _other._mpq)
+        SR = cython.cast(Ring, parent)._singular_ring
         e1: cython.ulong = p_GetMaxExp(self._poly, SR)
         e2: cython.ulong = p_GetMaxExp(_other._poly, SR)
         e: cython.ulong = e1 + e2
         if unlikely(e > SR.bitmask):
             raise OverflowError(f'exponent overflow {e}')
         prod = pp_Mult_qq(self._poly, _other._poly, SR)
-        return term(prod, _current_ring())
+        return term(prod, parent)
     
     def __neg__(self):
         if self._parent is None:
@@ -493,17 +446,7 @@ class Term:
     def __sub__(self, other: object) -> Term:
         if not isinstance(other, Term):
             return self - Term(other)
-        _other = cython.cast(Term, other)
-        if _current_ring() is None:
-            assert self._parent is None and _other._parent is None
-            return Term(self._mpq - _other._mpq)
-        self._coerce(_current_ring())
-        _other._coerce(_current_ring())
-        SR = _current_ring()._singular_ring
-        p1 = p_Copy(self._poly, SR)
-        p2 = p_Copy(_other._poly, SR)
-        difference = p_Sub(p1, p2, SR)
-        return term(difference, _current_ring())
+        return self + (-other)
     
     def __truediv__(self, other: object) -> Term:
         """True division. `other` must be a non-zero constant.
@@ -516,25 +459,14 @@ class Term:
             raise ZeroDivisionError()
         if not _other.is_constant():
             raise ValueError(f'non-constant divisor {_other}')
-        if _current_ring() is None:
-            assert self._parent is None and _other._parent is None
-            return Term(self._mpq / _other._mpq)
-        self._coerce(_current_ring())
-        _other._coerce(_current_ring())
-        SR = _current_ring()._singular_ring
-        n: cython.pointer[number] = p_GetCoeff(_other._poly, SR)
-        n = SR.cf.cfInvers(n, SR.cf)
-        quotient = pp_Mult_nn(self._poly, n, SR)
-        n_Delete(cython.address(n), SR.cf)
-        return term(quotient, _current_ring())
-        
+        return (1 / other.as_constant()) * self
+
     def __xor__(self, other: object) -> Term:
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
-    def as_fraction(self) -> mpq:
-        # Rename to as_constant
+    def as_constant(self) -> mpq:
         if not self.is_constant():
             raise ValueError(f'{self} is not constant')
         return self.constant_coefficient()
@@ -585,6 +517,21 @@ class Term:
             p = pNext(p)
         self._poly = ret
         self._parent = R
+
+    def _coerce_to_common_parent(self, other: Term) -> Optional[Ring]:
+        if self._parent is None and other._parent is None:
+            return None
+        elif self._parent is None:
+            self._coerce(other._parent)
+            return other._parent
+        elif other._parent is None:
+            other._coerce(self._parent)
+            return self._parent
+        else:
+            R = self._parent | other._parent
+            self._coerce(R)
+            other._coerce(R)
+            return R
 
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this Term.

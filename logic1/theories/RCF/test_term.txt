@@ -5,6 +5,58 @@
 
 """
 
+class tmp:
+    """
+    >>> null = Term(0)
+    >>> null._dump()
+    class Term
+        _parent = None
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = 0 (0)
+    >>> R = Ring(['x', 'y'])
+    >>> 
+    >>> x, y = list(R.get_vars())
+    >>> x
+    x
+    >>> x._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['x', 'y'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x)
+    >>> y._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['x', 'y'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (y)
+    >>> 
+    >>> S = Ring(['z', 'x'])
+    >>> S
+    Ring(['x', 'z'])
+    >>> S_x, z = list(S.get_vars())
+    >>> S_x
+    x
+    >>> S_x._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['x', 'z'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x)
+    >>> S_x == x
+    True
+    >>> x._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['x', 'y', 'z'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x)
+    >>> S_x._dump()  # doctest: +ELLIPSIS
+    class Variable
+        _parent: Ring = Ring(['x', 'y', 'z'])
+        _mpq: mpq = mpq(0,1)
+        _poly: cython.pointer[ring] = ... (x)
+    >>> (x + z) ** 2
+    x^2 + 2*x*z + z^2
+
+    """
+
 class Ring:
     """
     The attribute R._singular_ring is not visible in Python.
@@ -67,28 +119,28 @@ class VariableSet:
     b
     >>> VV['d']
     d
-    >>> VV.stack
-    [Ring(['a', 'c']), Ring(['b', 'd'])]
+    >>> VV.stack == [{'a', 'c'}, {'b', 'd'}]
+    True
     >>> VV.merge()
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'a', 'b', 'c', 'd'}]
+    True
 
-    Test the property _ring:
-    >>> VV._ring
-    Ring(['a', 'b', 'c', 'd'])
+    Test the property _used:
+    >>> VV._used == {'a', 'b', 'c', 'd'}
+    True
 
-    Test the setter for _ring:
+    Test the setter for _used:
     >>> VV.stash()
     >>> VV['will_be_lost']
     will_be_lost
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd']), Ring(['will_be_lost'])]
-    >>> VV._ring = None
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd']), None]
+    >>> VV.stack == [{'a', 'b', 'c', 'd'}, {'will_be_lost'}]
+    True
+    >>> VV._used = set()
+    >>> VV.stack == [{'a', 'b', 'c', 'd'}, set()]
+    True
     >>> VV._drop()
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'a', 'b', 'c', 'd'}]
+    True
 
     Test __getitem__:
     >>> VV.stash()
@@ -105,16 +157,11 @@ class VariableSet:
     >>> repr(VV)
     '{a, ...}'
 
-    Test add_vars:
-    >>> VV.add_vars(('c', 'b'))
-    >>> VV
-    {a, b, c, ...}
-
     Test fresh:
     >>> VV.fresh()
     G0001
     >>> VV
-    {G0001, a, b, c, ...}
+    {G0001, a, ...}
     >>> VV['d']
     d
     >>> VV.fresh()
@@ -125,32 +172,32 @@ class VariableSet:
     >>> VV.fresh()
     G0001
 
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd']), Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd']), Ring(['G0001'])]
+    >>> VV.stack == [{'a', 'b', 'd', 'c'}, {'G0001', 'a', 'G0002', 'd'}, {'G0001'}]
+    True
     >>> VV.merge()
-    >>> VV.stack
-    [Ring(['a', 'b', 'c', 'd']), Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'d', 'b', 'a', 'c'}, {'d', 'G0002', 'G0001', 'a'}]
+    True
     >>> VV.merge()
-    >>> VV.stack
-    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'G0002', 'b', 'G0001', 'a', 'c', 'd'}]
+    True
 
     Test merge at bottom of stack:
     >>> VV.merge()
     Traceback (most recent call last):
     ...
     ValueError: ignoring merge at bottom of stack
-    >>> VV.stack
-    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'b', 'G0001', 'd', 'a', 'c', 'G0002'}]
+    True
 
     Test _drop:
     >>> VV.stash()
     >>> VV['will_be_lost']
     will_be_lost
-    >>> VV.stack
-    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd']), Ring(['will_be_lost'])]
+    >>> VV.stack == [{'d', 'G0001', 'c', 'G0002', 'b', 'a'}, {'will_be_lost'}]
+    True
     >>> VV._drop()
-    >>> VV.stack
-    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd'])]
+    >>> VV.stack == [{'d', 'a', 'b', 'c', 'G0002', 'G0001'}]
+    True
 
     Test _drop at bottom of stack:
     >>> VV._drop()
@@ -165,8 +212,8 @@ class VariableSet:
     The method imp also inherited from logic1.firstorder.atomic.VariableSet
     cannot be tested because we are not interactive here.
 
-    >>> VV.stack
-    [Ring(['G0001', 'G0002', 'a', 'b', 'c', 'd', 'e'])]
+    >>> VV.stack == [{'b', 'c', 'G0001', 'G0002', 'e', 'd', 'a'}]
+    True
 
     """
 
@@ -322,32 +369,35 @@ class Term:
     True
 
     Test _coerce:
+    >>> R = Ring(['x', 'y'])
+
     >>> c = Term(1)
     >>> c._parent is None
     True
-    >>> c._parent == VV._ring
-    False
-    >>> c._coerce(VV._ring)
-    >>> c._parent == VV._ring
+    >>> c._coerce(R)
+    >>> c._parent is R
     True
 
-    >>> f = x + 1
-    >>> f._parent == VV._ring
+    >>> x = VV['x']
+    >>> x._parent
+    Ring(['x'])
+    >>> x._coerce(R)
+    >>> x._parent is R
     True
-    >>> _ = VV.fresh()
-    >>> f._parent == VV._ring
-    False
-    >>> f._coerce(VV._ring)
-    >>> f._parent == VV._ring
+    >>> x._coerce(R)
+    
+    >>> f = x + 1
+    >>> f._coerce(R)
+    >>> f._parent is R
     True
 
     >>> VV.stash()
     >>> will_be_lost = VV['will_be_lost']
     >>> VV._drop()
-    >>> will_be_lost._coerce(VV._ring)
+    >>> will_be_lost._coerce(R)
     Traceback (most recent call last):
     ...
-    ValueError: cannot coerce from Ring(['will_be_lost']) to Ring(['G0001', 'x', 'y'])
+    ValueError: cannot coerce from Ring(['will_be_lost']) to Ring(['x', 'y'])
 
     Test constant_coefficient:
     >>> Term(0).constant_coefficient()
@@ -373,7 +423,7 @@ class Term:
 
     >>> (x - x)._dump()
     class Term
-        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _parent: Ring = Ring(['x', 'y'])
         _mpq: mpq = mpq(0,1)
         _poly: cython.pointer[ring] = 0 (0)
 
@@ -385,13 +435,13 @@ class Term:
 
     >>> x._dump()  # doctest: +ELLIPSIS
     class Variable
-        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _parent: Ring = Ring(['x', 'y'])
         _mpq: mpq = mpq(0,1)
         _poly: cython.pointer[ring] = ... (x)
 
     >>> (x + 1)._dump()  # doctest: +ELLIPSIS
     class Term
-        _parent: Ring = Ring(['G0001', 'x', 'y'])
+        _parent: Ring = Ring(['x', 'y'])
         _mpq: mpq = mpq(0,1)
         _poly: cython.pointer[ring] = ... (x+1)
 
