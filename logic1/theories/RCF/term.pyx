@@ -14,6 +14,11 @@ import_gmpy2()
 siInit("/Users/sturm/miniforge3/envs/logic1_dev/lib/libSingular.dylib")
 
 
+p_number = cython.typedef(cython.pointer[number])
+p_poly = cython.typedef(cython.pointer[poly])
+pp_number = cython.typedef(cython.pointer[p_number])
+
+
 @cython.cclass
 class Ring:
 
@@ -105,9 +110,9 @@ class Ring:
         """Create a singular number from an mpq.
         """
         return nlInit2gmp(mpq_numref(MPQ(q)), mpq_denref(MPQ(q)), self._singular_ring.cf)
-    
+
     @cython.cfunc
-    def number_to_mpq(self, n: cython.pointer[number]) -> mpq:
+    def number_to_mpq(self, nn: pp_number) -> mpq:
         """Create an mpq from a singular number.
         """
         # Immediate integers handles carry the tag 'SR_INT', i.e. the last bit is 1.
@@ -116,9 +121,14 @@ class Ring:
         # (The second bit is reserved as tag to allow extensions of this scheme.)
         # Using immediates as pointers and dereferencing them gives address errors.
 
+        # n = n_Copy(n, self._singular_ring.cf)
+        n = nn[0]
+
         ret = GMPy_MPQ_New(cython.NULL)
         tmp = GMPy_MPZ_New(cython.NULL)
 
+        # nlGetNumerator is a C++ function. n is passed by reference and
+        # modified.
         n_num = nlGetNumerator(n, self._singular_ring.cf)
         if SR_HDL(n_num) & SR_INT:
             mpz_set_si(MPZ(tmp), SR_TO_INT(n_num))
@@ -134,6 +144,8 @@ class Ring:
             mpz_set(MPZ(tmp), n_den.z)
         mpq_set_den(MPQ(ret), MPZ(tmp))
         nlDelete(cython.address(n_den), self._singular_ring.cf)
+
+        nn[0] = n  # C-analogue of call-by-reference in C++
 
         return ret
     
@@ -273,16 +285,15 @@ class Term:
         SR: Final = self._parent._singular_ring
         h_names: Final = [hash(name) for name in SR.names[:SR.N]]
         ret: cython.long = 0
-        p = self._poly
-        while p:
-            ret_mon: cython.long = hash(self._parent.number_to_mpq(p_GetCoeff(p, SR)))
+        monomial: Term
+        for coefficient, monomial in self:
+            ret_mon: cython.long = hash(coefficient)
             for v in range(1, SR.N + 1):
-                n = p_GetExp(p, v, SR)
+                n = p_GetExp(monomial._poly, v, SR)
                 if n != 0:
                     ret_mon = (1000003 * ret_mon) ^ h_names[v - 1]
                     ret_mon = (1000003 * ret_mon) ^ n
             ret += ret_mon
-            p = pNext(p)
         return ret
 
     def __init__(self, arg: Fraction | int | mpq) -> None:
@@ -320,11 +331,22 @@ class Term:
             `The Sage implementation on GitHub
             <https://github.com/sagemath/sage/blob/develop/src/sage/rings/polynomial/multi_polynomial_libsingular.pyx>`
         """
-        for d, coef in self.summands():
-            power_product = Term(1)
-            for v in d:
-                power_product *= v ** d[v]
-            yield coef, power_product
+        R = self._parent
+        if R is None:
+            if self._mpq != 0:
+                yield self._mpq, Term(1)
+        else:
+            SR = R._singular_ring
+            p = p_Copy(self._poly, SR)
+            while p:
+                next = pNext(p)
+                p.next = cython.NULL
+                t = term(p, R)
+                coefficient = t.lc()
+                p_SetCoeff(t._poly, n_Init(1, SR.cf), SR)
+                p_Setm(t._poly, SR)  # necessary according to comment in decl
+                yield coefficient, t
+                p = next
             
     def __mul__(self, other: object) -> Term:
         if not isinstance(other, Term):
@@ -539,14 +561,15 @@ class Term:
         # Compare sage.rings.polynomial.multi_polynomial_libsingular.constant_coefficient
         if self._parent is None:
             return self._mpq
-        SR = self._parent._singular_ring
+        R = self._parent
+        SR = R._singular_ring
         p = self._poly
         if p == cython.NULL:
             return mpq(0)
         while p.next:
             p = pNext(p)
         if p_LmIsConstant(p, SR):
-            return self._parent.number_to_mpq(p_GetCoeff(p, SR))
+            return term(p, R).lc()
         else:
             return mpq(0)
             
@@ -607,33 +630,33 @@ class Term:
             return self._poly == cython.NULL
 
     def lc(self) -> mpq:
-        if self._parent is None:
+        R = self._parent
+        if R is None:
             return self._mpq
         if self._poly == cython.NULL:
             return mpq(0)
-        c = p_GetCoeff(self._poly, self._parent._singular_ring)
-        ret = self._parent.number_to_mpq(c)
-        return ret
+        # We use direct access to p.coef, in order to avoid
+        # return-by-reference of p_GetCoeff().
+        return R.number_to_mpq(cython.address(self._poly.coef))
 
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
         """Iterate over the summands of self yielding pairs of monomials and
         coefficients.
         """
-        if self._parent is None:
-            if self._mpq != 0:
-                yield ({}, self._mpq)
-        else:
-            SR: Final[cython.pointer[ring]] = self._parent._singular_ring
-            p: cython.pointer[poly] = self._poly
-            while p:
+        power_product: Term
+        for coefficient, power_product in self:
+            if power_product._parent is None:
+                assert power_product._mpq == 1
+                yield {}, coefficient
+            else:
+                SR = power_product._parent._singular_ring
+                p = power_product._poly
                 d: cython.dict = dict()
-                for v in range(1, SR.N + 1):
-                    n = p_GetExp(p, v, SR)
+                for i in range(1, SR.N + 1):
+                    n = p_GetExp(p, i, SR)
                     if n != 0:
-                        d[self._parent.get_var_by_index(v - 1)] = n
-                c = self._parent.number_to_mpq(p_GetCoeff(p, SR))
-                yield d, c
-                p = pNext(p)
+                        d[self._parent.get_var_by_index(i - 1)] = n
+                yield d, coefficient
 
 
 @cython.cfunc

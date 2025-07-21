@@ -269,6 +269,12 @@ class Term:
     1/2
 
     Test __iter__:
+    >>> list(Term(0))
+    []
+    >>> list(Term(2))
+    [(mpq(2,1), 1)]
+    >>> list(x - x)
+    []
     >>> t = (x - y + 2) ** 2
     >>> [(abs(coef), power_product) for coef, power_product in t]
     [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x), (mpq(4,1), y), (mpq(4,1), 1)]

@@ -1,7 +1,8 @@
 from cython.cimports.gmpy2 import mpq_t, mpz_ptr, mpz_t
 
 cdef extern from "singular/Singular/libsingular.h":
-    
+
+    # STRUCTS
     ctypedef struct ideal "sip_sideal"                          # ideals
 
     ctypedef struct n_Procs_s:                                  # number procs
@@ -99,9 +100,14 @@ cdef extern from "singular/Singular/libsingular.h":
         ringorder_Ws
         ringorder_L
 
+    # GLOBAL VARIABLES
+    cdef ring *currRing                                         # current ring
     cdef long SR_INT                                            # integer conversion constant
 
+    # FUNCTIONS
+    number *n_Copy(number *n, n_Procs_s *cf)                    # Copy this number
     void n_Delete(number **n, n_Procs_s *cf)                    # general number destructor
+    number *n_Init(int n, n_Procs_s *cf)                        # general number constructor
     void *omAlloc0(size_t size)                                 # memory allocation
     char *omStrDup(char *)
     unsigned long p_GetMaxExp(poly *p, ring *r)                 # get the maximal exponent in p
@@ -126,7 +132,7 @@ cdef extern from "singular/Singular/libsingular.h":
     poly *pp_Mult_nn(poly *p, number *n, ring *r)               # return p*n, p is const (i.e. copied)
     poly *pp_Mult_qq(poly *p, poly *q, ring *r)                 # return p*q, does neither destroy p nor q
     poly *pNext(poly *p)                                        # iterate through the monomials of p
-    void rChangeCurrRing(ring *r)
+    void rChangeCurrRing(ring *r)                               # change current ring to r
     ring *rDefault(int ch, int nvars, char **names,
                    int ord_size, rRingOrder_t *ord,
                    int *block0, int *block1, int **wvhdl)       # construct ring with characteristic, number of vars and names
