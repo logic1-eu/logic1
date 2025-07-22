@@ -30,4 +30,7 @@ output
 *.c
 *.cpp
 
+# CC Sanitizer output
+*.dSYM
+
 /logic1/**/*.html

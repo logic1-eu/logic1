@@ -14,6 +14,8 @@ setup(ext_modules=cythonize([
         'logic1.theories.RCF.term',
         sources=['logic1/theories/RCF/term.pyx'],
         # include_dirs=['/Users/sturm/miniforge3/envs/logic1_dev/include'],
+        extra_compile_args=['-g', '-fsanitize=leak'],
+        extra_link_args=['-fsanitize=leak'],
         language='c++',
     )],
     annotate=True))
