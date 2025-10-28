@@ -24,3 +24,15 @@ dist
 
 # rattler-build
 output
+
+# Cython
+*.so
+/logic1/**/*.c
+/logic1/**/*.cpp
+
+# CC Sanitizer output
+*.dSYM
+
+/logic1/**/*.html
+Leaks/leak_example
+Leaks/leak_example_singular
