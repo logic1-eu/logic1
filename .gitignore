@@ -31,3 +31,4 @@ output
 *.cpp
 
 /logic1/**/*.html
+Leaks/leak_example_singular

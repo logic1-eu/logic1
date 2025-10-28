@@ -53,10 +53,19 @@ class Ring:
         block1[1] = 0
 
         ring = rDefault(0, n, names, 1, order, block0, block1, cython.NULL)
+        for i in range(n):
+            omFree(names[i])
+        omFreeSize(names, n * cython.sizeof(cython.p_char))
         if ring is cython.NULL:
             raise ValueError("Failed to allocate Singular ring")
         ring.ShortOut = 0  # disable Singular's short printing
         self._singular_ring = ring
+        # Free names and nested stuff in this procedure (where?)
+
+
+    def __dealloc__(self) -> None:
+        rDelete(self._singular_ring)
+
 
     def __or__(self, other: Ring) -> Ring:
         if self is other:

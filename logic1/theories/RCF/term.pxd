@@ -109,6 +109,8 @@ cdef extern from "singular/Singular/libsingular.h":
     void n_Delete(number **n, n_Procs_s *cf)                    # general number destructor
     number *n_Init(int n, n_Procs_s *cf)                        # general number constructor
     void *omAlloc0(size_t size)                                 # memory allocation
+    void omFree(void *)                                         # free
+    void omFreeSize(void *, size_t size)
     char *omStrDup(char *)
     unsigned long p_GetMaxExp(poly *p, ring *r)                 # get the maximal exponent in p
     poly *p_Add_q(poly *p, poly *q, ring *r)                    # return p+q, destroys p and q
@@ -136,6 +138,7 @@ cdef extern from "singular/Singular/libsingular.h":
     ring *rDefault(int ch, int nvars, char **names,
                    int ord_size, rRingOrder_t *ord,
                    int *block0, int *block1, int **wvhdl)       # construct ring with characteristic, number of vars and names
+    void rDelete(ring *r)                                       # ring destructor
     long SR_TO_INT(number *)                                    # number to integer handle
     long SR_HDL(number *)                                       # available ring orders
     int siInit(char *)                                          # initialization
