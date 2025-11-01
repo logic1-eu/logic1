@@ -29,3 +29,5 @@ output
 *.so
 *.c
 /logic1/**/*.html
+
+Leaks
