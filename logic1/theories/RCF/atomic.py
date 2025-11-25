@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Container
 from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
@@ -822,6 +823,28 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             return self.poly.is_gen()
         except AttributeError:
             return self.poly.is_generator()
+        
+    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool: 
+        """Return :obj:`True` if this Term can be written as a_1 x_1 + ... +
+        a_n x_n + r such that a_1, ..., a_n in QQ, x_1, ..., x_n in X, and r is
+        a polynomial over QQ that does not contain any variable from X.
+
+        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
+        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+        >>> term.is_weakly_parametric_linear({x, y})
+        True
+        >>> term.is_weakly_parametric_linear({a})
+        False
+        >>> term.is_weakly_parametric_linear({b})
+        False
+        """
+        for m in self.monomials():
+            if m in X:
+                continue
+            for v in m.vars():
+                if v in X:
+                    return False
+        return True
 
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.
