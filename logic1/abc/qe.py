@@ -887,18 +887,18 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         self.root_nodes = self.create_root_nodes(vars_, matrix)
 
     def final_simplification(self):
-        logger.debug(f'entering {self.final_simplification.__name__}')
-        if logger.isEnabledFor(logging.DEBUG):
+        logger.info(f'entering {self.final_simplification.__name__}')
+        if logger.isEnabledFor(logging.INFO):
             num_atoms = sum(1 for _ in self.matrix.atoms())
-            logger.debug(f'found {num_atoms} atoms')
+            logger.info(f'found {num_atoms} atoms')
         logger.info('final simplification')
         timer = Timer()
         self.result = self.final_simplify(self.matrix, assume=self._assumptions.atoms)
         self.time_final_simplification = timer.get()
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f'{self.time_final_simplification=:.3f}')
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(f'{self.time_final_simplification=:.3f}')
             num_atoms = sum(1 for _ in self.result.atoms())
-            logger.debug(f'produced {num_atoms} atoms')
+            logger.info(f'produced {num_atoms} atoms')
 
     @abstractmethod
     def final_simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
