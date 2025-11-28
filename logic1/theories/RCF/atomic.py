@@ -665,6 +665,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         d_poly = {key.poly: value for key, value in degrees.items()}
         return Term(self.poly.coefficient(d_poly))
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this term.
 
@@ -680,6 +681,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return mpq(self.poly.constant_coefficient())
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def content(self) -> mpq:
         """Return the content of this term, which is defined as the gcd of its
         integer coefficients.
@@ -824,8 +826,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             return self.poly.is_gen()
         except AttributeError:
             return self.poly.is_generator()
-        
-    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool: 
+
+    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
         """Return :obj:`True` if this Term can be written as a_1 x_1 + ... +
         a_n x_n + r such that a_1, ..., a_n in QQ, x_1, ..., x_n in X, and r is
         a polynomial over QQ that does not contain any variable from X.
@@ -856,6 +858,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return self.poly.is_zero()
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def lc(self) -> mpq:
         """Leading coefficient of this term with respect to the degree
         lexicographical term order :mod:`deglex
@@ -901,6 +904,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return [Term(monomial) for monomial in self.poly.monomials()]
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def normalize(self) -> Term:
         return Term(self.poly / self.poly.lc())
 
@@ -1250,7 +1254,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
 
 class Eq(AtomicFormula):
     pass
-
 
 class Ne(AtomicFormula):
     pass
