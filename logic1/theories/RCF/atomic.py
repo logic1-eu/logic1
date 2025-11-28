@@ -994,24 +994,16 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
-        """Iterate over the summands of self yielding pairs of monomials and
-        coefficients.
+        """Iterate over the summands of self yielding pairs of dictionaries
+        representing monomials, and coefficients.
         """
-        n = self.polynomial_ring.sage_ring.ngens()
-        if n >= 32:
-            for m, c in zip(self.poly.monomials(), self.poly.coefficients()):
-                ret = {}
-                for v in m.variables():
-                    ret[Variable(v)] = int(m.degree(v))
-                yield ret, mpq(c)
-        else:
-            gens = self.polynomial_ring.sage_ring.gens()
-            for e, c in self.poly.iterator_exp_coeff(as_ETuples=False):
-                ret = {}
-                for i in range(n):
-                    if e[i] != 0:
-                        ret[Variable(gens[i])] = int(e[i])
-                yield ret, mpq(c)
+        gens = self.polynomial_ring.sage_ring.gens()
+        for etuple, coefficient in self.poly.iterator_exp_coeff(as_ETuples=True):
+            result = dict()
+            for i, exponent in enumerate(etuple):
+                if exponent:
+                    result[Variable(gens[i])] = int(exponent)
+            yield result, mpq(coefficient)
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
