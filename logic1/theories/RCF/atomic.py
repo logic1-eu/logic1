@@ -903,6 +903,18 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def normalize(self) -> Term:
         return Term(self.poly / self.poly.lc())
 
+    @lru_cache(maxsize=CACHE_SIZE)
+    def primitive_part(self, positive: bool = False) -> Term:
+        """Return the primitive part over ``Z``. This is ``self`` divided by its
+        (positive) content, so that ``self.content() * self.primitive_part() ==
+        self``. If ``positive`` is ``True``, the result is normalized to have a
+        positive leading coefficient.
+        """
+        pp = self / self.content()
+        if positive and pp.lc() < 0:
+            pp = -pp
+        return pp
+
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
         univariate polynomials in `x` with polynomial coefficients in all other
