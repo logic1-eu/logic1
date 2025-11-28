@@ -505,7 +505,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         # Eq.__bool__, which supports some comparisons in boolean contexts.
         # Same for __ne__.
         lhs = self - other
-        if lhs.lc() < 0:
+        # Use poly.lc() in order to support @lru_cache on Term.lc().
+        if lhs.poly.lc() < 0:
             lhs = -lhs
         return Eq(lhs, 0)
 
