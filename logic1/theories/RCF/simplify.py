@@ -311,17 +311,22 @@ class _Knowledge:
         >>> print(K._term_as_range(h,))
         [0, oo)
         """
+        # This is a hotspot. Code has been tuned by TS in the course of
+        # benchmarking MTP3 with Xopt.
         poly_result = _Range.from_constant(EP_ZERO)
         for monomial, coefficient in f.summands():
             term_result = _Range.from_constant(EndPoint(coefficient))
-            for g, e in monomial.items():
-                ge_result = self.dict_.get(g, RANGE_R) ** e
-                term_result *= ge_result
+            for variable, exponent in monomial.items():
+                # We know exponent != 0, and exponentiaton by 1 is implemented
+                # sufficiently efficient.
+                power = self.dict_.get(variable, RANGE_R) ** exponent
+                term_result *= power
+                if term_result == RANGE_R:
+                    return RANGE_R
             poly_result += term_result
             if poly_result == RANGE_R:
                 return RANGE_R
         return poly_result
-
 
 @dataclass
 class InternalRepresentation(
