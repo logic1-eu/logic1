@@ -8,6 +8,8 @@ from logging import Logger
 from typing import ClassVar, Iterable, Iterator, Literal, Optional, Self, TypeAlias
 from typing import reveal_type  # noqa
 
+from gmpy2 import mpq
+
 from logic1 import abc
 from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.support.tracing import trace  # noqa
@@ -465,12 +467,12 @@ class XoptCandidateSet:
         else:
             self.finite_solution_set = False
 
-    def apply_passive_list(self, passive_list: Iterable[AtomicFormula]) -> Self:
+    def apply_passive_list(self, passive_list: Iterable[Term]) -> Self:
         for subset in (self.equations, self.lower_bounds, self.upper_bounds):
             # Do not mutate a collection while iterating over it
             to_remove = []
             for candidate in subset:
-                if isinstance(simplify(Eq(candidate, 0), assume=passive_list), _F):
+                if candidate in passive_list:
                     to_remove.append(candidate)
                     # TODO: count passive list hits
             for candidate in to_remove:
@@ -482,7 +484,7 @@ class XoptInfinity(Enum):
     PLUS = auto()
     MINUS = auto()
 
-    def __mul__(self, other: Term) -> XoptInfinity:
+    def __mul__(self, other: mpq) -> XoptInfinity:
         if other > 0:
             return self
         elif other < 0:
@@ -518,7 +520,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
     answer: list
     outermost_block: bool
     options: Options
-    passive_list: set[Ne]
+    passive_list: set[Term]
     is_xopt: bool
 
     real_type_selection: ClassVar[dict[CLUSTERING,
@@ -674,7 +676,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
             covers generalizations of Gaussian elimination.
             """
             def bound_type(atom: AtomicFormula, x: Variable) -> XoptBoundType:
-                c = atom.lhs.coefficient({x: 1})
+                c = atom.lhs.monomial_coefficient(x)
                 if c == 0:
                     return XoptBoundType.NONE
                 elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
@@ -725,7 +727,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
             return XoptEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
 
         def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: XoptInfinity) -> Formula:
-            c = atom.lhs.coefficient({x: 1})
+            c = atom.lhs.monomial_coefficient(x)
             if c == 0:
                 return atom
             if isinstance(atom, Eq):
@@ -742,11 +744,11 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
             new_formula = formula.traverse(map_atoms=lambda at: subs_infinity_at(at, x, inf))
             return simplify(new_formula, assume=assumptions.atoms)
 
-        def subs_infinity_passive_list(passive_list: set[Ne], x: Variable) -> set[Ne]:
+        def subs_infinity_passive_list(passive_list: set[Term], x: Variable) -> set[Term]:
             result = set()
-            for ne in passive_list:
-                if ne.lhs.coefficient({x: 1}) == 0:
-                   result.add(ne)
+            for term in passive_list:
+                if term.monomial_coefficient(x) == 0:
+                   result.add(term)
             return result
 
         def subs_into_formula(formula: Formula, x: Variable, pt: Term | XoptInfinity,
@@ -757,8 +759,8 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 assert isinstance(pt, XoptInfinity)
                 return subs_infinity_formula(formula, x, pt, assumptions)
 
-        def subs_into_passive_list(passive_list: set[Ne], x: Variable,
-                                   pt: Term | XoptInfinity) -> set[Ne]:
+        def subs_into_passive_list(passive_list: set[Term], x: Variable,
+                                   pt: Term | XoptInfinity) -> set[Term]:
             if isinstance(pt, Term):
                 return subs_minpol_passive_list(passive_list, x, pt)
             else:
@@ -766,34 +768,35 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                 return subs_infinity_passive_list(passive_list, x)
 
         def subs_minpol_at(atom: AtomicFormula, x: Variable, m: Term) -> AtomicFormula:
-            # atom.lhs = a * x + b
-            a = atom.lhs.coefficient({x: 1})
-            b = atom.lhs - a * x
-            assert x not in b.vars()
-            # m = c * x + d
-            c = m.coefficient({x: 1})
-            d = m - c * x
-            assert x not in d.vars()
-            new_lhs = a * (-d / c) + b
-            return atom.op(new_lhs, 0)
+            return atom.op(subs_minpol_term(atom.lhs, x, m), 0)
 
         def subs_minpol_formula(formula: Formula, x: Variable, m: Term,
                               assumptions: Assumptions) -> Formula:
             new_formula = formula.traverse(map_atoms=lambda atom: subs_minpol_at(atom, x, m))
             return simplify(new_formula, assume=assumptions.atoms)
 
-        def subs_minpol_passive_list(passive_list: set[Ne], x: Variable, m: Term) -> set[Ne]:
+        def subs_minpol_passive_list(passive_list: set[Term], x: Variable, m: Term) -> set[Term]:
             result = set()
-            for ne in passive_list:
-                new_ne = simplify(subs_minpol_at(ne, x, m), explode_always=False, prefer_order=False)
-                if isinstance(new_ne, Ne):
-                    result.add(new_ne)
-                elif isinstance(new_ne, _T):
-                    continue
+            for passive_term in passive_list:
+                new_term = subs_minpol_term(passive_term, x, m)
+                if new_term.is_constant():
+                    # We cannot obtain zero, because such situations are
+                    # filtered via the application of the passive list.
+                    assert not new_term.is_zero(), f'{passive_term=}, {x=}, {m=}'
                 else:
-                    # We cannot obtain F, because such situations are filtered via the
-                    # application of the passive list.
-                    assert False, f'{new_ne} should be instance of Ne or _T, {ne=}, {x=}, {m=}'
+                    result.add(new_term.primitive_part(positive=True))
+            return result
+
+        def subs_minpol_term(term: Term, x: Variable, m: Term) -> Term:
+            # term = a * x + b
+            a = term.monomial_coefficient(x)
+            b = term - a * x
+            assert x not in b.vars()
+            # m = c * x + d
+            c = m.monomial_coefficient(x)
+            d = m - c * x
+            assert x not in d.vars()
+            result = a * (-d / c) + b
             return result
 
         x = self.variables[0]  # for now
@@ -834,7 +837,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                         is_xopt=True)
             successors.append(node)
             if isinstance(testpoint, Term):
-                passive_list.add(Ne(testpoint, 0))
+                passive_list.add(testpoint)
         return successors
 
     def regular_eset(self, assumptions: Assumptions) -> EliminationSet:
