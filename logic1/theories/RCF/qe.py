@@ -880,6 +880,30 @@ class XoptCandidateSet:
                 subset.remove(candidate)
         return self
 
+    def elimination_set(self) -> XoptEliminationSet:
+        if len(self.upper_bounds) == 0 and len(self.lower_bounds) == 0:
+            assert len(self.equations) > 0
+            standard_terms = self.equations
+            infinity = None
+        if len(self.upper_bounds) <= len(self.lower_bounds):
+            standard_terms = self.upper_bounds | self.equations
+            infinity = XoptInfinity.PLUS
+        else:
+            standard_terms = self.lower_bounds | self.equations
+            infinity = XoptInfinity.MINUS
+        return XoptEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
+
+
+@dataclass
+class XoptEliminationSet:
+    standard_terms: list[Term]
+    infinity: Optional[XoptInfinity]
+
+    def __iter__(self) -> Iterator[Term | XoptInfinity]:
+        if self.infinity is not None:
+            yield self.infinity
+        yield from self.standard_terms
+
 
 class XoptInfinity(Enum):
     PLUS = auto()
@@ -899,37 +923,25 @@ class XoptInfinity(Enum):
 
 
 @dataclass
-class XoptEliminationSet:
-    standard_terms: list[Term]
-    infinity: Optional[XoptInfinity]
-
-    def __iter__(self) -> Iterator[Term | XoptInfinity]:
-        if self.infinity is not None:
-            yield self.infinity
-        yield from self.standard_terms
-
-
-@dataclass
 class XoptNode(Node):
 
-    def process(self, assumptions: Assumptions) -> Sequence[XoptNode]:
+    def candidate_set(self, x: Variable) -> XoptCandidateSet:
+        """Compute a candidate set using structural elimination, which covers
+        generalizations of Gaussian elimination.
+        """
+        def bound_type(atom: AtomicFormula, x: Variable) -> XoptBoundType:
+            c = atom.lhs.monomial_coefficient(x)
+            if c == 0:
+                return XoptBoundType.NONE
+            elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
+                return XoptBoundType.UPPER_BOUND
+            elif c > 0 and isinstance(atom, Ge) or c < 0 and isinstance(atom, Le):
+                return XoptBoundType.LOWER_BOUND
+            else:
+                assert isinstance(atom, Eq)
+                return XoptBoundType.EQUATION
 
-        def candidate_set(formula: Formula, x: Variable) -> XoptCandidateSet:
-            """Compute a candidate set using structural elimination, which
-            covers generalizations of Gaussian elimination.
-            """
-            def bound_type(atom: AtomicFormula, x: Variable) -> XoptBoundType:
-                c = atom.lhs.monomial_coefficient(x)
-                if c == 0:
-                    return XoptBoundType.NONE
-                elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
-                    return XoptBoundType.UPPER_BOUND
-                elif c > 0 and isinstance(atom, Ge) or c < 0 and isinstance(atom, Le):
-                    return XoptBoundType.LOWER_BOUND
-                else:
-                    assert isinstance(atom, Eq)
-                    return XoptBoundType.EQUATION
-
+        def recurse(formula: Formula, x: Variable) -> XoptCandidateSet:
             if isinstance(formula, AtomicFormula):
                 if bound_type(formula, x) is XoptBoundType.NONE:
                     return XoptCandidateSet()
@@ -943,7 +955,7 @@ class XoptNode(Node):
             elif isinstance(formula, And):
                 result = XoptCandidateSet()
                 for arg in formula.args:
-                    candidate_set_ = candidate_set(arg, x)
+                    candidate_set_ = recurse(arg, x)
                     if candidate_set_.finite_solution_set:
                         return candidate_set_
                     else:
@@ -953,21 +965,54 @@ class XoptNode(Node):
                 assert isinstance(formula, Or)
                 result = XoptCandidateSet()
                 for arg in formula.args:
-                    result |= candidate_set(arg, x)
+                    result |= recurse(arg, x)
                 return result
 
-        def elimination_set(candidates: XoptCandidateSet) -> XoptEliminationSet:
-            if len(candidates.upper_bounds) == 0 and len(candidates.lower_bounds) == 0:
-                assert len(candidates.equations) > 0
-                standard_terms = candidates.equations
-                infinity = None
-            if len(candidates.upper_bounds) <= len(candidates.lower_bounds):
-                standard_terms = candidates.upper_bounds | candidates.equations
-                infinity = XoptInfinity.PLUS
-            else:
-                standard_terms = candidates.lower_bounds | candidates.equations
-                infinity = XoptInfinity.MINUS
-            return XoptEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
+        return recurse(self.formula, x)
+
+    def process(self, assumptions: Assumptions) -> Sequence[XoptNode]:
+        x = self.variables[0]  # for now
+        variables = self.variables[1:]
+        passive_list = self.passive_list
+        candidate_set = self.candidate_set(x)
+        if len(candidate_set) == 0:
+            return [XoptNode(variables=variables.copy(),
+                             formula=self.formula,
+                             answer=[],
+                             outermost_block=self.outermost_block,
+                             options=self.options,
+                             passive_list=passive_list.copy())]
+        self.logger().debug(f'Applying {passive_list=} to {candidate_set=}')
+        candidate_set.apply_passive_list(passive_list)
+        self.logger().debug(f'yields {candidate_set=}')
+        if len(candidate_set) == 0:
+            # Redlog returns a single Node representing F here.
+            return []
+        elimination_set = candidate_set.elimination_set()
+        self.logger().debug(f'eliminating {x} with {elimination_set}')
+        passive_list = self.passive_list
+        successors = []
+        for testpoint in elimination_set:
+            formula = XoptNode.subs_into_formula(self.formula, x, testpoint, assumptions)
+            if isinstance(formula, _T):
+                raise abc.qe.FoundT()
+            if isinstance(formula, _F):
+                continue
+            substituted_passive_list_copy = XoptNode.subs_into_passive_list(passive_list, x, testpoint)
+            node = XoptNode(variables=variables.copy(),
+                            formula=formula,
+                            answer=[],
+                            outermost_block=self.outermost_block,
+                            options=self.options,
+                            passive_list=substituted_passive_list_copy)
+            successors.append(node)
+            if isinstance(testpoint, Term):
+                passive_list.add(testpoint)
+        return successors
+
+    @staticmethod
+    def subs_into_formula(formula: Formula, x: Variable, pt: Term | XoptInfinity,
+                            assumptions: Assumptions) -> Formula:
 
         def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: XoptInfinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
@@ -982,104 +1027,34 @@ class XoptNode(Node):
                 assert isinstance(atom, Le)
                 return _T() if inf is XoptInfinity.MINUS else _F()
 
-        def subs_infinity_formula(formula: Formula, x: Variable, inf: XoptInfinity,
-                                  assumptions: Assumptions) -> Formula:
-            new_formula = formula.traverse(map_atoms=lambda at: subs_infinity_at(at, x, inf))
-            return simplify(new_formula, assume=assumptions.atoms)
+        if isinstance(pt, Term):
+            new_formula = formula.traverse(
+                map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, pt), 0))
+        else:
+            assert isinstance(pt, XoptInfinity)
+            new_formula = formula.traverse(
+                map_atoms=lambda atom: subs_infinity_at(atom, x, pt))
+        return simplify(new_formula, assume=assumptions.atoms)
 
-        def subs_infinity_passive_list(passive_list: set[Term], x: Variable) -> set[Term]:
-            result = set()
-            for term in passive_list:
-                if term.monomial_coefficient(x) == 0:
-                   result.add(term)
-            return result
-
-        def subs_into_formula(formula: Formula, x: Variable, pt: Term | XoptInfinity,
-                              assumptions: Assumptions) -> Formula:
-            if isinstance(pt, Term):
-                return subs_minpol_formula(formula, x, pt, assumptions)
-            else:
-                assert isinstance(pt, XoptInfinity)
-                return subs_infinity_formula(formula, x, pt, assumptions)
-
-        def subs_into_passive_list(passive_list: set[Term], x: Variable,
-                                   pt: Term | XoptInfinity) -> set[Term]:
-            if isinstance(pt, Term):
-                return subs_minpol_passive_list(passive_list, x, pt)
-            else:
-                assert isinstance(pt, XoptInfinity)
-                return subs_infinity_passive_list(passive_list, x)
-
-        def subs_minpol_at(atom: AtomicFormula, x: Variable, m: Term) -> AtomicFormula:
-            return atom.op(subs_minpol_term(atom.lhs, x, m), 0)
-
-        def subs_minpol_formula(formula: Formula, x: Variable, m: Term,
-                              assumptions: Assumptions) -> Formula:
-            new_formula = formula.traverse(map_atoms=lambda atom: subs_minpol_at(atom, x, m))
-            return simplify(new_formula, assume=assumptions.atoms)
-
-        def subs_minpol_passive_list(passive_list: set[Term], x: Variable, m: Term) -> set[Term]:
-            result = set()
+    @staticmethod
+    def subs_into_passive_list(passive_list: set[Term], x: Variable,
+                               pt: Term | XoptInfinity) -> set[Term]:
+        result = set()
+        if isinstance(pt, Term):
             for passive_term in passive_list:
-                new_term = subs_minpol_term(passive_term, x, m)
+                new_term = passive_term.subs_linear_solution(x, pt)
                 if new_term.is_constant():
                     # We cannot obtain zero, because such situations are
                     # filtered via the application of the passive list.
-                    assert not new_term.is_zero(), f'{passive_term=}, {x=}, {m=}'
+                    assert not new_term.is_zero(), f'{passive_term=}, {x=}, {pt=}'
                 else:
                     result.add(new_term.primitive_part(positive=True))
-            return result
-
-        def subs_minpol_term(term: Term, x: Variable, m: Term) -> Term:
-            # term = a * x + b
-            a = term.monomial_coefficient(x)
-            b = term - a * x
-            assert x not in b.vars()
-            # m = c * x + d
-            c = m.monomial_coefficient(x)
-            d = m - c * x
-            assert x not in d.vars()
-            result = a * (-d / c) + b
-            return result
-
-        x = self.variables[0]  # for now
-        variables = self.variables[1:]
-        passive_list = self.passive_list
-        candidates = candidate_set(self.formula, x)
-        if len(candidates) == 0:
-            return [XoptNode(variables=variables.copy(),
-                             formula=self.formula,
-                             answer=[],
-                             outermost_block=self.outermost_block,
-                             options=self.options,
-                             passive_list=passive_list.copy())]
-        self.logger().debug(f'Applying {passive_list=} to {candidates=}')
-        candidates.apply_passive_list(passive_list)
-        self.logger().debug(f'yields {candidates=}')
-        if len(candidates) == 0:
-            # Redlog returns a single Node representing F here.
-            return []
-        testpoints = elimination_set(candidates)
-        self.logger().debug(f'eliminating {x} with {testpoints}')
-        passive_list = self.passive_list
-        successors = []
-        for testpoint in testpoints:
-            formula = subs_into_formula(self.formula, x, testpoint, assumptions)
-            if isinstance(formula, _T):
-                raise abc.qe.FoundT()
-            if isinstance(formula, _F):
-                continue
-            substituted_passive_list_copy = subs_into_passive_list(passive_list, x, testpoint)
-            node = XoptNode(variables=variables.copy(),
-                            formula=formula,
-                            answer=[],
-                            outermost_block=self.outermost_block,
-                            options=self.options,
-                            passive_list=substituted_passive_list_copy)
-            successors.append(node)
-            if isinstance(testpoint, Term):
-                passive_list.add(testpoint)
-        return successors
+        else:
+            assert isinstance(pt, XoptInfinity)
+            for term in passive_list:
+                if term.monomial_coefficient(x) == 0:
+                    result.add(term)
+        return result
 
 
 @dataclass
