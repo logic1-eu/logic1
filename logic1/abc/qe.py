@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 import logging
 import multiprocessing as mp
@@ -108,7 +109,7 @@ class Node(Generic[φ, χ, λ]):
         ...
 
     @abstractmethod
-    def process(self, assumptions: λ) -> list[Self]:
+    def process(self, assumptions: λ) -> Sequence[Self]:
         """This `node` describes a formula ``Ex(node.variables,
         node.formula)``. Select a `variable` from ``node.variables`` and
         compute a list `S` of successor nodes such that:
