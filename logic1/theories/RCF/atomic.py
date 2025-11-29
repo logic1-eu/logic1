@@ -998,6 +998,22 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
                     assert False, (self, d)
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
+    def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:
+        """Substitute the solution of the weakly parametric linear
+        polynomial ``minimal_polynomial`` this weakly parametric linear
+        polynomial.
+        """
+        # self = a * x + b
+        a = self.monomial_coefficient(x)
+        b = self - a * x
+        assert x not in b.vars()
+        # minimal_polynomial = c * x + d
+        c = minimal_polynomial.monomial_coefficient(x)
+        d = minimal_polynomial - c * x
+        assert x not in d.vars()
+        result = a * (-d / c) + b
+        return result
+
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
         """Iterate over the summands of self yielding pairs of dictionaries
         representing monomials, and coefficients.
