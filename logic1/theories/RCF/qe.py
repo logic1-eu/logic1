@@ -24,6 +24,40 @@ class DegreeViolation(abc.qe.NodeProcessFailure):
     pass
 
 
+class Clustering(Enum):
+    """Available clustering strategies. Required by :class:`.Options`.
+    """
+    NONE = auto()
+    """No clustering at all.
+    """
+
+    FULL = auto()
+    """Full clustering.
+    """
+
+
+class Generic(Enum):
+    """Available degrees of genericity. For details on generic quantifier
+    elimination see
+
+    Required by :class:`.Options`.
+    """
+    NONE = auto()
+    """Regular quantifier elimination, not making any assumptions.
+    """
+
+    MONOMIAL = auto()
+    """Admit assumptions on parameters by adding atomic formulas to
+    :attr:`.abc.qe.QuantifierElimination.assumptions`, where the left hand side of those
+    atomic formulas is a monomial (and the right hand side is zero).
+    """
+
+    FULL = auto()
+    """Admit assumptions on parameters by adding atomic formulas to
+    :attr:`.abc.qe.QuantifierElimination.assumptions`.
+    """
+
+
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Assumptions.simplify>` of its super class
@@ -54,7 +88,7 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
 
     def __str__(self):
         s = f'Node({self.variables}, {self.formula}, ...'
-        if isinstance(self, XoptNode):
+        if isinstance(self, XoNode):
             s += f', {self.passive_list}'
         s += ')'
         return s
@@ -83,13 +117,13 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
                       options=self.options,
                       passive_list=set())
 
-    def as_xopt_node(self):
-        return XoptNode(variables=self.variables,
-                        formula=self.formula,
-                        answer=self.answer,
-                        outermost_block=self.outermost_block,
-                        options=self.options,
-                        passive_list=set())
+    def as_xo_node(self):
+        return XoNode(variables=self.variables,
+                      formula=self.formula,
+                      answer=self.answer,
+                      outermost_block=self.outermost_block,
+                      options=self.options,
+                      passive_list=set())
 
     def copy(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
@@ -111,55 +145,23 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
         """
         self.logger().debug(f'Entering process')
-        if isinstance(self, XoptNode):
+        if isinstance(self, XoNode):
             return self.process(assumptions=assumptions)
         elif isinstance(self, VsNode):
             if self.options.xopt and self.admits_xopt():
-                return self.as_xopt_node().process(assumptions=assumptions)
+                return self.as_xo_node().process(assumptions=assumptions)
             else:
                 return self.process(assumptions=assumptions)
         else:
             if self.options.xopt and self.admits_xopt():
-                return self.as_xopt_node().process(assumptions=assumptions)
+                return self.as_xo_node().process(assumptions=assumptions)
             else:
                 return self.as_vs_node().process(assumptions=assumptions)
 
 
-class CLUSTERING(Enum):
-    """Available clustering strategies. Required by :class:`.Options`.
+class _VsNsp(Enum):
+    """Non-Standard Part
     """
-    NONE = auto()
-    """No clustering at all.
-    """
-
-    FULL = auto()
-    """Full clustering.
-    """
-
-
-class GENERIC(Enum):
-    """Available degrees of genericity. For details on generic quantifier
-    elimination see
-
-    Required by :class:`.Options`.
-    """
-    NONE = auto()
-    """Regular quantifier elimination, not making any assumptions.
-    """
-
-    MONOMIAL = auto()
-    """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.assumptions`, where the left hand side of those
-    atomic formulas is a monomial (and the right hand side is zero).
-    """
-
-    FULL = auto()
-    """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.assumptions`.
-    """
-
-
-class NSP(Enum):
     NONE = auto()
     PLUS_EPSILON = auto()
     MINUS_EPSILON = auto()
@@ -167,25 +169,29 @@ class NSP(Enum):
     MINUS_INFINITY = auto()
 
 
-class TAG(Enum):
+class _VsTag(Enum):
+    """Describes the bound type - upper, lower, or any.
+    """
     XLB = auto()
     XUB = auto()
     ANY = auto()
 
 
-SignSequence: TypeAlias = tuple[Literal[-1, 0, 1], ...]
+_VsSignSequence: TypeAlias = tuple[Literal[-1, 0, 1], ...]
 
 
 @dataclass(frozen=True)
-class RootSpec:
+class _VsRootSpec:
+    """Root Specification
+    """
 
-    signs: SignSequence
+    signs: _VsSignSequence
     index: int
 
-    def __neg__(self) -> RootSpec:
-        return RootSpec(signs=tuple(-i for i in self.signs), index=self.index)
+    def __neg__(self) -> _VsRootSpec:
+        return _VsRootSpec(signs=tuple(-i for i in self.signs), index=self.index)
 
-    def bound_type(self, atom: AtomicFormula) -> tuple[bool, Optional[TAG]]:
+    def bound_type(self, atom: AtomicFormula) -> tuple[bool, Optional[_VsTag]]:
         """Return value None means that atom has a constant truth value
         """
         zero_index = 2 * self.index - 1
@@ -195,28 +201,28 @@ class RootSpec:
         assert left != 0 and right != 0, (self, atom)
         match (atom, left, right):
             case (Eq(), _, _):
-                return (False, TAG.ANY)
+                return (False, _VsTag.ANY)
 
             case (Ne(), _, _):
-                return (True, TAG.ANY)
+                return (True, _VsTag.ANY)
 
             case (Lt(), -1, -1) | (Gt(), 1, 1):
-                return (True, TAG.ANY)
+                return (True, _VsTag.ANY)
             case (Lt(), -1, 1) | (Gt(), 1, -1):
-                return (True, TAG.XUB)
+                return (True, _VsTag.XUB)
             case (Lt(), 1, -1) | (Gt(), -1, 1):
-                return (True, TAG.XLB)
+                return (True, _VsTag.XLB)
             case (Lt(), 1, 1) | (Gt(), -1, -1):
                 return (True, None)
 
             case (Le(), -1, -1) | (Ge(), 1, 1):
                 return (False, None)
             case (Le(), -1, 1) | (Ge(), 1, -1):
-                return (False, TAG.XUB)
+                return (False, _VsTag.XUB)
             case (Le(), 1, -1) | (Ge(), -1, 1):
-                return (False, TAG.XLB)
+                return (False, _VsTag.XLB)
             case (Le(), 1, 1) | (Ge(), -1, -1):
-                return (False, TAG.ANY)
+                return (False, _VsTag.ANY)
 
             case _:
                 assert False, (atom, left, right)
@@ -254,7 +260,7 @@ class RootSpec:
                 raise DegreeViolation(self, term, x)
 
     def kosta_code(self, d: int) -> int:
-        D: dict[tuple[int, SignSequence], int] = {
+        D: dict[tuple[int, _VsSignSequence], int] = {
             (1, (-1, 0, 1)): 1,
             (1, (1, 0, -1)): -1,
             (2, (1, 0, -1, 0, 1)): 1,
@@ -275,18 +281,19 @@ class RootSpec:
 
 
 @dataclass(frozen=True)
-class Cluster:
+class _VsCluster:
+    """A Cluster wraps a tuple of Root Specifications.
+    """
+    root_specs: tuple[_VsRootSpec, ...]
 
-    root_specs: tuple[RootSpec, ...]
+    def __neg__(self) -> _VsCluster:
+        return _VsCluster(tuple(- root_spec for root_spec in self.root_specs))
 
-    def __neg__(self) -> Cluster:
-        return Cluster(tuple(- root_spec for root_spec in self.root_specs))
-
-    def __iter__(self) -> Iterator[RootSpec]:
+    def __iter__(self) -> Iterator[_VsRootSpec]:
         return iter(self.root_specs)
 
     def bound_type(self, atom: AtomicFormula, x: Variable, assumptions: Assumptions)\
-            -> tuple[bool, Optional[TAG]]:
+            -> tuple[bool, Optional[_VsTag]]:
         epsilons = set()
         tags = set()
         for root_spec in self.root_specs:
@@ -303,25 +310,25 @@ class Cluster:
             epsilon = False
         if len(tags) == 0:
             tag = None
-        elif tags == {TAG.XLB} or tags == {TAG.XLB, TAG.ANY}:
-            tag = TAG.XLB
-        elif tags == {TAG.XUB} or tags == {TAG.XUB, TAG.ANY}:
-            tag = TAG.XUB
+        elif tags == {_VsTag.XLB} or tags == {_VsTag.XLB, _VsTag.ANY}:
+            tag = _VsTag.XLB
+        elif tags == {_VsTag.XUB} or tags == {_VsTag.XUB, _VsTag.ANY}:
+            tag = _VsTag.XUB
         else:
-            tag = TAG.ANY
+            tag = _VsTag.ANY
         return (epsilon, tag)
 
     def guard(self, term: Term, x: Variable) -> Formula:
         d = term.degree(x)
         match d, self:
-            case 1, Cluster((RootSpec(signs=(-1, 0, 1), index=1),
-                             RootSpec(signs=(1, 0, -1), index=1))):
+            case 1, _VsCluster((_VsRootSpec(signs=(-1, 0, 1), index=1),
+                                _VsRootSpec(signs=(1, 0, -1), index=1))):
                 a = term.coefficient({x: 1})
                 return a != 0
-            case 2, Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                             RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                             RootSpec(signs=(1, 0, 1), index=1),
-                             RootSpec(signs=(-1, 0, -1), index=1))):
+            case 2, _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                _VsRootSpec(signs=(1, 0, 1), index=1),
+                                _VsRootSpec(signs=(-1, 0, -1), index=1))):
                 a = term.coefficient({x: 2})
                 b = term.coefficient({x: 1})
                 c = term.coefficient({x: 0})
@@ -332,12 +339,12 @@ class Cluster:
 
 
 @dataclass(frozen=True)
-class PRD:
-    """Parametric Root Description"""
-
+class _VsPRD:
+    """Parametric Root Description
+    """
     term: Term
     variable: Variable
-    cluster: Cluster
+    cluster: _VsCluster
     xguard: Formula = field(default_factory=_T)
 
     def guard(self, assumptions: Assumptions) -> Formula:
@@ -384,40 +391,40 @@ class PRD:
                 C = 2 * a * bb - aa * b
                 match (deg_g, atom, self.cluster):
                     # Kosta Appendix A.1: Without clustering
-                    case (1, Eq(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
+                    case (1, Eq(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
                         return And(A >= 0, B == 0)
-                    case (1, Eq(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
+                    case (1, Eq(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
                         return And(A <= 0, B == 0)
-                    case (1, Eq(), Cluster((RootSpec(signs=(1, 0, 1), index=1),))):
+                    case (1, Eq(), _VsCluster((_VsRootSpec(signs=(1, 0, 1), index=1),))):
                         return C == 0
-                    case (1, Lt(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
+                    case (1, Lt(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
                         return Or(And(C < 0, B > 0), And(aa >= 0, Or(C < 0, B < 0)))
-                    case (1, Lt(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
+                    case (1, Lt(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
                         return Or(And(C < 0, B > 0), And(aa <= 0, Or(C < 0, B < 0)))
-                    case (1, Lt(), Cluster((RootSpec(signs=(1, 0, 1), index=1),))):
+                    case (1, Lt(), _VsCluster((_VsRootSpec(signs=(1, 0, 1), index=1),))):
                         return C < 0
-                    case (1, Le(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
+                    case (1, Le(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),))):
                         return Or(And(C <= 0, B >= 0), And(aa >= 0, B <= 0))
-                    case (1, Le(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
+                    case (1, Le(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=2),))):
                         return Or(And(C <= 0, B >= 0), And(aa <= 0, B <= 0))
-                    case (1, Le(), Cluster((RootSpec(signs=(1, 0, 1), index=1),))):
+                    case (1, Le(), _VsCluster((_VsRootSpec(signs=(1, 0, 1), index=1),))):
                         return C <= 0
                     # Kosta Appendix A.3: With clustering
-                    case (1, Eq(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                                            RootSpec(signs=(1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, -1), index=1)))):
+                    case (1, Eq(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                               _VsRootSpec(signs=(1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, -1), index=1)))):
                         return And(A >= 0, B == 0)
-                    case (1, Lt(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                                            RootSpec(signs=(1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, -1), index=1)))):
+                    case (1, Lt(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                               _VsRootSpec(signs=(1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, -1), index=1)))):
                         return Or(And(a * C < 0, a * B > 0),
                                   And(a * aa >= 0, Or(a * C < 0, a * B < 0)))
-                    case (1, Le(), Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                                            RootSpec(signs=(1, 0, 1), index=1),
-                                            RootSpec(signs=(-1, 0, -1), index=1)))):
+                    case (1, Le(), _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                               _VsRootSpec(signs=(1, 0, 1), index=1),
+                                               _VsRootSpec(signs=(-1, 0, -1), index=1)))):
                         return Or(And(a * C <= 0, a * B >= 0), And(a * aa >= 0, a * B <= 0))
                     case _:
                         assert False, f'{self=}, {atom=}'
@@ -434,28 +441,28 @@ class PRD:
             case 1:
                 match self.cluster:
                     # CLUSTERING.NONE
-                    case Cluster((RootSpec(signs=(-1, 0, 1), index=1),)):
+                    case _VsCluster((_VsRootSpec(signs=(-1, 0, 1), index=1),)):
                         return f'({-c}) / ({b})'
                     # CLUSTERING.FULL
-                    case Cluster((RootSpec(signs=(-1, 0, 1), index=1),
-                                  RootSpec(signs=(1, 0, -1), index=1))):
+                    case _VsCluster((_VsRootSpec(signs=(-1, 0, 1), index=1),
+                                     _VsRootSpec(signs=(1, 0, -1), index=1))):
                         return f'({-c}) / ({b})'
                     case _:
                         assert False, self
             case 2:
                 match self.cluster:
                     # CLUSTERING.NONE
-                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),)):
+                    case _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),)):
                         return f'({-b} - sqrt({b**2- 4*a*c})) / ({2*a})'
-                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),)):
+                    case _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=2),)):
                         return f'({-b} + sqrt({b**2- 4*a*c})) / ({2*a})'
-                    case Cluster((RootSpec(signs=(1, 0, 1), index=1),)):
+                    case _VsCluster((_VsRootSpec(signs=(1, 0, 1), index=1),)):
                         return f'({-b} ± sqrt({0})) / ({2*a})'
                     # CLUSTERING.FULL
-                    case Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                                  RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                                  RootSpec(signs=(1, 0, 1), index=1),
-                                  RootSpec(signs=(-1, 0, -1), index=1))):
+                    case _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                                     _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                                     _VsRootSpec(signs=(1, 0, 1), index=1),
+                                     _VsRootSpec(signs=(-1, 0, -1), index=1))):
                         return f'({-b} - sqrt({b**2- 4*a*c})) / ({2*a})'
                     case _:
                         assert False, self
@@ -464,21 +471,25 @@ class PRD:
 
 
 @dataclass(frozen=True)
-class CandidateSolution:
-    # CandidateSolutions are used as elements of sets. In order to become
-    # hashable, the dataclass is frozen, along with RootSpec, PRD, and
-    # RealType.
+class _VsCandidateSolution:
+    """A candidate solution combines a parametric root description with a
+    flag indicating that epsilon will be needed and a bound type.
 
-    prd: PRD
+    CandidateSolutions are used as elements of sets. In order to become
+    hashable, the dataclass is frozen, along with RootSpec, PRD, and RealType.
+    """
+    prd: _VsPRD
     with_epsilon: bool
-    tag: TAG
+    tag: _VsTag
 
 
 @dataclass
-class TestPoint:
-
-    prd: Optional[PRD] = None
-    nsp: NSP = NSP.NONE
+class _VsTestPoint:
+    """A test point combinines a parametric root description with an optional
+    non-standard part.
+    """
+    prd: Optional[_VsPRD] = None
+    nsp: _VsNsp = _VsNsp.NONE
 
     def guard(self, assumptions: Assumptions):
         if self.prd is None:
@@ -491,25 +502,25 @@ class TestPoint:
     def _translate(self) -> str:
         assert self.prd is not None
         match self.nsp:
-            case NSP.NONE:
+            case _VsNsp.NONE:
                 return self.prd._translate()
-            case NSP.PLUS_EPSILON:
+            case _VsNsp.PLUS_EPSILON:
                 return self.prd._translate() + ' + epsilon'
-            case NSP.MINUS_EPSILON:
+            case _VsNsp.MINUS_EPSILON:
                 return self.prd._translate() + ' - epsilon'
-            case NSP.PLUS_INFINITY:
+            case _VsNsp.PLUS_INFINITY:
                 return '+inf'
-            case NSP.MINUS_INFINITY:
+            case _VsNsp.MINUS_INFINITY:
                 return '-inf'
             case _:
                 assert False, self
 
 
 @dataclass
-class EliminationSet:
+class _VsEliminationSet:
 
     variable: Variable
-    test_points: list[TestPoint]
+    test_points: list[_VsTestPoint]
     method: str
 
     def _translate(self, assumptions: Assumptions):
@@ -520,40 +531,42 @@ class EliminationSet:
 
 @dataclass
 class VsNode(Node):
+    """Real linear and quadratic quantifier elimination based on [Kosta-2016]_
+    """
 
-    real_type_selection: ClassVar[dict[CLUSTERING,
-                                       dict[int, list[Cluster]]]] = {
+    real_type_selection: ClassVar[dict[Clustering,
+                                       dict[int, list[_VsCluster]]]] = {
         # W.l.o.g. the last sign in the first SignSequence of each tuple is always +1.
-        CLUSTERING.NONE: {
-            1: [Cluster((RootSpec(signs=(-1, 0, 1), index=1),))],
-            2: [Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),)),
-                Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=2),)),
-                Cluster((RootSpec(signs=(1, 0, 1), index=1),))]
+        Clustering.NONE: {
+            1: [_VsCluster((_VsRootSpec(signs=(-1, 0, 1), index=1),))],
+            2: [_VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),)),
+                _VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=2),)),
+                _VsCluster((_VsRootSpec(signs=(1, 0, 1), index=1),))]
         },
-        CLUSTERING.FULL: {
-            1: [Cluster((RootSpec(signs=(-1, 0, 1), index=1),
-                         RootSpec(signs=(1, 0, -1), index=1)))],
-            2: [Cluster((RootSpec(signs=(1, 0, -1, 0, 1), index=1),
-                         RootSpec(signs=(-1, 0, 1, 0, -1), index=2),
-                         RootSpec(signs=(1, 0, 1), index=1),
-                         RootSpec(signs=(-1, 0, -1), index=1)))]
+        Clustering.FULL: {
+            1: [_VsCluster((_VsRootSpec(signs=(-1, 0, 1), index=1),
+                            _VsRootSpec(signs=(1, 0, -1), index=1)))],
+            2: [_VsCluster((_VsRootSpec(signs=(1, 0, -1, 0, 1), index=1),
+                            _VsRootSpec(signs=(-1, 0, 1, 0, -1), index=2),
+                            _VsRootSpec(signs=(1, 0, 1), index=1),
+                            _VsRootSpec(signs=(-1, 0, -1), index=1)))]
         }
     }
 
-    def eset(self, assumptions: Assumptions) -> EliminationSet:
+    def eset(self, assumptions: Assumptions) -> _VsEliminationSet:
         return self.gauss_eset(assumptions) or self.regular_eset(assumptions)
 
-    def gauss_eset(self, assumptions: Assumptions) -> Optional[EliminationSet]:
+    def gauss_eset(self, assumptions: Assumptions) -> Optional[_VsEliminationSet]:
         if not isinstance(self.formula, And):
             return None
         for degree in (1, 2):
             # Look for degree-Gauss with a non-zero coefficient modulo assumptions
-            for round_ in (GENERIC.NONE, GENERIC.MONOMIAL, GENERIC.FULL):
-                if round_ == GENERIC.MONOMIAL and not self.outermost_block:
+            for round_ in (Generic.NONE, Generic.MONOMIAL, Generic.FULL):
+                if round_ == Generic.MONOMIAL and not self.outermost_block:
                     break
-                if round_ == GENERIC.MONOMIAL and self.options.generic == GENERIC.NONE:
+                if round_ == Generic.MONOMIAL and self.options.generic == Generic.NONE:
                     break
-                if round_ == GENERIC.FULL and self.options.generic == GENERIC.MONOMIAL:
+                if round_ == Generic.FULL and self.options.generic == Generic.MONOMIAL:
                     break
                 for x in self.variables:
                     for arg in self.formula.args:
@@ -565,18 +578,18 @@ class VsNode(Node):
                             continue
                         a = lhs.coefficient({x: degree})
                         match round_:
-                            case GENERIC.NONE:
+                            case Generic.NONE:
                                 if not is_valid(a != 0, assumptions.atoms):
                                     continue
                                 self.logger().debug(f'{degree}-Gauss')
-                            case GENERIC.MONOMIAL:
+                            case Generic.MONOMIAL:
                                 if len(a.monomials()) > 1:
                                     continue
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
                                 self.logger().debug(f'{degree}-Gauss assuming {a != 0}')
-                            case GENERIC.FULL:
+                            case Generic.FULL:
                                 if not set(a.vars()).isdisjoint(self.variables):
                                     continue
                                 assumptions.append(a != 0)
@@ -585,36 +598,36 @@ class VsNode(Node):
                         test_points = []
                         for cluster in self.real_type_selection[self.options.clustering][degree]:
                             for sign in (1, -1):
-                                prd = PRD(sign * lhs, x, cluster)
+                                prd = _VsPRD(sign * lhs, x, cluster)
                                 if prd.guard(assumptions) is not _F():
-                                    test_points.append(TestPoint(prd))
-                        eset = EliminationSet(variable=x, test_points=test_points, method='g')
+                                    test_points.append(_VsTestPoint(prd))
+                        eset = _VsEliminationSet(variable=x, test_points=test_points, method='g')
                         return eset
         return None
 
     def is_admissible_assumption(self, atom: Ne) -> bool:
         match self.options.generic:
-            case GENERIC.NONE:
+            case Generic.NONE:
                 return False
-            case GENERIC.MONOMIAL:
+            case Generic.MONOMIAL:
                 if len(atom.lhs.monomials()) > 1:
                     return False
                 if not set(atom.fvars()).isdisjoint(self.variables):
                     return False
                 return True
-            case GENERIC.FULL:
+            case Generic.FULL:
                 if not set(atom.fvars()).isdisjoint(self.variables):
                     return False
                 return True
             case _:
                 assert False, self.options.generic
 
-    def regular_eset(self, assumptions: Assumptions) -> EliminationSet:
+    def regular_eset(self, assumptions: Assumptions) -> _VsEliminationSet:
 
         def red(f: Term, x: Variable, d: int) -> Term:
             return f - f.coefficient({x: d}) * x ** d
 
-        def at_cs(atom: AtomicFormula, x: Variable) -> set[CandidateSolution]:
+        def at_cs(atom: AtomicFormula, x: Variable) -> set[_VsCandidateSolution]:
             """Produce the set of candidate solutions of an atomic formula.
             """
             candidate_solutions = set()
@@ -622,16 +635,16 @@ class VsNode(Node):
             while (d := atom.lhs.degree(x)) > 0:
                 clusters = VsNode.real_type_selection[self.options.clustering][d]
                 for cluster in clusters:
-                    prd = PRD(atom.lhs, x, cluster, xguard)
+                    prd = _VsPRD(atom.lhs, x, cluster, xguard)
                     (with_epsilon, tag) = cluster.bound_type(atom, x, assumptions)
                     if tag is not None:
-                        cs = CandidateSolution(prd, with_epsilon, tag)
+                        cs = _VsCandidateSolution(prd, with_epsilon, tag)
                         candidate_solutions.add(cs)
                     if set(cluster) != set(- cluster):
-                        prd = PRD(- atom.lhs, x, cluster, xguard)
+                        prd = _VsPRD(- atom.lhs, x, cluster, xguard)
                         (with_epsilon, tag) = (- cluster).bound_type(atom, x, assumptions)
                         if tag is not None:
-                            cs = CandidateSolution(prd, with_epsilon, tag)
+                            cs = _VsCandidateSolution(prd, with_epsilon, tag)
                             candidate_solutions.add(cs)
                 lc = atom.lhs.coefficient({x: d})
                 if self.is_admissible_assumption(lc != 0):
@@ -646,7 +659,7 @@ class VsNode(Node):
         assert self.variables
         for x in self.variables:
             # We can use (with_epsilon, TAG) as a key in the future.
-            candidates: dict[TAG, set[CandidateSolution]] = {tag: set() for tag in TAG}
+            candidates: dict[_VsTag, set[_VsCandidateSolution]] = {tag: set() for tag in _VsTag}
             for atom in sorted(set(self.formula.atoms())):
                 assert isinstance(atom, AtomicFormula)
                 assert atom.rhs == Term(0)
@@ -659,49 +672,53 @@ class VsNode(Node):
                                 candidates[candidate.tag].add(candidate)
                     case _:
                         raise DegreeViolation(atom, x, atom.lhs.degree(x))
-            num_xub = len(candidates[TAG.XUB])
-            num_xlb = len(candidates[TAG.XLB])
-            num_any = len(candidates[TAG.ANY])
+            num_xub = len(candidates[_VsTag.XUB])
+            num_xlb = len(candidates[_VsTag.XLB])
+            num_any = len(candidates[_VsTag.ANY])
             eset_size = min(num_xub, num_xlb) + num_any
             if smallest_eset_size is None or eset_size < smallest_eset_size:
                 smallest_eset_size = eset_size
                 best_variable = x
                 best_candidates = candidates
                 if num_xub < num_xlb:
-                    best_inf, best_eps, best_xb = NSP.PLUS_INFINITY, NSP.MINUS_EPSILON, TAG.XUB
+                    best_inf = _VsNsp.PLUS_INFINITY
+                    best_eps = _VsNsp.MINUS_EPSILON
+                    best_xb = _VsTag.XUB
                 else:
-                    best_inf, best_eps, best_xb = NSP.MINUS_INFINITY, NSP.PLUS_EPSILON, TAG.XLB
+                    best_inf = _VsNsp.MINUS_INFINITY
+                    best_eps = _VsNsp.PLUS_EPSILON
+                    best_xb = _VsTag.XLB
         self.variables.remove(best_variable)
-        test_points = [TestPoint(nsp=best_inf)]
-        for tag in (TAG.ANY, best_xb):
+        test_points = [_VsTestPoint(nsp=best_inf)]
+        for tag in (_VsTag.ANY, best_xb):
             for candidate in best_candidates[tag]:
                 if candidate.with_epsilon:
-                    test_points.append(TestPoint(candidate.prd, best_eps))
+                    test_points.append(_VsTestPoint(candidate.prd, best_eps))
                 else:
-                    test_points.append(TestPoint(candidate.prd))
-        eset = EliminationSet(variable=best_variable, test_points=test_points, method='e')
+                    test_points.append(_VsTestPoint(candidate.prd))
+        eset = _VsEliminationSet(variable=best_variable, test_points=test_points, method='e')
         return eset
 
-    def vsubs(self, eset: EliminationSet, assumptions: Assumptions) -> list[VsNode]:
+    def vsubs(self, eset: _VsEliminationSet, assumptions: Assumptions) -> list[VsNode]:
 
-        def vs_at(atom: AtomicFormula, tp: TestPoint, x: Variable) -> Formula:
+        def vs_at(atom: AtomicFormula, tp: _VsTestPoint, x: Variable) -> Formula:
             """Virtually substitute a test point into an atom.
             """
             match tp.nsp:
-                case NSP.NONE:
+                case _VsNsp.NONE:
                     assert tp.prd is not None
                     h = pseudo_sgn_rem(atom.lhs, tp.prd, x)
                     return vs_prd_at(atom.op(h, 0), tp.prd, x)
-                case NSP.PLUS_EPSILON | NSP.MINUS_EPSILON:
+                case _VsNsp.PLUS_EPSILON | _VsNsp.MINUS_EPSILON:
                     phi = expand_eps_at(atom, tp.nsp, x)
-                    recurse = lambda atom: vs_at(atom, TestPoint(tp.prd, NSP.NONE), x)  # noqa E731
+                    recurse = lambda atom: vs_at(atom, _VsTestPoint(tp.prd, _VsNsp.NONE), x)  # noqa E731
                     return phi.traverse(map_atoms=recurse)
-                case NSP.PLUS_INFINITY | NSP.MINUS_INFINITY:
+                case _VsNsp.PLUS_INFINITY | _VsNsp.MINUS_INFINITY:
                     return vs_inf_at(atom, tp.nsp, x)
                 case _:
                     assert False, tp.nsp
 
-        def pseudo_sgn_rem(g: Term, prd: PRD, x: Variable) -> Term:
+        def pseudo_sgn_rem(g: Term, prd: _VsPRD, x: Variable) -> Term:
             """Sign-corrected pseudo-remainder
             """
             f = prd.term
@@ -731,15 +748,15 @@ class VsNode(Node):
             # simplifier takes care of this.
             return h
 
-        def vs_prd_at(atom: AtomicFormula, prd: PRD, x: Variable) -> Formula:
+        def vs_prd_at(atom: AtomicFormula, prd: _VsPRD, x: Variable) -> Formula:
             """Virtually substitute a parametric root description into an atom.
             """
             return prd.vsubs(atom)
 
-        def vs_inf_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def vs_inf_at(atom: AtomicFormula, nsp: _VsNsp, x: Variable) -> Formula:
             """Virtually substitute ±∞ into an atom
             """
-            assert nsp in (NSP.PLUS_INFINITY, NSP.MINUS_INFINITY), nsp
+            assert nsp in (_VsNsp.PLUS_INFINITY, _VsNsp.MINUS_INFINITY), nsp
             match atom:
                 case Eq() | Ne():
                     return tau(atom, x)
@@ -748,18 +765,18 @@ class VsNode(Node):
                     mu: Formula = atom.op(c, 0)
                     for e in range(1, atom.lhs.degree(x) + 1):
                         c = atom.lhs.coefficient({x: e})
-                        if nsp == NSP.MINUS_INFINITY and e % 2 == 1:
+                        if nsp == _VsNsp.MINUS_INFINITY and e % 2 == 1:
                             c = - c
                         mu = Or(atom.op.strict_part()(c, 0), And(Eq(c, 0), mu))
                     return mu
                 case _:
                     assert False, atom
 
-        def expand_eps_at(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def expand_eps_at(atom: AtomicFormula, nsp: _VsNsp, x: Variable) -> Formula:
             """Reduce virtual substitution of a parametric root description ±ε
             to virtual substitution of a parametric root description.
             """
-            assert nsp in (NSP.PLUS_EPSILON, NSP.MINUS_EPSILON), nsp
+            assert nsp in (_VsNsp.PLUS_EPSILON, _VsNsp.MINUS_EPSILON), nsp
             match atom:
                 case Eq() | Ne():
                     return tau(atom, x)
@@ -768,13 +785,13 @@ class VsNode(Node):
                 case _:
                     assert False, atom
 
-        def nu(atom: AtomicFormula, nsp: NSP, x: Variable) -> Formula:
+        def nu(atom: AtomicFormula, nsp: _VsNsp, x: Variable) -> Formula:
             """Recursion on the vanishing of derivatives
             """
             if atom.lhs.degree(x) <= 0:
                 return atom
             lhs_prime = atom.lhs.derivative(x)
-            if nsp == NSP.MINUS_EPSILON:
+            if nsp == _VsNsp.MINUS_EPSILON:
                 lhs_prime = - lhs_prime
             atom_strict = atom.op.strict_part()(atom.lhs, 0)
             atom_prime = atom.op(lhs_prime, 0)
@@ -817,13 +834,12 @@ class VsNode(Node):
                                    assume=assumptions.atoms)
             if new_formula is _T():
                 raise abc.qe.FoundT()
-            new_nodes.append(
-                VsNode(variables=variables.copy(),
-                     formula=new_formula,
-                     answer=[],
-                     outermost_block=self.outermost_block,
-                     options=self.options,
-                     passive_list=set()))
+            new_nodes.append(VsNode(variables=variables.copy(),
+                                    formula=new_formula,
+                                    answer=[],
+                                    outermost_block=self.outermost_block,
+                                    options=self.options,
+                                    passive_list=set()))
         return new_nodes
 
     def process(self, assumptions: Assumptions) -> Sequence[VsNode]:
@@ -832,7 +848,7 @@ class VsNode(Node):
         return nodes
 
 
-class XoptBoundType(Enum):
+class _XoBoundType(Enum):
     EQUATION = auto()
     LOWER_BOUND = auto()
     UPPER_BOUND = auto()
@@ -840,7 +856,7 @@ class XoptBoundType(Enum):
 
 
 @dataclass
-class XoptCandidateSet:
+class _XoCandidateSet:
     equations: set[Term] = field(default_factory=set)
     lower_bounds: set[Term] = field(default_factory=set)
     upper_bounds: set[Term] = field(default_factory=set)
@@ -876,80 +892,80 @@ class XoptCandidateSet:
                 subset.remove(candidate)
         return self
 
-    def elimination_set(self) -> XoptEliminationSet:
+    def elimination_set(self) -> _XoEliminationSet:
         if len(self.upper_bounds) == 0 and len(self.lower_bounds) == 0:
             assert len(self.equations) > 0
             standard_terms = self.equations
             infinity = None
         if len(self.upper_bounds) <= len(self.lower_bounds):
             standard_terms = self.upper_bounds | self.equations
-            infinity = XoptInfinity.PLUS
+            infinity = _XoInfinity.PLUS
         else:
             standard_terms = self.lower_bounds | self.equations
-            infinity = XoptInfinity.MINUS
-        return XoptEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
+            infinity = _XoInfinity.MINUS
+        return _XoEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
 
 
 @dataclass
-class XoptEliminationSet:
+class _XoEliminationSet:
     standard_terms: list[Term]
-    infinity: Optional[XoptInfinity]
+    infinity: Optional[_XoInfinity]
 
-    def __iter__(self) -> Iterator[Term | XoptInfinity]:
+    def __iter__(self) -> Iterator[Term | _XoInfinity]:
         if self.infinity is not None:
             yield self.infinity
         yield from self.standard_terms
 
 
-class XoptInfinity(Enum):
+class _XoInfinity(Enum):
     PLUS = auto()
     MINUS = auto()
 
-    def __mul__(self, other: mpq) -> XoptInfinity:
+    def __mul__(self, other: mpq) -> _XoInfinity:
         if other > 0:
             return self
         elif other < 0:
-            if self is XoptInfinity.PLUS:
-                return XoptInfinity.MINUS
+            if self is _XoInfinity.PLUS:
+                return _XoInfinity.MINUS
             else:
-                assert self is XoptInfinity.MINUS
-                return XoptInfinity.PLUS
+                assert self is _XoInfinity.MINUS
+                return _XoInfinity.PLUS
         else:
             raise ValueError(f'{other}')
 
 
 @dataclass
-class XoptNode(Node):
+class XoNode(Node):
 
-    def candidate_set(self, x: Variable) -> XoptCandidateSet:
+    def candidate_set(self, x: Variable) -> _XoCandidateSet:
         """Compute a candidate set using structural elimination, which covers
         generalizations of Gaussian elimination.
         """
-        def bound_type(atom: AtomicFormula, x: Variable) -> XoptBoundType:
+        def bound_type(atom: AtomicFormula, x: Variable) -> _XoBoundType:
             c = atom.lhs.monomial_coefficient(x)
             if c == 0:
-                return XoptBoundType.NONE
+                return _XoBoundType.NONE
             elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
-                return XoptBoundType.UPPER_BOUND
+                return _XoBoundType.UPPER_BOUND
             elif c > 0 and isinstance(atom, Ge) or c < 0 and isinstance(atom, Le):
-                return XoptBoundType.LOWER_BOUND
+                return _XoBoundType.LOWER_BOUND
             else:
                 assert isinstance(atom, Eq)
-                return XoptBoundType.EQUATION
+                return _XoBoundType.EQUATION
 
-        def recurse(formula: Formula, x: Variable) -> XoptCandidateSet:
+        def recurse(formula: Formula, x: Variable) -> _XoCandidateSet:
             if isinstance(formula, AtomicFormula):
-                if bound_type(formula, x) is XoptBoundType.NONE:
-                    return XoptCandidateSet()
-                elif bound_type(formula, x) is XoptBoundType.UPPER_BOUND:
-                    return XoptCandidateSet(upper_bounds={formula.lhs})
-                elif bound_type(formula, x) is XoptBoundType.LOWER_BOUND:
-                    return XoptCandidateSet(lower_bounds={formula.lhs})
+                if bound_type(formula, x) is _XoBoundType.NONE:
+                    return _XoCandidateSet()
+                elif bound_type(formula, x) is _XoBoundType.UPPER_BOUND:
+                    return _XoCandidateSet(upper_bounds={formula.lhs})
+                elif bound_type(formula, x) is _XoBoundType.LOWER_BOUND:
+                    return _XoCandidateSet(lower_bounds={formula.lhs})
                 else:
-                    assert bound_type(formula, x) is XoptBoundType.EQUATION
-                    return XoptCandidateSet(equations={formula.lhs})
+                    assert bound_type(formula, x) is _XoBoundType.EQUATION
+                    return _XoCandidateSet(equations={formula.lhs})
             elif isinstance(formula, And):
-                result = XoptCandidateSet()
+                result = _XoCandidateSet()
                 for arg in formula.args:
                     candidate_set_ = recurse(arg, x)
                     if candidate_set_.finite_solution_set:
@@ -959,25 +975,25 @@ class XoptNode(Node):
                 return result
             else:
                 assert isinstance(formula, Or)
-                result = XoptCandidateSet()
+                result = _XoCandidateSet()
                 for arg in formula.args:
                     result |= recurse(arg, x)
                 return result
 
         return recurse(self.formula, x)
 
-    def process(self, assumptions: Assumptions) -> Sequence[XoptNode]:
+    def process(self, assumptions: Assumptions) -> Sequence[XoNode]:
         x = self.variables[0]  # for now
         variables = self.variables[1:]
         passive_list = self.passive_list
         candidate_set = self.candidate_set(x)
         if len(candidate_set) == 0:
-            return [XoptNode(variables=variables.copy(),
-                             formula=self.formula,
-                             answer=[],
-                             outermost_block=self.outermost_block,
-                             options=self.options,
-                             passive_list=passive_list.copy())]
+            return [XoNode(variables=variables.copy(),
+                           formula=self.formula,
+                           answer=[],
+                           outermost_block=self.outermost_block,
+                           options=self.options,
+                           passive_list=passive_list.copy())]
         self.logger().debug(f'Applying {passive_list=} to {candidate_set=}')
         candidate_set.apply_passive_list(passive_list)
         self.logger().debug(f'yields {candidate_set=}')
@@ -989,28 +1005,28 @@ class XoptNode(Node):
         passive_list = self.passive_list
         successors = []
         for testpoint in elimination_set:
-            formula = XoptNode.subs_into_formula(self.formula, x, testpoint, assumptions)
+            formula = XoNode.subs_into_formula(self.formula, x, testpoint, assumptions)
             if isinstance(formula, _T):
                 raise abc.qe.FoundT()
             if isinstance(formula, _F):
                 continue
-            substituted_passive_list_copy = XoptNode.subs_into_passive_list(passive_list, x, testpoint)
-            node = XoptNode(variables=variables.copy(),
-                            formula=formula,
-                            answer=[],
-                            outermost_block=self.outermost_block,
-                            options=self.options,
-                            passive_list=substituted_passive_list_copy)
+            substituted_passive_list_copy = XoNode.subs_into_passive_list(passive_list, x, testpoint)
+            node = XoNode(variables=variables.copy(),
+                          formula=formula,
+                          answer=[],
+                          outermost_block=self.outermost_block,
+                          options=self.options,
+                          passive_list=substituted_passive_list_copy)
             successors.append(node)
             if isinstance(testpoint, Term):
                 passive_list.add(testpoint)
         return successors
 
     @staticmethod
-    def subs_into_formula(formula: Formula, x: Variable, pt: Term | XoptInfinity,
+    def subs_into_formula(formula: Formula, x: Variable, pt: Term | _XoInfinity,
                             assumptions: Assumptions) -> Formula:
 
-        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: XoptInfinity) -> Formula:
+        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: _XoInfinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
             if c == 0:
                 return atom
@@ -1018,23 +1034,23 @@ class XoptNode(Node):
                 return _F()
             inf = inf * c
             if isinstance(atom, Ge):
-                return _T() if inf is XoptInfinity.PLUS else _F()
+                return _T() if inf is _XoInfinity.PLUS else _F()
             else:
                 assert isinstance(atom, Le)
-                return _T() if inf is XoptInfinity.MINUS else _F()
+                return _T() if inf is _XoInfinity.MINUS else _F()
 
         if isinstance(pt, Term):
             new_formula = formula.traverse(
                 map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, pt), 0))
         else:
-            assert isinstance(pt, XoptInfinity)
+            assert isinstance(pt, _XoInfinity)
             new_formula = formula.traverse(
                 map_atoms=lambda atom: subs_infinity_at(atom, x, pt))
         return simplify(new_formula, assume=assumptions.atoms)
 
     @staticmethod
     def subs_into_passive_list(passive_list: set[Term], x: Variable,
-                               pt: Term | XoptInfinity) -> set[Term]:
+                               pt: Term | _XoInfinity) -> set[Term]:
         result = set()
         if isinstance(pt, Term):
             for passive_term in passive_list:
@@ -1046,7 +1062,7 @@ class XoptNode(Node):
                 else:
                     result.add(new_term.primitive_part(positive=True))
         else:
-            assert isinstance(pt, XoptInfinity)
+            assert isinstance(pt, _XoInfinity)
             for term in passive_list:
                 if term.monomial_coefficient(x) == 0:
                     result.add(term)
@@ -1063,12 +1079,12 @@ class Options(abc.qe.Options):
     variable :data:`.abc.qe.ω` of :class:`.abc.qe.QuantifierElimination`.
     """
 
-    clustering: CLUSTERING
+    clustering: Clustering
     """The clustering strategy used by :class:`.VirtualSubstitution`. See
     [Kosta-2016]_ for details on clustering.
     """
 
-    generic: GENERIC
+    generic: Generic
     """The degree of genericity used by :class:`.VirtualSubstitution`. See
     [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_ for details on generic
     quantifier elimination.
@@ -1118,8 +1134,8 @@ class Options(abc.qe.Options):
 
     xopt: bool
 
-    def __init__(self, /, clustering: CLUSTERING = CLUSTERING.FULL,
-                 generic: GENERIC = GENERIC.NONE, traditional_guards: bool = True,
+    def __init__(self, /, clustering: Clustering = Clustering.FULL,
+                 generic: Generic = Generic.NONE, traditional_guards: bool = True,
                  xopt: bool = True, **kwargs) \
             -> None:
         super().__init__(**kwargs)

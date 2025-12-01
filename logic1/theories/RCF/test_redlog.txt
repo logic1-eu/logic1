@@ -7,15 +7,15 @@
 
 # redlog.gqe:
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.NONE)
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.NONE)
 Traceback (most recent call last):
 ...
-logic1.support.excepthook.NoTraceException: GENERIC.NONE is not supported - use redlog.qe instead
+logic1.support.excepthook.NoTraceException: Generic.NONE is not supported - use redlog.qe instead
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.MONOMIAL)
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.MONOMIAL)
 ([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.FULL)
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
 ([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
 
 
