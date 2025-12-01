@@ -24,10 +24,6 @@ class DegreeViolation(abc.qe.NodeProcessFailure):
     pass
 
 
-class Failed(Exception):
-    pass
-
-
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Assumptions.simplify>` of its super class
