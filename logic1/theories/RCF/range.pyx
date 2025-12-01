@@ -245,7 +245,7 @@ class _Range:
         if negate:
             self.ineg()
         return self
-    
+
     @cython.cfunc
     def _imul_core(self, other: _Range) -> cython.void:
         s1 = self.start.sgn()
@@ -429,7 +429,7 @@ class _Range:
         abs_of_negative = _Range(
             True, EP_ZERO, -self.start, self.lopen, {-p for p in self.exc if p < EP_ZERO})
         return non_negative.union(abs_of_negative)
-    
+
     def copy(self) -> _Range:
         return _Range(self.lopen, self.start, self.end, self.ropen, self.exc)
 
@@ -437,7 +437,7 @@ class _Range:
     def from_constant(cls, ep: EndPoint) -> _Range:
         assert ep.finite_value is not None
         return _Range(lopen=False, start=ep, end=ep, ropen=False, exc=set())
-    
+
     def intersection(self, other: _Range) -> _Range:
         if self.start < other.start:
             lopen = other.lopen
@@ -511,15 +511,15 @@ class _Range:
     @cython.ccall
     def is_zero(self) -> cython.bint:
         return self.is_point() and self.start == EP_ZERO
-    
+
     @cython.ccall
     def ineg(self) -> _Range:
         self.lopen, self.ropen = self.ropen, self.lopen
         self.start, self.end = -self.end, -self.start
         self.exc = {-ep for ep in self.exc}
         return self
-    
-    @cython.cfunc    
+
+    @cython.cfunc
     def iset(self, other: _Range) -> _Range:
         self.lopen = other.lopen
         self.start = other.start
