@@ -495,7 +495,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly + other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly + Rational(other))
         return Term(self.poly + other)
 
@@ -527,11 +527,11 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             self._hash = hash(self.poly)
         return self._hash
 
-    def __init__(self, arg: Fraction | int | Integer | MPolynomial[Rational]
+    def __init__(self, arg: float | Fraction | int | Integer | MPolynomial[Rational]
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
             self._poly = arg
-        elif isinstance(arg, (Fraction, int, Integer, mpq, Rational, UPolynomial)):
+        elif isinstance(arg, (float | Fraction, int, Integer, mpq, Rational, UPolynomial)):
             self._poly = self.polynomial_ring(arg)
         else:
             raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
@@ -565,7 +565,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly * other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly * Rational(other))
         return Term(self.poly * other)
 
@@ -587,35 +587,35 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def __radd__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) + self.poly)
         return Term(other + self.poly)
 
     def __rmul__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) * self.poly)
         return Term(other * self.poly)
 
     def __rsub__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) - self.poly)
         return Term(other - self.poly)
 
     def __sub__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly - other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly - Rational(other))
         return Term(self.poly - other)
 
     def __truediv__(self, other: object) -> Term:
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly / Rational(other))
         if isinstance(other, Term):
             return Term(self.poly / other.poly)
-        # x*y / x would yield y as a Sage rational function and raise and
+        # x*y / x would yield y as a Sage rational function and raise an
         # exception.
         return Term(self.poly / other)
 
