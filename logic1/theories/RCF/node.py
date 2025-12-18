@@ -18,6 +18,12 @@ if TYPE_CHECKING:
     from logic1.theories.RCF.qe import Options
 
 
+class Statistics:
+    passive_list_hits: int = 0
+    nodes_processed: int = 0
+    gauss_instances: int = 0
+
+
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Assumptions.simplify>` of its super class
@@ -887,7 +893,7 @@ class _XoCandidateSet:
             for candidate in subset:
                 if candidate in passive_list:
                     to_remove.append(candidate)
-                    # TODO: count passive list hits
+                    Statistics.passive_list_hits += 1
             for candidate in to_remove:
                 subset.remove(candidate)
         return self
@@ -980,11 +986,15 @@ class XoNode(Node):
                     result |= recurse(arg, x)
                 return result
 
-        return recurse(self.formula, x)
+        result = recurse(self.formula, x)
+        if result.finite_solution_set:
+            Statistics.gauss_instances += 1
+        return result
 
     def process(self, assumptions: Assumptions) -> Sequence[XoNode]:
-        x = self.variables[0]  # for now
-        variables = self.variables[1:]
+        Statistics.nodes_processed += 1
+        x = self.variables[-1]
+        variables = self.variables[:-1]
         passive_list = self.passive_list
         candidate_set = self.candidate_set(x)
         if len(candidate_set) == 0:
@@ -1046,7 +1056,11 @@ class XoNode(Node):
             assert isinstance(pt, _XoInfinity)
             new_formula = formula.traverse(
                 map_atoms=lambda atom: subs_infinity_at(atom, x, pt))
-        return simplify(new_formula, assume=assumptions.atoms)
+        return simplify(new_formula, assume=assumptions.atoms,
+                                     explode_always=False,
+                                     implicit_ranges=False,
+                                     prefer_order=True,
+                                     prefer_weak=True)
 
     @staticmethod
     def subs_into_passive_list(passive_list: set[Term], x: Variable,

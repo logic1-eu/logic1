@@ -8,6 +8,8 @@ from .qe import Clustering, Generic, qe
 from . import redlog
 from .simplify import is_valid, simplify
 
+from . import node
+
 __all__ = [
     'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term', 'Variable', 'VV',
 
@@ -21,5 +23,7 @@ __all__ = [
 
     'is_valid', 'simplify',
 
-    'cache_clear', 'cache_info'
+    'cache_clear', 'cache_info',
+
+    'node'
 ]
