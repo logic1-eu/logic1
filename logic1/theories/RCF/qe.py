@@ -90,8 +90,8 @@ class Options(abc.qe.Options):
 
 
 @dataclass
-class VirtualSubstitution(abc.qe.QuantifierElimination[
-        Node, Assumptions, list[str], Options, AtomicFormula, Term, Variable, int]):
+class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, frozenset[Term]],
+      Assumptions, list[str], Options, AtomicFormula, Term, Variable, int]):
     """Real quantifier elimination by virtual substitution.
 
     Implements the abstract methods

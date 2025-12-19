@@ -80,7 +80,8 @@ class Generic(Enum):
 
 
 @dataclass
-class Node(abc.qe.Node[Formula, Variable, Assumptions]):
+class Node(abc.qe.Node[
+        AtomicFormula, Term, Variable, int, Assumptions, tuple[Formula, frozenset[Term]]]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution` for
@@ -146,6 +147,9 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
             return abc.qe.logger
         else:
             return abc.qe.multiprocessing_logger
+
+    def memorize(self) -> tuple[Formula, frozenset[Term]]:
+        return (self.formula, frozenset(self.passive_list))
 
     def process(self, assumptions: Assumptions) -> Sequence[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
@@ -1005,6 +1009,7 @@ class XoNode(Node):
                            options=self.options,
                            passive_list=passive_list.copy())]
         self.logger().debug(f'Applying {passive_list=} to {candidate_set=}')
+        self.logger().info(f'{passive_list=}')
         candidate_set.apply_passive_list(passive_list)
         self.logger().debug(f'yields {candidate_set=}')
         if len(candidate_set) == 0:

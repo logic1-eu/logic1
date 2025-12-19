@@ -4,9 +4,9 @@ quantifier elimination, which can used by various theories via subclassing.
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field
 import logging
 import multiprocessing as mp
@@ -53,11 +53,6 @@ multiprocessing_logger.addHandler(multiprocessing_handler)
 χ = TypeVar('χ', bound=Variable)
 σ = TypeVar('σ')
 
-φ = TypeVar('φ', bound=Formula)
-"""A type variable denoting a formula with upper bound
-:class:`logic1.firstorder.formula.Formula`.
-"""
-
 ν = TypeVar('ν', bound='Node')
 """A type variable denoting a node with upper bound
 :class:`logic1.abc.qe.Node`.
@@ -69,6 +64,11 @@ abstract method :meth:`.QuantifierElimination.init_env`."""
 
 λ = TypeVar('λ', bound='Assumptions')
 """A type variable denoting a assumptions with upper bound :class:`.Assumptions`.
+"""
+
+μ = TypeVar('μ', bound='Hashable')
+"""A type variable denoting the information stored in the Memory attribute of
+:class:`.NodeList` and its subclasses.
 """
 
 ω = TypeVar('ω', bound='Options')
@@ -86,7 +86,7 @@ class NodeProcessFailure(Exception):
 
 
 @dataclass
-class Node(Generic[φ, χ, λ]):
+class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     """Holds a subproblem for existential quantifier elimination. Theories
     implementing the interface can put restrictions on the existing fields and
     add further fields.
@@ -98,7 +98,7 @@ class Node(Generic[φ, χ, λ]):
     """A list of variables.
     """
 
-    formula: φ
+    formula: Formula[α, τ, χ, σ]
     """A quantifier-free formula.
     """
 
@@ -106,6 +106,10 @@ class Node(Generic[φ, χ, λ]):
     def copy(self) -> Self:
         """Create a copy of this node.
         """
+        ...
+
+    @abstractmethod
+    def memorize(self) -> μ:
         ...
 
     @abstractmethod
@@ -126,11 +130,11 @@ class Node(Generic[φ, χ, λ]):
 
 
 @dataclass
-class NodeList(Collection[ν], Generic[φ, ν]):
+class NodeList(Collection[ν], Generic[ν, μ]):
     # Sequential only
 
     nodes: list[ν] = field(default_factory=list)
-    memory: set[φ] = field(default_factory=set)
+    memory: set[μ] = field(default_factory=set)
     hits: int = 0
     candidates: int = 0
 
@@ -144,10 +148,11 @@ class NodeList(Collection[ν], Generic[φ, ν]):
         return len(self.nodes)
 
     def append(self, node: ν) -> bool:
-        is_new = node.formula not in self.memory
+        memorize = node.memorize()
+        is_new = memorize not in self.memory
         if is_new:
             self.nodes.append(node)
-            self.memory.add(node.formula)
+            self.memory.add(memorize)
         else:
             self.hits += 1
         self.candidates += 1
@@ -182,7 +187,7 @@ class NodeList(Collection[ν], Generic[φ, ν]):
 
 
 @dataclass
-class WorkingNodeList(NodeList[φ, ν]):
+class WorkingNodeList(NodeList[ν, μ]):
     # Sequential only
 
     node_counter: Counter[int] = field(default_factory=Counter)
@@ -242,11 +247,11 @@ class WorkingNodeList(NodeList[φ, ν]):
 
 
 @dataclass
-class NodeListManager(Generic[φ, ν]):
+class NodeListManager(Generic[ν, μ]):
 
     nodes: list[ν] = field(default_factory=list)
     nodes_lock: threading.Lock = field(default_factory=threading.Lock)
-    memory: set[φ] = field(default_factory=set)
+    memory: set[μ] = field(default_factory=set)
     memory_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
     hits_candidates_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -256,7 +261,7 @@ class NodeListManager(Generic[φ, ν]):
         with self.nodes_lock:
             return self.nodes.copy()
 
-    def get_memory(self) -> set[φ]:
+    def get_memory(self) -> set[μ]:
         with self.memory_lock:
             return self.memory.copy()
 
@@ -272,9 +277,10 @@ class NodeListManager(Generic[φ, ν]):
 
     def append(self, node: ν) -> bool:
         with self.memory_lock:
-            is_new = node.formula not in self.memory
+            memorize = node.memorize()
+            is_new = memorize not in self.memory
             if is_new:
-                self.memory.add(node.formula)
+                self.memory.add(memorize)
         if is_new:
             with self.nodes_lock:
                 self.nodes.append(node)
@@ -293,7 +299,7 @@ class NodeListManager(Generic[φ, ν]):
             return (self.hits, self.candidates)
 
 
-class NodeListProxy(Collection[ν], Generic[φ, ν]):
+class NodeListProxy(Collection[ν], Generic[ν, μ]):
     # parallel
 
     def __init__(self, proxy: _NodeListProxy) -> None:
@@ -304,7 +310,7 @@ class NodeListProxy(Collection[ν], Generic[φ, ν]):
         return self._proxy.get_nodes()
 
     @property
-    def memory(self) -> set[φ]:
+    def memory(self) -> set[μ]:
         return self._proxy.get_memory()
 
     @property
@@ -358,12 +364,12 @@ class NodeListProxy(Collection[ν], Generic[φ, ν]):
         return f'{key}={num_nodes}, H={ratio:.0%}'
 
 
-class _NodeListProxy(mp.managers.BaseProxy, Generic[φ, ν]):
+class _NodeListProxy(mp.managers.BaseProxy, Generic[ν, μ]):
 
     def get_nodes(self) -> list[ν]:
         return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
 
-    def get_memory(self) -> set[φ]:
+    def get_memory(self) -> set[μ]:
         return self._callmethod('get_memory')  # type: ignore[func-returns-value]
 
     def get_candidates(self) -> int:
@@ -386,7 +392,7 @@ class _NodeListProxy(mp.managers.BaseProxy, Generic[φ, ν]):
 
 
 @dataclass
-class WorkingNodeListManager(NodeListManager[φ, ν]):
+class WorkingNodeListManager(NodeListManager[ν, μ]):
 
     busy: int = 0
     busy_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -431,7 +437,7 @@ class WorkingNodeListManager(NodeListManager[φ, ν]):
             self.busy -= 1
 
 
-class WorkingNodeListProxy(NodeListProxy[φ, ν]):
+class WorkingNodeListProxy(NodeListProxy[ν, μ]):
 
     def __init__(self, proxy: _WorkingNodeListProxy) -> None:
         self._proxy: _WorkingNodeListProxy = proxy
@@ -493,7 +499,7 @@ class WorkingNodeListProxy(NodeListProxy[φ, ν]):
         self._proxy.task_done()
 
 
-class _WorkingNodeListProxy(_NodeListProxy[φ, ν]):
+class _WorkingNodeListProxy(_NodeListProxy[ν, μ]):
 
     def get_node_counter(self) -> Counter[int]:
         return self._callmethod('get_node_counter')  # type: ignore[func-returns-value]
@@ -508,13 +514,13 @@ class _WorkingNodeListProxy(_NodeListProxy[φ, ν]):
         return self._callmethod('task_done')  # type: ignore[func-returns-value]
 
 
-class SyncManager(mp.managers.SyncManager, Generic[φ, ν]):
+class SyncManager(mp.managers.SyncManager, Generic[ν, μ]):
 
-    def NodeList(self) -> NodeListProxy[φ, ν]:
+    def NodeList(self) -> NodeListProxy[ν, μ]:
         proxy = self._NodeListProxy()  # type: ignore[attr-defined]
         return NodeListProxy(proxy)
 
-    def WorkingNodeList(self) -> WorkingNodeListProxy[φ, ν]:
+    def WorkingNodeList(self) -> WorkingNodeListProxy[ν, μ]:
         proxy = self._WorkingNodeListProxy()  # type: ignore[attr-defined]
         return WorkingNodeListProxy(proxy)
 
@@ -530,7 +536,7 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 
 
 @dataclass
-class Assumptions(Generic[α, τ, χ, σ]):
+class Assumptions(Generic[α, τ, χ, σ], ABC):
     """Holds the currently valid assumptions. This starts with user assumptions
     explicitly provided by the user. Certain variants of quantified elimination
     may add further assumptions in the course of the elimination.
@@ -646,7 +652,7 @@ class Options:
 
 
 @dataclass
-class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
+class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
     """A generic callable class that implements quantifier elimination.
     """
 
@@ -688,18 +694,18 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
     matrix into the :attr:`.working_nodes`.
     """
 
-    working_nodes: Optional[WorkingNodeList[Formula[α, τ, χ, σ], ν]] = None
+    working_nodes: Optional[WorkingNodeList[ν, μ]] = None
     """Subproblems left for the current block. Element nodes of
     :attr:`.working_nodes` have the same shape as element nodes of
     :attr:`.root_nodes`
     """
 
-    success_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    success_nodes: Optional[NodeList[ν, μ]] = None
     """Finished subproblems of the current block. For each `node` in
     `success_nodes` we have ``node.variables == []``.
     """
 
-    failure_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    failure_nodes: Optional[NodeList[ν, μ]] = None
     """Failed subproblems of the current block, which can occur with incomplete
     quantifier elimination procedures. An element nodes of
     :attr:`.failure_nodes` have the same shape as an element node of
@@ -946,12 +952,12 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         assert self._assumptions is not None
         logger.debug('entering sync manager context')
         timer = Timer()
-        manager: SyncManager[Formula[α, τ, χ, σ], ν]
+        manager: SyncManager[ν, μ]
         with SyncManager() as manager:
             self.time_syncmanager_enter = timer.get()
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            working_nodes: WorkingNodeListProxy[Formula[α, τ, χ, σ], ν] = manager.WorkingNodeList()
+            working_nodes: WorkingNodeListProxy[ν, μ] = manager.WorkingNodeList()
             working_nodes.extend(self.root_nodes)
             self.root_nodes = None
             success_nodes: multiprocessing.Queue[Optional[list[ν]]] = multiprocessing.Queue()
