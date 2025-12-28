@@ -18,10 +18,21 @@ if TYPE_CHECKING:
     from logic1.theories.RCF.qe import Options
 
 
+_trace: bool = False
+
+
+def trprint(*args):
+    if _trace:
+        return print(*args)
+
+
 class Statistics:
     passive_list_hits: int = 0
     nodes_processed: int = 0
+    nodes_false = 0
     gauss_instances: int = 0
+    gauss_and: int = 0
+    gauss_or: int = 0
 
 
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
@@ -872,23 +883,42 @@ class _XoCandidateSet:
     upper_bounds: set[Term] = field(default_factory=set)
     finite_solution_set: Optional[bool] = field(default=None, init=False)
 
-    def __ior__(self, other: Self) -> Self:
+    def __iand__(self, other: Self) -> Self:
+        if other.finite_solution_set is None:
+            return self
         self.equations |= other.equations
         self.lower_bounds |= other.lower_bounds
         self.upper_bounds |= other.upper_bounds
-        self.finite_solution_set = (self.finite_solution_set and other.finite_solution_set)
+        assert self.finite_solution_set is not True
+        assert other.finite_solution_set is False
+        self.finite_solution_set = False
+        return self
+
+    def __ior__(self, other: Self) -> Self:
+        if other.finite_solution_set is None:
+            return self
+        self.equations |= other.equations
+        self.lower_bounds |= other.lower_bounds
+        self.upper_bounds |= other.upper_bounds
+        if self.finite_solution_set is None:
+            self.finite_solution_set = other.finite_solution_set
+        else:
+            self.finite_solution_set &= other.finite_solution_set
         return self
 
     def __len__(self) -> int:
         return len(self.equations) + len(self.lower_bounds) + len(self.upper_bounds)
 
     def __post_init__(self):
-        if  len(self) > 1:
-            raise ValueError("illegal arguments in XoptCandidateSet()")
-        if self.equations:
-            self.finite_solution_set = True
+        if len(self) == 0:
+            self.finite_solution_set = None
+        elif len(self) == 1:
+            if self.equations:
+                self.finite_solution_set = True
+            else:
+                self.finite_solution_set = False
         else:
-            self.finite_solution_set = False
+            raise ValueError("illegal arguments in XoptCandidateSet()")
 
     def apply_passive_list(self, passive_list: Iterable[Term]) -> Self:
         for subset in (self.equations, self.lower_bounds, self.upper_bounds):
@@ -898,6 +928,8 @@ class _XoCandidateSet:
                 if candidate in passive_list:
                     to_remove.append(candidate)
                     Statistics.passive_list_hits += 1
+                else:
+                    assert not isinstance(simplify(candidate == 0, (Ne(t, 0) for t in passive_list)), _F)
             for candidate in to_remove:
                 subset.remove(candidate)
         return self
@@ -907,7 +939,7 @@ class _XoCandidateSet:
             assert len(self.equations) > 0
             standard_terms = self.equations
             infinity = None
-        if len(self.upper_bounds) <= len(self.lower_bounds):
+        elif len(self.upper_bounds) <= len(self.lower_bounds):
             standard_terms = self.upper_bounds | self.equations
             infinity = _XoInfinity.PLUS
         else:
@@ -925,6 +957,20 @@ class _XoEliminationSet:
         if self.infinity is not None:
             yield self.infinity
         yield from self.standard_terms
+
+    def __len__(self) -> int:
+        if self.infinity is None:
+            return len(self.standard_terms)
+        else:
+            return len(self.standard_terms) + 1
+
+    def _choice(self) -> str:
+        if self.infinity == _XoInfinity.PLUS:
+            return f'{len(self)} upper bounds and equations'
+        elif self.infinity == _XoInfinity.MINUS:
+            return f'{len(self)} lower bounds and equations'
+        else:
+            return f'{len(self)} equations'
 
 
 class _XoInfinity(Enum):
@@ -979,15 +1025,18 @@ class XoNode(Node):
                 for arg in formula.args:
                     candidate_set_ = recurse(arg, x)
                     if candidate_set_.finite_solution_set:
+                        Statistics.gauss_and += 1
                         return candidate_set_
                     else:
-                        result |= candidate_set_
+                        result &= candidate_set_
                 return result
             else:
                 assert isinstance(formula, Or)
                 result = _XoCandidateSet()
                 for arg in formula.args:
                     result |= recurse(arg, x)
+                if result.finite_solution_set:
+                    Statistics.gauss_or += 1
                 return result
 
         result = recurse(self.formula, x)
@@ -996,6 +1045,7 @@ class XoNode(Node):
         return result
 
     def process(self, assumptions: Assumptions) -> Sequence[XoNode]:
+
         Statistics.nodes_processed += 1
         x = self.variables[-1]
         variables = self.variables[:-1]
@@ -1008,38 +1058,48 @@ class XoNode(Node):
                            outermost_block=self.outermost_block,
                            options=self.options,
                            passive_list=passive_list.copy())]
-        self.logger().debug(f'Applying {passive_list=} to {candidate_set=}')
-        self.logger().info(f'{passive_list=}')
+        trprint(f'{self.formula=}')
+        trprint(f'{x=}')
+        trprint(f'{candidate_set=}')
+        trprint(f'{passive_list=}')
         candidate_set.apply_passive_list(passive_list)
-        self.logger().debug(f'yields {candidate_set=}')
+        trprint(f'{candidate_set=}')
         if len(candidate_set) == 0:
             # Redlog returns a single Node representing F here.
             return []
         elimination_set = candidate_set.elimination_set()
-        self.logger().debug(f'eliminating {x} with {elimination_set}')
+        trprint(f'eliminating {x} with {elimination_set._choice()}')
+        trprint(f'{elimination_set=}')
+        trprint('-' * 72)
         passive_list = self.passive_list
         successors = []
         for testpoint in elimination_set:
             formula = XoNode.subs_into_formula(self.formula, x, testpoint, assumptions)
             if isinstance(formula, _T):
                 raise abc.qe.FoundT()
-            if isinstance(formula, _F):
-                continue
-            substituted_passive_list_copy = XoNode.subs_into_passive_list(passive_list, x, testpoint)
-            node = XoNode(variables=variables.copy(),
-                          formula=formula,
-                          answer=[],
-                          outermost_block=self.outermost_block,
-                          options=self.options,
-                          passive_list=substituted_passive_list_copy)
-            successors.append(node)
+            elif isinstance(formula, _F):
+                Statistics.nodes_false += 1
+                # It would be correct to leave this to the else-case, but
+                # we want to avoid computing the substituted_passive_list_copy.
+            else:
+                substituted_passive_list_copy = XoNode.subs_into_passive_list(passive_list, x, testpoint)
+                node = XoNode(variables=variables.copy(),
+                              formula=formula,
+                              answer=[],
+                              outermost_block=self.outermost_block,
+                              options=self.options,
+                              passive_list=substituted_passive_list_copy)
+                successors.append(node)
             if isinstance(testpoint, Term):
                 passive_list.add(testpoint)
         return successors
 
     @staticmethod
-    def subs_into_formula(formula: Formula, x: Variable, pt: Term | _XoInfinity,
-                            assumptions: Assumptions) -> Formula:
+    def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | _XoInfinity,
+                          assumptions: Assumptions) -> Formula:
+        """Substitute ``testpoint`` for ``x`` in ``formula``, and apply
+        simplification modulo ``assumptions``
+        """
 
         def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: _XoInfinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
@@ -1054,35 +1114,39 @@ class XoNode(Node):
                 assert isinstance(atom, Le)
                 return _T() if inf is _XoInfinity.MINUS else _F()
 
-        if isinstance(pt, Term):
+        if isinstance(testpoint, Term):
             new_formula = formula.traverse(
-                map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, pt), 0))
+                map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, testpoint), 0))
         else:
-            assert isinstance(pt, _XoInfinity)
+            assert isinstance(testpoint, _XoInfinity)
             new_formula = formula.traverse(
-                map_atoms=lambda atom: subs_infinity_at(atom, x, pt))
+                map_atoms=lambda atom: subs_infinity_at(atom, x, testpoint))
         return simplify(new_formula, assume=assumptions.atoms,
                                      explode_always=False,
                                      implicit_ranges=False,
                                      prefer_order=True,
-                                     prefer_weak=True)
+                                     prefer_weak=True,
+                                     substitute=1)
 
     @staticmethod
     def subs_into_passive_list(passive_list: set[Term], x: Variable,
-                               pt: Term | _XoInfinity) -> set[Term]:
+                               testpoint: Term | _XoInfinity) -> set[Term]:
+        """Returns a copy of ``passive_list`` with ``testpoint`` substituted for
+        ``x``.
+        """
         result = set()
-        if isinstance(pt, Term):
+        if isinstance(testpoint, Term):
             for passive_term in passive_list:
-                new_term = passive_term.subs_linear_solution(x, pt)
+                new_term = passive_term.subs_linear_solution(x, testpoint)
                 if new_term.is_constant():
                     # We cannot obtain zero, because such situations are
                     # filtered via the application of the passive list.
-                    assert not new_term.is_zero(), f'{passive_term=}, {x=}, {pt=}'
+                    assert not new_term.is_zero(), f'{passive_term=}, {x=}, {testpoint=}'
                 else:
                     result.add(new_term.primitive_part(positive=True))
         else:
-            assert isinstance(pt, _XoInfinity)
-            for term in passive_list:
-                if term.monomial_coefficient(x) == 0:
-                    result.add(term)
+            assert isinstance(testpoint, _XoInfinity)
+            for passive_term in passive_list:
+                if passive_term.monomial_coefficient(x) == 0:
+                    result.add(passive_term)
         return result
