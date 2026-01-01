@@ -117,7 +117,9 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, froz
         assert self.options is not None
         assert self._assumptions is not None
         return [Node(variables=list(variables),
-                     formula=simplify(matrix, assume=self._assumptions.atoms),
+                     formula=simplify(matrix, assume=self._assumptions.atoms,
+                                              prefer_order=True,
+                                              prefer_weak=True),
                      answer=[],
                      outermost_block=not self.blocks,
                      options=self.options,
