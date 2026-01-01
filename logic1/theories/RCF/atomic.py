@@ -998,6 +998,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
                     assert False, (self, d)
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:
         """Substitute the solution of the weakly parametric linear
         polynomial ``minimal_polynomial`` this weakly parametric linear
