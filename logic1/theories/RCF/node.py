@@ -958,7 +958,7 @@ class _XoEliminationSet:
     def __iter__(self) -> Iterator[Term | _XoInfinity]:
         if self.infinity is not None:
             yield self.infinity
-        yield from self.standard_terms
+        yield from sorted(self.standard_terms, reverse=True)
 
     def __len__(self) -> int:
         if self.infinity is None:
