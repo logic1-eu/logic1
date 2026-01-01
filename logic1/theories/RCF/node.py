@@ -852,7 +852,9 @@ class VsNode(Node):
             new_formula = self.formula.traverse(map_atoms=lambda atom: vs_at(atom, tp, x))
             # requires discussion: guard will be simplified twice
             new_formula = simplify(And(tp.guard(assumptions), new_formula),
-                                   assume=assumptions.atoms)
+                                   assume=assumptions.atoms,
+                                   prefer_order=True,
+                                   prefer_weak=True)
             if new_formula is _T():
                 raise abc.qe.FoundT()
             new_nodes.append(VsNode(variables=variables.copy(),
@@ -1045,12 +1047,14 @@ class XoNode(Node):
         return result
 
     def process(self, assumptions: Assumptions) -> Sequence[XoNode]:
-
         Statistics.nodes_processed += 1
         x = self.variables[-1]
         variables = self.variables[:-1]
         passive_list = self.passive_list
         candidate_set = self.candidate_set(x)
+        trprint(f'{x=}\n')
+        trprint(f'{self.formula=}\n')
+        trprint(f'{candidate_set=}\n')
         if len(candidate_set) == 0:
             return [XoNode(variables=variables.copy(),
                            formula=self.formula,
@@ -1058,17 +1062,14 @@ class XoNode(Node):
                            outermost_block=self.outermost_block,
                            options=self.options,
                            passive_list=passive_list.copy())]
-        trprint(f'{self.formula=}')
-        trprint(f'{x=}')
-        trprint(f'{candidate_set=}')
-        trprint(f'{passive_list=}')
+        trprint(f'{passive_list=}\n')
         candidate_set.apply_passive_list(passive_list)
-        trprint(f'{candidate_set=}')
+        trprint(f'{candidate_set=}\n')
         if len(candidate_set) == 0:
             # Redlog returns a single Node representing F here.
             return []
         elimination_set = candidate_set.elimination_set()
-        trprint(f'eliminating {x} with {elimination_set._choice()}')
+        trprint(f'eliminating {x} with {elimination_set._choice()}\n')
         trprint(f'{elimination_set=}')
         trprint('-' * 72)
         passive_list = self.passive_list
