@@ -467,7 +467,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
-    _hash: Optional[int] = None
+    _hash: Optional[int]
     _poly: MPolynomial[Rational]
 
     # The property should be private. We might want a method to_sage()
@@ -527,6 +527,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             self._hash = hash(self.poly)
         return self._hash
 
+    def __getstate__(self):
+        d = {"_poly": self._poly}
+        return d
+
+    def __setstate__(self, state):
+        self._poly = state["_poly"]
+        self._hash = None
+
     def __init__(self, arg: float | Fraction | int | Integer | MPolynomial[Rational]
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
@@ -535,6 +543,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             self._poly = self.polynomial_ring(arg)
         else:
             raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
+        self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
         """Iterate over the polynomial representation of the term, yielding
