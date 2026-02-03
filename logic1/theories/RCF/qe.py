@@ -78,15 +78,18 @@ class Options(abc.qe.Options):
 
     xopt: bool
 
+    elimination_order: int
+
     def __init__(self, /, clustering: Clustering = Clustering.FULL,
                  generic: Generic = Generic.NONE, traditional_guards: bool = True,
-                 xopt: bool = True, **kwargs) \
+                 xopt: bool = True, elimination_order: int = 1, **kwargs) \
             -> None:
         super().__init__(**kwargs)
         self.clustering = clustering
         self.generic = generic
         self.traditional_guards = traditional_guards
         self.xopt = xopt
+        self.elimination_order = elimination_order
 
 
 @dataclass
