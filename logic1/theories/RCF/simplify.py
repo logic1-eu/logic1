@@ -30,6 +30,7 @@ class Options(abc.simplify.Options):
     lift: bool = True
     prefer_order: bool = True
     prefer_weak: bool = False
+    substitute: int = 2
 
 
 @dataclass
@@ -140,8 +141,8 @@ class _BasicKnowledge:
                 L.append(Ne(self.term - q.finite_value, 0))
         return L
 
-    def as_subst_values(self) -> tuple[_SubstValue, _SubstValue]:
-        assert self.is_substitution()
+    def as_subst_values(self, level: int) -> tuple[_SubstValue, _SubstValue]:
+        assert self.is_substitution(level)
         mons = self.term.monomials()
         if len(mons) == 1:
             assert self.range.start.finite_value is not None
@@ -154,14 +155,17 @@ class _BasicKnowledge:
             c2 = self.term.monomial_coefficient(x2)
             return (_SubstValue(c1, x1), _SubstValue(-c2, x2))
 
-    def is_substitution(self) -> bool:
-        if not self.range.is_point():
-            return False
-        mons = self.term.monomials()
-        if len(mons) == 1:
-            return mons[0].is_variable()
-        if len(mons) == 2:
-            return mons[0].is_variable() and mons[1].is_variable() and self.range.start == EP_ZERO
+    def is_substitution(self, level: int) -> bool:
+        assert level in range(3)
+        if level >= 1:
+            if not self.range.is_point():
+                return False
+            mons = self.term.monomials()
+            if len(mons) == 1:
+                return mons[0].is_variable()
+        if level >= 2:
+            if len(mons) == 2:
+                return mons[0].is_variable() and mons[1].is_variable() and self.range.start == EP_ZERO
         return False
 
     def reduce(self, G: Iterable[Term]) -> Optional[Self]:
@@ -311,17 +315,22 @@ class _Knowledge:
         >>> print(K._term_as_range(h,))
         [0, oo)
         """
+        # This is a hotspot. Code has been tuned by TS in the course of
+        # benchmarking MTP3 with Xopt.
         poly_result = _Range.from_constant(EP_ZERO)
         for monomial, coefficient in f.summands():
             term_result = _Range.from_constant(EndPoint(coefficient))
-            for g, e in monomial.items():
-                ge_result = self.dict_.get(g, RANGE_R) ** e
-                term_result *= ge_result
+            for variable, exponent in monomial.items():
+                # We know exponent != 0, and exponentiaton by 1 is implemented
+                # sufficiently efficient.
+                power = self.dict_.get(variable, RANGE_R) ** exponent
+                term_result *= power
+                if term_result == RANGE_R:
+                    return RANGE_R
             poly_result += term_result
             if poly_result == RANGE_R:
                 return RANGE_R
         return poly_result
-
 
 @dataclass
 class InternalRepresentation(
@@ -361,7 +370,7 @@ class InternalRepresentation(
                 continue
             bknowl = self._knowl.prune(maybe_bknowl)
             if self._knowl.is_known(maybe_bknowl):
-                if bknowl.is_substitution():
+                if bknowl.is_substitution(self._options.substitute):
                     self._propagate(bknowl)
                     restart = abc.simplify.RESTART.ALL
                 else:
@@ -444,16 +453,16 @@ class InternalRepresentation(
 
     def _propagate(self, bknowl: _BasicKnowledge) -> None:
         # print(f'_propagate: {self=}, {bknowl=}')
-        assert bknowl.is_substitution()
+        assert bknowl.is_substitution(self._options.substitute)
         stack = [bknowl]
         while stack:
             for bknowl in stack:
-                val1, val2 = bknowl.as_subst_values()
+                val1, val2 = bknowl.as_subst_values(self._options.substitute)
                 self._subst.union(val1, val2)
             stack = []
             self._knowl = self._knowl.reduce(self._subst.as_gb())
             for bknowl in self._knowl:
-                if bknowl.is_substitution():
+                if bknowl.is_substitution(self._options.substitute):
                     stack.append(bknowl)
 
     def restart(self, ir: Self) -> Self:
@@ -782,6 +791,35 @@ def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> For
       And(a != 0, Or(b == 0, a >= 0))
       >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
       And(a != 0, Or(b == 0, a >= 0))
+
+    :param substitute:
+
+    .. admonition:: Example
+
+        Consider :math:`d = 2 \land 4b - 3c = 0 \land a + b + c + d >= 0`:
+
+        1. :math:`phi` is equivalent to :math:`d = 2 \land 4b - 3c == 0 \land
+           a + b + c + 2 >= 0`, substituting the value :math:`2` of :math:`d`
+           wherever adequate.
+        2. Going further, :math:`phi` is also equivalent to :math:`d = 2 \land
+           4b - 3c == 0 \land 4a + 7c + 8 >= 0` additionally substituting the
+           monomial :math:`3/4 c` for :math:`b`.
+
+        The default is `substitute=2`, which means that both these
+        simplifications are applied. With `substitute=1`, only values are
+        substituted. With `substitute=0` neither of these simplifications is
+        applied.
+
+      >>> from logic1.firstorder import *
+      >>> from logic1.theories.RCF import *
+      >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+      >>> phi = And(d == 2, 4*b - 3*c == 0, a + b + c + d >= 0)
+      >>> simplify(phi, substitute=0)
+      And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + d >= 0)
+      >>> simplify(phi, substitute=1)
+      And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + 2 >= 0)
+      >>> simplify(phi)
+      And(d - 2 == 0, 4*b - 3*c == 0, 4*a + 7*c + 8 >= 0)
 
     :returns:
       A simplified equivalent of `f` modulo `assume`.

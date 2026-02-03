@@ -31,3 +31,6 @@ output
 /logic1/**/*.html
 
 Leaks
+
+# VS Code
+.vscode

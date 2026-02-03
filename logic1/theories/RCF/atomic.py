@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Container
 from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
@@ -466,7 +467,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
-    _hash: Optional[int] = None
+    _hash: Optional[int]
     _poly: MPolynomial[Rational]
 
     # The property should be private. We might want a method to_sage()
@@ -494,7 +495,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __add__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly + other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly + Rational(other))
         return Term(self.poly + other)
 
@@ -504,7 +505,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         # Eq.__bool__, which supports some comparisons in boolean contexts.
         # Same for __ne__.
         lhs = self - other
-        if lhs.lc() < 0:
+        # Use poly.lc() in order to support @lru_cache on Term.lc().
+        if lhs.poly.lc() < 0:
             lhs = -lhs
         return Eq(lhs, 0)
 
@@ -525,14 +527,23 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             self._hash = hash(self.poly)
         return self._hash
 
-    def __init__(self, arg: Fraction | int | Integer | MPolynomial[Rational]
+    def __getstate__(self):
+        d = {"_poly": self._poly}
+        return d
+
+    def __setstate__(self, state):
+        self._poly = state["_poly"]
+        self._hash = None
+
+    def __init__(self, arg: float | Fraction | int | Integer | MPolynomial[Rational]
                  | mpq | Rational | UPolynomial) -> None:
         if isinstance(arg, MPolynomial):
             self._poly = arg
-        elif isinstance(arg, (Fraction, int, Integer, mpq, Rational, UPolynomial)):
+        elif isinstance(arg, (float | Fraction, int, Integer, mpq, Rational, UPolynomial)):
             self._poly = self.polynomial_ring(arg)
         else:
             raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
+        self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
         """Iterate over the polynomial representation of the term, yielding
@@ -563,7 +574,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __mul__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly * other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly * Rational(other))
         return Term(self.poly * other)
 
@@ -585,35 +596,35 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def __radd__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) + self.poly)
         return Term(other + self.poly)
 
     def __rmul__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) * self.poly)
         return Term(other * self.poly)
 
     def __rsub__(self, other: object) -> Term:
         assert not isinstance(object, Term)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(Rational(other) - self.poly)
         return Term(other - self.poly)
 
     def __sub__(self, other: object) -> Term:
         if isinstance(other, Term):
             return Term(self.poly - other.poly)
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly - Rational(other))
         return Term(self.poly - other)
 
     def __truediv__(self, other: object) -> Term:
-        if isinstance(other, mpq):
+        if isinstance(other, (mpq, float)):
             return Term(self.poly / Rational(other))
         if isinstance(other, Term):
             return Term(self.poly / other.poly)
-        # x*y / x would yield y as a Sage rational function and raise and
+        # x*y / x would yield y as a Sage rational function and raise an
         # exception.
         return Term(self.poly / other)
 
@@ -663,6 +674,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         d_poly = {key.poly: value for key, value in degrees.items()}
         return Term(self.poly.coefficient(d_poly))
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this term.
 
@@ -678,6 +690,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return mpq(self.poly.constant_coefficient())
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def content(self) -> mpq:
         """Return the content of this term, which is defined as the gcd of its
         integer coefficients.
@@ -823,6 +836,28 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         except AttributeError:
             return self.poly.is_generator()
 
+    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
+        """Return :obj:`True` if this Term can be written as a_1 x_1 + ... +
+        a_n x_n + r such that a_1, ..., a_n in QQ, x_1, ..., x_n in X, and r is
+        a polynomial over QQ that does not contain any variable from X.
+
+        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
+        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+        >>> term.is_weakly_parametric_linear({x, y})
+        True
+        >>> term.is_weakly_parametric_linear({a})
+        False
+        >>> term.is_weakly_parametric_linear({b})
+        False
+        """
+        for m in self.monomials():
+            if m in X:
+                continue
+            for v in m.vars():
+                if v in X:
+                    return False
+        return True
+
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is a zero.
 
@@ -832,6 +867,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return self.poly.is_zero()
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def lc(self) -> mpq:
         """Leading coefficient of this term with respect to the degree
         lexicographical term order :mod:`deglex
@@ -877,8 +913,21 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return [Term(monomial) for monomial in self.poly.monomials()]
 
+    @lru_cache(maxsize=CACHE_SIZE)
     def normalize(self) -> Term:
         return Term(self.poly / self.poly.lc())
+
+    @lru_cache(maxsize=CACHE_SIZE)
+    def primitive_part(self, positive: bool = False) -> Term:
+        """Return the primitive part over ``Z``. This is ``self`` divided by its
+        (positive) content, so that ``self.content() * self.primitive_part() ==
+        self``. If ``positive`` is ``True``, the result is normalized to have a
+        positive leading coefficient.
+        """
+        pp = self / self.content()
+        if positive and pp.lc() < 0:
+            pp = -pp
+        return pp
 
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
@@ -958,25 +1007,34 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
                     assert False, (self, d)
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
-    def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
-        """Iterate over the summands of self yielding pairs of monomials and
-        coefficients.
+    @lru_cache(maxsize=CACHE_SIZE)
+    def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:
+        """Substitute the solution of the weakly parametric linear
+        polynomial ``minimal_polynomial`` this weakly parametric linear
+        polynomial.
         """
-        n = self.polynomial_ring.sage_ring.ngens()
-        if n >= 32:
-            for m, c in zip(self.poly.monomials(), self.poly.coefficients()):
-                ret = {}
-                for v in m.variables():
-                    ret[Variable(v)] = int(m.degree(v))
-                yield ret, mpq(c)
-        else:
-            gens = self.polynomial_ring.sage_ring.gens()
-            for e, c in self.poly.iterator_exp_coeff(as_ETuples=False):
-                ret = {}
-                for i in range(n):
-                    if e[i] != 0:
-                        ret[Variable(gens[i])] = int(e[i])
-                yield ret, mpq(c)
+        # self = a * x + b
+        a = self.monomial_coefficient(x)
+        b = self - a * x
+        assert x not in b.vars()
+        # minimal_polynomial = c * x + d
+        c = minimal_polynomial.monomial_coefficient(x)
+        d = minimal_polynomial - c * x
+        assert x not in d.vars()
+        result = a * (-d / c) + b
+        return result
+
+    def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
+        """Iterate over the summands of self yielding pairs of dictionaries
+        representing monomials, and coefficients.
+        """
+        gens = self.polynomial_ring.sage_ring.gens()
+        for etuple, coefficient in self.poly.iterator_exp_coeff(as_ETuples=True):
+            result = dict()
+            for i, exponent in enumerate(etuple):
+                if exponent:
+                    result[Variable(gens[i])] = int(exponent)
+            yield result, mpq(coefficient)
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
@@ -1222,7 +1280,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
 
 class Eq(AtomicFormula):
     pass
-
 
 class Ne(AtomicFormula):
     pass
