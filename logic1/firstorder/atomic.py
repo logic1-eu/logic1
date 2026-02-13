@@ -176,7 +176,7 @@ class Term(Generic[τ, χ, σ, κ]):
           <class 'logic1.theories.RCF.atomic.Lt'>
 
           As a consquence, rich comparisons are not available for defining an
-          ordering on terms, and we instead provid a `key`, which can be used,
+          ordering on terms, and we instead provide a `key`, which can be used,
           e.g., with Python's :external:func:`sorted <sorted>`, or directly as
           follows:
 

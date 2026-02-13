@@ -978,7 +978,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return Term(quo), Term(rem)
 
     def sort_key(self) -> SortKey[Self]:
-        """A sort key suitable for ordering instances of this class. ImplementTerm(remainder)s
+        """A sort key suitable for ordering instances of this class. Implements
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
         """
         return SortKey(self)
