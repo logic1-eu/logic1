@@ -81,19 +81,19 @@ class TermContext:
     >>> c._context is TermContext(())
     False
     >>> c = R.coerce(c)
-    >>> c._context is R
+    >>> c._context == R
     True
 
     >>> x = VV['x']
     >>> x._context
     TermContext(('x',))
     >>> R_x = R.coerce(x)
-    >>> R_x._context is R
+    >>> R_x._context == R
     True
 
     >>> f = x + 1
     >>> R_f = R.coerce(f)
-    >>> R_f._context is R
+    >>> R_f._context == R
     True
 
     ----------------------------------------------------------------------------
@@ -632,23 +632,18 @@ class Term:
     Test from_raw:
     ----------------------------------------------------------------------------
     From a variable's raw polynomial:
-    >>> Term.from_raw(x._poly, x._context)
+    >>> Term.from_raw(x._poly)
     x
 
     From a constant polynomial:
-    >>> ctx = TermContext(())
-    >>> p = ctx._poly_context.constant(fmpq(3, 4))
-    >>> Term.from_raw(p, ctx)
+    >>> ctx = fmpq_mpoly_ctx.get((), 'deglex')
+    >>> p = ctx.constant(fmpq(3, 4))
+    >>> Term.from_raw(p)
     3/4
 
     From coerced polynomials in a shared context:
-    >>> ctx = x._context | y._context | z._context
-    >>> p = ctx.coerce_poly(x._poly) ** 2 + ctx.coerce_poly(z._poly)
-    >>> t = Term.from_raw(p, ctx)
-    >>> t
+    >>> Term.from_raw((x**2 + z)._poly)
     x**2 + z
-    >>> t._context == ctx
-    True
 
     ----------------------------------------------------------------------------
     Test is_constant:
