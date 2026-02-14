@@ -67,9 +67,6 @@ class TermContext:
     def __repr__(self) -> str:
         return f'TermContext({self._poly_context.names()})'
 
-    def __hash__(self) -> int:
-        return hash(self._poly_context)
-
     def coerce(self, term: Term) -> Term:
         """Coerce term to the TermContext self.
         """
@@ -536,10 +533,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
             return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        # Requires further discussion!
-        # return hash((tuple(self._poly.terms()), self._context))
-        # return hash(self._poly.terms())
-        return hash(repr(self._poly))
+        return hash(self._summands_as_hashable())
 
     def __init__(self, arg: Constant) -> None:
         """
@@ -894,14 +888,43 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
         """Iterate over the summands of self yielding pairs of dictionaries
         representing monomials, and coefficients.|
+
+        >>> x, y = VV.get('x', 'y')
+        >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
+        >>> list(motzkin.summands())
+        [({x: 4, y: 2}, mpq(1,1)), ({x: 2, y: 4}, mpq(1,1)),
+         ({x: 2, y: 2}, mpq(-3,1)), ({}, mpq(1,1))]
         """
-        vars = tuple(Variable.from_raw(gen) for gen in self._poly.context().gens())
-        for exp_vec, coeff in self._poly.terms():
+        poly = self._poly
+        vars = tuple(Variable.from_raw(gen) for gen in poly.context().gens())
+        for exp_vec, coeff in poly.terms():
             exp_dict = dict()
             for i, exp in enumerate(exp_vec):
                 if exp:
                     exp_dict[vars[i]] = exp
             yield exp_dict, fmpq_to_mpq(coeff)
+
+    def _summands_as_hashable(self) -> tuple[tuple[tuple[tuple[str, int], ...], mpq], ...]:
+        """Return the summands of self as a hashable tuple of pairs of tuples
+        representing monomials, and coefficients. The summands ordered by the
+        term order.
+
+        >>> x, y = VV.get('x', 'y')
+        >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
+        >>> motzkin._summands_as_hashable()
+        (((('x', 4), ('y', 2)), mpq(1,1)), ((('x', 2), ('y', 4)), mpq(1,1)),
+         ((('x', 2), ('y', 2)), mpq(-3,1)), ((), mpq(1,1)))
+        """
+        poly = self._poly
+        gen = poly.context().gen
+        summands = []
+        for exp_vec, coeff in poly.terms():
+            exp_list = []
+            for i, exp in enumerate(exp_vec):
+                if exp:
+                    exp_list.append((str(gen(i)), exp))
+            summands.append((tuple(exp_list), fmpq_to_mpq(coeff)))
+        return tuple(summands)
 
     def term_context(self) -> TermContext:
         """Return a TermContext of this term.
