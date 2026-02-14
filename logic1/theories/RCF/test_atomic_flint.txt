@@ -16,8 +16,8 @@ class _:
     >>> x, y = R.get_vars()
     >>> x
     x
-    >>> x._poly, x._context
-    (x, TermContext(('x', 'y')))
+    >>> x._poly, x._poly.context()
+    (x, fmpq_mpoly_ctx(2, '<Ordering.deglex: 'deglex'>', ('x', 'y')))
 
     >>> S = TermContext(('z', 'x'))
     >>> S
@@ -25,8 +25,8 @@ class _:
     >>> S_x, z = list(S.get_vars())
     >>> S_x
     x
-    >>> S_x._poly, S_x._context
-    (x, TermContext(('x', 'z')))
+    >>> S_x._poly, S_x._poly.context()
+    (x, fmpq_mpoly_ctx(2, '<Ordering.deglex: 'deglex'>', ('x', 'z')))
 
     >>> bool(S_x == x)
     True
@@ -40,12 +40,12 @@ class _:
     x^2 + 2 x z + z^2
 
     >>> coerced_sum = x + S_x
-    >>> coerced_sum._poly, coerced_sum._context
-    (2*x, TermContext(('x', 'y', 'z')))
+    >>> coerced_sum._poly, coerced_sum._poly.context()
+    (2*x, fmpq_mpoly_ctx(3, '<Ordering.deglex: 'deglex'>', ('x', 'y', 'z')))
 
     >>> zero = x - S_x
-    >>> zero._poly, zero._context
-    (0, TermContext(('x', 'y', 'z')))
+    >>> zero._poly, zero._poly.context()
+    (0, fmpq_mpoly_ctx(3, '<Ordering.deglex: 'deglex'>', ('x', 'y', 'z')))
 
     """
 
@@ -76,24 +76,24 @@ class TermContext:
     ----------------------------------------------------------------------------
     >>> R = TermContext(['x', 'y'])
     >>> c = Term(1)
-    >>> c._context == TermContext(())
+    >>> c.term_context() == TermContext(())
     True
-    >>> c._context is TermContext(())
+    >>> c.term_context() is TermContext(())
     False
     >>> c = R.coerce(c)
-    >>> c._context == R
+    >>> c.term_context() == R
     True
 
     >>> x = VV['x']
-    >>> x._context
+    >>> x.term_context()
     TermContext(('x',))
     >>> R_x = R.coerce(x)
-    >>> R_x._context == R
+    >>> R_x.term_context() == R
     True
 
     >>> f = x + 1
     >>> R_f = R.coerce(f)
-    >>> R_f._context == R
+    >>> R_f.term_context() == R
     True
 
     ----------------------------------------------------------------------------

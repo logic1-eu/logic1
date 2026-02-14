@@ -76,7 +76,7 @@ class TermContext:
         # The following assertion fires in particular when term contains
         # variables created between VV._stash() and VV._drop(). This is useful
         # because we would return a semantically meaningless term:
-        assert not (bad_names := set(term._context.get_names()) - VV._used), \
+        assert not (bad_names := set(term._poly.context().names()) - VV._used), \
                f'{term} contains unknown variables {bad_names}'
         return Term.from_raw(self.coerce_poly(term._poly))
 
@@ -450,33 +450,33 @@ class SortKey:
     term: Term
 
     def __eq__(self, other: Self) -> bool:  # type: ignore[override]
-        context = self.term._context | other.term._context
-        return self.sort_key(context) == other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) == other.sort_key(tcontext)
 
     def __ge__(self, other: Self) -> bool:
-        context = self.term._context | other.term._context
-        return self.sort_key(context) >= other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) >= other.sort_key(tcontext)
 
     def __gt__(self, other: Self) -> bool:
-        context = self.term._context | other.term._context
-        return self.sort_key(context) > other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) > other.sort_key(tcontext)
 
     def __hash__(self) -> int:
         return hash(self.term)
 
     def __le__(self, other: Self) -> bool:
-        context = self.term._context | other.term._context
-        return self.sort_key(context) <= other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) <= other.sort_key(tcontext)
 
     def __lt__(self, other: Self) -> bool:
-        context = self.term._context | other.term._context
-        return self.sort_key(context) < other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) < other.sort_key(tcontext)
 
     def __ne__(self, other: Self) -> bool:  # type: ignore[override]
-        context = self.term._context | other.term._context
-        return self.sort_key(context) != other.sort_key(context)
+        tcontext = self.term.term_context() | other.term.term_context()
+        return self.sort_key(tcontext) != other.sort_key(tcontext)
 
-    def sort_key(self, context: TermContext) -> Tuple[Any, ...]:
+    def sort_key(self, tcontext: TermContext) -> Tuple[Any, ...]:
         def exp_key(exp_vec: Tuple[int, ...], ord: Ordering) -> Tuple[Any, ...]:
             """Return a tuple of fmpz such that Python's tuple ordering
             matches the monomial order in `ord` (ascending).
@@ -492,21 +492,19 @@ class SortKey:
         def poly_key(poly: fmpq_mpoly, ord: Ordering) -> Tuple[Any, ...]:
             return tuple((exp_key(exp_vec, ord), coeff) for exp_vec, coeff in poly.terms())
 
-        return poly_key(context.coerce_poly(self.term._poly), context.ordering())
+        poly = tcontext.coerce_poly(self.term._poly)
+        ord = poly.context().ordering()
+        return poly_key(poly, ord)
 
 
 class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
 
     _poly: fmpq_mpoly
 
-    @property
-    def _context(self) -> TermContext:
-        return self.term_context()
-
     def __add__(self, other: Term | Constant) -> Term:
         if isinstance(other, Term):
-            context = self._context | other._context
-            sum = context.coerce_poly(self._poly) + context.coerce_poly(other._poly)
+            tcontext = self.term_context() | other.term_context()
+            sum = tcontext.coerce_poly(self._poly) + tcontext.coerce_poly(other._poly)
             return Term.from_raw(sum)
         else:
             return self + Term(other)
@@ -600,8 +598,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         x^2 - y^2
         """
         if isinstance(other, Term):
-            term_context = self._context | other._context
-            product = term_context.coerce_poly(self._poly) * term_context.coerce_poly(other._poly)
+            tcontext = self.term_context() | other.term_context()
+            product = tcontext.coerce_poly(self._poly) * tcontext.coerce_poly(other._poly)
             return Term.from_raw(product)
         else:
             return self * Term(other)
@@ -638,8 +636,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
 
     def __sub__(self, other: Term | Constant) -> Term:
         if isinstance(other, Term):
-            term_context = self._context | other._context
-            difference = term_context.coerce_poly(self._poly) - term_context.coerce_poly(other._poly)
+            tcontext = self.term_context() | other.term_context()
+            difference = tcontext.coerce_poly(self._poly) - tcontext.coerce_poly(other._poly)
             return Term.from_raw(difference)
         else:
             return self - Term(other)
@@ -649,8 +647,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         will raise an error.
         """
         if isinstance(other, Term):
-            term_context = self._context | other._context
-            quotient = term_context.coerce_poly(self._poly) / term_context.coerce_poly(other._poly)
+            tcontext = self.term_context() | other.term_context()
+            quotient = tcontext.coerce_poly(self._poly) / tcontext.coerce_poly(other._poly)
             return Term.from_raw(quotient)
         else:
             return self / Term(other)
@@ -704,11 +702,12 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
                 assert False, f'zero summand in {self!r}'
 
         def _format_var(v: Variable) -> str:
-            return repr(v._poly)
+            return str(v._poly)
 
         def _format_mon(d: dict[Variable, int]) -> str:
             ret = ''
-            for v in self._context.get_vars():
+            for gen in self._poly.context().gens():
+                v = Variable.from_raw(gen)
                 e = d.get(v, 0)
                 if e == 0:
                     continue
@@ -782,7 +781,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """
         context = self._poly.context()
         names = context.names()
-        x_name = repr(x._poly)
+        x_name = str(x._poly)
         if x_name not in names:
             return 0
         x_index = context.variable_to_index(x_name)
@@ -797,7 +796,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """
         poly = self._poly
         names = poly.context().names()
-        x_name = repr(x._poly)
+        x_name = str(x._poly)
         if x_name not in names:
             return Term(0)
         for _ in range(n):
@@ -818,7 +817,6 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         >>> t.factor()
         (mpq(-1,1), {x - y: 1, x + y: 1})
         """
-        context = self._context
         unit, factors = self._poly.factor()
         D = dict()
         for factor, exp in factors:
@@ -878,11 +876,11 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         for var, substitute in mapping.items():
             if isinstance(substitute, Term):
                 if substitute.is_constant():
-                    constant_mapping[repr(var._poly)] = mpq_to_fmpq(substitute.as_constant())
+                    constant_mapping[str(var._poly)] = mpq_to_fmpq(substitute.as_constant())
                 else:
                     proper_term_mapping[var] = substitute
             else:
-                constant_mapping[repr(var._poly)] = as_fmpq(substitute)
+                constant_mapping[str(var._poly)] = as_fmpq(substitute)
         # First use fmpq_mpoly.subs for subsituting constants:
         pre_result = Term.from_raw(self._poly.subs(constant_mapping))
         # Then use arithmetic for the rest:
@@ -897,7 +895,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """Iterate over the summands of self yielding pairs of dictionaries
         representing monomials, and coefficients.|
         """
-        vars = self._context.get_vars()
+        vars = tuple(Variable.from_raw(gen) for gen in self._poly.context().gens())
         for exp_vec, coeff in self._poly.terms():
             exp_dict = dict()
             for i, exp in enumerate(exp_vec):
@@ -911,21 +909,18 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         return TermContext.from_raw(self._poly.context())
 
     def unused_vars(self) -> Iterator[Variable]:
+        context = self._poly.context()
         for name in self._poly.unused_gens():
-            yield self._context.get_var_by_name(name)
+            yield Variable.from_raw(context.gen(context.variable_to_index(name)))
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
-
-        .. seealso::
-            :external:meth:`MPolynomial_libsingular.variables()
-            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.variables>`
         """
-        unused = set(self.unused_vars())
-        for var in self._context.get_vars():
-            if var not in unused:
-                yield var
+        unused = set(self._poly.unused_gens())  # set[str]
+        for gen in self._poly.context().gens():
+            if str(gen) not in unused:
+                yield Variable.from_raw(gen)
 
 
 class Variable(Term, firstorder.Variable['Variable', int, SortKey]):
