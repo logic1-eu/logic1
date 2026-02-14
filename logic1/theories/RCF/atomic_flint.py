@@ -566,8 +566,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         context = self._context
         poly_factory = context._poly_context.term
         for exp_vec, coeff in self._poly.terms():
-            power_product = Term.from_raw(poly_factory(exp_vec=exp_vec), context)
-            yield fmpq_to_mpq(coeff), power_product
+            monomial = Term.from_raw(poly_factory(exp_vec=exp_vec), context)
+            yield fmpq_to_mpq(coeff), monomial
 
     def __le__(self, other: Term | Constant) -> Ge | Le:
         lhs = self - other
@@ -659,6 +659,15 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         return self.constant_coefficient()
 
     def as_latex(self) -> str:
+        """LaTeX representation as a string. Implements the abstract method
+        :meth:`.firstorder.atomic.Term.as_latex`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.as_latex()
+        'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
+        """
         return self._as_string(mul=' ', pow='^', exp_pre='{', exp_post='}')
 
     def _as_string(self, mul: str, pow: str, exp_pre: str = '', exp_post: str = '') -> str:
@@ -714,9 +723,21 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         return ''.join(ret)
 
     def as_variable(self) -> Variable:
-        if not self.is_variable():
-            raise ValueError(f'{self} is not a variable')
         return Variable.from_raw(self._poly, self._context)
+
+    def coefficient(self, degrees: dict[Variable, int]) -> Term:
+        """Return the coefficient of the variables with the degrees specified
+        in the python dictionary `degrees`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.coefficient({x: 1, y: 1})
+        -2
+        >>> t.coefficient({x: 1})
+        -2*y + 4
+        """
+        raise NotImplementedError()
 
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this Term.
@@ -728,11 +749,74 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
                 return fmpq_to_mpq(last_coeff)
         return mpq(0)
 
-    def _dump(self):
-        """Dump type and attributes of self._poly, for debugging. Figure out how
-         are built, and write a _dump for development.
+    def content(self) -> mpq:
+        """Return the content of this term, which is defined as the positive gcd
+        of its rational coefficients.
+
+        >>> x, y = VV.get('x', 'y')
+        >>> (mpq(2, 3) * x + mpq(4, 9) * y + mpq(8, 15)).content()
+        mpq(2,45)
         """
-        ...
+        content = fmpq(0)
+        for coeff in self._poly.coeffs():
+            content = content.gcd(coeff)
+        assert content > 0 or (content == 0 and self == 0)
+        return fmpq_to_mpq(content)
+
+    def degree(self, x: Variable) -> int:
+        """Return the degree in `x` of this term. `x` is matched against
+        variables of `self` by name. The index of the variables in their
+        specific TermContext is not relevant. If no variable with the name of
+        `x` occurs in the context of `self`, return 0.
+
+        >>> x, y = VV.get('x', 'y')
+        >>> (2*y*x**2 + x + 1).degree(x)
+        2
+        """
+        context = self._poly.context()
+        names = context.names()
+        x_name = repr(x._poly)
+        if x_name not in names:
+            return 0
+        x_index = context.variable_to_index(x_name)
+        return self._poly.degrees()[x_index]
+
+    def derivative(self, x: Variable, n: int = 1) -> Term:
+        """The `n`-th derivative of this term, with respect to `x`.
+
+        >>> x, y, z = VV.get('x', 'y', 'z')
+        >>> (x ** 2 * y + x * z ** 2 + y ** 2 * z).derivative(x)
+        2*x*y + z**2
+        """
+        poly = self._poly
+        names = poly.context().names()
+        x_name = repr(x._poly)
+        if x_name not in names:
+            return Term(0)
+        for _ in range(n):
+            poly = poly.derivative(x_name)
+        return Term.from_raw(poly, self._context)
+
+    def factor(self) -> tuple[mpq, dict[Term, int]]:
+        """A polynomial factorization of this term.
+
+        A pair `(unit, D)`, where `unit` is a rational number, the
+        keys of `D` are irreducible factors, and the corresponding values are
+        their multiplicities. All irreducible factors are monic. Note that
+        the return value is uniquely determined by this specification.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = -x**2 + y**2
+        >>> t.factor()
+        (mpq(-1,1), {x - y: 1, x + y: 1})
+        """
+        context = self._context
+        unit, factors = self._poly.factor()
+        D = dict()
+        for factor, exp in factors:
+            D[Term.from_raw(factor, context)] = exp
+        return fmpq_to_mpq(unit), D
 
     @classmethod
     def from_raw(cls, poly: fmpq_mpoly, context: TermContext) -> Self:
@@ -841,6 +925,10 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey]):
         """
         return VV.fresh(suffix=f'_{str(self)}')
 
+    @classmethod
+    def from_raw(cls, poly: fmpq_mpoly, context: TermContext) -> Self:
+        assert poly in poly.context().gens(), f'{poly} is not a generator'
+        return super().from_raw(poly, context)
 
 # The following has been literally copied from atomic.py
 
