@@ -468,7 +468,29 @@ class Term:
     ...
     AssertionError: will_be_lost contains unknown variables {'will_be_lost'}
 
+    ----------------------------------------------------------------------------
+    Test coefficient:
+    ----------------------------------------------------------------------------
+    >>> f = (x - y + 2) ** 2; f
+    x**2 - 2*x*y + y**2 + 4*x - 4*y + 4
+    >>> f.coefficient({x: 1, y: 1})
+    -2
+    >>> f.coefficient({x: 1})
+    -2*y + 4
+
+    >>> f = x * y + y + 5
+    >>> f.coefficient({x: 0, y: 1})
+    1
+    >>> f.coefficient({x: 0})
+    y + 5
+
+    >>> f = (1 + y + y**2) * (1 + x + x**2)
+    >>> f.coefficient({x: 0})
+    y**2 + y + 1
+
+    ----------------------------------------------------------------------------
     Test constant_coefficient:
+    ----------------------------------------------------------------------------
     >>> Term(0).constant_coefficient()
     mpq(0,1)
     >>> Term(-2).constant_coefficient()
@@ -663,6 +685,30 @@ class Term:
     False
 
     ----------------------------------------------------------------------------
+    Test is_definite:
+    ----------------------------------------------------------------------------
+    >>> print(Term(0).is_definite())
+    DEFINITE.ZERO
+
+    >>> f = x**2 + y**2
+    >>> print(f.is_definite())
+    DEFINITE.POSITIVE_SEMI
+
+    >>> g = -x**2 - y**2 - 1
+    >>> print(g.is_definite())
+    DEFINITE.NEGATIVE
+
+    >>> h = (x - y) ** 2
+    >>> print(h.is_definite())
+    DEFINITE.UNKNOWN
+
+    >>> print(h.is_definite(assume={x: DEFINITE.POSITIVE, y: DEFINITE.NEGATIVE}))
+    DEFINITE.POSITIVE
+
+    >>> print(h.is_definite(assume={x: DEFINITE.NEGATIVE_SEMI, y: DEFINITE.POSITIVE_SEMI}))
+    DEFINITE.POSITIVE_SEMI
+
+    ----------------------------------------------------------------------------
     Test is_monomial:
     ----------------------------------------------------------------------------
     >>> Term(0).is_monomial()
@@ -707,6 +753,18 @@ class Term:
     False
 
     ----------------------------------------------------------------------------
+    Test is_weakly_parametric_linear:
+    ----------------------------------------------------------------------------
+    >>> a, b = VV.get('a', 'b')
+    >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+    >>> term.is_weakly_parametric_linear({x, y})
+    True
+    >>> term.is_weakly_parametric_linear({a})
+    False
+    >>> term.is_weakly_parametric_linear({b})
+    False
+
+    ----------------------------------------------------------------------------
     Test is_zero:
     ----------------------------------------------------------------------------
     >>> Term(0).is_zero()
@@ -734,6 +792,54 @@ class Term:
     -1/2*x**2 + x*y
     >>> f.lc()
     mpq(-1,2)
+
+    ----------------------------------------------------------------------------
+    Test monomial_coefficient:
+    ----------------------------------------------------------------------------
+    >>> t = mpq(2, 3) * x**2 * y + mpq(5, 7) * x - mpq(1, 4)
+
+    Existing monomial:
+    >>> t.monomial_coefficient(x**2 * y)
+    mpq(2,3)
+    >>> t.monomial_coefficient(x)
+    mpq(5,7)
+
+    Constant term:
+    >>> t.monomial_coefficient(Term(1))
+    mpq(-1,4)
+
+    Missing monomial:
+    >>> t.monomial_coefficient(y)
+    mpq(0,1)
+    >>> t.monomial_coefficient(x**2)
+    mpq(0,1)
+
+    Constant polynomial:
+    >>> Term(5).monomial_coefficient(x)
+    mpq(0,1)
+    >>> Term(5).monomial_coefficient(Term(1))
+    mpq(5,1)
+
+    Zero polynomial:
+    >>> Term(0).monomial_coefficient(Term(1))
+    mpq(0,1)
+
+    ----------------------------------------------------------------------------
+    Test monomials:
+    ----------------------------------------------------------------------------
+    >>> f = (x + y) ** 5
+    >>> list(f.monomials())
+    [x**5, x**4*y, x**3*y**2, x**2*y**3, x*y**4, y**5]
+
+    >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
+    >>> list(motzkin.monomials())
+    [x**4*y**2, x**2*y**4, x**2*y**2, 1]
+
+    >>> list(Term(0).monomials())
+    []
+
+    >>> list(Term(1).monomials())
+    [1]
 
     ----------------------------------------------------------------------------
     Test summands:

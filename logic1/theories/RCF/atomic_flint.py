@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Container
 from dataclasses import dataclass
 from enum import Enum, auto
 from fractions import Fraction
-from typing import Any, Final, Iterable, Iterator, Mapping, Self, Tuple, TypeVar
+from typing import Any, Final, Iterable, Iterator, Mapping, Optional, Self, Tuple, TypeVar
 
 from flint import Ordering, fmpq, fmpz, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
@@ -726,8 +727,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         return Variable.from_raw(self._poly)
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
-        """Return the coefficient of the variables with the degrees specified
-        in the python dictionary `degrees`.
+        """Return the coefficient of the variables with the degrees specified in
+        the `degrees`. Mathematically, this is the coefficient in the base ring
+        adjoined by the variables of this ring that are not listed in `degrees`.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
@@ -737,17 +739,56 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         >>> t.coefficient({x: 1})
         -2*y + 4
         """
-        raise NotImplementedError()
+
+        def subtract_if_subset(d1: dict[Variable, int], d2: dict[str, int]) \
+                -> Optional[dict[Variable, int]]:
+            """Check if d2 constraints are satisfied by d1, return remaining
+            exponents. Returns d1 with keys matching d2 removed, if each key in
+            d2 either has a zero exponent and does not exist in d1, or has a
+            non-zero exponent and exists in d1 with the same exponent. Returns
+            None otherwise.
+            """
+            # Map variable names in d1 back to actual Variable objects
+            str_to_var = {str(var1): var1 for var1 in d1}
+
+            # Verify that contraint on d2 keys is satisfied
+            for name2, exp2 in d2.items():
+                if name2 not in str_to_var:
+                    if exp2 != 0:
+                        return None
+                else:
+                    var1 = str_to_var[name2]
+                    if d1[var1] != exp2:
+                        return None
+
+            # Return d1 with all variables mentioned in d2 removed
+            return {var1: exp1 for var1, exp1 in d1.items() if str(var1) not in d2}
+
+        # The result will have the same context as `self`. We reference
+        # `degrees` only by the names of the variables.
+        degrees_by_names = {str(var): exp for var, exp in degrees.items()}
+        ret = Term(0)
+        for exp_dict, coeff in self.summands():
+            summand_dict = subtract_if_subset(exp_dict, degrees_by_names)
+            if summand_dict is not None:
+                summand = Term(coeff)
+                for var, exp in summand_dict.items():
+                    summand *= var ** exp
+                ret += summand
+        return ret
 
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this Term.
         """
-        summands = tuple(self._poly.terms())
-        if summands:
-            last_exp_vec, last_coeff = summands[-1]
-            if all(exp == 0 for exp in last_exp_vec):
-                return fmpq_to_mpq(last_coeff)
-        return mpq(0)
+        last = None
+        for last in self._poly.terms():
+            pass
+        if last is None:
+            return mpq(0)
+        last_exp_vec, last_coeff = last
+        if any(exp != 0 for exp in last_exp_vec):
+            return mpq(0)
+        return fmpq_to_mpq(last_coeff)
 
     def content(self) -> mpq:
         """Return the content of this term, which is defined as the positive gcd
@@ -828,6 +869,45 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """
         return self._poly.is_constant()
 
+    def is_definite(self, assume: Mapping[Variable, DEFINITE] = {}) -> DEFINITE:
+        """A fast heuristic test for definitetess properties of this term. This
+        is based on *trivial square sum* properties of coefficient signs and
+        exponents.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> print(Term(0).is_definite())
+        DEFINITE.ZERO
+        >>> f = x**2 + y**2
+        >>> print(f.is_definite())
+        DEFINITE.POSITIVE_SEMI
+        >>> g = -x**2 - y**2 - 1
+        >>> print(g.is_definite())
+        DEFINITE.NEGATIVE
+        >>> h = (x - y) ** 2
+        >>> print(h.is_definite())
+        DEFINITE.UNKNOWN
+        >>> print(h.is_definite(assume={x: DEFINITE.POSITIVE, y: DEFINITE.NEGATIVE}))
+        DEFINITE.POSITIVE
+        >>> print(h.is_definite(assume={x: DEFINITE.NEGATIVE_SEMI, y: DEFINITE.POSITIVE_SEMI}))
+        DEFINITE.POSITIVE_SEMI
+        """
+        # Start with the neutral element of DEFINITE.add().
+        poly_result = DEFINITE.ZERO
+        for exp_dict, coeff in self.summands():
+            # Start with either POSITIVE or NEGATIVE, depending on the coefficient.
+            mon_result = DEFINITE.from_constant(coeff)
+            for var, exp in exp_dict.items():
+                assert exp != 0
+                var_exp_result = assume.get(var, DEFINITE.UNKNOWN)
+                if exp % 2 == 0:
+                    var_exp_result = DEFINITE.square(var_exp_result)
+                mon_result = DEFINITE.mul(mon_result, var_exp_result)
+            poly_result = DEFINITE.add(poly_result, mon_result)
+            if poly_result is DEFINITE.UNKNOWN:
+                return DEFINITE.UNKNOWN
+        return poly_result
+
     def is_monomial(self) -> bool:
         """Check if this term is a monomial. A monomial is a summand without its
         coefficient, i.e., there is a bijection between monomials and exponent
@@ -842,6 +922,28 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         poly = self._poly
         return poly in poly.context().gens()
 
+    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
+        """Return :obj:`True` if this Term can be written as a_1 x_1 + ... +
+        a_n x_n + r such that a_1, ..., a_n in QQ, x_1, ..., x_n in X, and r is
+        a polynomial over QQ that does not contain any variable from X.
+
+        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
+        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+        >>> term.is_weakly_parametric_linear({x, y})
+        True
+        >>> term.is_weakly_parametric_linear({a})
+        False
+        >>> term.is_weakly_parametric_linear({b})
+        False
+        """
+        for m in self.monomials():
+            if m in X:
+                continue
+            for v in m.vars():
+                if v in X:
+                    return False
+        return True
+
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term represents the constant zero.
         """
@@ -849,6 +951,40 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
 
     def lc(self) -> mpq:
         return fmpq_to_mpq(self._poly.leading_coefficient())
+
+    def monomial_coefficient(self, monomial: Term) -> mpq:
+        """Return the rational coefficient of the monomial mon in self. If
+        monomial is not a monomial of self, return 0.
+        """
+        # There is a more straighforward implementation using self.__iter__().
+        # However, this method is performance critical, e.g. for substitution in
+        # xopt elimination. Here we compare exponent vectors directly, while
+        # comparison of monomial Terms involves subtraction, construction of an
+        # AtomicFormula, and its evaluation via __bool__.
+
+        tcontext = self.term_context() | monomial.term_context()
+        self_poly = tcontext.coerce_poly(self._poly)
+        monomial_poly = tcontext.coerce_poly(monomial._poly)
+        monomial_terms = tuple(monomial_poly.terms())
+        assert len(monomial_terms) == 1, f'{monomial!r} is not a monomial'
+        monomial_exp_vec, monomial_coeff = monomial_terms[0]
+        assert monomial_coeff == 1, f'{monomial!r} is not a monomial'
+        for exp_vec, coeff in self_poly.terms():
+            if exp_vec == monomial_exp_vec:
+                return fmpq_to_mpq(coeff)
+        return mpq(0)
+
+    def monomials(self) -> list[Term]:
+        """List of monomials of this term. A monomial is defined here as a
+        summand of a polynomial *without* the coefficient.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.monomials()
+        [x^2, x*y, y^2, x, y, 1]
+        """
+        return [monomial for _, monomial in self]
 
     def sort_key(self) -> SortKey:
         """A sort key suitable for ordering instances of this class. Implements
