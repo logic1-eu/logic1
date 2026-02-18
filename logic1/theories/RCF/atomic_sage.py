@@ -6,8 +6,8 @@ from enum import auto, Enum
 from fractions import Fraction
 from functools import lru_cache
 from typing import (
-    Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self,
-    TypeVar)
+    TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping,
+    Optional, Self, TypeVar)
 
 from gmpy2 import mpq
 from sage.all import QQ
@@ -31,6 +31,9 @@ from ...firstorder import _T, _F
 from ...support.excepthook import NoTraceException
 
 from ...support.tracing import trace  # noqa
+
+if TYPE_CHECKING:
+    from .typing import Formula
 
 
 τ = TypeVar('τ', bound='Term')
@@ -1298,6 +1301,3 @@ class Gt(AtomicFormula):
 
 class Lt(AtomicFormula):
     pass
-
-
-from .typing import Formula
