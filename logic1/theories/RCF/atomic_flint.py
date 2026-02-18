@@ -4,7 +4,7 @@ from collections.abc import Container
 from dataclasses import dataclass
 from enum import Enum, auto
 from fractions import Fraction
-from typing import Any, Final, Iterable, Iterator, Mapping, Optional, Self, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Final, Iterable, Iterator, Mapping, Optional, Self, Tuple
 
 from flint import Ordering, fmpq, fmpz, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
@@ -17,6 +17,7 @@ from logic1.support.excepthook import NoTraceException
 type Constant = float | fmpq | Fraction| int | mpq
 
 _CONSTANT_TYPES = (float, fmpq, Fraction, int, mpq)
+
 
 def as_fmpq(arg: Constant) -> fmpq:
     if isinstance(arg, float):
@@ -654,8 +655,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
             "in Python, and has the wrong precedence")
 
     def as_constant(self) -> mpq:
-        if not self.is_constant():
-            raise ValueError(f'{self} is not constant')
+        assert self.is_constant()
         return self.constant_coefficient()
 
     def as_latex(self) -> str:
@@ -864,6 +864,23 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         self._poly = poly
         return self
 
+    @classmethod
+    def from_sage(self, sage_poly: Any) -> Term:
+        """Convert a Sage polynomial to a Term. The context of the
+        result is determined by the names of the variables of sage_poly, and
+        their order in the term order of sage_poly. In particular, if
+        sage_poly has no variables, the result is a constant term.
+        """
+        def rational_to_fmpq(r):
+            return fmpq(int(r.numerator()), int(r.denominator()))
+
+        sage_dict = sage_poly.dict().items()
+        flint_dict = {exp_vec: rational_to_fmpq(coeff) for exp_vec, coeff in sage_dict}
+        names = sage_poly.parent().variable_names()
+        context = fmpq_mpoly_ctx.get(names, 'deglex')
+        flint_poly = context.from_dict(flint_dict)
+        return Term.from_raw(flint_poly)
+
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
         """
@@ -986,6 +1003,71 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """
         return [monomial for _, monomial in self]
 
+    def normalize(self) -> Term:
+        """Divide this Term by its leading coefficient, so that the result is
+        monic.
+        """
+        poly = self._poly
+        return Term.from_raw(poly / poly.leading_coefficient())
+
+    def primitive_part(self, positive: bool = False) -> Term:
+        """Return the primitive part over ``Z``. This is ``self`` divided by its
+        (positive) content, so that ``self.content() * self.primitive_part() ==
+        self``. If ``positive`` is ``True``, the result is normalized to have a
+        positive leading coefficient.
+        """
+        pp = self / self.content()
+        if positive and pp.lc() < 0:
+            pp = -pp
+        return pp
+
+    def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
+        """Pseudo quotient and remainder of this term and other, both as
+        univariate polynomials in `x` with polynomial coefficients in all other
+        variables.
+
+        >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+        >>> f = a * x**2 + b*x + c
+        >>> g = c * x + b
+        >>> q, r = f.pseudo_quo_rem(g, x); q, r
+        (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
+        >>> assert c**(2 - 1 + 1) * f == q * g + r
+        """
+        tcontext = self.term_context() | other.term_context()
+        p1 = tcontext.coerce(self).to_sage()
+        p2 = tcontext.coerce(other).to_sage()
+        ring = p1.parent()
+        x_sage = ring(x.to_sage())
+        p1_x = p1.polynomial(x_sage)
+        p2_x = p2.polynomial(x_sage)
+        quo_x, rem_x = p1_x.pseudo_quo_rem(p2_x)
+        quo, rem = ring(quo_x), ring(rem_x)
+        return Term.from_sage(quo), Term.from_sage(rem)
+
+    def quo_rem(self, other: Term) -> tuple[Term, Term]:
+        """Quotient and remainder of this term and `other`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = 2*y*x**2 + x + 1
+        >>> f.quo_rem(x)
+        (2*x*y + 1, 1)
+        >>> f.quo_rem(y)
+        (2*x^2, x + 1)
+        >>> f.quo_rem(3*x)  # would yield (0, 2*x^2*y + x + 1) over ZZ
+        (2/3*x*y + 1/3, 1)
+        """
+        tcontext = self.term_context() | other.term_context()
+        p1 = tcontext.coerce(self).to_sage()
+        p2 = tcontext.coerce(other).to_sage()
+        quo, rem = p1.quo_rem(p2)
+        return Term.from_sage(quo), Term.from_sage(rem)
+
+    def reduce(self, G: Iterable[Term]) -> Term:
+        """Reduce self modulo G.
+        """
+        return Term.from_sage(self.to_sage().reduce([g.to_sage() for g in G]))
+
     def sort_key(self) -> SortKey:
         """A sort key suitable for ordering instances of this class. Implements
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
@@ -1019,6 +1101,22 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
             for var, exp in exp_dict.items():
                 substitute = proper_term_mapping.get(var, var)
                 result += Term(coeff) * substitute ** exp
+        return result
+
+    def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:
+        """Substitute the solution of the weakly parametric linear
+        polynomial ``minimal_polynomial`` this weakly parametric linear
+        polynomial.
+        """
+        # self = a * x + b
+        a = self.monomial_coefficient(x)
+        b = self - a * x
+        assert x not in b.vars(), f'{tuple(b.vars())} contains {x!r}, {tuple((x - x).vars())=}'
+        # minimal_polynomial = c * x + d
+        c = minimal_polynomial.monomial_coefficient(x)
+        d = minimal_polynomial - c * x
+        assert x not in d.vars()
+        result = a * (-d / c) + b
         return result
 
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
@@ -1067,17 +1165,36 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey]):
         """
         return TermContext.from_raw(self._poly.context())
 
-    def unused_vars(self) -> Iterator[Variable]:
-        context = self._poly.context()
-        for name in self._poly.unused_gens():
-            yield Variable.from_raw(context.gen(context.variable_to_index(name)))
+    def to_sage(self) -> Any:
+        """Convert this Term to a Sage MPolynomial_libsingular if
+        """
+        from sage.all import PolynomialRing, QQ, Rational
+
+        def fmpq_to_rational(r: fmpq) -> Rational:
+            return Rational((int(r.numerator), int(r.denominator)))
+
+        flint_poly = self._poly
+        flint_dict = dict(flint_poly.terms())
+        sage_dict = {exp_vec: fmpq_to_rational(coeff) for exp_vec, coeff in flint_dict.items()}
+        names = flint_poly.context().names()
+        if names:
+            sage_ring = PolynomialRing(QQ, names=names, order='deglex', implementation='singular')
+        else:
+            sage_ring = PolynomialRing(QQ, names=names, order='deglex')
+        sage_poly = sage_ring(sage_dict)
+        return sage_poly
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
         """
-        unused = set(self._poly.unused_gens())  # set[str]
-        for gen in self._poly.context().gens():
+        poly = self._poly
+        context = poly.context()
+        if poly.is_zero():  # compare https://github.com/flintlib/python-flint/issues/368
+            unused = set(context.names())
+        else:
+            unused = set(poly.unused_gens())
+        for gen in context.gens():
             if str(gen) not in unused:
                 yield Variable.from_raw(gen)
 

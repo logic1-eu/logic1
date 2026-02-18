@@ -669,6 +669,13 @@ class Term:
     x**2 + z
 
     ----------------------------------------------------------------------------
+    Test from_sage/to_sage:
+    ----------------------------------------------------------------------------
+    >>> tests = (y, f, f**2, x**2 + y**2 + 1, Term(0), Term(1), Term(mpq(1, 2)), Term(mpq(-3, 4)))
+    >>> all(Term.from_sage(test.to_sage()) == test for test in tests)
+    True
+
+    ----------------------------------------------------------------------------
     Test is_constant:
     ----------------------------------------------------------------------------
     >>> Term(0).is_constant()
@@ -842,6 +849,88 @@ class Term:
     [1]
 
     ----------------------------------------------------------------------------
+    Test pseudo_quo_rem:
+    ----------------------------------------------------------------------------
+    >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+
+    >>> f = a * x**2 + b*x + c
+    >>> g = c * x + b
+    >>> q, r = f.pseudo_quo_rem(g, x); q, r
+    (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
+
+    >>> bool(c**(2 - 1 + 1) * f == q * g + r)
+    True
+
+    ----------------------------------------------------------------------------
+    Test quo_rem:
+    ----------------------------------------------------------------------------
+    >>> f = 2*y*x**2 + x + 1
+    >>> f.quo_rem(x)
+    (2*x*y + 1, 1)
+
+    >>> f.quo_rem(y)
+    (2*x**2, x + 1)
+
+    >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
+    (2/3*x*y + 1/3, 1)
+
+    ----------------------------------------------------------------------------
+    Test reduce:
+    ----------------------------------------------------------------------------
+    >>> f1 = -2 * x**2 + x**3
+    >>> f2 = -2 * y + x* y
+    >>> f3 = -x**2 + y**2
+    >>> F = [f1, f2, f3]
+    >>> g = x*y - 3*x*y**2
+    >>> g.reduce(F)
+    -6*y**2 + 2*y
+
+    ----------------------------------------------------------------------------
+    Test subs_linear_solution:
+    ----------------------------------------------------------------------------
+    Simple substitution:
+    >>> t = 3 * x + 2
+    >>> mp = x + 5
+    >>> t.subs_linear_solution(x, mp)
+    -13
+
+    Parametric case:
+    >>> t = 2 * x + y
+    >>> mp = x - z
+    >>> t.subs_linear_solution(x, mp)
+    y + 2*z
+
+    Rational coefficients:
+    >>> t = mpq(1, 2) * x + mpq(3, 4)
+    >>> mp = mpq(2, 3) * x + mpq(1, 5)
+    >>> t.subs_linear_solution(x, mp)
+    3/5
+
+    Zero constant term in self:
+    >>> t = 3 * x
+    >>> mp = x + 2
+    >>> t.subs_linear_solution(x, mp)
+    -6
+
+    Zero constant term in minimal_polynomial:
+    >>> t = 2 * x + 1
+    >>> mp = 3 * x
+    >>> t.subs_linear_solution(x, mp)
+    1
+
+    Both zero constant terms:
+    >>> t = 4 * x
+    >>> mp = 2 * x
+    >>> t.subs_linear_solution(x, mp)
+    0
+
+    Self is purely constant (zero coefficient of x):
+    >>> t = Term(7)
+    >>> mp = x + 3
+    >>> t.subs_linear_solution(x, mp)
+    7
+
+    ----------------------------------------------------------------------------
     Test summands:
     ----------------------------------------------------------------------------
     >>> f = (x + y) ** 5
@@ -878,5 +967,36 @@ class Term:
 
     >>> Term(1)._summands_as_hashable()
     (((), mpq(1,1)),)
+
+    ----------------------------------------------------------------------------
+    Test vars:
+    ----------------------------------------------------------------------------
+    Single variable:
+    >>> list((x).vars())
+    [x]
+
+    Multiple variables:
+    >>> list((x**2 + y).vars())
+    [x, y]
+
+    Three variables in deglex order:
+    >>> list((z + x*y).vars())
+    [x, y, z]
+
+    Constant:
+    >>> list(Term(5).vars())
+    []
+
+    Zero:
+    >>> list(Term(0).vars())
+    []
+
+    Regression: x - x is different from 0 in flint:
+    >>> list((x - x).vars())
+    []
+
+    Variable absent after cancellation:
+    >>> list((x + y - y).vars())
+    [x]
 
     """
