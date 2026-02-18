@@ -633,9 +633,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
-    def as_fraction(self) -> mpq:
-        if not self.is_constant():
-            raise ValueError(f'{self} is not constant')
+    def as_constant(self) -> mpq:
+        assert self.is_constant()
         return self.constant_coefficient()
 
     def as_latex(self) -> str:
@@ -950,13 +949,6 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         quotient, remainder = self1.pseudo_quo_rem(other1)
         return Term(quotient), Term(remainder)
 
-    def reduce(self, G: Iterable[Term]) -> Term:
-        """Reduce self modulo G.
-        """
-        # Sage requires that g.poly can be coerced to self.poly.parent().
-        poly = self.polynomial_ring(self.poly).reduce([g.poly for g in G])
-        return Term(poly)
-
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
         """Quotient and remainder of this term and `other`.
 
@@ -976,6 +968,13 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         quo, rem = self.poly.quo_rem(other.poly)
         return Term(quo), Term(rem)
+
+    def reduce(self, G: Iterable[Term]) -> Term:
+        """Reduce self modulo G.
+        """
+        # Sage requires that g.poly can be coerced to self.poly.parent().
+        poly = self.polynomial_ring(self.poly).reduce([g.poly for g in G])
+        return Term(poly)
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
