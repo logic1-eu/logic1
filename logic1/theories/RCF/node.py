@@ -1032,64 +1032,15 @@ class XoNode(Node):
             return best_choice
         elif self.options.elimination_order == 2:
             raise NotImplementedError('elimination_order > 1 is not supported')
-            # The following is experimental code. The general idea is to
-            # consider all smallest elimination sets and find a good one, at the
-            # price of substituting.
+            # Some experimental code has been removed here. The general idea is
+            # to consider all smallest elimination sets and find a good one, at
+            # the price of substituting.
             #
             # On the one hand, the number of nodes computed in SC50A decreases
             # by about 20 percent, while the computation time increases. On the
             # other hand the number of nodes increases by about 20 percent in
             # SC50A-r. There is no effect on the number of nodes computed in
             # MTP3. We need more benchmarks and fresh ideas.
-            for x in reversed(X):
-                candidate_set = XoNode.candidate_set(self.formula, x)
-                assert len(candidate_set) > 0
-                candidate_set.apply_passive_list(self.passive_list)
-                if len(candidate_set) == 0:
-                    raise FoundF()
-                elimination_set = candidate_set.elimination_set()
-                length = len(elimination_set)
-                if best_length is None or length < best_length:
-                    best_length = length
-                    best_choices = [(elimination_set, x)]
-                elif length == best_length:
-                    best_choices.append((elimination_set, x))
-            best_size = None
-            X_set = frozenset(X)
-            for elimination_set, x in best_choices:
-                false_successors = 0
-                num_bound_variables = []
-                num_all_variables = []
-                num_atoms = []
-                num_different_atoms = []
-                num_different_terms = []
-                num_chars = []
-                for testpoint in elimination_set:
-                    substituted_formula = XoNode.subs_into_formula(self.formula, x, testpoint, assumptions)
-                    if isinstance(substituted_formula, _T):
-                        raise abc.qe.FoundT()
-                    else:
-                        if isinstance(substituted_formula, _F):
-                            false_successors += 1
-                        all_variables = frozenset(substituted_formula.fvars())
-                        atoms = list(substituted_formula.atoms())
-                        num_all_variables.append(len(all_variables))
-                        num_bound_variables.append(len(all_variables & X_set))
-                        num_atoms.append(len(atoms))
-                        num_different_atoms.append(len(set(atoms)))
-                        num_different_terms.append(len(set(atom.lhs for atom in atoms)))
-                        num_chars.append(len(str(substituted_formula)))
-                # One could also compare the num_* as tuples.
-                size = (-false_successors,
-                        sum(num_bound_variables),
-                        sum(num_all_variables),
-                        sum(num_different_atoms),
-                        sum(num_atoms))
-                if best_size is None or size < best_size:
-                    best_size = size
-                    best_elimination_set = elimination_set
-                    best_x = x
-            return best_elimination_set, best_x
         assert False
 
     @staticmethod
@@ -1207,6 +1158,9 @@ class XoNode(Node):
             bound_variables = all_variables & frozenset(self.variables)
             free_variables = all_variables - bound_variables
             return (-len(bound_variables), -len(free_variables))
+            # -(-len(all_variables)) performed slightly better on a small set of
+            # benchmarks comprising AFIRO, SC50A, SC50B, MPT-2, and MTP3.
+            # Our choice above is essentially as good and more inutitive.
         else:
             return (0, 0)
 
