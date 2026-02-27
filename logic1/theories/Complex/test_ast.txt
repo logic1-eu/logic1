@@ -1,0 +1,3 @@
+>>> from logic1.firstorder import *
+>>> from logic1.theories.Complex import *
+>>> a, b, x, y, z = VV.get('a', 'b', 'x', 'y', 'z')
