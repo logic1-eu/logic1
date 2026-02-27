@@ -1,0 +1,43 @@
+>>> from logic1 import *
+>>> from logic1.theories.RCF import *
+
+>>> x, a, b, c, d, e, f, g = VV.get(*"xabcdefg")
+
+
+Example 9.20 from the lecture notes.
+
+>>> F = {x + 1, 2*x + 1, x**2 - 1}
+>>> for assume, M in chm(F, x, set()): print(assume, "\n", M, "\n")
+T 
+Matrix:
+  x + 1: [-1, 0, 1, 1, 1, 1, 1]
+  2*x + 1: [-1, -1, -1, 0, 1, 1, 1]
+  x^2 - 1: [1, 0, -1, -1, -1, 0, 1]
+
+>>>
+
+Generic linear polynomial
+
+>>> F = {a * x + b}
+>>> for assume, M in chm(F, x, set()): print(f"{assume}\n{M}\n")
+b > 0 and a == 0 
+Matrix:
+  a*x + b: [1] 
+
+b == 0 and a == 0 
+Matrix:
+  a*x + b: [0] 
+
+b < 0 and a == 0 
+Matrix:
+  a*x + b: [-1] 
+
+a > 0 
+Matrix:
+  a*x + b: [-1, 0, 1] 
+
+a < 0 
+Matrix:
+  a*x + b: [1, 0, -1] 
+ 
+>>>
