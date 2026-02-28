@@ -33,11 +33,11 @@ class _:
 
     >>> binomial = (x + z) ** 2
     >>> print(f'{repr(binomial)=}, {str(binomial)=}, {binomial.as_latex()=}')
-    repr(binomial)='x**2 + 2*x*z + z**2', str(binomial)='x^2 + 2 x z + z^2', binomial.as_latex()='x^{2} + 2 x z + z^{2}'
+    repr(binomial)='x**2 + 2*x*z + z**2', str(binomial)='x^2 + 2*x*z + z^2', binomial.as_latex()='x^{2} + 2 x z + z^{2}'
     >>> binomial
     x**2 + 2*x*z + z**2
     >>> print(binomial)
-    x^2 + 2 x z + z^2
+    x^2 + 2*x*z + z^2
 
     >>> coerced_sum = x + S_x
     >>> coerced_sum._poly, coerced_sum._poly.context()
@@ -387,7 +387,7 @@ class Term:
     Test __str__:
     ----------------------------------------------------------------------------
     >>> print(f)
-    x^2 + 2 x y + y^2
+    x^2 + 2*x*y + y^2
     >>> print(Term(0))
     0
     >>> print(Term(1))
@@ -401,11 +401,11 @@ class Term:
     >>> print(x)
     x
     >>> print(x - 2 * y)
-    x - 2 y
+    x - 2*y
     >>> print(2 * y - x)
-    -x + 2 y
+    -x + 2*y
     >>> print((7 * x + y + mpq(-1, 2)) ** 2)
-    49 x^2 + 14 x y + y^2 - 7 x - y + 1/4
+    49*x^2 + 14*x*y + y^2 - 7*x - y + 1/4
 
     ----------------------------------------------------------------------------
     Test __sub__:
@@ -466,7 +466,7 @@ class Term:
     >>> R.coerce(will_be_lost)
     Traceback (most recent call last):
     ...
-    AssertionError: will_be_lost contains unknown variables {'will_be_lost'}
+    AssertionError: will_be_lost uses a context with unknown variables {'will_be_lost'}
 
     ----------------------------------------------------------------------------
     Test coefficient:

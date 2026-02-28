@@ -158,9 +158,9 @@ def gqe(f: Formula, generic: Generic = Generic.FULL) -> tuple[list[AtomicFormula
     >>> from logic1.theories.RCF import *
     >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
     >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.MONOMIAL)
-    ([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
+    ([b != 0], Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0))
     >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
-    ([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
+    ([a + 1 != 0], 4*a*c - b**2 + 4*c <= 0)
 
     .. seealso::
       :meth:`.qe` with `generic` in :attr:`.Generic.FULL`, :attr:`.Generic.MONOMIAL`.
@@ -209,7 +209,7 @@ def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
     >>> redlog.qe(All(x, Ex(y, x**2 + x*y + b > 0 and x + a*y**2 + b <= 0)));
     a < 0
     >>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), [b != 0])
-    Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0)
+    Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0)
     >>> redlog.qe(All(x, Ex(y, And(b + x**2 + x*y > 0, a*y**2 + b + x <= 0))))
     And(b > 0, a < 0)
     """
