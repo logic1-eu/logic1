@@ -753,8 +753,19 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
         >>> t = -x**2 + y**2
-        >>> t.factor()
-        (mpq(-1,1), {x - y: 1, x + y: 1})
+        >>> t.factor() == (mpq(-1,1), {x - y: 1, x + y: 1})
+        True
+
+        It is noteworthy that Sage factorization over QQ does not always yield
+        monic factors.
+
+        >>> a, b = VV.get('a', 'b')
+        >>> t = 2*a**2 + 4*a*b + 2*b**2 - 1
+        >>> t.factor() == (mpq(2,1), {a**2 + 2*a*b + b**2 - 1/2: 1})
+        True
+        >>> sage_factorization = t.poly.factor()
+        >>> sage_factorization.unit(), list(sage_factorization)
+        (1, [(2*a^2 + 4*a*b + 2*b^2 - 1, 1)])
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.factor()
@@ -768,7 +779,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             assert not poly.is_constant()
             lc = poly.lc()
             poly /= lc
-            unit *= mpq(lc)
+            unit *= mpq(lc) ** multiplicity
             D[Term(poly)] = multiplicity
         return unit, D
 
