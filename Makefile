@@ -1,11 +1,23 @@
- ign_cython = --ignore=logic1/theories/RCF/range.pyx
- ign_parallel = --ignore-glob=*parallel*
- ign_redlog = --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt --ignore=logic1/theories/RCF/redlog.py
- ign_slow = --ignore=logic1/theories/RCF/test_simplify_motor.txt\
- 	--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt\
- 	--ignore=logic1/theories/RCF/test_qe.txt
+POLYLIB ?= SAGE
 
-ignores = $(ign_slow)
+ifeq ($(POLYLIB),FLINT)
+other_backend_module := atomic_sage
+else
+other_backend_module := atomic_flint
+endif
+
+ign_cython               := --ignore=logic1/theories/RCF/range.pyx
+ign_other_backend_module := --ignore=logic1/theories/RCF/$(other_backend_module).py
+ign_parallel             := --ignore-glob=*parallel*
+ign_redlog               := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
+                            --ignore=logic1/theories/RCF/redlog.py
+ign_slow                 := --ignore=logic1/theories/RCF/test_simplify_motor.txt \
+                            --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
+                            --ignore=logic1/theories/RCF/test_qe.txt
+
+ignores := $(ign_other_backend_module) $(ign_parallel)
+
+exclude_re := logic1/theories/RCF/$(other_backend_module)\.py
 
 .PHONY: pytest pytest-full test-doc mypy test test-all doc pygount\
 		coverage coverage_html clean veryclean conda-build
@@ -39,8 +51,8 @@ test-doc:
 	cd doc && make test
 
 mypy:
-	mypy --explicit-package-bases stubs
-	mypy logic1
+	mypy --no-incremental --explicit-package-bases stubs
+	mypy --no-incremental --exclude '$(exclude_re)' logic1
 
 test: mypy pytest
 
@@ -53,7 +65,7 @@ pygount:
 	pygount -f summary logic1
 
 coverage:
-	coverage run -m pytest --doctest-modules
+	coverage run -m pytest --doctest-modules $(ignores)
 
 coverage_html: coverage
 	coverage html
