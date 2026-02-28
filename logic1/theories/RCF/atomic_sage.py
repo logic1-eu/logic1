@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from .typing import Formula
 
 
+POLYLIB: Final = "SAGE"
+
+
 τ = TypeVar('τ', bound='Term')
 """A type variable denoting a type of terms with upper bound
 :class:`logic1.theories.RCF.Term`.
@@ -45,9 +48,10 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 def _caches():
+    from .node import XoNode
     from .simplify import Simplify
     from .substitution import _SubstValue
-    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at]
+    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at, XoNode.subs_into_formula]
 
 
 def cache_clear():
@@ -556,7 +560,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
         >>> [(abs(coef), power_product) for coef, power_product in t]
-        [(mpq(1,1), x^2), (mpq(2,1), x*y), (mpq(1,1), y^2), (mpq(4,1), x),
+        [(mpq(1,1), x**2), (mpq(2,1), x*y), (mpq(1,1), y**2), (mpq(4,1), x),
          (mpq(4,1), y), (mpq(4,1), 1)]
         """
         for coefficient, power_product in self.poly:
@@ -594,14 +598,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __pow__(self, other: object) -> Term:
         return Term(self.poly ** other)
 
-    def __repr__(self) -> str:
-        return str(self.poly)
-
     def __radd__(self, other: object) -> Term:
         assert not isinstance(object, Term)
         if isinstance(other, (mpq, float)):
             return Term(Rational(other) + self.poly)
         return Term(other + self.poly)
+
+    def __repr__(self) -> str:
+        return repr(self.poly).replace('^', '**')
 
     def __rmul__(self, other: object) -> Term:
         assert not isinstance(object, Term)
@@ -614,6 +618,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         if isinstance(other, (mpq, float)):
             return Term(Rational(other) - self.poly)
         return Term(other - self.poly)
+
+    def __str__(self):
+        return str(self.poly)
 
     def __sub__(self, other: object) -> Term:
         if isinstance(other, Term):
@@ -750,7 +757,6 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
           their multiplicities. All irreducible factors are monic. Note that
           the return value is uniquely determined by this specification.
 
-        >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
         >>> t = -x**2 + y**2
         >>> t.factor() == (mpq(-1,1), {x - y: 1, x + y: 1})
@@ -797,7 +803,6 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         is based on *trivial square sum* properties of coefficient signs and
         exponents.
 
-        >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
         >>> print(Term(0).is_definite())
         DEFINITE.ZERO
@@ -918,7 +923,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
         >>> t.monomials()
-        [x^2, x*y, y^2, x, y, 1]
+        [x**2, x*y, y**2, x, y, 1]
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.monomials()
@@ -951,7 +956,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> f = a * x**2 + b*x + c
         >>> g = c * x + b
         >>> q, r = f.pseudo_quo_rem(g, x); q, r
-        (a*c*x - a*b + b*c, a*b^2 - b^2*c + c^3)
+        (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
         >>> assert c**(2 - 1 + 1) * f == q * g + r
 
         .. seealso::
@@ -972,8 +977,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> f.quo_rem(x)
         (2*x*y + 1, 1)
         >>> f.quo_rem(y)
-        (2*x^2, x + 1)
-        >>> f.quo_rem(3*x)  # would yield (0, 2*x^2*y + x + 1) over ZZ
+        (2*x**2, x + 1)
+        >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
         (2/3*x*y + 1/3, 1)
 
         .. seealso::
@@ -1003,7 +1008,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>> f = 2*y*x**2 + x + 1
         >>> f.subs({x: y, y: 2*z})
-        4*y^2*z + y + 1
+        4*y**2*z + y + 1
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.subs()
@@ -1152,11 +1157,13 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return L.index(self.op) <= L.index(other.op)
 
     def __repr__(self) -> str:
-        if self.lhs.poly.is_constant() and self.rhs.poly.is_constant():
+        if self.lhs.is_constant() and self.rhs.is_constant():
             # Return Eq(1, 2) instead of 1 == 2, because the latter is not
             # suitable as input.
             return super().__repr__()
-        return str(self)
+        SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
+        SPACING: Final = ' '
+        return f'{self.lhs!r}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs!r}'
 
     def __str__(self) -> str:
         """String representation of this atomic formula. Implements the
@@ -1164,7 +1171,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs.poly}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.poly}'
+        return f'{self.lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs}'
 
     def as_latex(self) -> str:
         """Latex representation as a string. Implements the abstract method
