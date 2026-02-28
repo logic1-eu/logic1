@@ -43,8 +43,11 @@ class _BasicKnowledge:
         assert self.term.lc() == 1, self
         assert self.term.constant_coefficient() == 0
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.term!r}, {self.range!r})'
+
     def __str__(self) -> str:
-        return f'{self.__class__.__name__}({self.term!s}, {self.range!s})'
+        return f'{self.__class__.__name__}({self.term}, {self.range})'
 
     def as_atoms(self, ref_range: _Range, gand: type[And | Or], options: Options) \
             -> list[AtomicFormula]:
@@ -575,7 +578,7 @@ class Simplify(abc.simplify.Simplify[
         >>> from .atomic import VV
         >>> a, b = VV.get('a', 'b')
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
-        2*a^2 + 4*a*b + 2*b^2 - 1 >= 0
+        2*a**2 + 4*a*b + 2*b**2 - 1 >= 0
         """
         def _simpl_at_eq_ne(rel: type[Eq | Ne], lhs: Term) -> Formula:
 
