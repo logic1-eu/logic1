@@ -103,6 +103,9 @@ class mpz:
 
     def __int__(self) -> int:
         ...
+    
+    def __gt__(self, other: object) -> bool:
+        ...
 
 
 def sign(arg: mpfr | mpq | mpz) -> Literal[-1, 0, 1]:
