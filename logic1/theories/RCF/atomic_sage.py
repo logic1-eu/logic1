@@ -53,14 +53,20 @@ def _caches():
     from .substitution import _SubstValue
     return [Term.factor, _SubstValue.as_term, Simplify._simpl_at, XoNode.subs_into_formula]
 
-
 def cache_clear():
     for cache in _caches():
         cache.cache_clear()
 
-
 def cache_info():
     return {cache.__wrapped__: cache.cache_info() for cache in _caches()}
+
+
+def init_env(ring_vars: list[str]) -> None:
+    # We pass the ring variables to the workers. The workers reconstruct the ring.
+    polynomial_ring.add_vars(ring_vars)
+
+def init_env_arg() -> list[str]:
+    return [str(v) for v in polynomial_ring.get_vars()]
 
 
 class _PolynomialRing:

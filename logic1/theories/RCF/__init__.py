@@ -1,7 +1,8 @@
 """A theory package for Real Closed Fields.
 """
 
-from .atomic import POLYLIB, cache_clear, cache_info, Eq, Ne, Ge, Le, Gt, Lt, Term, Variable, VV
+from .atomic import (POLYLIB, cache_clear, cache_info, init_env, init_env_arg,
+                     Eq, Ne, Ge, Le, Gt, Lt, Term, Variable, VV)
 from .bnf import cnf, dnf
 from .parser import l1
 from .qe import Clustering, Generic, qe
