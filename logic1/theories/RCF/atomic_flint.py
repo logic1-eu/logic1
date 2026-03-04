@@ -73,6 +73,217 @@ def init_env_arg() -> list[str]:
     return list(VV._used)
 
 
+class FmpqMpolyPoly():
+
+    # All fmpq_mpoly must have the same context. `name` is a name in that
+    # context, whose exponent is always 0.
+
+    name: str
+    terms: dict[int, fmpq_mpoly]
+
+    def __init__(self, terms: dict[int, fmpq_mpoly], name: str) -> None:
+        self.terms = terms
+        self.name = name
+
+    def __repr__(self) -> str:
+        return f'FmpqMpolyPoly({self.name}, {self.terms})'
+
+    def __str__(self) -> str:
+        summands = sorted(self.terms.items(), reverse=True)
+        return ' + '.join(f'({coeff!s}) {self.name}^{exp}' for exp, coeff in summands) or '0'
+
+    def as_fmpq_mpoly(self) -> fmpq_mpoly:
+        if not self.terms:
+            ctx = fmpq_mpoly_ctx.get((self.name,), TERM_ORDER)
+            poly = ctx.constant(0)
+            return poly
+
+        ctx = next(iter(self.terms.values())).context()
+        idx = ctx.variable_to_index(self.name)
+        their_terms = {}
+        for exp, poly in self.terms.items():
+            for exp_vec, coeff in poly.terms():
+                their_exp_vec = exp_vec[:idx] + (exp,) + exp_vec[idx+1:]
+                their_terms[their_exp_vec] = coeff
+        poly = ctx.from_dict(their_terms)
+        return poly
+
+    @classmethod
+    def from_fmpq_mpoly(cls, poly: fmpq_mpoly, name: str) -> Self:
+        """Convert a univariate fmpq_mpoly to an FmpqMpolyPoly. If `name` does
+        not occur in the context of `poly`, we first project `poly` to a context
+        containing `name`, which is then used as the common context for the
+        resulting FmpqMpolyPoly.
+        """
+        ctx = poly.context()
+        zero = ctx.constant(fmpq(0))
+
+        names = ctx.names()
+        if name not in names:
+            new_names = sorted(names + (name,), key=TermContext.sort_key)
+            new_ctx = fmpq_mpoly_ctx.get(new_names, TERM_ORDER)
+            new_poly = poly.project_to_context(new_ctx)
+            return cls({0: new_poly}, name)
+
+        idx = ctx.variable_to_index(name)
+        terms: dict[int, fmpq_mpoly] = {}
+        for exp_vec, coeff in poly.terms():
+            exp = exp_vec[idx]
+            my_exp_vec = exp_vec[:idx] + (0,) + exp_vec[idx+1:]
+            my_coeff = terms.get(exp, zero) + ctx.term(coeff=coeff, exp_vec=my_exp_vec)
+            terms[exp] = my_coeff
+        return cls(terms, name)
+
+    def pseudo_quo_rem(self, divisor: FmpqMpolyPoly, full_delta: bool = True) \
+            -> tuple[FmpqMpolyPoly, FmpqMpolyPoly, fmpq_mpoly]:
+        """Pseudo-quotient and pseudo-remainder following Knuth Vol. 2.
+
+        Computes (Q, R, lc_pow) satisfying:
+
+            lc_pow * self  =  Q * divisor + R
+
+        where deg(R) < deg(divisor).
+
+        If full_delta=True (default), lc_pow = lc(divisor)^delta where
+        delta = max(deg(self) - deg(divisor) + 1, 0), matching Knuth exactly.
+        If full_delta=False, lc_pow = lc(divisor)^s where s is the number of
+        reduction steps actually performed (s <= delta).
+
+        Examples:
+
+        1. Classic example from Knuth Vol. 2 §4.6.1:
+
+        >>> ctx = fmpq_mpoly_ctx.get(('x',), TERM_ORDER)
+        >>> x, = ctx.gens()
+        >>> A = FmpqMpolyPoly.from_fmpq_mpoly(
+        ...     x**8 - x**6 + 2*x**5 - 2*x**4 + 2*x**3 - 2*x**2 + 2*x - 1, 'x')
+        >>> B = FmpqMpolyPoly.from_fmpq_mpoly(
+        ...     3*x**6 - 5*x**4 + 3*x**3 - x, 'x')
+        >>> Q, R, lc_pow = A.pseudo_quo_rem(B)
+        >>> print(Q)
+        (9) x^2 + (6) x^0
+        >>> print(R)
+        (27) x^5 + (-24) x^4 + (45) x^3 + (-54) x^2 + (60) x^1 + (-27) x^0
+
+        lc(B) = 3, so lc_pow = 3^3 = 27:
+
+        >>> lc_pow == ctx.constant(27)
+        True
+
+        Fundamental identity lc_pow * A == Q*B + R:
+
+        >>> lc_pow * A.as_fmpq_mpoly() == Q.as_fmpq_mpoly() * B.as_fmpq_mpoly() + R.as_fmpq_mpoly()
+        True
+
+        With full_delta=False the loop exits after 2 steps, so lc_pow = 3^2 = 9:
+
+        >>> Q2, R2, lc_pow2 = A.pseudo_quo_rem(B, full_delta=False)
+        >>> print(Q2)
+        (3) x^2 + (2) x^0
+        >>> print(R2)
+        (9) x^5 + (-8) x^4 + (15) x^3 + (-18) x^2 + (20) x^1 + (-9) x^0
+        >>> lc_pow2 == ctx.constant(9)
+        True
+        >>> lc_pow2 * A.as_fmpq_mpoly() == Q2.as_fmpq_mpoly() * B.as_fmpq_mpoly() + R2.as_fmpq_mpoly()
+        True
+
+        Q and R scale by lc_B^(delta-s) = lc_pow // lc_pow2 between the two modes:
+
+        >>> all(R.terms[e] == R2.terms[e] * (lc_pow // lc_pow2) for e in R2.terms)
+        True
+
+        2. Parametric example with multivariate coefficients in QQ[a, b][x]:
+
+        >>> ctx2 = fmpq_mpoly_ctx.get(('a', 'b', 'x'), TERM_ORDER)
+        >>> a, b, x = ctx2.gens()
+        >>> A3 = FmpqMpolyPoly.from_fmpq_mpoly(a*b*x**2 + (a + b)*x + 1, 'x')
+        >>> B3 = FmpqMpolyPoly.from_fmpq_mpoly(a*x + b, 'x')
+        >>> Q3, R3, lc_pow3 = A3.pseudo_quo_rem(B3)
+        >>> print(Q3)
+        (a^2*b) x^1 + (-a*b^2 + a^2 + a*b) x^0
+
+        lc(B3) = a, delta = 2, so lc_pow = a^2:
+
+        >>> lc_pow3 == a**2
+        True
+
+        Fundamental identity:
+
+        >>> lc_pow3 * A3.as_fmpq_mpoly() == Q3.as_fmpq_mpoly() * B3.as_fmpq_mpoly() + R3.as_fmpq_mpoly()
+        True
+
+        R3 has degree 0; its coefficient is a (b - a) (b^2 - 1):
+
+        >>> print(R3)
+        (a*b^3 - a^2*b - a*b^2 + a^2) x^0
+
+        3. Trivial case deg(A) < deg(B): Q = 0, R = A, lc_pow = 1:
+
+        >>> Q0, R0, lc_pow0 = B.pseudo_quo_rem(A)
+        >>> Q0.terms, R0.terms == B.terms, lc_pow0 == ctx.constant(1)
+        ({}, True, True)
+        """
+        assert self.name == divisor.name
+        assert divisor.terms
+
+        name = self.name
+        deg_A = max(self.terms, default=-1)
+        deg_B = max(divisor.terms)
+
+        ctx = next(iter(divisor.terms.values())).context()
+
+        zero = ctx.constant(fmpq(0))
+        one = ctx.constant(fmpq(1))
+
+        # Trivial case
+        if deg_A < deg_B:
+            return FmpqMpolyPoly({}, name), FmpqMpolyPoly(dict(self.terms), name), one
+
+        assert next(iter(self.terms.values())).context() is ctx
+
+        lc_B = divisor.terms[deg_B]
+        delta = deg_A - deg_B + 1
+
+        R: dict[int, fmpq_mpoly] = dict(self.terms)
+        Q: dict[int, fmpq_mpoly] = {}
+        steps = 0
+
+        def scale_dict(d: dict[int, fmpq_mpoly], c: fmpq_mpoly) -> None:
+            for e in list(d):
+                d[e] = c * d[e]
+
+        def add_term(d: dict[int, fmpq_mpoly], e: int, val: fmpq_mpoly) -> None:
+            new_c = d.get(e, zero) + val
+            if new_c == zero:
+                d.pop(e, None)
+            else:
+                d[e] = new_c
+
+        for _ in range(delta):
+            deg_R = max(R, default=-1)
+            if deg_R < deg_B:
+                break
+            lc_R = R[deg_R]
+            k = deg_R - deg_B
+            scale_dict(R, lc_B)
+            scale_dict(Q, lc_B)
+            add_term(Q, k, lc_R)
+            for e_B, c_B in divisor.terms.items():
+                add_term(R, e_B + k, -(lc_R * c_B))
+            steps += 1
+
+        # If full_delta, apply the remaining lc_B factors to Q and R
+        extra = delta - steps
+        if full_delta and extra > 0:
+            lc_extra = lc_B ** extra
+            scale_dict(Q, lc_extra)
+            scale_dict(R, lc_extra)
+
+        lc_pow = lc_B ** (delta if full_delta else steps)
+
+        return FmpqMpolyPoly(Q, name), FmpqMpolyPoly(R, name), lc_pow
+
+
 class TermContext:
 
     _poly_context: fmpq_mpoly_ctx
@@ -1101,6 +1312,25 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
         tcontext = self.term_context() | other.term_context() | x.term_context()
+        v = str(x._poly)
+        p1 = FmpqMpolyPoly.from_fmpq_mpoly(tcontext.coerce_poly(self._poly), v)
+        p2 = FmpqMpolyPoly.from_fmpq_mpoly(tcontext.coerce_poly(other._poly), v)
+        quo, rem, _ = p1.pseudo_quo_rem(p2)
+        return Term.from_raw(quo.as_fmpq_mpoly()), Term.from_raw(rem.as_fmpq_mpoly())
+
+    def _pseudo_quo_rem_sage(self, other: Term, x: Variable) -> tuple[Term, Term]:
+        """Pseudo quotient and remainder of this term and other, both as
+        univariate polynomials in `x` with polynomial coefficients in all other
+        variables. Deprecated; use peudo_quo_rem() instead.
+
+        >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+        >>> f = a * x**2 + b*x + c
+        >>> g = c * x + b
+        >>> q, r = f.pseudo_quo_rem(g, x); q, r
+        (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
+        >>> assert c**(2 - 1 + 1) * f == q * g + r
+        """
+        tcontext = self.term_context() | other.term_context() | x.term_context()
         p1 = tcontext.coerce(self).to_sage()
         p2 = tcontext.coerce(other).to_sage()
         v = tcontext.coerce(x).to_sage()
@@ -1151,7 +1381,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def reduce(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G using the standard algorithm (Buchberger/CLO
-        Division Algorithm in k[x_1,...,x_n]).  The result is the remainder of
+        Division Algorithm in k[x_1,...,x_n]). The result is the remainder of
         self modulo G with respect to TERM_ORDER. The result is unique modulo
         the ideal generated by G, but may depend on the order of G and
         TERM_ORDER when G is not a Gröbner basis.
@@ -1381,7 +1611,6 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
         assert poly in poly.context().gens(), f'{poly} is not a generator'
         return super().from_raw(poly)
 
-# The following has been literally copied from atomic.py
 
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int]):
 
@@ -1399,10 +1628,9 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
 
     def __bool__(self) -> bool:
         """In boolean contexts atomic formulas are evaluated via corresponding
-        comparisons with respect to the degree lexicographical term order
-        :mod:`deglex <sage.rings.polynomial.term_order>`. In particular,
-        comparisons between terms representing integers follow the natural
-        order.
+        comparisons with respect to the degree lexicographical term order. In
+        particular, comparisons between terms representing integers follow the
+        natural order.
         """
         match self:
             case Eq():
