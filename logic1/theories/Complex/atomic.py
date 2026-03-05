@@ -1,17 +1,24 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from fractions import Fraction
-from typing import ClassVar, Final, Generic, Never, Self, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Final, Generic, Never, Optional, Self, TypeVar
 
-from gmpy2 import mpq, mpz
+from gmpy2 import mpq
 
-from ... import firstorder
+from logic1 import firstorder
 
+if TYPE_CHECKING:
+    from logic1.theories.Complex.typing import Formula
 
+α = TypeVar('α')
 τ = TypeVar('τ', bound='Term')
+
+type Number = int | float | Fraction | mpq | complex
+_NUMBER_TYPES: Final = (int, float, Fraction, mpq, complex)
+
 
 @dataclass
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
@@ -65,6 +72,8 @@ VV: Final = VariableSet()
 @dataclass
 class SortKey(Generic[τ]):
 
+    # Variable(x), Re(x), Im(x), abs(x), Varriable(y), ... Rational, I, ...
+
     term: τ
 
     def __eq__(self, other: Self) -> bool:  # type: ignore[override]
@@ -89,76 +98,104 @@ class SortKey(Generic[τ]):
         raise NotImplementedError()
 
 
+class TermVisitor(Generic[α]):
+
+    @abstractmethod
+    def visit_rational(self, num: Rational) -> α:
+        ...
+
+    @abstractmethod
+    def visit_i(self, i: _I) -> α:
+        ...
+
+    @abstractmethod
+    def visit_variable(self, var: Variable) -> α:
+        ...
+
+    @abstractmethod
+    def visit_add(self, add: Add) -> α:
+        ...
+
+    @abstractmethod
+    def visit_mul(self, mul: Mul) -> α:
+        ...
+
+    @abstractmethod
+    def visit_pow(self, pow: Pow) -> α:
+        ...
+
+    @abstractmethod
+    def visit_neg(self, neg: Neg) -> α:
+        ...
+
+    @abstractmethod
+    def visit_re(self, re: Re) -> α:
+        ...
+
+    @abstractmethod
+    def visit_im(self, im: Im) -> α:
+        ...
+
+
 class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
     """
-    Abstract class representing a node of the AST
+    Class representing a node of the AST
     """
-
-    PRECEDENCE = {
-        'Add': 10,
-        'Neg': 10,
-        'Mul': 20,
-        'Pow': 30,
-        'Re': 100,
-        'Im': 100,
-        'Variable': 100,
-        'Constant': 100
-    }
 
     @property
     def op(self) -> type[Self]:
         return type(self)
     
     @property
-    def args(self) -> tuple[object, ...]:
-        raise NotImplementedError()
+    def args(self) -> tuple[object, ...]:  # type: ignore[empty-body]
+        ...
     
-    @property
-    def _precedence(self) -> int:
-        return Term.PRECEDENCE.get(self.op.__name__, 0)
-    
-    def __add__(self, other: object) -> Term:
-        if not isinstance(other, Term):
-            return self + Constant(other)
-        return Add(self, other)
-
-    def __eq__(self, other: object) -> Eq:  # type: ignore[override]
-        if not isinstance(other, Term):
-            return self == Constant(other)
-        return Eq(self, other)
-
-    def __ge__(self, other: object) -> Ge:
-        if not isinstance(other, Term):
-            return self >= Constant(other)
-        return Ge(self, other)
-
-    def __gt__(self, other: object) -> Gt:
-        if not isinstance(other, Term):
-            return self > Constant(other)
-        return Gt(self, other)
-
+    def __add__(self, other: Number | Term) -> Term:
+        if isinstance(other, Term):
+            return Add(self, other)
+        return self + Term.from_number(other)
+        
+    def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Eq(self, other)
+        return self == Term.from_number(other)
+        
+    def __ge__(self, other: Number | Term) -> Ge:
+        if isinstance(other, Term):
+            return Ge(self, other)
+        return self >= Term.from_number(other)
+        
+    def __gt__(self, other: Number | Term) -> Gt:
+        if isinstance(other, Term):
+            return Gt(self, other)
+        return self > Term.from_number(other)
+        
     def __hash__(self) -> int:
         return hash((tuple(str(cls) for cls in self.op.mro()), self.args))
+    
+    @abstractmethod
+    def __init__(self, *args: object) -> None:
+        ...
 
-    def __le__(self, other: object) -> Le:
-        if not isinstance(other, Term):
-            return self <= Constant(other)
-        return Le(self, other)
+    def __le__(self, other: Number | Term) -> Le:
+        if isinstance(other, Term):
+            return Le(self, other)
+        return self <= Term.from_number(other)
 
-    def __lt__(self, other: object) -> Lt:
-        if not isinstance(other, Term):
-            return self < Constant(other)
-        return Lt(self, other)
-
-    def __mul__(self, other: object) -> Term:
-        if not isinstance(other, Term):
-            return self * Constant(other)
-        return Mul(self, other)
-
-    def __ne__(self, other: object) -> Ne:  # type: ignore[override]
-        if not isinstance(other, Term):
-            return self != Constant(other)
-        return Ne(self, other)
+    def __lt__(self, other: Number | Term) -> Lt:
+        if isinstance(other, Term):
+            return Lt(self, other)
+        return self < Term.from_number(other)
+        
+    def __mul__(self, other: Number | Term) -> Term:
+        if isinstance(other, Term):
+            return Mul(self, other)
+        return self * Term.from_number(other)
+        
+    def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
+        if isinstance(other, Term):
+            return Ne(self, other)
+        return self != Term.from_number(other)
 
     def __neg__(self) -> Term:
         return Neg(self)
@@ -166,47 +203,113 @@ class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
     def __pow__(self, other: int) -> Term:
         return Pow(self, other)
 
+    def __radd__(self, other: Number | Term) -> Term:
+        assert not isinstance(other, Term)
+        return Term.from_number(other) + self
+    
     def __repr__(self) -> str:
-        return f'{self.op.__name__}({', '.join(map(repr, self.args))})'
+        return self.accept(ReprFormatter())
 
-    def __radd__(self, other: object) -> Term:
+    def __rmul__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
-        return Constant(other) + self
+        return Term.from_number(other) * self
 
-    def __rmul__(self, other: object) -> Term:
+    def __rsub__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
-        return Constant(other) * self
-
-    def __rsub__(self, other: object) -> Term:
-        assert not isinstance(other, Term)
-        return Constant(other) - self
+        return Term.from_number(other) - self
     
     def __str__(self) -> str:
-        return f'{self.op.__name__}({', '.join(map(str, self.args))})'
+        return self.accept(StrFormatter())
 
-    def __sub__(self, other: object) -> Term:
-        if not isinstance(other, Term):
-            return self - Constant(other)
-        return self + (-other)
+    def __sub__(self, other: Number | Term) -> Term:
+        if isinstance(other, Term):
+            return self + (-other)
+        return self - Term.from_number(other)
+        
+    def __truediv__(self, other: Number | Term) -> Term:
+        if isinstance(other, Term):
+            try:
+                a, b = other.eval_constant()
+            except ValueError:
+                raise ValueError('Cannot divide by a non-constant term')
+            if a == mpq(0) and b == mpq(0):
+                raise ZeroDivisionError('Division by zero')
+            a, b = (a / (a * a + b * b), -b / (a * a + b * b))
+            return Mul(self, Term.from_real_imag(a, b))
+        return self / Term.from_number(other)
 
-    def __truediv__(self, other: object) -> Term:
-        raise NotImplementedError()
-
-    def __xor__(self, other: object) -> Term:
+    def __xor__(self, other: Number | Term) -> Term:
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
+    
+    @abstractmethod
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        """Accept a visitor."""
+        ...
 
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
         """
-        raise NotImplementedError()
+        return self.accept(LatexFormatter())
+    
+    def _dump(self) -> str:
+        """Dump this term as a string that can be evaluated to reconstruct the term. This is used for debugging.
+        """
+        args = []
+        for arg in self.args:
+            if isinstance(arg, Term):
+                args.append(arg._dump())
+            else:
+                args.append(repr(arg))
+        return f'{self.op.__name__}({", ".join(args)})'
+    
+    def eval_constant(self) -> tuple[mpq, mpq]:
+        """Evaluate this term if it is constant, and return the real and
+        imaginary part as a pair of rational numbers. Raises ValueError if
+        this term is not constant.
+        """
+        return self.accept(Evaluator())
+        
+    @staticmethod
+    def from_real_imag(real: mpq, imag: mpq) -> Term:
+        """Construct a term from the given real and imaginary part.
+        """
+        if imag == mpq(0):
+            return Rational(real)
+        elif real == mpq(0):
+            if imag == mpq(1):
+                return _I()
+            elif imag == mpq(-1):
+                return Neg(_I())
+            else:
+                return Mul(Rational(imag), _I())
+        else:
+            return Add(Rational(real), Mul(Rational(imag), _I()))
+    
+    @staticmethod
+    def from_number(value: Number) -> Term:
+        """Construct a term from the given number.
+        """
+        if isinstance(value, (int, float)):
+            return Rational(mpq(value))
+        elif isinstance(value, Fraction):
+            return Rational(mpq(value.numerator, value.denominator))
+        elif isinstance(value, mpq):
+            return Rational(value)
+        elif isinstance(value, complex):
+            return Term.from_real_imag(mpq(value.real), mpq(value.imag))
+        else:
+            number_types = ', '.join(c.__name__ for c in _NUMBER_TYPES)
+            raise ValueError(f'expected one of {number_types}; {value} is {type(value)}')
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
         """
-        return isinstance(self, Constant)
+        if isinstance(self, Variable):
+            return False
+        return all(isinstance(arg, Term) and arg.is_constant() for arg in self.args)
 
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
@@ -214,7 +317,7 @@ class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
         return isinstance(self, Variable)
 
     def normalize(self) -> Term:
-        raise NotImplementedError()
+        return self.accept(Normalizer())
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
@@ -226,101 +329,52 @@ class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
         """An iterator that yields each variable of this term once. Implements
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
         """
-        raise NotImplementedError()
-
-    
-class Add(Term):
-
-    precedence: int = 10
-
-    _args: tuple[Term, ...]
-
-    @property
-    def args(self) -> tuple[Term, ...]:
-        return self._args
-
-    def __init__(self, *args: Term) -> None:
-        super().__init__()
-        args_flat = []
-        for arg in args:
-            if isinstance(arg, Add):
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        self._args = tuple(args_flat)
-
-    def __new__(cls, *args: Term):
-        if not args:
-            return Constant(0)
-        if len(args) == 1:
-            return args[0]
-        return super().__new__(cls)
-    
-    def __str__(self) -> str:
-        result = []
-        for arg in self.args:
-            if arg._precedence > self._precedence:
-                result.append(f'{arg}')
-            else:
-                result.append(f'({arg})')
-        return " + ".join(result)
-
-
-class Mul(Term):
-
-    _args: tuple[Term, ...]
-
-    @property
-    def args(self) -> tuple[Term, ...]:
-        return self._args
-
-    def __init__(self, *args: Term) -> None:
-        super().__init__()
-        args_flat = []
-        for arg in args:
-            if isinstance(arg, Mul):
-                args_flat.extend(list(arg.args))
-            else:
-                args_flat.append(arg)
-        self._args = tuple(args_flat)
-
-    def __new__(cls, *args: Term):
-        if not args:
-            return Constant(1)
-        if len(args) == 1:
-            return args[0]
-        return super().__new__(cls)
-    
-    def __str__(self) -> str:
-        result = []
-        for arg in self.args:
-            if arg._precedence > self._precedence:
-                result.append(f'{arg}')
-            else:
-                result.append(f'({arg})')
-        return "*".join(result)
-
-
-class Pow(Term):
-    
-    base: Term
-    exponent: int
-
-    @property
-    def args(self) -> tuple[Term, int]:
-        return (self.base, self.exponent)
-    
-    def __init__(self, base: Term, exponent: int) -> None:
-        if exponent < 0:
-            raise ValueError('Negative exponents are not allowed!')
-        self.base = base
-        self.exponent = exponent
-
-    def __str__(self) -> str:
-        if self._precedence > self.base._precedence:
-            return f'({self.base})^{self.exponent}'
+        if isinstance(self, Variable):
+            yield self
         else:
-            return f'{self.base}^{self.exponent}'
+            vars: set[Variable] = set()
+            for arg in self.args:
+                if isinstance(arg, Term):
+                    vars.update(arg.vars())
+            yield from vars
+
+
+class Rational(Term):
+    
+    value: mpq
+
+    @property
+    def args(self) -> tuple[mpq]:
+        return (self.value,)
+
+    def __init__(self, value: mpq) -> None:
+        self.value = value
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_rational(self)
+
+
+class _I(Term):
+
+    _instance: Optional[_I] = None
+    
+    @property
+    def args(self) -> tuple[()]:
+        return ()
+    
+    def __init__(self) -> None:
+        pass
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_i(self)
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+    
+    
+I: Final = _I()
 
 
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
@@ -335,97 +389,76 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
     def __init__(self, name: str) -> None:
         self.name = name
 
-    def __str__(self) -> str:
-        return self.name
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_variable(self)
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
         abstract method :meth:`.firstorder.atomic.Variable.fresh`.
         """
         return self.VV.fresh(suffix=f'_{str(self)}')
-
-
-class Constant(Term):
     
-    real: mpq
-    imag: mpq
+    
+class MonoidalOperation(Term):
+
+    _args: tuple[Term, ...]
+    identity: Term
 
     @property
-    def args(self) -> tuple[mpq, mpq]:
-        return (self.real, self.imag)
-    
-    @property
-    def _precedence(self) -> int:
-        if self.is_real():
-            if self.real < 0:
-                return Term.PRECEDENCE['Neg']
-            else:
-                return Term.PRECEDENCE['Constant']
-        elif self.is_imaginary():
-            if self.imag == 1:
-                return Term.PRECEDENCE['Variable']
-            elif self.imag == -1:
-                return Term.PRECEDENCE['Neg']
-            else:
-                return Term.PRECEDENCE['Mul']
-        else:
-            return Term.PRECEDENCE['Add']
+    def args(self) -> tuple[Term, ...]:
+        return self._args
 
-    def __init__(self, *args: object) -> None:
-        super().__init__()
+    def __init__(self, *args: Term) -> None:
+        args_flat = []
+        for arg in args:
+            if isinstance(arg, self.__class__):
+                args_flat.extend(list(arg.args))
+            else:
+                args_flat.append(arg)
+        self._args = tuple(args_flat)
+
+    def __new__(cls, *args: Term):
+        if not args:
+            return cls.identity
         if len(args) == 1:
-            if isinstance(args[0], complex):
-                self.real = mpq(args[0].real)
-                self.imag = mpq(args[0].imag)
-            else:
-                self.real = Constant._real_to_mpq(args[0])
-                self.imag = mpq(0)
-        elif len(args) == 2:
-            self.real = Constant._real_to_mpq(args[0])
-            self.imag = Constant._real_to_mpq(args[1])
-        else:
-            raise ValueError(f'Cannot contruct constant from {type(args)}!')
-        
-    def __str__(self) -> str:
-        if self.is_real():
-            return str(self.real)
-        elif self.is_imaginary():
-            return Constant._imag_str(self.imag)
-        elif self.imag < 0:
-            return f'{str(self.real)} - {Constant._imag_str(-self.imag)}'
-        else:
-            return f'{str(self.real)} + {Constant._imag_str(self.imag)}'
-        
-    @staticmethod
-    def _imag_str(x: mpq) -> str:
-        assert x.denominator > 0
-        denom = '/' + str(x.denominator) if x.denominator != 1 else ''
-        if x.numerator == 0:
-            return '0'
-        elif x.numerator == 1:
-            return 'i' + denom
-        elif x.numerator == -1:
-            return '-i' + denom
-        else:
-            return str(x.numerator) + 'i' + denom
-        
-    def is_imaginary(self) -> bool:
-        return self.real == mpq(0)
+            return args[0]
+        return super().__new__(cls)
+    
 
-    def is_real(self) -> bool:
-        return self.imag == mpq(0)
+class Add(MonoidalOperation):
 
-    @staticmethod
-    def _real_to_mpq(value: object) -> mpq:
-        if isinstance(value, (int, float)):
-            return mpq(value)
-        elif isinstance(value, Fraction):
-            return mpq(value.numerator, value.denominator)
-        elif isinstance(value, mpq):
-            return value
-        else:
-            raise ValueError(f'Cannot contruct mpq from {type(value)}!')
-        
+    identity: Rational = Rational(mpq(0))
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_add(self)
+
+
+class Mul(MonoidalOperation):
+
+    identity: Rational = Rational(mpq(1))
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_mul(self)
+
+
+class Pow(Term):
+    
+    base: Term
+    exponent: int
+
+    @property
+    def args(self) -> tuple[Term, int]:
+        return (self.base, self.exponent)
+    
+    def __init__(self, base: Term, exponent: int) -> None:
+        if not isinstance(exponent, int) or exponent < 0:
+            raise TypeError('Exponent must be a non-negative integer')
+        self.base = base
+        self.exponent = exponent
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_pow(self)
+
         
 class UnaryOperation(Term):
 
@@ -435,32 +468,29 @@ class UnaryOperation(Term):
     def args(self) -> tuple[Term]:
         return (self.arg,)
     
-    def __init__(self, arg: object) -> None:
+    def __init__(self, arg: Number | Term) -> None:
         if isinstance(arg, Term):
             self.arg = arg
         else:
-            self.arg = Constant(arg)
+            self.arg = Term.from_number(arg)
 
 
 class Neg(UnaryOperation):
-    
-    def __str__(self) -> str:
-        if self._precedence > self.arg._precedence:
-            return f'-({self.arg})'
-        else:
-            return f'-{self.arg}'
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_neg(self)
 
 
 class Re(UnaryOperation):
-    
-    def __str__(self) -> str:
-        return f'Re({self.arg})'
-    
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_re(self)   
+
 
 class Im(UnaryOperation):
-    
-    def __str__(self) -> str:
-        return f'Im({self.arg})'
+
+    def accept(self, visitor: TermVisitor[α]) -> α:
+        return visitor.visit_im(self)
 
 
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', Never]):
@@ -483,10 +513,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
     def __eq__(self, other: object) -> bool:
         raise NotImplementedError()
 
-    def __init__(self, lhs: object, rhs: object):
+    def __init__(self, lhs: Number | Term, rhs: Number | Term):
         self.args = (
-            lhs if isinstance(lhs, Term) else Constant(lhs), 
-            rhs if isinstance(rhs, Term) else Constant(rhs)
+            lhs if isinstance(lhs, Term) else Term.from_number(lhs), 
+            rhs if isinstance(rhs, Term) else Term.from_number(rhs)
         )
 
     def __le__(self, other: Formula) -> bool:
@@ -495,6 +525,11 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
         """
         raise NotImplementedError()
+    
+    def __repr__(self) -> str:
+        SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
+        SPACING: Final = ' '
+        return f'{repr(self.lhs)}{SPACING}{SYMBOL[self.op]}{SPACING}{repr(self.rhs)}'
 
     def __str__(self) -> str:
         """String representation of this atomic formula. Implements the
@@ -502,7 +537,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
-        return f'{self.lhs}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs}'
+        return f'{str(self.lhs)}{SPACING}{SYMBOL[self.op]}{SPACING}{str(self.rhs)}'
 
     def as_latex(self) -> str:
         """Latex representation as a string. Implements the abstract method
@@ -535,6 +570,9 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
           Inherited method :meth:`.firstorder.atomic.AtomicFormula.to_complement`
           """
         return {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}[cls]
+    
+    def _dump(self) -> str:
+        return f'{self.op.__name__}({self.lhs._dump()}, {self.rhs._dump()})'
 
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are *not* elements of
@@ -567,6 +605,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
 class Eq(AtomicFormula):
     pass
 
+
 class Ne(AtomicFormula):
     pass
 
@@ -587,4 +626,5 @@ class Lt(AtomicFormula):
     pass
 
 
-from .typing import Formula
+from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter
+from logic1.theories.Complex.simplify import Evaluator, Normalizer

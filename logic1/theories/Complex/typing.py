@@ -1,6 +1,6 @@
-from typing import Never, TypeAlias
+from typing import Never
 
-from ... import firstorder
-from .atomic import AtomicFormula, Term, Variable
+from logic1 import firstorder
+from logic1.theories.Complex.atomic import AtomicFormula, Term, Variable
 
-Formula: TypeAlias = firstorder.Formula[AtomicFormula, Term, Variable, Never]
+type Formula = firstorder.Formula[AtomicFormula, Term, Variable, Never]

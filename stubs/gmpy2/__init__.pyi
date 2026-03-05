@@ -92,6 +92,9 @@ class mpq:
     def __pow__(self, n: int) -> Self:
         ...
 
+    def __sub__(self, other: Self) -> Self:
+        ...
+
     def __truediv__(self, other: Self) -> Self:
         ...
 
