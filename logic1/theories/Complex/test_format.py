@@ -32,6 +32,9 @@ def test_repr():
     formula6 = -(x + I * y) < x * Im(-1 * w) - I**2
     assert repr(formula6) == '-(x + I * y) < x * Im(-1 * w) - I**2'
 
+    # ((z**2 - I / 2)).normalize()
+    # (Im(z) * Re(z**2)).normalize()
+
 
 def test_str():
     assert str(I**3) == 'i^3'

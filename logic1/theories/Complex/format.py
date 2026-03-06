@@ -1,11 +1,14 @@
 
 from logic1.theories.Complex.atomic import _I, Add, Im, Mul, Neg, Pow, Rational, Re, Term, TermVisitor, Variable
-from gmpy2 import mpq
+from gmpy2 import mpq, mpz
 
 
 class BaseFormatter(TermVisitor[str]):
 
     symbols: dict[type[Term], str] = {}
+
+    def group(self, s: str) -> str:
+        return s
     
     def visit_rational(self, num: Rational) -> str:
         return str(num.value)
@@ -80,4 +83,38 @@ class StrFormatter(BaseFormatter):
 
 
 class LatexFormatter(BaseFormatter):
-    pass
+    
+    symbols = {
+        Mul: '\\cdot',
+        Re: '\\operatorname{Re}',
+        Im: '\\operatorname{Im}'
+    }
+
+    def group(self, s: str) -> str:  # TODO: fix i^1000
+        return f'{{{s}}}'
+
+    def visit_rational(self, num: Rational) -> str:
+        a = num.value.numerator
+        b = num.value.denominator
+        if a == mpz(0) or b == mpz(1):
+            return str(a)
+        else:
+            return f'\\frac{{{str(a)}}}{{{str(b)}}}'
+        
+    def visit_variable(self, var: Variable) -> str:
+        if "_" in var.name:
+            base, *indices = var.name.split("_")
+            grouped = "_".join(f'{{{idx}}}' for idx in indices)
+            return f'\\mathit{{{base}}}_{grouped}'
+        else:
+            base = var.name.rstrip('0123456789')
+            index = var.name[len(base):]
+            if index:
+                return f'\\mathit{{{base}}}_{{{str(index)}}}'
+            else:
+                return f'\\mathit{{{base}}}'
+        
+
+    
+
+    

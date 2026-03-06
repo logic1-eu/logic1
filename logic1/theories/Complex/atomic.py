@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from fractions import Fraction
+import functools
+import operator
 from typing import TYPE_CHECKING, ClassVar, Final, Generic, Never, Optional, Self, TypeVar
 
 from gmpy2 import mpq
@@ -70,33 +72,37 @@ VV: Final = VariableSet()
 
 
 @dataclass
+@functools.total_ordering
 class SortKey(Generic[τ]):
-
-    # Variable(x), Re(x), Im(x), abs(x), Varriable(y), ... Rational, I, ...
 
     term: τ
 
-    def __eq__(self, other: Self) -> bool:  # type: ignore[override]
-        raise NotImplementedError()
+    @property
+    def op(self) -> type[Term]:
+        return self.term.op
+    
+    @property
+    def args(self) -> tuple[object, ...]:
+        return tuple(SortKey(arg) if isinstance(arg, Term) else arg for arg in self.term.args)
 
-    def __ge__(self, other: Self) -> bool:
-        raise NotImplementedError()
-
-    def __gt__(self, other: Self) -> bool:
-        raise NotImplementedError()
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SortKey):
+            return False
+        if self.term is other.term:
+            return True
+        return self.op == other.op and self.args == other.args
 
     def __hash__(self) -> int:
-        raise NotImplementedError()
+        return hash(self.term)
 
-    def __le__(self, other: Self) -> bool:
-        raise NotImplementedError()
-
-    def __lt__(self, other: Self) -> bool:
-        raise NotImplementedError()
-
-    def __ne__(self, other: Self) -> bool:  # type: ignore[override]
-        raise NotImplementedError()
-
+    def __le__(self, other: SortKey) -> bool:
+        ORDER = (Add, Mul, Neg, Pow, Im, Re, Variable, _I, Rational)
+        assert self.op in ORDER and other.op in ORDER
+        if self.op == other.op:
+            return self.args <= other.args
+        else:
+            return ORDER.index(self.op) < ORDER.index(other.op)
+        
 
 class TermVisitor(Generic[α]):
 
@@ -137,7 +143,7 @@ class TermVisitor(Generic[α]):
         ...
 
 
-class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
+class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     """
     Class representing a node of the AST
     """
@@ -307,9 +313,11 @@ class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
         """
-        if isinstance(self, Variable):
+        try:
+            self.eval_constant()
+            return True
+        except ValueError:
             return False
-        return all(isinstance(arg, Term) and arg.is_constant() for arg in self.args)
 
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
@@ -318,6 +326,12 @@ class Term(firstorder.Term['Term', 'Variable', Never, SortKey['Term']]):
 
     def normalize(self) -> Term:
         return self.accept(Normalizer())
+    
+    def _repr_latex_(self) -> str:
+        result = f'$\\displaystyle {self.as_latex()}$'
+        if len(result) > 5000:
+            raise ValueError('Latex output too long')
+        return result 
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
@@ -377,7 +391,7 @@ class _I(Term):
 I: Final = _I()
 
 
-class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
+class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']]):
 
     name: str
     VV: ClassVar[VariableSet] = VV
@@ -493,7 +507,7 @@ class Im(UnaryOperation):
         return visitor.visit_im(self)
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', Never]):
+class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Number]):
 
     @property
     def lhs(self) -> Term:
@@ -508,10 +522,27 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         return self.args[1]
     
     def __bool__(self) -> bool:
-        raise NotImplementedError()
+        ops = {
+            Eq: operator.eq,
+            Ne: operator.ne,
+            Ge: operator.ge,
+            Gt: operator.gt,
+            Le: operator.le,
+            Lt: operator.lt
+        }
+        return ops[self.op](self.lhs.sort_key(), self.rhs.sort_key())
+
 
     def __eq__(self, other: object) -> bool:
-        raise NotImplementedError()
+        if not isinstance(other, AtomicFormula):
+            return False
+        if self.op != other.op:
+            return False
+        if self.lhs.sort_key() != other.lhs.sort_key():
+            return False
+        if self.rhs.sort_key() != other.rhs.sort_key():
+            return False
+        return True
 
     def __init__(self, lhs: Number | Term, rhs: Number | Term):
         self.args = (
@@ -524,7 +555,18 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         equal to other. Implements abstract method
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
         """
-        raise NotImplementedError()
+        if not isinstance(other, AtomicFormula):
+            return True
+        self_key = self.lhs.sort_key()
+        other_key = other.lhs.sort_key()
+        if self_key != other_key:
+            return self_key <= other_key
+        self_key = self.rhs.sort_key()
+        other_key = other.rhs.sort_key()
+        if self_key != other_key:
+            return self_key <= other_key
+        L = [Eq, Ne, Le, Lt, Ge, Gt]
+        return L.index(self.op) <= L.index(other.op)
     
     def __repr__(self) -> str:
         SYMBOL: Final = {Eq: '==', Ne: '!=', Ge: '>=', Le: '<=', Gt: '>', Lt: '<'}
@@ -591,9 +633,10 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable'
         """Fast basic simplification. The result is equivalent to self.
         Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.
         """
-        raise NotImplementedError()
+        term = Add(self.lhs, Neg(self.rhs)).normalize()
+        return self.op(term, Rational(mpq(0)))
         
-    def subs(self, sigma: Mapping[Variable, Term]) -> Self:
+    def subs(self, sigma: Mapping[Variable, Number | Term]) -> Self:
         """Formal simultaneous term substitution into the two argument terms of
         the atomic formula. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.subs`.

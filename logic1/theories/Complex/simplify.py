@@ -76,19 +76,24 @@ class Normalizer(TermVisitor[Term]):
         # collect all products and the absolute constants
         constant: Term = Rational(mpq(0))
         products: dict[Term, Term] = {}
-        for arg in args:
+        while args:
+            arg = args.pop()
+            if isinstance(arg, Add):
+                args.extend(arg.args)
+                continue
             if arg.is_constant():
                 constant = Add(constant, arg)
-            else:
-                coeff: Term = Rational(mpq(1))
-                if isinstance(arg, Mul) and arg.args[0].is_constant():
-                    coeff = arg.args[0]
-                    arg = Mul(*arg.args[1:])
-                exisiting_coeff = products.get(arg, Rational(mpq(0)))
-                products[arg] = Add(exisiting_coeff, coeff)
+                continue
+            coeff: Term = Rational(mpq(1))
+            if isinstance(arg, Mul) and arg.args[0].is_constant():
+                coeff = arg.args[0]
+                arg = Mul(*arg.args[1:])
+            exisiting_coeff = products.get(arg, Rational(mpq(0)))
+            products[arg] = Add(exisiting_coeff, coeff)
         # put all products and constants back together and simplify if possible
         result = []
-        for prod, coeff in products.items():  # TODO: sorted
+        for prod in sorted(products, key=Term.sort_key):
+            coeff = products[prod]
             a, b = coeff.eval_constant()
             if a == mpq(0) and b == mpq(0):
                 continue
@@ -103,36 +108,59 @@ class Normalizer(TermVisitor[Term]):
     
     def visit_mul(self, mul: Mul) -> Term:
         args = [arg.accept(self) for arg in mul.args]
-        consts = []
-        result = []
+        # resolve sums and negs as args
         for i, arg in enumerate(args):
-            if arg.is_constant():
-                consts.append(arg)
-            elif isinstance(arg, Add):
+            if isinstance(arg, Add):
                 arg_args = [Mul(*args[:i], arg_arg, *args[i + 1:]) for arg_arg in arg.args]
                 return Add(*arg_args).accept(self)
-            elif isinstance(arg, Neg):
-                consts.append(Rational(mpq(-1)))
-                result.append(arg.arg)
+            if isinstance(arg, Neg):
+                return Mul(*args[:i], Rational(mpq(-1)), arg.arg, *args[i + 1:]).accept(self)
+        # collect constant/non-constant factors
+        consts = []
+        factors: dict[Term, int] = {}
+        while args:
+            arg = args.pop()
+            if isinstance(arg, Mul):
+                args.extend(arg.args)
+                continue
+            if arg.is_constant():
+                consts.append(arg)
+                continue
+            exp = 1
+            if isinstance(arg, Pow):
+                exp = arg.exponent
+                arg = arg.base
+            assert isinstance(arg, (Variable, Re, Im)), (type(arg), args, mul)
+            factors[arg] = factors.get(arg, 0) + exp
+        # regroup factors
+        result = []
+        for factor in sorted(factors, key=Term.sort_key):
+            exp = factors[factor]
+            if exp == 0:
+                continue
+            elif exp == 1:
+                result.append(factor)
             else:
-                result.append(arg)
+                result.append(Pow(factor, exp))
+        # evaluate constant and build final product
         a, b = Mul(*consts).eval_constant()
         if a == mpq(0) and b == mpq(0):
             return Rational(mpq(0))
-        elif a == mpq(1) and b == mpq(0):
+        if a == mpq(1) and b == mpq(0):
             return Mul(*result)
-        else:
-            return Mul(Term.from_real_imag(a, b), *result)
+        return Mul(Term.from_real_imag(a, b), *result)
 
     def visit_pow(self, pow: Pow) -> Term:
         if pow.exponent == 0:
             return Rational(mpq(1))  # note: 0^0 = 1 as for mpq
         base = pow.base.accept(self)
-        if pow.exponent % 2 == 0:
-            base = Mul(base, base).accept(self)
-            return Pow(base, pow.exponent // 2).accept(self)
+        if base.is_constant():
+            a, b = Pow(base, pow.exponent).eval_constant()
+            return Term.from_real_imag(a, b)
+        elif isinstance(base, (Variable, Re, Im)):
+            return Pow(base, pow.exponent)
         else:
-            return Mul(base, Pow(base, pow.exponent - 1)).accept(self)
+            return Mul(*[base] * pow.exponent).accept(self)
 
     def visit_neg(self, neg: Neg) -> Term:
         arg = neg.arg.accept(self)
@@ -159,6 +187,8 @@ class Normalizer(TermVisitor[Term]):
 
     def visit_re(self, re: Re) -> Term:
         arg = re.arg.accept(self)
+        if isinstance(arg, Pow):
+            arg = Mul(*[arg.base] * arg.exponent) # TODO optimize?
         if isinstance(arg, Rational):
             return arg
         elif isinstance(arg, _I):
@@ -171,7 +201,7 @@ class Normalizer(TermVisitor[Term]):
             x, xs = arg.args[0], Mul(*arg.args[1:])
             return (Re(x) * Re(xs) - Im(x) * Im(xs)).accept(self)
         elif isinstance(arg, Pow):
-            return Re(Mul(*([arg.base] * arg.exponent))).accept(self)
+            assert False
         elif isinstance(arg, Neg):
             return Neg(Re(arg.arg)).accept(self)
         elif isinstance(arg, Re):
@@ -183,6 +213,8 @@ class Normalizer(TermVisitor[Term]):
 
     def visit_im(self, im: Im) -> Term:
         arg = im.arg.accept(self)
+        if isinstance(arg, Pow):
+            arg = Mul(*[arg.base] * arg.exponent) # TODO optimize?
         if isinstance(arg, Rational):
             return Rational(mpq(0))
         elif isinstance(arg, _I):
@@ -195,7 +227,7 @@ class Normalizer(TermVisitor[Term]):
             x, xs = arg.args[0], Mul(*arg.args[1:])
             return (Re(x) * Im(xs) + Im(x) * Re(xs)).accept(self)
         elif isinstance(arg, Pow):
-            return Im(Mul(*([arg.base] * arg.exponent))).accept(self)
+            assert False # return Im(Mul(*([arg.base] * arg.exponent))).accept(self)
         elif isinstance(arg, Neg):
             return Neg(Im(arg.arg)).accept(self)
         elif isinstance(arg, Re):
