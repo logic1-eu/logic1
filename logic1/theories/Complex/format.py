@@ -1,5 +1,6 @@
 
-from logic1.theories.Complex.atomic import _I, Add, Im, Mul, Neg, Pow, Rational, Re, Term, TermVisitor, Variable
+from logic1.theories.Complex.atomic import Eq, Ge, Gt, Le, Lt, Ne
+from logic1.theories.Complex.term import Add, Conj, IdentityTermVisitor, _I, I, Im, Mul, Neg, Number, Pow, Rational, Re, Term, TermVisitor, Variable, VV
 from gmpy2 import mpq, mpz
 
 
@@ -57,9 +58,15 @@ class BaseFormatter(TermVisitor[str]):
 
     def visit_neg(self, neg: Neg) -> str:
         symbol = self.symbols.get(Neg, '-')
-        if isinstance(neg.arg, (Add, Mul, Neg)):
+        if isinstance(neg.arg, (Add, Mul, Neg, Conj)):  # discuss -- for repr?
             return f'{symbol}({neg.arg.accept(self)})'
         return f'{symbol}{neg.arg.accept(self)}'
+
+    def visit_conj(self, conj: Conj) -> str:
+        symbol = self.symbols.get(Conj, '~')
+        if isinstance(conj.arg, (Add, Mul, Neg, Conj)):  # discuss -- for repr?
+            return f'{symbol}({conj.arg.accept(self)})'
+        return f'{symbol}{conj.arg.accept(self)}'
 
     def visit_re(self, re: Re) -> str:
         symbol = self.symbols.get(Re, 'Re')
@@ -113,6 +120,9 @@ class LatexFormatter(BaseFormatter):
                 return f'\\mathit{{{base}}}_{{{str(index)}}}'
             else:
                 return f'\\mathit{{{base}}}'
+
+    def visit_conj(self, conj: Conj) -> str:
+        return f'\\overline{{{conj.arg.accept(self)}}}'
         
 
     

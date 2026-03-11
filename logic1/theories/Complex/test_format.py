@@ -1,5 +1,5 @@
-
-from logic1.theories.Complex.atomic import VV, I, Im, Re
+from logic1.firstorder import *
+from logic1.theories.Complex import *
 
 
 def test_repr():
@@ -11,7 +11,7 @@ def test_repr():
     term2 = -((x + 1j * y) * (z + w / I - 0.5)**3)
     assert repr(term2) == '-((x + I * y) * (z + w * (-I) - 1/2)**3)'
 
-    term3 = -(x + (y + z)) / I**3 * Re(Im(z * w - I)) + (-1) * (-z**2)**0
+    term3 = -(x + (y + z)) / I**3 * Re(Im(z * w - I)) + -1 * (-z**2)**0
     assert repr(term3) == '-(x + y + z) * I * Re(Im(z * w - I)) + -1 * (-z**2)**0'  # TODO: discuss
 
     formula1 = (x + I * y) * (z - w) == Re(Im(x**3 + y**2))

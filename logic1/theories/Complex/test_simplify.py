@@ -1,7 +1,8 @@
 from gmpy2 import mpq
 import pytest
 
-from logic1.theories.Complex.atomic import Term, I, Re, Im, VV
+from logic1.firstorder import *
+from logic1.theories.Complex import *
 
 
 def test_eval_constant():
