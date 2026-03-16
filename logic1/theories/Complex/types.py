@@ -5,8 +5,11 @@ from gmpy2 import mpq
 
 from logic1 import firstorder
 
-type Number = int | float | Fraction | mpq | complex
-_NUMBER_TYPES: Final = (int, float, Fraction, mpq, complex)
+type RationalNumber = int | float | Fraction | mpq
+_RATIONAL_NUMBER_TYPES: Final = (int, float, Fraction, mpq)
+
+type Number = RationalNumber | complex
+_NUMBER_TYPES: Final = _RATIONAL_NUMBER_TYPES + (complex,)
 
 type Formula = firstorder.Formula[AtomicFormula, Term, Variable, Number]
 

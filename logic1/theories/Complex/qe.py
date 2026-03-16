@@ -4,23 +4,34 @@ from typing import Any
 from logic1.firstorder.boolean import And, Implies, Implies, Not, Or, Equivalent
 from logic1.firstorder.quantified import All, Ex
 from logic1.theories import RCF
+from logic1.theories.Complex.simplify import simplify
 from logic1.theories.RCF.atomic import AtomicFormula as RCF_AtomicFormula  # TODO: export
 from logic1.theories.RCF.typing import Formula as RCF_Formula  # TODO: export
 from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne, Ge, Gt, Le, Lt
-from logic1.theories.Complex.simplify import ArithmeticEvaluator
+from logic1.theories.Complex.normalize import ArithmeticEvaluator
 from logic1.theories.Complex.term import Add, Mul, Neg, Rational, Term, Variable, _I, Conj, Re, Im
-from logic1.theories.Complex.typing import Formula
+from logic1.theories.Complex.types import Formula
 from gmpy2 import mpq
 
 class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
+    """A term visitor that evaluates a complex term to a term in the theory of real closed fields. 
+    Raises a ValueError if the term contains any complex-specific operations that cannot be evaluated in RCF, such as the imaginary unit or complex conjugation.
+    Implements the abstract class :class:`.Complex.ArithmeticEvaluator`.
+    """
     
     def _add(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
+        """Returns the sum of the RCF terms a and b. Implements abstract method :meth:`.Complex.ArithmeticEvaluator._add`.
+        """
         return a + b
     
     def _neg(self, a: RCF.Term) -> RCF.Term:
+        """Returns the negation of the RCF term a. Implements the abstract method :meth:`.Complex.ArithmeticEvaluator._neg`.
+        """
         return -a
     
     def _mul(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
+        """Returns the product of the RCF terms a and b. Implements the abstract method :meth:`.Complex.ArithmeticEvaluator._mul`.
+        """
         return a * b
     
     def visit_rational(self, num: Rational) -> RCF.Term:
@@ -49,7 +60,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         
 
 def formula_complex_to_rcf(formula: Formula) -> Any:  # TODO: export RCF.Formula, this could be a FormulaVisitor
-    if isinstance(formula, AtomicFormula):
+    if isinstance(formula, AtomicFormula): 
         a = Re(formula.lhs - formula.rhs).normalize().accept(RCF_Evaluator())  # type: ignore
         b = Im(formula.lhs - formula.rhs).normalize().accept(RCF_Evaluator())  # type: ignore
         if isinstance(formula, Eq):
@@ -97,10 +108,13 @@ def formula_rcf_to_complex(formula: RCF_Formula) -> Formula:
     return formula.op(*(formula_rcf_to_complex(arg) for arg in formula.args))  # type: ignore
     
 
-def qe(formula: Formula) -> Formula:
+def qe(formula: Formula, final_simplify: bool = True) -> Formula:
     """Quantifier elimination for the theory of complex numbers. Returns a
     quantifier-free formula equivalent to the input formula.
     """
     rcf_formula = formula_complex_to_rcf(formula)
     rcf_qe_formula = RCF.qe(rcf_formula)
-    return formula_rcf_to_complex(rcf_qe_formula).simplify()  # type: ignore
+    result = formula_rcf_to_complex(rcf_qe_formula)  # type: ignore
+    if final_simplify:
+        result = simplify(result)
+    return result

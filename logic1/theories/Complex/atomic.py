@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass, field
-from fractions import Fraction
-import functools
-import operator
-from typing import TYPE_CHECKING, Final, Optional, Self, TypeVar
+from typing import Final, Optional, Self
 
-from gmpy2 import mpq
+import operator
 
 from logic1 import firstorder
-from logic1.theories.Complex.typing import Formula, Number
-from logic1.theories.Complex.term import Term, Variable
+from logic1.firstorder.boolean import And, Or
+from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.term import Im, Rational, Re, Term, Variable
+from gmpy2 import mpq
 
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Number]):
 
@@ -101,6 +98,25 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
             Eq: '=', Ne: '\\neq', Ge: '\\geq', Le: '\\leq', Gt: '>', Lt: '<'}
         SPACING: Final = ' '
         return f'{self.lhs.as_latex()}{SPACING}{SYMBOL[self.op]}{SPACING}{self.rhs.as_latex()}'
+    
+    def as_real_formula(self) -> Formula:
+        """Returns an equivalent formula where all terms are real.
+        """
+        a = Re(self.lhs - self.rhs).normalize()
+        b = Im(self.lhs - self.rhs).normalize()
+        if isinstance(self, Eq):
+            return And(a == 0, b == 0)
+        if isinstance(self, Ne):
+            return Or(a != 0, b != 0)
+        if isinstance(self, Ge):
+            return And(a >= 0, b == 0)
+        if isinstance(self, Le):
+            return And(a <= 0, b == 0)
+        if isinstance(self, Gt):
+            return And(a > 0, b == 0)
+        if isinstance(self, Lt):
+            return And(a < 0, b == 0)
+        assert False, type(self)
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of
@@ -157,13 +173,39 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
             if v not in quantified:
                 yield v
 
-    def normalize_weak(self) -> AtomicFormula:
+    def normalize_weak(self) -> Self:
         lhs = (self.lhs - self.rhs).normalize_weak()
+        if isinstance(self, (Eq, Ne)):
+            lhs = (lhs / lhs.lc()).normalize_weak()
         return self.op(lhs, 0)
     
-    def normalize(self) -> Formula:
+    def normalize(self) -> Self:
         lhs = (self.lhs - self.rhs).normalize()
+        if isinstance(self, (Eq, Ne)):
+            lhs = (lhs / lhs.lc()).normalize()
         return self.op(lhs, 0)
+    
+    def normalize_complex(self) -> Self:
+        lhs = (self.lhs - self.rhs).normalize_complex()
+        a, b = lhs.lc().eval_constant()
+        if a != mpq(0) or b != mpq(0):
+            if isinstance(self, (Eq, Ne)):
+                lhs = (lhs / lhs.lc()).normalize_complex()
+            elif a == mpq(0):
+                lhs = (lhs / Rational(b)).normalize_complex()
+            else:
+                lhs = (lhs / Rational(a)).normalize_complex()
+        else:
+            lhs = Rational(0)
+        c, d = lhs.lc().eval_constant()
+        # assert c == mpq(1), ((self.lhs - self.rhs).normalize_complex(), (self.lhs - self.rhs).normalize_complex()._dump(), (self.lhs - self.rhs).normalize_complex().lc(), (a, b, c, d), lhs, self._dump(), lhs._dump())
+        return self.op(lhs, 0)
+    
+    def is_imaginary(self) -> bool:
+        return self.lhs.is_imaginary() and self.rhs.is_imaginary()
+    
+    def is_real(self) -> bool:
+        return self.lhs.is_real() and self.rhs.is_real()
 
     def simplify(self) -> Formula:
         """Fast basic simplification. The result is equivalent to self.

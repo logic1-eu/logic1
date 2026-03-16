@@ -6,13 +6,13 @@ def test_repr():
     w, x, y, z = VV.get('w', 'x', 'y', 'z')
 
     term1 = Re(Im((x + y) * (z**2 - I / 2)))
-    assert repr(term1) == 'Re(Im((x + y) * (z**2 - I * 1/2)))'
+    assert repr(term1) == 'Im((z**2 + -1/2 * I) * (x + y))'
 
     term2 = -((x + 1j * y) * (z + w / I - 0.5)**3)
     assert repr(term2) == '-((x + I * y) * (z + w * (-I) - 1/2)**3)'
 
     term3 = -(x + (y + z)) / I**3 * Re(Im(z * w - I)) + -1 * (-z**2)**0
-    assert repr(term3) == '-(x + y + z) * I * Re(Im(z * w - I)) + -1 * (-z**2)**0'  # TODO: discuss
+    assert repr(term3) == '-(x + y + z) * I * Re(Im(z * w - I)) + -1 * (-z**2)**0'
 
     formula1 = (x + I * y) * (z - w) == Re(Im(x**3 + y**2))
     assert repr(formula1) == '(x + I * y) * (z - w) == Re(Im(x**3 + y**2))'
@@ -37,7 +37,9 @@ def test_repr():
 
 
 def test_str():
-    assert str(I**3) == 'i^3'
+    x, y, z = VV.get('x', 'y', 'z')
+    assert str(x**3) == 'x^3'
+    assert str(I**3) == '-i'
 
 
 def test_latex():

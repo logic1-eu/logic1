@@ -9,7 +9,7 @@ def test_dump():
     assert phi._dump() == "Eq(Variable('z'), Add(Re(Variable('z')), Mul(_I(), Im(Variable('z')))))"
 
     phi = z**2 == -1
-    assert phi._dump() == "Eq(Pow(Variable('z'), 2), Rational(mpq(-1,1)))"
+    assert phi._dump() == "Eq(Pow(Variable('z'), 2), Neg(Rational(mpq(1,1))))"
 
     phi = x*y**2 + Re(a - b) - 3j
     assert phi._dump() == "Add(Mul(Variable('x'), Pow(Variable('y'), 2)), Re(Add(Variable('a'), Neg(Variable('b')))), Neg(Mul(Rational(mpq(3,1)), _I())))"
