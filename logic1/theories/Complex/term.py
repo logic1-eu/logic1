@@ -26,7 +26,7 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return [self._names]
 
     def __getitem__(self, index: str) -> Variable:
-        """Implements abstract method
+        """Implements the abstract method
         :meth:`.firstorder.atomic.VariableSet.__getitem__`.
         """
         if not isinstance(index, str):
@@ -68,7 +68,9 @@ VV: Final = VariableSet()
 @dataclass
 @functools.total_ordering
 class SortKey(Generic[τ]):
-    """A sort key for terms. Implements the abstract class :class:`.firstorder.atomic.Term.SortKey`."""
+    """A sort key for terms. Implements the abstract class
+    :class:`.firstorder.atomic.Term.SortKey`.
+    """
 
     term: τ
     """The term for which this is a sort key.
@@ -82,7 +84,8 @@ class SortKey(Generic[τ]):
     
     @property
     def args(self) -> tuple[object, ...]:
-        """The arguments of the underlying term, where each argument that is itself a term is replaced by its sort key.
+        """The arguments of the underlying term, where each argument
+        that is itself a term is replaced by its sort key.
         """
         return tuple(SortKey(arg) if isinstance(arg, Term) else arg for arg in self.term.args)
 
@@ -106,14 +109,16 @@ class SortKey(Generic[τ]):
         
 
 class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
-    """An expression consisting of complex variables, rational numbers, the imaginary unit, arithmetic operations, 
-    complex conjugation, and real and imaginary part. Implements the abstract class :class:`.firstorder.atomic.Term` 
-    for the theory of complex numbers.
+    """An expression consisting of complex variables, rational numbers,
+    the imaginary unit, arithmetic operations, complex conjugation, and
+    real and imaginary part. Implements the abstract class
+    :class:`.firstorder.atomic.Term` for the theory of complex numbers.
     """
 
     @property
     def op(self) -> type[Self]:
-        """The operator of this term, which is represented by the class of this term.
+        """The operator of this term, which is represented by the
+        class of this term.
         """
         return type(self)
     
@@ -184,10 +189,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term.from_number(other) + self
     
     def __repr__(self) -> str:
-        """String representation of this term that can be evaluated to reconstruct the term. For a more human-readable string 
+        """String representation of this term that can be evaluated to
+        reconstruct the term. For a more human-readable string
         representation, use :meth:`.Term.__str__` or :meth:`.Term.as_latex`.
         """
-        return self.normalize_weak().accept(ReprFormatter())
+        return self.accept(ReprFormatter())
 
     def __rmul__(self, other: Number | Term) -> Mul:
         assert not isinstance(other, Term)
@@ -198,7 +204,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term.from_number(other) - self
     
     def __str__(self) -> str:
-        return self.normalize_weak().accept(StrFormatter())
+        return self.accept(StrFormatter())
 
     def __sub__(self, other: Number | Term) -> Add:
         if isinstance(other, Term):
@@ -206,11 +212,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self - Term.from_number(other)
         
     def __truediv__(self, other: Number | Term) -> Term:
-        """Division is defined as multiplication by the inverse. If the other term is not constant, this method raises a ValueError.
+        """Division is defined as multiplication by the inverse. If the
+        other term is not constant, this method raises a ValueError.
         """
         if isinstance(other, Term):
             try:
-                a, b = other.eval_constant()
+                a, b = other.eval()
             except ValueError:
                 raise ValueError('Cannot divide by a non-constant term')
             if a == mpq(0) and b == mpq(0):
@@ -233,7 +240,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
         """
-        return self.normalize_weak().accept(LatexFormatter())
+        return self.accept(LatexFormatter())
     
     def lc(self) -> Term:
         """Returns the leading constant of this term.
@@ -252,7 +259,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
             return Rational(1)
 
     def _dump(self) -> str:
-        """Dump this term as a string that can be evaluated to reconstruct the term. This is used for debugging.
+        """Dump this term as a string that can be evaluated to
+        reconstruct the term. This is used for debugging.
         """
         args = []
         for arg in self.args:
@@ -262,12 +270,14 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
                 args.append(repr(arg))
         return f'{self.op.__name__}({", ".join(args)})'
     
-    def eval_constant(self) -> tuple[mpq, mpq]:
-        """Evaluate this term if it is constant, and return the real and
-        imaginary part as a pair of rational numbers. Raises ValueError if
-        this term is not constant.
+    def eval(self, variables: dict[Variable, Number] = dict()) -> tuple[mpq, mpq]:
+        """Evaluate this term to a pair of rational numbers
+        representing the real and imaginary part of this term, given an
+        assignment of the variables in this term to rational numbers.
+        Raises a ValueError if this term contains any variables that are
+        not in the given assignment.
         """
-        return self.accept(Evaluator())
+        return self.accept(ConstantEvaluator(variables))
         
     @staticmethod
     def from_real_imag(real: mpq, imag: mpq) -> Term:
@@ -301,15 +311,21 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """Return :obj:`True` if this term is constant.
         """
         try:
-            self.eval_constant()
+            self.eval()
             return True
         except ValueError:
             return False
         
     def is_imaginary(self) -> bool:
+        """Return :obj:`True` if this term is imaginary, i.e., its real
+        part is zero.
+        """
         return Re(self).is_zero()
 
     def is_real(self) -> bool:
+        """Return :obj:`True` if this term is real, i.e., its imaginary
+        part is zero.
+        """
         return Im(self).is_zero()
 
     def is_variable(self) -> bool:
@@ -318,8 +334,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return isinstance(self, Variable)
 
     def is_zero(self) -> bool:
+        """Return :obj:`True` if this term is equivalent to zero.
+        """
         try:
-            a, b = self.normalize_complex().eval_constant()
+            a, b = self.normalize_complex().eval()
             return a == mpq(0) and b == mpq(0)
         except ValueError:
             return False
@@ -328,7 +346,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self.accept(Normalizer())
     
     def normalize_complex(self) -> Term:
-        return self.accept(ComplexNormalizer()).normalize()
+        return self.accept(ComplexNormalizer())
     
     def normalize_weak(self) -> Term:
         return self.accept(WeakNormalizer())
@@ -369,7 +387,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
 
 class Rational(Term):
-    """A rational number, represented as a gmpy2.mpq. Implements the abstract class :class:`.firstorder.atomic.Term`."""
+    """A rational number, represented as a gmpy2.mpq. Implements the
+    abstract class :class:`.firstorder.atomic.Term`.
+    """
     
     value: mpq
 
@@ -379,7 +399,10 @@ class Rational(Term):
         return (self.value,)
 
     def __init__(self, value: RationalNumber) -> None:
-        """Initialize this rational term with the given value. The value must be non-negative, otherwise this term is represented as a negation of a rational term with a non-negative value."""
+        """Initialize this rational term with the given value. The
+        value must be non-negative, otherwise this term is represented
+        as a negation of a rational term with a non-negative value.
+        """
         if isinstance(value, (int, float)):
             self.value = mpq(value)
         elif isinstance(value, Fraction):
@@ -404,7 +427,9 @@ class Rational(Term):
 
 
 class _I(Term):
-    """The imaginary unit. This is a singleton class, and the only instance is `I`. Implements the abstract class :class:`.firstorder.atomic.Term`.
+    """The imaginary unit. This is a singleton class, and the only
+    instance is `I`. Implements the abstract class
+    :class:`.firstorder.atomic.Term`.
     """
 
     _instance: Optional[_I] = None
@@ -418,7 +443,8 @@ class _I(Term):
         return ()
     
     def __init__(self) -> None:
-        """Initialize the imaginary unit. This is a singleton class, so this method should not be called directly. Use `I` instead.
+        """Initialize the imaginary unit. This is a singleton class, so
+        this method should not be called directly. Use `I` instead.
         """
         pass
 
@@ -434,12 +460,14 @@ class _I(Term):
     
     
 I: Final = _I()
-"""The singleton instance of the imaginary unit.s
+"""The singleton instance of the imaginary unit.
 """
 
 
 class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']]):
-    """A variable, represented by a string name. Implements the abstract class :class:`.firstorder.atomic.Term` and :class:`.firstorder.atomic.Variable`.
+    """A variable, represented by a string name. Implements the
+    abstract class :class:`.firstorder.atomic.Term` and
+    :class:`.firstorder.atomic.Variable`.
     """
 
     name: str
@@ -447,12 +475,14 @@ class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']
     """
 
     VV: ClassVar[VariableSet] = VV
-    """The variable set containg all exisiting complex variables. See :class:`.VariableSet` for details.
+    """The variable set containing all existing complex variables. See
+    :class:`.VariableSet` for details.
     """
     
     @property
     def args(self) -> tuple[str]:
-        """The arguments of this term, which is just the name of the variable itself.
+        """The arguments of this term, which is just the name of the
+        variable itself.
         """
         return (self.name,)
 
@@ -474,15 +504,18 @@ class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']
     
     
 class MonoidalOperation(Term):
-    """A monoidal operation, which is an associative operation with an identity element. 
-    This is a base class for addition and multiplication. Implements parts the abstract class :class:`.Term`."""
+    """A monoidal operation, which is an associative operation with an
+    identity element. This is a base class for addition and
+    multiplication. Implements parts the abstract class :class:`.Term`.
+    """
 
     _args: tuple[Term, ...]
     """The arguments of this term.
     """
 
     identity: ClassVar[Term]
-    """The identity element of this operation. This should be overridden by subclasses.
+    """The identity element of this operation. This should be
+    overridden by subclasses.
     """
 
     @property
@@ -492,7 +525,9 @@ class MonoidalOperation(Term):
         return self._args
 
     def __init__(self, *args: Term) -> None:
-        """Initialize this monoidal operation with the given arguments. If any of the arguments is itself a monoidal operation of the same type, it is flattened into the arguments of this term.
+        """Initialize this monoidal operation with the given arguments.
+        If any of the arguments is itself a monoidal operation of the
+        same type, it is flattened into the arguments of this term.
         """
         args_flat = []
         for arg in args:
@@ -503,7 +538,9 @@ class MonoidalOperation(Term):
         self._args = tuple(args_flat)
 
     def __new__(cls, *args: Term):
-        """Create a new instance of this monoidal operation with the given arguments. If no arguments are given, return the identity element. If only one argument is given, return that argument.
+        """Create a new instance of this monoidal operation with the
+        given arguments. If no arguments are given, return the identity
+        element. If only one argument is given, return that argument.
         """
         if not args:
             return cls.identity
@@ -527,7 +564,8 @@ class Add(MonoidalOperation):
 
 
 class Mul(MonoidalOperation):
-    """Multiplication. Implements the abstract class :class:`.MonoidalOperation`.
+    """Multiplication. Implements the abstract class
+    :class:`.MonoidalOperation`.
     """
 
     identity: ClassVar[Rational] = Rational(mpq(1))
@@ -559,7 +597,8 @@ class Pow(Term):
         return (self.base, self.exponent)
     
     def __init__(self, base: Term, exponent: int) -> None:
-        """Initialize this power term with the given base and exponent. The exponent must be a non-negative integer.
+        """Initialize this power term with the given base and exponent.
+        The exponent must be a non-negative integer.
         """
         if not isinstance(exponent, int) or exponent < 0:
             raise TypeError('Exponent must be a non-negative integer')
@@ -573,7 +612,9 @@ class Pow(Term):
 
         
 class UnaryOperation(Term):
-    """A unary operation, which is an operation with one argument. This is a base class for negation, conjugation, real part, and imaginary part. Implements parts the abstract class :class:`.Term`.
+    """A unary operation, which is an operation with one argument.
+    This is a base class for negation, conjugation, real part, and
+    imaginary part. Implements parts the abstract class :class:`.Term`.
     """
 
     arg: Term
@@ -581,13 +622,16 @@ class UnaryOperation(Term):
 
     @property
     def args(self) -> tuple[Term]:
-        """The arguments of this term, which is just the single argument of this unary operation.
+        """The arguments of this term, which is just the single
+        argument of this unary operation.
         """
         return (self.arg,)
     
     def __init__(self, arg: Number | Term) -> None:
-        """Initialize this unary operation with the given argument, which can be either a term or a number. 
-        If it is a number, it is converted to a term using :meth:`.Term.from_number`.
+        """Initialize this unary operation with the given argument,
+        which can be either a term or a number.
+        If it is a number, it is converted to a term using
+        :meth:`.Term.from_number`.
         """
         if isinstance(arg, Term):
             self.arg = arg
@@ -606,7 +650,8 @@ class Neg(UnaryOperation):
     
 
 class Conj(UnaryOperation):
-    """Complex conjugation. Implements the abstract class :class:`.UnaryOperation`.
+    """Complex conjugation. Implements the abstract class
+    :class:`.UnaryOperation`.
     """
 
     def accept(self, visitor: TermVisitor[α]) -> α:
@@ -636,7 +681,9 @@ class Im(UnaryOperation):
 
 
 class TermVisitor(Generic[α]):
-    """Visitor for terms. This is used to implement various operations on terms, such as normalization, evaluation, etc."""
+    """Visitor for terms. This is used to implement various operations
+    on terms, such as normalization, evaluation, etc.
+    """
 
     @abstractmethod
     def visit_rational(self, num: Rational) -> α:
@@ -700,73 +747,93 @@ class TermVisitor(Generic[α]):
 
 
 class IdentityTermVisitor(TermVisitor[Term]):
-    """Visitor that returns the same term, but with all subterms visited. Useful as a base class for other visitors.
+    """Visitor that returns the same term, but with all subterms
+    visited. Useful as a base class for other visitors.
     """
     
     def visit_rational(self, num: Rational) -> Term:
-        """Return the same rational term. Implements the abstract method :meth:`.TermVisitor.visit_rational`.
+        """Return the same rational term. Implements the abstract
+        method :meth:`.TermVisitor.visit_rational`.
         """
         return num
     
     def visit_i(self, i: _I) -> Term:
-        """Return the imaginary unit. Implements the abstract method :meth:`.TermVisitor.visit_i`.
+        """Return the imaginary unit. Implements the abstract method
+        :meth:`.TermVisitor.visit_i`.
         """
         return i
     
     def visit_variable(self, var: Variable) -> Term:
-        """Return the same variable. Implements the abstract method :meth:`.TermVisitor.visit_variable`.
+        """Return the same variable. Implements the abstract method
+        :meth:`.TermVisitor.visit_variable`.
         """
         return var
     
     def visit_add(self, add: Add) -> Term:
-        """Return the same addition term, but with all arguments visited. Implements the abstract method :meth:`.TermVisitor.visit_add`.
+        """Return the same addition term, but with all arguments
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_add`.
         """
         return Add(*[arg.accept(self) for arg in add.args])
     
     def visit_mul(self, mul: Mul) -> Term:
-        """Return the same multiplication term, but with all arguments visited. Implements the abstract method :meth:`.TermVisitor.visit_mul`.
+        """Return the same multiplication term, but with all arguments
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_mul`.
         """
         return Mul(*[arg.accept(self) for arg in mul.args])
 
     def visit_pow(self, pow: Pow) -> Term:
-        """Return the same power term, but with the base visited. Implements the abstract method :meth:`.TermVisitor.visit_pow`.
+        """Return the same power term, but with the base visited.
+        Implements the abstract method :meth:`.TermVisitor.visit_pow`.
         """
         return Pow(pow.base.accept(self), pow.exponent)
 
     def visit_neg(self, neg: Neg) -> Term:
-        """Return the same negation term, but with the argument visited. Implements the abstract method :meth:`.TermVisitor.visit_neg`.
+        """Return the same negation term, but with the argument
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_neg`.
         """
         return Neg(neg.arg.accept(self))
 
     def visit_conj(self, conj: Conj) -> Term:
-        """Return the same conjugation term, but with the argument visited. Implements the abstract method :meth:`.TermVisitor.visit_conj`.
+        """Return the same conjugation term, but with the argument
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_conj`.
         """
         return Conj(conj.arg.accept(self))
 
     def visit_re(self, re: Re) -> Term:
-        """Return the same real part term, but with the argument visited. Implements the abstract method :meth:`.TermVisitor.visit_re`.
+        """Return the same real part term, but with the argument
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_re`.
         """
         return Re(re.arg.accept(self))
 
     def visit_im(self, im: Im) -> Term:
-        """Return the same imaginary part term, but with the argument visited. Implements the abstract method :meth:`.TermVisitor.visit_im`.
+        """Return the same imaginary part term, but with the argument
+        visited. Implements the abstract method
+        :meth:`.TermVisitor.visit_im`.
         """
         return Im(im.arg.accept(self))
     
 
 class VariableSubstitutor(IdentityTermVisitor):
-    """Visitor that substitutes variables according to a given mapping. See also :meth:`.Term.subs`.
+    """Visitor that substitutes variables according to a given
+    mapping. See also :meth:`.Term.subs`.
     """
     
     mapping: Mapping[Variable, Number | Term]
 
     def __init__(self, mapping: Mapping[Variable, Number | Term]) -> None:
-        """Initialize the substitutor with the given mapping containing either terms or numbers.
+        """Initialize the substitutor with the given mapping
+        containing either terms or numbers.
         """
         self.mapping = mapping
     
     def visit_variable(self, var: Variable) -> Term:
-        """Return the substituted term for the given variable, or the variable itself if not found in the mapping.
+        """Return the substituted term for the given variable, or the
+        variable itself if not found in the mapping.
         """
         value = self.mapping.get(var, var)
         if isinstance(value, Term):
@@ -777,4 +844,4 @@ class VariableSubstitutor(IdentityTermVisitor):
 
 from logic1.theories.Complex.atomic import Eq, Ge, Gt, Le, Lt, Ne
 from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter
-from logic1.theories.Complex.normalize import ComplexNormalizer, Evaluator, Normalizer, WeakNormalizer
+from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator, Normalizer, WeakNormalizer

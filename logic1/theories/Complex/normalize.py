@@ -1,10 +1,11 @@
-"""
-This module defines visitors for simplifying and normalizing terms in the theory of complex numbers.
+"""This module defines visitors for simplifying and normalizing terms in
+the theory of complex numbers.
 """
 
 from abc import abstractmethod
 from typing import TypeVar
 
+from logic1.theories.Complex.atomic import AtomicFormula, AtomicFormulaVisitor, Eq, Ge, Gt, Le, Lt, Ne
 from logic1.theories.Complex.term import Add, Conj, IdentityTermVisitor, _I, I, Im, Mul, Neg, Number, Pow, Rational, Re, Term, TermVisitor, Variable
 from gmpy2 import mpq
 
@@ -52,10 +53,12 @@ class ArithmeticEvaluator(TermVisitor[α]):
             return self._mul(a, b)
 
 
-class Evaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
-    """Visitor that evaluates a term to a constant under a given variable assignment. 
-    The result is a pair of rational numbers representing the real and imaginary parts of the complex number.
-    Raises a ValueError if the term contains variables that are not in the assignment.
+class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]], AtomicFormulaVisitor[bool]):
+    """Visitor that evaluates a term to a constant under a given
+    variable assignment. The result is a pair of rational numbers 
+    representing the real and imaginary parts of the complex number. 
+    Raises a ValueError if the term contains variables that are not 
+    in the assignment.
     """
 
     _variables: dict[Variable, Number]
@@ -67,36 +70,45 @@ class Evaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
         self._variables = variables
 
     def _add(self, a: tuple[mpq, mpq], b: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
-        """Adds two complex numbers represented as pairs of rational numbers (real, imag).
-        Implements the abstract method :meth:`.ArithmeticEvaluator._add`.
+        """Adds two complex numbers represented as pairs of rational
+        numbers (real, imag). Implements the abstract method 
+        :meth:`.ArithmeticEvaluator._add`.
         """
         return a[0] + b[0], a[1] + b[1]
     
     def _neg(self, a: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
-        """Negates a complex number represented as a pair of rational numbers (real, imag).
-        Implements the abstract method :meth:`.ArithmeticEvaluator._neg`.
+        """Negates a complex number represented as a pair of rational
+        numbers (real, imag). Implements the abstract method 
+        :meth:`.ArithmeticEvaluator._neg`.
         """
         return -a[0], -a[1]
 
     def _mul(self, a: tuple[mpq, mpq], b: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
-        """Multiplies two complex numbers represented as pairs of rational numbers (real, imag).
-        Implements the abstract method :meth:`.ArithmeticEvaluator._mul`.
+        """Multiplies two complex numbers represented as pairs of
+        rational numbers (real, imag). Implements the abstract method 
+        :meth:`.ArithmeticEvaluator._mul`.
         """
         return a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]
 
     def visit_rational(self, num: Rational) -> tuple[mpq, mpq]:
-        """Evaluates a rational number term to a complex number represented as a pair of rational numbers (real, imag).
-        Implements the abstract method :meth:`.TermVisitor.visit_rational`."""
+        """Evaluates a rational number term to a complex number
+        represented as a pair of rational numbers (real, imag).
+        Implements the abstract method :meth:`.TermVisitor.visit_rational`.
+        """
         return num.value, mpq(0)
 
     def visit_i(self, i: _I) -> tuple[mpq, mpq]:
-        """Evaluates the imaginary unit term to a complex number represented as a pair of rational numbers (real, imag).
-        Implements the abstract method :meth:`.TermVisitor.visit_i`."""
+        """Evaluates the imaginary unit term to a complex number
+        represented as a pair of rational numbers (real, imag).
+        Implements the abstract method :meth:`.TermVisitor.visit_i`.
+        """
         return mpq(0), mpq(1)
 
     def visit_variable(self, var: Variable) -> tuple[mpq, mpq]:
-        """Evaluates a variable term to a complex number represented as a pair of rational numbers (real, imag) under 
-        the variable assignment given in the constructor. Implements the abstract method :meth:`.TermVisitor.visit_variable`.
+        """Evaluates a variable term to a complex number represented as
+        a pair of rational numbers (real, imag) under the variable
+        assignment given in the constructor. Implements the abstract
+        method :meth:`.TermVisitor.visit_variable`.
         """
         try:
             return Term.from_number(self._variables[var]).accept(self)
@@ -104,34 +116,88 @@ class Evaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
             raise ValueError(f'Cannot evaluate variable {var}')
 
     def visit_conj(self, conj: Conj) -> tuple[mpq, mpq]:
-        """Evaluates a conjugation term to a complex number represented as a pair of rational numbers (real, imag).
+        """Evaluates a conjugation term to a complex number represented
+        as a pair of rational numbers (real, imag).
         Implements the abstract method :meth:`.TermVisitor.visit_conj`.
         """
         a, b = conj.arg.accept(self)
         return a, -b
 
     def visit_re(self, re: Re) -> tuple[mpq, mpq]:
-        """Evaluates a real part term to a complex number represented as a pair of rational numbers (real, imag).
+        """Evaluates a real part term to a complex number represented as
+        a pair of rational numbers (real, imag).
         Implements the abstract method :meth:`.TermVisitor.visit_re`.
         """
         a, _ = re.arg.accept(self)
         return a, mpq(0)
 
     def visit_im(self, im: Im) -> tuple[mpq, mpq]:
-        """Evaluates an imaginary part term to a complex number represented as a pair of rational numbers (real, imag).
+        """Evaluates an imaginary part term to a complex number
+        represented as a pair of rational numbers (real, imag).
         Implements the abstract method :meth:`.TermVisitor.visit_im`.
         """
         _, b = im.arg.accept(self)
         return b, mpq(0)
 
+    def visit_eq(self, eq: Eq) -> bool:
+        """Evaluates an equality formula to a boolean value under the
+        variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_eq`.
+        """
+        return eq.lhs.accept(self) == eq.rhs.accept(self)
+    
+    def visit_ne(self, ne: Ne) -> bool:
+        """Evaluates an inequality formula to a boolean value under the
+        variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_ne`.
+        """
+        return ne.lhs.accept(self) != ne.rhs.accept(self)
+    
+    def visit_ge(self, ge: Ge) -> bool:
+        """Evaluates a greater-than-or-equal formula to a boolean value
+        under the variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_ge`.
+        """
+        a1, b1 = ge.lhs.accept(self)
+        a2, b2 = ge.rhs.accept(self)
+        return a1 >= a2 and b1 == 0 and b2 == 0
 
-class WeakNormalizer(IdentityTermVisitor):
+    def visit_le(self, le: Le) -> bool:
+        """Evaluates a less-than-or-equal formula to a boolean value
+        under the variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_le`.
+        """
+        a1, b1 = le.lhs.accept(self)
+        a2, b2 = le.rhs.accept(self)
+        return a1 <= a2 and b1 == 0 and b2 == 0
+
+    def visit_gt(self, gt: Gt) -> bool:
+        """Evaluates a greater-than formula to a boolean value under the
+        variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_gt`.
+        """
+        a1, b1 = gt.lhs.accept(self)
+        a2, b2 = gt.rhs.accept(self)
+        return a1 > a2 and b1 == 0 and b2 == 0
+
+    def visit_lt(self, lt: Lt) -> bool:
+        """Evaluates a less-than formula to a boolean value under the
+        variable assignment given in the constructor.
+        Implements the abstract method :meth:`.AtomicFormulaVisitor.visit_lt`.
+        """
+        a1, b1 = lt.lhs.accept(self)
+        a2, b2 = lt.rhs.accept(self)
+        return a1 < a2 and b1 == 0 and b2 == 0
+
+
+class WeakNormalizer(IdentityTermVisitor, AtomicFormulaVisitor[AtomicFormula]):
     """Visitor that normalizes a term by rearranging sums and products, 
     and applying obvious simplifications, but not expanding any terms.
     """
     
     def visit_add(self, add: Add) -> Term:
-        """Normalizes a sum by collecting constant terms and rearranging non-constant terms in a canonical order.
+        """Normalizes a sum by collecting constant terms and
+        rearranging non-constant terms in a canonical order.
         
         >>> from logic1.theories.Complex import *
         >>> x, y, z = VV.get('x', 'y', 'z')
@@ -169,7 +235,7 @@ class WeakNormalizer(IdentityTermVisitor):
         result = []
         for i, prod in enumerate(sorted(products, key=Term.sort_key)):
             assert not isinstance(prod, Mul) or not prod.args[0].is_constant(), (prod, add)
-            a, b = products[prod].eval_constant()
+            a, b = products[prod].eval()
             if a == mpq(0) and b == mpq(0):
                 continue
             elif a == mpq(1) and b == mpq(0): 
@@ -186,7 +252,7 @@ class WeakNormalizer(IdentityTermVisitor):
                 coeff = Term.from_real_imag(a, b)
                 result.append(coeff * prod)
         # add the abolute constant if it is not zero
-        a, b = constant.eval_constant()
+        a, b = constant.eval()
         if a == mpq(0) and b == mpq(0):
             pass
         elif len(result) > 0 and (a < mpq(0) or (a == mpq(0) and b < mpq(0))):
@@ -197,7 +263,8 @@ class WeakNormalizer(IdentityTermVisitor):
     
     def visit_mul(self, mul: Mul) -> Term:
         """
-        Normalizes a product by collecting constant factors and rearranging non-constant factors in a canonical order.
+        Normalizes a product by collecting constant factors and
+        rearranging non-constant factors in a canonical order.
 
         >>> from logic1.theories.Complex import *
         >>> x, y, z = VV.get('x', 'y', 'z')
@@ -252,26 +319,24 @@ class WeakNormalizer(IdentityTermVisitor):
             else:
                 result.append(Pow(factor, exp))
         # evaluate constant and build final product
-        a, b = constant.eval_constant()
+        a, b = constant.eval()
         if negated:
             a, b = -a, -b
+        if len(result) == 0:
+            return Term.from_real_imag(a, b)
         if a == mpq(0) and b == mpq(0):
             return Rational(mpq(0))
         if a == mpq(1) and b == mpq(0):
             return Mul(*result)
         if a == mpq(-1) and b == mpq(0):
-            negated = True
+            result[0] = Neg(result[0])
         else:
             result = [Term.from_real_imag(a, b)] + result
-            negated = False
-        if len(result) == 0:
-            return Rational(mpq(1))
-        if negated:
-            result[0] = Neg(result[0])
         return Mul(*result)
 
     def visit_pow(self, pow: Pow) -> Term:
-        """Normalizes a power by evaluating it if the base is constant, and simplifying if the exponent is 0 or 1.
+        """Normalizes a power by evaluating it if the base is constant,
+        and simplifying if the exponent is 0 or 1.
 
         >>> from logic1.theories.Complex import *
         >>> x, y = VV.get('x', 'y')
@@ -290,7 +355,7 @@ class WeakNormalizer(IdentityTermVisitor):
             return Rational(mpq(1))  # note: 0^0 = 1 as for mpq
         base = pow.base.accept(self)
         if base.is_constant():
-            a, b = Pow(base, pow.exponent).eval_constant()
+            a, b = Pow(base, pow.exponent).eval()
             return Term.from_real_imag(a, b)
         elif pow.exponent == 1:
             return base
@@ -346,8 +411,50 @@ class WeakNormalizer(IdentityTermVisitor):
         else:
             return Im(arg)
 
+    def _visit_equality(self, eq: Eq | Ne) -> AtomicFormula:
+        lhs: Term = (eq.lhs - eq.rhs).accept(self)
+        a, b = lhs.lc().eval()
+        if (a, b) != (mpq(0), mpq(0)):
+            lhs = (lhs / Term.from_real_imag(a, b)).accept(self)
+        return eq.op(lhs, 0)
+
+    def _visit_inequality(self, ieq: Le | Ge | Lt | Gt) -> AtomicFormula:
+        lhs: Term = (ieq.lhs - ieq.rhs).accept(self)
+        a, b = lhs.lc().eval()
+        if a == mpq(0) and b != mpq(0):
+            c = b
+        elif a != mpq(0):
+            c = a
+        else:
+            return ieq.op(lhs, 0)
+        lhs = (lhs / Rational(c)).accept(self)
+        if c < mpq(0):
+            return ieq.op.converse()(lhs, 0)
+        else:
+            return ieq.op(lhs, 0)
+
+    def visit_eq(self, eq: Eq) -> AtomicFormula:
+        return self._visit_equality(eq)
+        
+    def visit_ne(self, ne: Ne) -> AtomicFormula:
+        return self._visit_equality(ne)
+
+    def visit_ge(self, ge: Ge) -> AtomicFormula:
+        return self._visit_inequality(ge)
+
+    def visit_le(self, le: Le) -> AtomicFormula:
+        return self._visit_inequality(le)
+    
+    def visit_gt(self, gt: Gt) -> AtomicFormula:
+        return self._visit_inequality(gt)
+
+    def visit_lt(self, lt: Lt) -> AtomicFormula:
+        return self._visit_inequality(lt)
+
+
 class Normalizer(WeakNormalizer):
-    """Visitor that normalizes a term as in `WeakNormalizer`, but also expands terms and propagates `Re`, `Im` and `Conj`.
+    """Visitor that normalizes a term as in `WeakNormalizer`, but also
+    expands terms and propagates `Re`, `Im` and `Conj`.
 
     >>> from logic1.theories.Complex import *
     >>> x, y, z = VV.get('x', 'y', 'z')
@@ -364,16 +471,19 @@ class Normalizer(WeakNormalizer):
     """
 
     def visit_mul(self, mul: Mul) -> Term:
-        for i, arg in enumerate(mul.args):
+        args = [arg.accept(self) for arg in mul.args]
+        for i, arg in enumerate(args):
             if isinstance(arg, Add):
-                arg_args = [Mul(*mul.args[:i], arg_arg, *mul.args[i + 1:]) for arg_arg in arg.args]
+                arg_args = [Mul(*args[:i], arg_arg, *args[i + 1:]) for arg_arg in arg.args]
                 return Add(*arg_args).accept(self)
-        return super().visit_mul(mul)
+        result = super().visit_mul(mul)
+        return result
     
     def visit_pow(self, pow: Pow) -> Term:
         term = super().visit_pow(pow)
         if isinstance(term, Pow) and not isinstance(term.base, (Variable, Re, Im, Conj)):
-            return Mul(*[term.base] * term.exponent).accept(self)
+            result = Mul(*[term.base] * term.exponent).accept(self)
+            return result
         return term
 
     def visit_neg(self, neg: Neg) -> Term:
@@ -427,7 +537,8 @@ class Normalizer(WeakNormalizer):
     
 
 class ComplexNormalizer(Normalizer):
-    """Visitor that normalizes a term as in `Normalizer`, but also replaces all occurrences of `Re` and `Im`. 
+    """Visitor that normalizes a term as in `Normalizer`, but also
+    replaces all occurrences of `Re` and `Im`.
     This yields a unique normal form for terms.
     
     >>> from logic1.theories.Complex import *
@@ -436,28 +547,28 @@ class ComplexNormalizer(Normalizer):
     z
     >>> (Re(z)**2 + Im(z)**2).accept(ComplexNormalizer())
     z * Conj(z) 
-    """    
+    """
 
     def visit_re(self, re: Re) -> Term:
-        """Replaces a real part term with its equivalent expression in terms of its argument and its conjugate.
+        """Replaces a real part term with its equivalent expression in
+        terms of its argument and its conjugate.
         
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> ComplexNormalizer().visit_re(Re(z))
         (z + Conj(z)) * 1/2
         """
-        term = (re.arg + Conj(re.arg)) / 2
-        return term.accept(self)
+        return ((re.arg + Conj(re.arg)) / 2).accept(self)
 
     def visit_im(self, im: Im) -> Term:
-        """Replaces an imaginary part term with its equivalent expression in terms of its argument and its conjugate.
+        """Replaces an imaginary part term with its equivalent
+        expression in terms of its argument and its conjugate.
 
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> ComplexNormalizer().visit_im(Im(z))
         (z - Conj(z)) * -I * 1/2
         """
-        term = (im.arg - Conj(im.arg)) / (2 * I)
-        return term.accept(self)
+        return ((im.arg - Conj(im.arg)) / (2 * I)).accept(self)
 
     
