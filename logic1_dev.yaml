@@ -21,6 +21,7 @@ dependencies:
   - line_profiler
   - more-itertools
   - mypy
+  - networkx
   - pip
   - pyeda
   - pytest
@@ -31,4 +32,5 @@ dependencies:
   - snakeviz
   - sphinx
   - sphinx-book-theme
+  - types-networkx
   - viztracer
