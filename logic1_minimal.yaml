@@ -16,6 +16,7 @@ channels:
 dependencies:
   - python=3.12
   - more-itertools
+  - networkx
   - pyeda
   - sage=10.6
   - typing-extensions
