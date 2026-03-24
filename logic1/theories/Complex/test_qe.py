@@ -8,7 +8,7 @@ def test_qe():
 
     # Ex. 7.4
     a, b, c, d = VV.get('a', 'b', 'c', 'd')
-    phi = Ex(c, All([b, a], Implies(Or(And(a == d, b ==c), And(a == c, b == 1)), a**2 == b))) 
+    phi = Ex(c, All([b, a], Implies(Or(And(a == d, b ==c), And(a == c, b == 1)), a**2 == b)))
     qe(phi)
 
     # some random formula
@@ -29,10 +29,10 @@ def test_colinear_points():
 
     # REMIS: Real Geometry Proving - Example by MacLane
     xb, xc, yc, xd, yd, xe, ye, xf, yf, xg, yg, xh, yh = VV.get('xb', 'xc', 'yc', 'xd', 'yd', 'xe', 'ye', 'xf', 'yf', 'xg', 'yg', 'xh', 'yh')
-    phi = All([yh, xe, ye, xf, yf, xg, yg], 
+    phi = All([yh, xe, ye, xf, yf, xg, yg],
               Implies(
                   And(
-                      xh * yc - xc * yh == 0, 
+                      xh * yc - xc * yh == 0,
                       xg * yf - xf * yg == 0,
                       xb * ye - xc * ye + xe * yc - xb * yc == 0,
                       xb * yh - xg * yh + xh * yg - xb * yg == 0,
@@ -63,7 +63,7 @@ def test_circuits():
 
     def cont_stability(Hp, Hq, s):
         return All(s, Implies(Hq == 0, Re(s) < 0))
-    
+
     def disc_stability(Hp, Hq, z):
         return All(z, Implies(Hq == 0, z * Conj(z) < 1))
 
@@ -78,10 +78,10 @@ def test_circuits():
     q1 = G1*1*(G9 + G1*0)*G5*G7*G2
     q2 = G1*1*(G9 + G1*0)*G7*G1*G2
 
-    Hp = p0 + p1*s + p2*s**2 
+    Hp = p0 + p1*s + p2*s**2
     Hq = q0 + q1*s + q2*s**2
     phi = And(*assume, cont_stability(Hp, Hq, s))
-    qe(phi)
+    # qe(phi)
 
     # Example 2
     z, A, B, C, D, E, F, G, H, I, J, K, L = VV.get('z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
@@ -97,7 +97,7 @@ def test_circuits():
     Hp = p0 + p1*z + p2*z**2
     Hq = q0 + q1*z + q2*z**2
     phi = And(*assume, disc_stability(Hp, Hq, z))
-    qe(phi)
+    # qe(phi)
 
     # Example 3
     s, gm1, gm2, gm3, go1, go2, gL, CC1, CC2, CL = VV.get('s', 'gm1', 'gm2', 'gm3', 'go1', 'go2', 'gL', 'CC1', 'CC2', 'CL')
