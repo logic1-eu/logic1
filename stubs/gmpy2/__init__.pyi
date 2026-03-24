@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 
-from typing import Literal, Self, TypeVar
+from typing import Literal, overload, Self, TypeVar
 from sage.all import Rational
 
 
@@ -69,7 +69,12 @@ class mpq:
     def __gt__(self, other: object) -> bool:
         ...
 
-    def __init__(self, arg: int | mpz | Rational) -> None:
+    @overload
+    def __init__(self, arg: float | int | mpz | Rational) -> None:
+        ...
+
+    @overload
+    def __init__(self, numer: int | mpz, denom: int | mpz) -> None:
         ...
 
     def __le__(self, other: object) -> bool:
@@ -95,7 +100,9 @@ class mpq:
 
 
 class mpz:
-    ...
+
+    def __int__(self) -> int:
+        ...
 
 
 def sign(arg: mpfr | mpq | mpz) -> Literal[-1, 0, 1]:

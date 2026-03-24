@@ -91,7 +91,7 @@ class Ex(QuantifiedFormula[α, τ, χ, σ]):
     >>> from logic1.theories.RCF import *
     >>> x, y, z = VV.get('x', 'y', 'z')
     >>> Ex(x, x**2 == y)
-    Ex(x, x^2 - y == 0)
+    Ex(x, x**2 - y == 0)
     >>> Ex([x, y], And(x > 0, y > 0, z == x - y))
     Ex(x, Ex(y, And(x > 0, y > 0, x - y - z == 0)))
     """
@@ -113,9 +113,9 @@ class All(QuantifiedFormula[α, τ, χ, σ]):
     >>> from logic1.theories.RCF import *
     >>> x, y = VV.get('x', 'y')
     >>> All(x, x**2 >= 0)
-    All(x, x^2 >= 0)
+    All(x, x**2 >= 0)
     >>> All([x, y], (x + y)**2 >= 0)
-    All(x, All(y, x^2 + 2*x*y + y^2 >= 0))
+    All(x, All(y, x**2 + 2*x*y + y**2 >= 0))
     """
     @classmethod
     def dual(cls) -> type[Ex[α, τ, χ, σ]]:

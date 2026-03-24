@@ -18,11 +18,43 @@ of a triangle ABC. If O does not lie outside of ABC, then ∠ACB = ∠AOB/2.
 ...                          x1 * t_prime == u1),
 ...                      t == t_prime).all({u1, u2, u3})
 >>> qe(stu99_3_16, clustering=Clustering.NONE, generic=Generic.FULL), qe.assumptions
-(T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0])
+(And(Or(u3 < 0, u1 == 0, u1**2 - u2**2 - u3**2 < 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 < 0, u1 == 0, u1**2 - u2**2 - u3**2 < 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 < 0, u1 == 0, u1**2 - u2**2 - u3**2 > 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 < 0, u1 == 0, u1**2 - u2**2 - u3**2 > 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 > 0, u1 == 0, u1**2 - u2**2 - u3**2 < 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 > 0, u1 == 0, u1**2 - u2**2 - u3**2 < 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 > 0, u1 == 0, u1**2 - u2**2 - u3**2 > 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 > 0, u1 == 0, u1**2 - u2**2 - u3**2 > 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0))),
+[u3 != 0, u1**2 - u2**2 - u3**2 != 0])
 >>> qe(stu99_3_16, clustering=Clustering.NONE, generic=Generic.MONOMIAL), qe.assumptions
-(T, [u3 != 0])
+(And(Or(u3 < 0, u1**2 - u2**2 - u3**2 <= 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 < 0, u1**2 - u2**2 - u3**2 <= 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 < 0, u1**2 - u2**2 - u3**2 >= 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 < 0, u1**2 - u2**2 - u3**2 >= 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 > 0, u1**2 - u2**2 - u3**2 <= 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 > 0, u1**2 - u2**2 - u3**2 <= 0, u1**2*u3 - u2**2*u3 - u3**3 < 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0)),
+Or(u3 > 0, u1**2 - u2**2 - u3**2 >= 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+u1**4 - 2*u1**2*u2**2 + 2*u1**2*u3**2 + u2**4 + 2*u2**2*u3**2 + u3**4 <= 0),
+Or(u3 > 0, u1**2 - u2**2 - u3**2 >= 0, u1**2*u3 - u2**2*u3 - u3**3 > 0,
+And(u1**2 - 2*u1*u2 + u2**2 + u3**2 != 0, u1**2 + 2*u1*u2 + u2**2 + u3**2 != 0))),
+[u3 != 0, u1 != 0])
 >>> qe(stu99_3_16, clustering=Clustering.FULL, generic=Generic.FULL), qe.assumptions
-(T, [u3 != 0, u1^2 - u2^2 - u3^2 != 0])
+(T, [u3 != 0, u1**2 - u2**2 - u3**2 != 0])
 >>> qe(stu99_3_16, clustering=Clustering.FULL, generic=Generic.MONOMIAL), qe.assumptions
 (T, [u3 != 0, u1 != 0])
 >>> qe(stu99_3_16, assume=[u1 != 0], clustering=Clustering.FULL, generic=Generic.MONOMIAL), qe.assumptions
@@ -51,6 +83,7 @@ all eight points lie on a line. This holds over R but not over C.
 6. Chou 2.1
 
 >>> VV.push()
+>>> cache_clear()
 >>> VV.imp('u1', 'u2', 'u3', 'x1', 'x2', 'x3', 'x4')
 >>> ex6 = All((x1,x2,x3,x4),
 ...           Implies(And(u1*x1 - u1*u3 == 0,

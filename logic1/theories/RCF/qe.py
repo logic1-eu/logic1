@@ -7,7 +7,8 @@ from typing import Iterable
 
 from logic1 import abc
 from logic1.firstorder import _T
-from logic1.theories.RCF.atomic import AtomicFormula, polynomial_ring, Term, Variable
+from logic1.theories.RCF import atomic
+from logic1.theories.RCF.atomic import AtomicFormula, Term, Variable
 from logic1.theories.RCF.node import Assumptions, Clustering, Generic, Node
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.typing import Formula
@@ -152,17 +153,15 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, froz
         return simplify(formula, assume)
 
     @classmethod
-    def init_env(cls, ring_vars: list[str]):
+    def init_env(cls, ring_vars: list[str]) -> None:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
         """
-        polynomial_ring.add_vars(ring_vars)
+        atomic.init_env(ring_vars)
 
     def init_env_arg(self) -> list[str]:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.
         """
-        # We pass the ring variables to the workers. The workers
-        # reconstruct the ring.
-        return [str(v) for v in polynomial_ring.get_vars()]
+        return atomic.init_env_arg()
 
 
 qe = virtual_substitution = VirtualSubstitution()
