@@ -100,7 +100,7 @@ class SortKey(Generic[τ]):
         return hash(self.term)
 
     def __le__(self, other: SortKey) -> bool:
-        ORDER = (Add, Mul, Neg, Conj, Pow, Im, Re, Variable, _I, Rational)
+        ORDER = (Rational, _I, Variable, Conj, Re, Im, Pow, Neg, Mul, Add)
         assert self.op in ORDER and other.op in ORDER
         if self.op == other.op:
             return self.args <= other.args
@@ -243,7 +243,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self.accept(LatexFormatter())
     
     def lc(self) -> Term:
-        """Returns the leading constant of this term.
+        """Returns the left-most coefficient of this term.
         """
         if self.is_constant():
             return self
@@ -261,6 +261,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def _dump(self) -> str:
         """Dump this term as a string that can be evaluated to
         reconstruct the term. This is used for debugging.
+
+        >>> x = VV['x']
+        >>> (x + 2 * I)._dump()
+        "Add(Variable('x'), Mul(Rational(mpq(2,1)), _I()))"
         """
         args = []
         for arg in self.args:
@@ -282,6 +286,21 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     @staticmethod
     def from_real_imag(real: mpq, imag: mpq) -> Term:
         """Construct a term from the given real and imaginary part.
+
+        >>> Term.from_real_imag(mpq(2), mpq(0))
+        2
+        >>> Term.from_real_imag(mpq(0), mpq(1))
+        I
+        >>> Term.from_real_imag(mpq(0), mpq(-1))
+        -I
+        >>> Term.from_real_imag(mpq(0), mpq(3))
+        3 * I
+        >>> Term.from_real_imag(mpq(2), mpq(1))
+        2 + I
+        >>> Term.from_real_imag(mpq(2), mpq(-1))
+        2 - I
+        >>> Term.from_real_imag(mpq(2), mpq(3))
+        2 + 3 * I
         """
         if imag == mpq(0):
             return Rational(real)
@@ -293,11 +312,31 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
             else:
                 return Mul(Rational(imag), _I())
         else:
-            return Add(Rational(real), Mul(Rational(imag), _I()))
+            if imag == mpq(1):
+                return Add(Rational(real), _I())
+            elif imag == mpq(-1):
+                return Add(Rational(real), Neg(_I()))
+            else:
+                return Add(Rational(real), Mul(Rational(imag), _I()))
     
     @staticmethod
     def from_number(value: Number) -> Term:
         """Construct a term from the given number.
+
+        >>> Term.from_number(2)
+        2
+        >>> Term.from_number(3.5)
+        7/2
+        >>> Term.from_number(Fraction(1, 3))
+        1/3
+        >>> Term.from_number(mpq(1, 4))
+        1/4
+        >>> Term.from_number(2 + 3j)
+        2 + 3 * I
+        >>> Term.from_number("x")
+        Traceback (most recent call last):
+          ...
+        ValueError: expected one of int, float, Fraction, mpq, complex; x is <class 'str'>
         """
         if isinstance(value, _RATIONAL_NUMBER_TYPES):
             return Rational(value)
@@ -309,6 +348,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
+
+        >>> x = VV['x']
+        >>> (x + 2).is_constant()
+        False
+        >>> (2 * I).is_constant()
+        True
         """
         try:
             self.eval()
@@ -319,22 +364,48 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def is_imaginary(self) -> bool:
         """Return :obj:`True` if this term is imaginary, i.e., its real
         part is zero.
+
+        >>> x = VV['x']
+        >>> (x + 2).is_imaginary()
+        False
+        >>> (2 * I).is_imaginary()
+        True
         """
         return Re(self).is_zero()
 
     def is_real(self) -> bool:
         """Return :obj:`True` if this term is real, i.e., its imaginary
         part is zero.
+
+        >>> x = VV['x']
+        >>> (x + 2).is_real()
+        False
+        >>> (x + Conj(x)).is_real()
+        True
         """
         return Im(self).is_zero()
 
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
+
+        >>> x = VV['x']
+        >>> (x + 2).is_variable()
+        False
+        >>> x.is_variable()
+        True
+        >>> I.is_variable()
+        False
         """
         return isinstance(self, Variable)
 
     def is_zero(self) -> bool:
-        """Return :obj:`True` if this term is equivalent to zero.
+        """Return :obj:`True` if this term is represents zero.
+
+        >>> x = VV['x']
+        >>> (x + 2).is_zero()
+        False
+        >>> (x - x).is_zero()
+        True
         """
         try:
             a, b = self.normalize_complex().eval()

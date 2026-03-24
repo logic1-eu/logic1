@@ -49,19 +49,19 @@ class BaseFormatter(TermVisitor[str], AtomicFormulaVisitor[str]):
 
     def visit_pow(self, pow: Pow) -> str:
         symbol = self.symbols.get(Pow, '^')
-        if isinstance(pow.base, (Add, Mul, Neg, Pow)):
+        if isinstance(pow.base, (Add, Mul, Neg, Pow, Conj)):
             return f'({pow.base.accept(self)}){symbol}{pow.exponent}'
         return f'{pow.base.accept(self)}{symbol}{pow.exponent}'
 
     def visit_neg(self, neg: Neg) -> str:
         symbol = self.symbols.get(Neg, '-')
-        if isinstance(neg.arg, (Add, Mul, Neg, Conj)):  # discuss -- for repr?
+        if isinstance(neg.arg, (Add, Mul)):
             return f'{symbol}({neg.arg.accept(self)})'
         return f'{symbol}{neg.arg.accept(self)}'
 
     def visit_conj(self, conj: Conj) -> str:
         symbol = self.symbols.get(Conj, '~')
-        if isinstance(conj.arg, (Add, Mul, Neg, Conj)):  # discuss -- for repr?
+        if isinstance(conj.arg, (Add, Mul)):
             return f'{symbol}({conj.arg.accept(self)})'
         return f'{symbol}{conj.arg.accept(self)}'
 
