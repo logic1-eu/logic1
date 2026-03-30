@@ -7,7 +7,7 @@ from logic1.theories.Complex import *
 
 def test_eval():
 
-    assert Term.from_number(5).eval() == (mpq(5), mpq(0))
+    assert Term(5).eval() == (mpq(5), mpq(0))
 
     assert (-I).eval() == (mpq(0), mpq(-1))
 

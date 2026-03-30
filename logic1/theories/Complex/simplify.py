@@ -5,9 +5,10 @@ from typing import Optional, Self, TypeVar
 import networkx as nx
 
 from logic1 import abc
-from logic1.firstorder.boolean import And, Or
+from logic1.firstorder.boolean import F, T, And, Or
+from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
 from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne
-from logic1.theories.Complex.term import _I, I, Conj, Im, Neg, Rational, Re, Term, TermVisitor, Variable
+from logic1.theories.Complex.term import I, Term, Variable
 from logic1.theories.Complex.types import Formula, Number
 
 from gmpy2 import mpz
@@ -63,16 +64,16 @@ class Options(abc.simplify.Options):
     pass
 
 
-class TermComplexityVisitor(TermVisitor[float]):
-    """Visitor that computes a measure of the complexity of a complex
-    term, used to guide the simplification process. The complexity is
-    defined as 1 plus the sum of the complexities of the subterms, with
+class ComplexityVisitor(ASTVisitor[float]):
+    """Visitor that computes a measure of the complexity of a AST, used to 
+    guide the simplification process. The complexity is defined as 1 plus the 
+    sum of the complexities of the children, with
     some adjustments for certain operations.
     """
 
-    def visit_rational(self, num: Rational) -> float:
-        """Returns the complexity of a rational term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_rational`.
+    def visit_rat(self, num: Rat) -> float:
+        """Returns the complexity of a rational number. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_rat`.
         """
         if num.value.denominator == mpz(1):
             return 1.0
@@ -81,55 +82,55 @@ class TermComplexityVisitor(TermVisitor[float]):
         
     def visit_i(self, _: _I) -> float:
         """Returns the complexity of the imaginary unit. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_i`.
+        abstract method :meth:`.Complex.ASTVisitor.visit_i`.
         """
         return 1.0
     
-    def visit_variable(self, var: Variable) -> float:
-        """Returns the complexity of a variable term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_variable`.
+    def visit_var(self, var: Var) -> float:
+        """Returns the complexity of a variable. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_var`.
         """
         return 1.0
 
-    def visit_add(self, add) -> float:
-        """Returns the complexity of an addition term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_add`.
+    def visit_add(self, add: Add) -> float:
+        """Returns the complexity of an addition. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_add`.
         """
         return 1.0 + sum((arg.arg if isinstance(arg, Neg) else arg).accept(self) for arg in add.args)
     
-    def visit_mul(self, mul) -> float:   
-        """Returns the complexity of a multiplication term. Implements
-        the abstract method :meth:`.Complex.TermVisitor.visit_mul`.
+    def visit_mul(self, mul: Mul) -> float:   
+        """Returns the complexity of a multiplication. Implements
+        the abstract method :meth:`.Complex.ASTVisitor.visit_mul`.
         """
         return 1.0 + sum(arg.accept(self) for arg in mul.args)
 
-    def visit_pow(self, pow) -> float:
-        """Returns the complexity of a power term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_pow`.
+    def visit_pow(self, pow: Pow) -> float:
+        """Returns the complexity of a power. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_pow`.
         """
         return 1.0 + pow.base.accept(self)
 
     def visit_neg(self, neg: Neg) -> float:
-        """Returns the complexity of a negation term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_neg`.
+        """Returns the complexity of a negation. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_neg`.
         """
         return 1.0 + neg.arg.accept(self)
     
     def visit_conj(self, conj: Conj) -> float:
-        """Returns the complexity of a conjugate term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_conj`.
+        """Returns the complexity of a conjugation. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_conj`.
         """
         return conj.arg.accept(self)
     
     def visit_re(self, re: Re) -> float:
-        """Returns the complexity of a real part term. Implements the
-        abstract method :meth:`.Complex.TermVisitor.visit_re`.
+        """Returns the complexity of a real part. Implements the
+        abstract method :meth:`.Complex.ASTVisitor.visit_re`.
         """
         return 1.0 + re.arg.accept(self)
         
     def visit_im(self, im: Im) -> float:
-        """Returns the complexity of an imaginary part term. Implements
-        the abstract method :meth:`.Complex.TermVisitor.visit_im`.
+        """Returns the complexity of an imaginary part. Implements
+        the abstract method :meth:`.Complex.ASTVisitor.visit_im`.
         """
         return 1.0 + im.arg.accept(self)
 
@@ -151,20 +152,17 @@ class InternalRepresentation(
         :meth:`.abc.simplify.InternalRepresentation.add`.
         """
         if gand is Or:
-            atoms = (atom.to_complement() for atom in atoms)
+            atoms = [atom.to_complement() for atom in atoms]
         for atom in atoms:
-            atom = atom.normalize_complex()
-            assert atom.rhs.is_zero()
-            try:
-                if atom.eval():
-                    continue
-                else:
-                    raise InternalRepresentation.Inconsistent()
-            except ValueError: 
-                pass
-            if atom.to_complement() in self._atoms:
+            simple_atom = atom.simplify()
+            if simple_atom is T:
+                continue
+            if simple_atom is F:
                 raise InternalRepresentation.Inconsistent()
-            self._atoms.add(atom)
+            assert isinstance(simple_atom, AtomicFormula) and simple_atom.rhs.is_zero()
+            if simple_atom.to_complement() in self._atoms:
+                raise InternalRepresentation.Inconsistent()
+            self._atoms.add(simple_atom)
         return abc.simplify.RESTART.NONE
     
     @staticmethod
@@ -172,8 +170,8 @@ class InternalRepresentation(
         """Returns a measure of the complexity of the given atomic
         formula, used to guide the simplification process.
         """
-        visitor = TermComplexityVisitor()
-        return 1.0 + atom.lhs.accept(visitor) + atom.rhs.accept(visitor)
+        visitor = ComplexityVisitor()
+        return 1.0 + atom.lhs._ast.accept(visitor) + atom.rhs._ast.accept(visitor)
 
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method
@@ -250,14 +248,18 @@ class InternalRepresentation(
             atom2 = atom2.op(atom2.lhs * I, atom2.rhs * I)
         if not atom1.is_real() or not atom2.is_imaginary():
             return None
-        result = atom1.op(atom1.lhs + atom2.lhs, atom1.rhs + atom2.rhs).normalize_complex()
+        result = atom1.op(atom1.lhs + atom2.lhs, atom1.rhs + atom2.rhs)
         return result
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method
         :meth:`.abc.simplify.InternalRepresentation.next_`.
         """
-        return self.__class__(_atoms=set(self._atoms), _options=self._options)
+        atoms = set()
+        for atom in self._atoms:
+            if remove is None or remove not in atom.fvars():
+                atoms.add(atom)
+        return self.__class__(_atoms=atoms, _options=self._options)
     
 
 @dataclass(frozen=True)

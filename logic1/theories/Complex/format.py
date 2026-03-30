@@ -1,23 +1,24 @@
 
-from logic1.theories.Complex.atomic import AtomicFormula, AtomicFormulaVisitor, Eq, Ge, Gt, Le, Lt, Ne
-from logic1.theories.Complex.term import Add, Conj, IdentityTermVisitor, _I, I, Im, Mul, Neg, Number, Pow, Rational, Re, Term, TermVisitor, Variable, VV
-from gmpy2 import mpq, mpz
+
+from gmpy2 import mpz
+
+from logic1.theories.Complex.ast import _I, AST, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Re, Var, Rat
 
 
-class BaseFormatter(TermVisitor[str], AtomicFormulaVisitor[str]):
+class BaseFormatter(ASTVisitor[str]):
 
-    symbols: dict[type[Term] | type[AtomicFormula], str] = {}
+    symbols: dict[type[AST], str] = {}
 
     def group(self, s: str) -> str:
         return s
     
-    def visit_rational(self, num: Rational) -> str:
+    def visit_rat(self, num: Rat) -> str:
         return str(num.value)
     
     def visit_i(self, _: _I) -> str:
         return self.symbols.get(_I, 'i')
     
-    def visit_variable(self, var: Variable) -> str:
+    def visit_var(self, var: Var) -> str:
         return var.name
     
     def visit_add(self, add: Add) -> str:
@@ -73,30 +74,6 @@ class BaseFormatter(TermVisitor[str], AtomicFormulaVisitor[str]):
         symbol = self.symbols.get(Im, 'Im')
         return f'{symbol}({im.arg.accept(self)})'
 
-    def visit_eq(self, eq: Eq) -> str:
-        symbol = self.symbols.get(Eq, '==')
-        return f'{eq.lhs.accept(self)} {symbol} {eq.rhs.accept(self)}'
-
-    def visit_ne(self, ne: Ne) -> str:
-        symbol = self.symbols.get(Ne, '!=')
-        return f'{ne.lhs.accept(self)} {symbol} {ne.rhs.accept(self)}'
-
-    def visit_le(self, le: Le) -> str:
-        symbol = self.symbols.get(Le, '<=')
-        return f'{le.lhs.accept(self)} {symbol} {le.rhs.accept(self)}'
-
-    def visit_lt(self, lt: Lt) -> str:
-        symbol = self.symbols.get(Lt, '<')
-        return f'{lt.lhs.accept(self)} {symbol} {lt.rhs.accept(self)}'
-
-    def visit_ge(self, ge: Ge) -> str:
-        symbol = self.symbols.get(Ge, '>=')
-        return f'{ge.lhs.accept(self)} {symbol} {ge.rhs.accept(self)}'
-
-    def visit_gt(self, gt: Gt) -> str:
-        symbol = self.symbols.get(Gt, '>')
-        return f'{gt.lhs.accept(self)} {symbol} {gt.rhs.accept(self)}'
-
 
 class ReprFormatter(BaseFormatter):
     
@@ -116,18 +93,12 @@ class LatexFormatter(BaseFormatter):
         Mul: '\\cdot',
         Re: '\\operatorname{Re}',
         Im: '\\operatorname{Im}',
-        Eq: '=',
-        Ne: '\\neq',
-        Le: '\\leq',
-        Lt: '<',
-        Ge: '\\geq',
-        Gt: '>'
     }
 
     def group(self, s: str) -> str:  # TODO: fix i^1000
         return f'{{{s}}}'
 
-    def visit_rational(self, num: Rational) -> str:
+    def visit_rat(self, num: Rat) -> str:
         a = num.value.numerator
         b = num.value.denominator
         if a == mpz(0) or b == mpz(1):
@@ -135,7 +106,7 @@ class LatexFormatter(BaseFormatter):
         else:
             return f'\\frac{{{str(a)}}}{{{str(b)}}}'
         
-    def visit_variable(self, var: Variable) -> str:
+    def visit_var(self, var: Var) -> str:
         if "_" in var.name:
             base, *indices = var.name.split("_")
             grouped = "_".join(f'{{{idx}}}' for idx in indices)
