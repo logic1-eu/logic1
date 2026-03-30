@@ -9,14 +9,15 @@ endif
 ign_cython               := --ignore=logic1/theories/RCF/range.pyx
 ign_other_backend_module := --ignore=logic1/theories/RCF/$(other_backend_module).py
 ign_parallel             := --ignore-glob=*parallel*
-ign_redlog               := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
+ign_redlog               := --ignore=logic1/theories/RCF/test_redlog.txt \
+							--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                             --ignore=logic1/theories/RCF/redlog.py
 ign_slow                 := --ignore=logic1/theories/RCF/test_simplify_motor.txt \
                             --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                             --ignore=logic1/theories/RCF/test_qe.txt
 ign_redlog_motor         := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 
-ignores := $(ign_other_backend_module) $(ign_redlog_motor)
+ignores := $(ign_other_backend_module) $(ign_redlog)
 
 exclude_re := logic1/theories/RCF/$(other_backend_module)\.py
 
