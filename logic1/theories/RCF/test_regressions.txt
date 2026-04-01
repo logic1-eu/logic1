@@ -41,3 +41,10 @@ i2 == 0, Or(And(9*td - 20050 == 0, q > 0), And(9*td - 20050 <= 0, q == 0,
 >>> phi = qe(Ex(x, T))
 >>> qe(phi)
 T
+
+# There was a bug in Node.memorize for nodes with the same formula but different
+# variables
+>>> a, b = VV.get('a', 'b')
+>>> phi = Ex([a, b], a != 0)
+>>> qe(phi)
+T

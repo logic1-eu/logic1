@@ -102,7 +102,8 @@ class Generic(Enum):
 
 @dataclass
 class Node(abc.qe.Node[
-        AtomicFormula, Term, Variable, int, Assumptions, tuple[Formula, frozenset[Term]]]):
+        AtomicFormula, Term, Variable, int, Assumptions, 
+        tuple[tuple[Variable, ...], Formula, frozenset[Term]]]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.VirtualSubstitution` for
@@ -169,8 +170,10 @@ class Node(abc.qe.Node[
         else:
             return abc.qe.multiprocessing_logger
 
-    def memorize(self) -> tuple[Formula, frozenset[Term]]:
-        return (self.formula, frozenset(self.passive_list))
+    def memorize(self) -> tuple[tuple[Variable, ...], Formula, frozenset[Term]]:
+        return (tuple(self.variables), 
+                self.formula, 
+                frozenset(self.passive_list))
 
     def process(self, assumptions: Assumptions) -> Sequence[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
