@@ -15,7 +15,7 @@ from logic1 import abc
 from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, Term, Variable
 from logic1.theories.RCF.simplify import is_valid, simplify
-from logic1.theories.RCF.typing import Formula
+from logic1.theories.RCF.types import Formula
 
 if TYPE_CHECKING:
     from logic1.theories.RCF.qe import Options

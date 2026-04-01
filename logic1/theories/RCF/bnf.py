@@ -2,7 +2,7 @@ from ... import abc
 
 from .atomic import AtomicFormula, Term, Variable
 from .simplify import simplify as _simplify
-from .typing import Formula
+from .types import Formula
 
 
 class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, int]):

@@ -14,7 +14,7 @@ from logic1.firstorder import _T, _F
 from logic1.support.excepthook import NoTraceException
 
 if TYPE_CHECKING:
-    from .typing import Formula
+    from .types import Formula
 
 
 POLYLIB: Final[str] = "FLINT"

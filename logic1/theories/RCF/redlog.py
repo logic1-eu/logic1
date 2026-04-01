@@ -5,7 +5,7 @@ import logic1.firstorder as firstorder
 from logic1.support.excepthook import NoTraceException
 from logic1.theories.RCF.atomic import AtomicFormula, Variable
 from logic1.theories.RCF.qe import Generic
-from logic1.theories.RCF.typing import Formula
+from logic1.theories.RCF.types import Formula
 
 _START: Final = '889e0d7343405c079195e7b8903c8c9e'
 _END: Final = 'b0061974914468de549a2af8ced10316'

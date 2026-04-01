@@ -33,7 +33,7 @@ from ...support.excepthook import NoTraceException
 from ...support.tracing import trace  # noqa
 
 if TYPE_CHECKING:
-    from .typing import Formula
+    from .types import Formula
 
 
 POLYLIB: Final = "SAGE"

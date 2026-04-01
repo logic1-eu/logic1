@@ -430,4 +430,4 @@ class C_(AtomicFormula):
         return cls._instances[index]
 
 
-from .typing import Formula
+from .types import Formula

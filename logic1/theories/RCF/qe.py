@@ -11,7 +11,7 @@ from logic1.theories.RCF import atomic
 from logic1.theories.RCF.atomic import AtomicFormula, Term, Variable
 from logic1.theories.RCF.node import Assumptions, Clustering, Generic, Node
 from logic1.theories.RCF.simplify import simplify
-from logic1.theories.RCF.typing import Formula
+from logic1.theories.RCF.types import Formula
 
 
 @dataclass

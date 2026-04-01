@@ -17,7 +17,7 @@ from ... import abc
 from ...firstorder import And, _F, Not, Or, _T
 from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
 from .substitution import _SubstValue, _Substitution  # type: ignore
-from .typing import Formula
+from .types import Formula
 
 from .range import EndPoint, EP_INF, EP_ZERO, _Range, RANGE_R  # type: ignore
 from ...support.tracing import trace  # noqa

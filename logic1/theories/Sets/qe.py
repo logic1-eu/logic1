@@ -12,7 +12,7 @@ from logic1.support.tracing import trace  # noqa
 from logic1.theories.Sets.atomic import AtomicFormula, C, Eq, Ne, Variable
 from logic1.theories.Sets.bnf import dnf
 from logic1.theories.Sets.simplify import simplify
-from logic1.theories.Sets.typing import Formula
+from logic1.theories.Sets.types import Formula
 
 
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):

@@ -1,7 +1,7 @@
 from ... import abc
 from .atomic import AtomicFormula, Variable
 from .simplify import simplify as _simplify
-from .typing import Formula, Never
+from .types import Formula, Never
 
 
 class BooleanNormalForm(
