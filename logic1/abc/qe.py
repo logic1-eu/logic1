@@ -22,7 +22,7 @@ from typing import reveal_type  # noqa
 
 from logic1.support.excepthook import NoTraceException
 from logic1.firstorder import (All, And, AtomicFormula, _F, Formula, Not, Or,
-                               Prefix, Term, Variable)
+                               Prefix, _T, Term, Variable)
 from logic1.support.logging import DeltaTimeFormatter, Timer
 
 # Create logger
@@ -232,6 +232,8 @@ class WorkingNodeList(NodeList[ν, μ]):
     def extend(self, nodes: Iterable[ν]) -> None:
         for node in nodes:
             match node.formula:
+                case _T():
+                    raise FoundT()
                 case _F():
                     continue
                 case Or(args=args):
@@ -450,6 +452,8 @@ class WorkingNodeListProxy(NodeListProxy[ν, μ]):
         new_nodes = []
         for node in nodes:
             match node.formula:
+                case _T():
+                    raise FoundT()
                 case _F():
                     continue
                 case Or(args=args):

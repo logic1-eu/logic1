@@ -34,3 +34,10 @@ i2 == 0, Or(And(9*td - 20050 == 0, q > 0), And(9*td - 20050 <= 0, q == 0,
 ...     q *= factor ** exp
 >>> p - q
 0
+
+# There was a assertion violation in WorkingNodeList.extend if a node contained 
+# the formula T
+>>> x = VV['x']
+>>> phi = qe(Ex(x, T))
+>>> qe(phi)
+T
