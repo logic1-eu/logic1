@@ -1,13 +1,13 @@
+from typing import Iterable
+
 from logic1.firstorder.boolean import _F, _T, And, Equivalent, Implies, Not, Or
 from logic1.firstorder.quantified import All, Ex
 from logic1.theories import RCF
 from logic1.theories.Complex.ast import _I, Conj, Im, Rat, Re, Var
 from logic1.theories.Complex.simplify import simplify
 from logic1.theories.Complex.term import VV, Term
-from logic1.theories.RCF.atomic import AtomicFormula as RCF_AtomicFormula  # TODO: export in __init__
-from logic1.theories.RCF.typing import Formula as RCF_Formula  # TODO: export in __init__
 from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne, Ge, Gt, Le, Lt
-from logic1.theories.Complex.normalize import ArithmeticEvaluator, Normalizer
+from logic1.theories.Complex.normalize import ArithmeticEvaluator, RealNormalizer, ComplexNormalizer, cartesian_normal_form, conjugate_normal_form
 from logic1.theories.Complex.types import Formula
 
 
@@ -74,8 +74,29 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         else:
             raise ValueError(f"Cannot evaluate imaginary part of non-variable term {im.arg} in RCF")
         
+def real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
+    """Converts an atomic formula in the theory of complex numbers that is
+    already known to be a real formula to an equivalent atomic formula
+    in the theory of real closed fields.
+    """
+    assert atom.is_real()
+    lhs = cartesian_normal_form((atom.lhs - atom.rhs)._ast).accept(RCF_Evaluator())
+    if isinstance(atom, Eq):
+        return RCF.Eq(lhs, 0)
+    elif isinstance(atom, Ne):
+        return RCF.Ne(lhs, 0)
+    elif isinstance(atom, Ge):
+        return RCF.Ge(lhs, 0)
+    elif isinstance(atom, Gt):
+        return RCF.Gt(lhs, 0)
+    elif isinstance(atom, Le):
+        return RCF.Le(lhs, 0)
+    elif isinstance(atom, Lt):
+        return RCF.Lt(lhs, 0)
+    else:                
+        assert False, type(atom)
 
-def formula_to_rcf(formula: Formula) -> RCF_Formula:
+def formula_to_rcf(formula: Formula) -> RCF.Formula:
     """Converts a formula in the theory of complex numbers to an
     equivalent formula in the theory of real closed fields. Raises a
     ValueError if the formula contains any complex-specific operations
@@ -84,28 +105,15 @@ def formula_to_rcf(formula: Formula) -> RCF_Formula:
     """
     if isinstance(formula, AtomicFormula): 
        if formula.is_real():
-            lhs = Re(formula.lhs._ast).accept(Normalizer()).accept(RCF_Evaluator())
-            rhs = Re(formula.rhs._ast).accept(Normalizer()).accept(RCF_Evaluator())
-            if isinstance(formula, Eq):
-                return RCF.Eq(lhs - rhs, 0)
-            elif isinstance(formula, Ne):
-                return RCF.Ne(lhs - rhs, 0)
-            elif isinstance(formula, Ge):
-                return RCF.Ge(lhs - rhs, 0)
-            elif isinstance(formula, Gt):
-                return RCF.Gt(lhs - rhs, 0)
-            elif isinstance(formula, Le):
-                return RCF.Le(lhs - rhs, 0)
-            elif isinstance(formula, Lt):
-                return RCF.Lt(lhs - rhs, 0)
-            else:                
-                assert False, type(formula)
+            return real_atom_to_rcf(formula)
        else:
             formula = formula.as_real_formula()
             return formula_to_rcf(formula)
     if isinstance(formula, (All, Ex)):
-        var_re = RCF.VV[f"{formula.var.name}_re"]
-        var_im = RCF.VV[f"{formula.var.name}_im"]
+        var = conjugate_normal_form(formula.var._ast)
+        assert isinstance(var, Var)
+        var_re = RCF.VV[f"{var.name}_re"]
+        var_im = RCF.VV[f"{var.name}_im"]
         arg = formula_to_rcf(formula.arg)
         return formula.op([var_re, var_im], arg)
     if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
@@ -143,9 +151,10 @@ def term_to_complex(term: RCF.Term) -> Term:
     return result
 
 
-def formula_to_complex(formula: RCF_Formula) -> Formula:
-    OPS: dict[type[RCF_AtomicFormula], type[AtomicFormula]] = {RCF.Eq: Eq, RCF.Ne: Ne, RCF.Ge: Ge, RCF.Gt: Gt, RCF.Le: Le, RCF.Lt: Lt}
-    if isinstance(formula, RCF_AtomicFormula):
+def formula_to_complex(formula: RCF.Formula) -> Formula:
+    OPS: dict[type[RCF.AtomicFormula], type[AtomicFormula]] = {
+        RCF.Eq: Eq, RCF.Ne: Ne, RCF.Ge: Ge, RCF.Gt: Gt, RCF.Le: Le, RCF.Lt: Lt}
+    if isinstance(formula, RCF.AtomicFormula):
         lhs = term_to_complex(formula.lhs)
         rhs = term_to_complex(formula.rhs)
         return OPS[type(formula)](lhs, rhs)
@@ -156,15 +165,27 @@ def formula_to_complex(formula: RCF_Formula) -> Formula:
     assert False, type(formula)
     
 
-def qe(formula: Formula, final_simplify: bool = True) -> Formula:
+def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
     """Quantifier elimination for the theory of complex numbers. Returns a
     quantifier-free formula equivalent to the input formula.
     """
-    rcf_formula = formula_to_rcf(formula)
-    rcf_qe_formula = RCF.qe(rcf_formula)
+    assumption = formula_to_rcf(And(*assume))
+    if isinstance(assumption, RCF.AtomicFormula):
+        rcf_assume = [assumption]
+    elif isinstance(assumption, And):
+        rcf_assume = [arg for arg in assumption.args 
+                      if isinstance(arg, RCF.AtomicFormula)]
+    else:
+        rcf_assume = []
+    rcf_formula = formula_to_rcf(formula).to_pnf()
+    topmost_op = type(rcf_formula)
+    rcf_qe_formula = RCF.qe(rcf_formula, assume=rcf_assume, **options)
     if rcf_qe_formula is None:
         raise ValueError("Quantifier elimination failed")
+    if topmost_op == All:
+        rcf_qe_formula = RCF.simplify(RCF.cnf(rcf_qe_formula))
+    elif topmost_op == Ex:
+        rcf_qe_formula = RCF.simplify(RCF.dnf(rcf_qe_formula))
     result = formula_to_complex(rcf_qe_formula)
-    if final_simplify:
-        result = simplify(result)
+    result = simplify(result)
     return result

@@ -5,7 +5,7 @@ from typing import Optional, Self, TypeVar
 import networkx as nx
 
 from logic1 import abc
-from logic1.firstorder.boolean import F, T, And, Or
+from logic1.firstorder.boolean import _F, F, _T, T, And, Or
 from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
 from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne
 from logic1.theories.Complex.term import I, Term, Variable
@@ -120,7 +120,7 @@ class ComplexityVisitor(ASTVisitor[float]):
         """Returns the complexity of a conjugation. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_conj`.
         """
-        return conj.arg.accept(self)
+        return 1.0 + conj.arg.accept(self)
     
     def visit_re(self, re: Re) -> float:
         """Returns the complexity of a real part. Implements the
@@ -181,17 +181,10 @@ class InternalRepresentation(
         assert all(atom in self._atoms for atom in ref._atoms)
 
         refs = set(ref._atoms)
-        #for atom in ref._atoms:
-        #    if not atom.is_real():
-        #        real_formula = atom.as_real_formula()
-        #        if isinstance(real_formula, And):
-        #            for arg in real_formula.args:
-        #                if isinstance(arg, AtomicFormula):
-        #                    refs.add(arg)
 
         node_costs: dict[AtomicFormula, float] = dict()
         edge_weights: dict[tuple[AtomicFormula, AtomicFormula], float] = dict()
-        edge_results: dict[tuple[AtomicFormula, AtomicFormula], AtomicFormula] = dict()
+        edge_results: dict[tuple[AtomicFormula, AtomicFormula], AtomicFormula | _T | _F] = dict()
 
         for atom in self._atoms:
             node_costs[atom] = self._complexity(atom)
@@ -203,8 +196,14 @@ class InternalRepresentation(
                 new = self._merge_atoms(node, other)
                 if new is None:
                     continue
+                if new is F:
+                    raise InternalRepresentation.Inconsistent()
+                if new is T:
+                    new_weight = 0.0
+                else:
+                    assert isinstance(new, AtomicFormula)
+                    new_weight = self._complexity(new)
                 old_weight = edge_weights.get((node, other), float('inf'))
-                new_weight = self._complexity(new)
                 if new_weight < old_weight:
                     edge_weights[(node, other)] = edge_weights[(other, node)] = new_weight
                     edge_results[(node, other)] = edge_results[(other, node)] = new
@@ -214,14 +213,19 @@ class InternalRepresentation(
         result: set[AtomicFormula] = set()
         remaining: set[AtomicFormula] = set(self._atoms)
         for node, other in cover:
-            atom = edge_results[(node, other)]
-            if atom in refs:
+            res = edge_results[(node, other)]
+            if res is T:
                 continue
-            if atom.to_complement() in refs:
+            assert isinstance(res, AtomicFormula)
+            if res in refs:
+                continue
+            if res.to_complement() in refs:
                 raise InternalRepresentation.Inconsistent()
-            result.add(atom)
-            remaining.remove(node)
-            remaining.remove(other)
+            result.add(res)
+            if node in remaining:
+                remaining.remove(node)
+            if other in remaining:
+                remaining.remove(other)
         result.update(remaining)
 
         result = set(atom for atom in result if not atom in refs)
@@ -234,22 +238,21 @@ class InternalRepresentation(
             return list(result)
         
     @staticmethod
-    def _merge_atoms(atom1: AtomicFormula, atom2: AtomicFormula) -> Optional[AtomicFormula]:
-        """Given two real or imaginary atomic formulas, returns a
+    def _merge_atoms(atom1: AtomicFormula, atom2: AtomicFormula) -> Optional[AtomicFormula | _T | _F]:
+        """Given two atomic formulas, returns a
         single atomic formula that is equivalent to both of them, or
         None if no such formula can be found.
         """
-        if isinstance(atom1, Ne) or not isinstance(atom2, Eq):
+        if not isinstance(atom1, Eq) or not isinstance(atom2, Eq):
             return None
         if atom1.is_imaginary():
-            assert isinstance(atom1, Eq)
             atom1 = atom1.op(atom1.lhs / I, atom1.rhs / I)
         if atom2.is_real():
             atom2 = atom2.op(atom2.lhs * I, atom2.rhs * I)
         if not atom1.is_real() or not atom2.is_imaginary():
             return None
         result = atom1.op(atom1.lhs + atom2.lhs, atom1.rhs + atom2.rhs)
-        return result
+        return result.simplify()
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method

@@ -201,6 +201,21 @@ class AST:
         method raises a ValueError.
         """
         return self.accept(ConstantEvaluator())
+    
+    def factors(self) -> list[AST]:
+        """Return a list of factors of this AST node, where each factor is a 
+        AST node that is not a multiplication.
+
+        >>> x = Var('x')
+        >>> (2 * x * I).factors()
+        [2, x, I]
+        >>> (x + 1).factors()
+        [x + 1]
+        """
+        if isinstance(self, Mul):
+            return list(self.args)
+        else:
+            return [self]
         
     @staticmethod
     def from_real_imag(real: mpq, imag: mpq) -> AST:

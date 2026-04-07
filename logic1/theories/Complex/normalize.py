@@ -3,11 +3,13 @@ the theory of complex numbers.
 """
 
 from abc import abstractmethod
-from typing import TypeVar
+from dataclasses import dataclass
+from functools import total_ordering
+from typing import Self, TypeVar
 
 from gmpy2 import mpq
 
-from logic1.theories.Complex.ast import _I, AST, I, Add, ASTVisitor, Conj, IdentityASTVisitor, Im, Mul, Neg, Pow, Rat, Re, Var
+from logic1.theories.Complex.ast import _I, AST, I, Add, ASTVisitor, Conj, IdentityASTVisitor, Im, Mul, Neg, Pow, Rat, Re, SortKey, Var
 
 α = TypeVar('α')
 """Type variable for the result type of `ASTVisitor` methods."""
@@ -171,6 +173,80 @@ class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
         """
         _, b = im.arg.accept(self)
         return b, mpq(0)
+    
+
+@dataclass
+@total_ordering
+class AddSortKey:
+
+    ast: AST
+    total_degree: int
+    factors: list[tuple[AST, int]]
+
+    def __init__(self, ast: AST) -> None:
+        if isinstance(ast, Neg):
+            ast = ast.arg
+        self.ast = ast
+        self.total_degree = 0
+        self.factors = []
+        for factor in self.ast.factors():
+            if factor.is_constant():
+                continue
+            if isinstance(factor, Neg):
+                factor = factor.arg
+            degree = 1
+            if isinstance(factor, Pow):
+                degree = factor.exponent
+                factor = factor.base
+            self.factors.append((factor, degree))
+            self.total_degree += degree
+
+    def __le__(self, other: Self) -> bool:
+        if self.total_degree != other.total_degree:
+            return self.total_degree <= other.total_degree
+        for i in range(len(self.factors)):
+            if i == len(other.factors):
+                return False 
+            if self.factors[i] != other.factors[i]:
+                factor1, degree1 = self.factors[i]
+                factor2, degree2 = other.factors[i]
+                if factor1 != factor2:
+                    return not (MulSortKey(factor1) <= MulSortKey(factor2))
+                else:
+                    return degree1 <= degree2
+        return True
+
+
+@dataclass
+@total_ordering
+class MulSortKey:
+
+
+    ast: AST
+    degree: int = 1
+
+    @property
+    def args(self) -> tuple[object, ...]:
+        return tuple(MulSortKey(arg) if isinstance(arg, AST) else arg for arg in self.ast.args)
+
+    def __init__(self, ast: AST) -> None:
+        assert not ast.is_constant()
+        assert not isinstance(ast, (Neg, Mul))
+        if isinstance(ast, Pow):
+            self.ast = ast.base
+            self.degree = ast.exponent
+        else:
+            self.ast = ast
+            self.degree = 1
+
+    def __le__(self, other: Self) -> bool:
+        ORDER = (Var, Conj, Re, Im, Add)
+        assert self.ast.op in ORDER, self.ast.op
+        assert other.ast.op in ORDER, other.ast.op
+        if self.ast.op == other.ast.op:
+            return (self.args, self.degree) <= (other.args, other.degree)
+        else:
+            return ORDER.index(self.ast.op) <= ORDER.index(other.ast.op)
 
 
 class WeakNormalizer(IdentityASTVisitor):
@@ -178,6 +254,29 @@ class WeakNormalizer(IdentityASTVisitor):
     and applying obvious simplifications, but not expanding any nodes.
     """
     
+    def _add_sort_key(self, ast: AST) -> tuple[int, tuple[tuple[SortKey, int], ...]]:
+        total_degree = 0
+        pairs = []
+        for factor in ast.factors():
+            if factor.is_constant():
+                continue
+            if isinstance(factor, Neg):
+                factor = factor.arg
+            degree = 1
+            if isinstance(factor, Pow):
+                degree = factor.exponent
+                factor = factor.base
+            pairs.append((factor.sort_key(), degree))
+            total_degree += degree
+        result = (total_degree, tuple(pairs))
+        # print(ast, result)
+        return result
+
+    def _mul_sort_key(self, ast: AST) -> SortKey:
+        if isinstance(ast, Pow):
+            ast = ast.base
+        return ast.sort_key()
+
     def visit_add(self, add: Add) -> AST:
         """Normalizes a sum by collecting constant terms and
         rearranging non-constant terms in a canonical order.
@@ -216,7 +315,8 @@ class WeakNormalizer(IdentityASTVisitor):
             products[arg] = products.get(arg, 0) + coeff 
         # put all products with their coefficients back together and simplify if possible
         result = []
-        for i, prod in enumerate(sorted(products, key=AST.sort_key)):
+        sorted_products = sorted(products, key=AddSortKey, reverse=True)
+        for i, prod in enumerate(sorted_products):
             assert not isinstance(prod, Mul) or not prod.args[0].is_constant(), (prod, add)
             a, b = products[prod].eval()
             if a == mpq(0) and b == mpq(0):
@@ -301,7 +401,7 @@ class WeakNormalizer(IdentityASTVisitor):
                 result.append(factor)
             else:
                 result.append(Pow(factor, exp))
-        result.sort(key=AST.sort_key)
+        result.sort(key=MulSortKey)
         # evaluate constant and build final product
         a, b = constant.eval()
         if negated:
@@ -478,7 +578,7 @@ class Normalizer(WeakNormalizer):
         >>> from logic1.theories.Complex.ast import *
         >>> x, y = Var('x'), Var('y')
         >>> Normalizer().visit_pow((x + y)**2)
-        x**2 + y**2 + 2 * x * y
+        x**2 + 2 * x * y + y**2
         >>> Normalizer().visit_pow((x * y)**2)
         x**2 * y**2
         >>> Normalizer().visit_pow((-x)**3)
@@ -626,3 +726,52 @@ class ComplexNormalizer(Normalizer):
         return ((im.arg - Conj(im.arg)) / (2 * I)).accept(self)
 
     
+class RealNormalizer(Normalizer):
+
+    def visit_re(self, re: Re) -> AST:
+        if isinstance(re.arg, Var):
+            return re
+        return super().visit_re(re)
+    
+    def visit_im(self, im: Im) -> AST:
+        if isinstance(im.arg, Var):
+            return im
+        return super().visit_im(im)
+
+    def visit_var(self, var: Var) -> AST:
+        """Replaces a variable with its equivalent expression in terms of its 
+        real and imaginary parts.
+        
+        >>> from logic1.theories.Complex.ast import *
+        >>> z = Var('z')
+        >>> RealNormalizer().visit_var(z)
+        Re(z) + I * Im(z)
+        """
+        return Re(var) + I * Im(var)
+    
+    def visit_conj(self, conj: Conj) -> AST:
+        """Replaces a conjugation with its equivalent expression in
+        terms of its argument and its real and imaginary parts.
+        
+        >>> from logic1.theories.Complex.ast import *
+        >>> z = Var('z')
+        >>> RealNormalizer().visit_conj(Conj(z))
+        Re(z) - I * Im(z)
+        """
+        return (Re(conj.arg) - I * Im(conj.arg)).accept(self)
+    
+
+def conjugate_normal_form(ast: AST) -> AST:
+    return ast.accept(ComplexNormalizer())
+
+def cartesian_normal_form(ast: AST) -> AST:
+    normalizer = Normalizer()
+    re = Re(ast).accept(normalizer)
+    im = Im(ast).accept(normalizer)
+    if isinstance(re, Rat) and re.value == 0 and isinstance(im, Rat) and im.value == 0:
+        return Rat(0)
+    if isinstance(re, Rat) and re.value == 0:
+        return I * im
+    if isinstance(im, Rat) and im.value == 0:
+        return re
+    return re + I * im

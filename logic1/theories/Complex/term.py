@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
+from enum import Enum, auto
 import functools
-from typing import ClassVar, Final, Generic, Never, Self, TypeVar
+from typing import Callable, ClassVar, Final, Generic, Never, Self, TypeVar
 
 from gmpy2 import mpq
 
 from logic1 import firstorder
 from logic1.theories.Complex import ast
-from logic1.theories.Complex.normalize import ComplexNormalizer
+from logic1.theories.Complex.normalize import ComplexNormalizer, Normalizer, cartesian_normal_form, conjugate_normal_form
 from logic1.theories.Complex.types import Number, RationalNumber
 
 α = TypeVar('α')
@@ -90,7 +91,7 @@ class SortKey(Generic[τ]):
 class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     _ast: ast.AST
-    _normalizer: ClassVar[ast.ASTVisitor[ast.AST]] = ComplexNormalizer()
+    _normal_form: ClassVar[Callable[[ast.AST], ast.AST]] = conjugate_normal_form
 
     def __init__(self, number: Number) -> None:
         """Initialize a term from a number.
@@ -102,8 +103,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> Term(1 + 2j)
         1 + 2 * I
         """
-        self._ast = ast.AST.from_number(number).accept(self._normalizer)
-
+        self._ast = Term._normal_form(ast.AST.from_number(number))
     
     def __add__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
@@ -212,8 +212,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         ...
         ValueError: Term x + 1 is not a variable
         """
-        if isinstance(self._ast, ast.Var):
-            return VV[self._ast.name]
+        maybe_var = conjugate_normal_form(self._ast)
+        if isinstance(maybe_var, ast.Var):
+            return VV[maybe_var.name]
         raise ValueError(f'Term {self} is not a variable')
     
     def conjugate(self) -> Term:
@@ -247,7 +248,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """Construct a term from an AST.
         """
         term = cls.__new__(cls)
-        term._ast = ast.accept(cls._normalizer)
+        term._ast = cls._normal_form(ast)
         return term
 
     @staticmethod
@@ -316,7 +317,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> I.is_variable()
         False
         """
-        return isinstance(self._ast, ast.Var)
+        return isinstance(conjugate_normal_form(self._ast), ast.Var)
 
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is zero.
@@ -332,8 +333,19 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def lc(self) -> Term:
         """Return the leading coefficient of this term.
         """
-        _, coeff = next(self.summands())
-        return coeff
+        if self.is_constant():
+            return self
+        if isinstance(self._ast, ast.Add):
+            return Term._from_ast(self._ast.args[0]).lc()
+        if isinstance(self._ast, ast.Neg):
+            return -Term._from_ast(self._ast.arg).lc()
+        if isinstance(self._ast, ast.Mul):
+            result = Term(1)
+            for arg in self._ast.args:
+                if arg.is_constant():
+                    result = result * Term._from_ast(arg)
+            return result
+        return Term(1)
     
     def real_part(self) -> Term:
         """Return the real part of this term.
@@ -360,9 +372,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def subs(self, sigma: Mapping[Variable, Number | Term]) -> Term:
         raise NotImplementedError()
     
-    def summands(self) -> Iterator[tuple[Mapping[Term, int], Term]]:
-        """An iterator that yields each summand of this term as a pair of a
-        mapping from terms to their exponents, and a coefficient in 
+    def _summands(self) -> Iterator[tuple[Mapping[Term, int], Term]]:
+        """An iterator that yields each summand of this term
+        as a pair of a mapping from terms to their exponents, and a coefficient in 
         decreasing order of the leading term.
         """
         constant = Term(0)
@@ -396,20 +408,14 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
         """
         result = set()
-        for mapping, _ in self.summands():
-            for term in mapping:
-                _ast = term._ast
-                if isinstance(_ast, ast.Var):
-                    result.add(VV[_ast.name])
-                elif isinstance(_ast, ast.Conj) and isinstance(_ast.arg, ast.Var):
-                    result.add(VV[_ast.arg.name])
-                elif isinstance(_ast, ast.Re) and isinstance(_ast.arg, ast.Var):
-                    result.add(VV[_ast.arg.name])
-                elif isinstance(_ast, ast.Im) and isinstance(_ast.arg, ast.Var):
-                    result.add(VV[_ast.arg.name])
-                else:
-                    assert False, f'Unexpected term in summand: {term}'
-        return iter(result)
+        stack = [self._ast]
+        while stack:
+            node = stack.pop()
+            if isinstance(node, ast.Var):
+                result.add(VV[node.name])
+            else:
+                stack.extend(arg for arg in node.args if isinstance(arg, ast.AST))
+        yield from result
 
 
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
@@ -418,8 +424,9 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
     def name(self) -> str:
         """The name of this variable.
         """
-        assert isinstance(self._ast, ast.Var)
-        return self._ast.name
+        _ast = conjugate_normal_form(self._ast)
+        assert isinstance(_ast, ast.Var)
+        return _ast.name
 
     def __init__(self) -> None:
         raise NotImplementedError("Use VV[...] to create variables")

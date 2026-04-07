@@ -23,13 +23,13 @@ def test_repr():
     formula3 = Re(x + I * y) >= Im(z**3 - w)
     # assert repr(formula3) == 'Re(x + I * y) >= Im(z**3 - w)'
 
-    formula4 = Im((x + y)**2) <= Re(z) * (I + w)
+    formula4 = Im((x + y)**2) <= Re(z * (I + w))
     # assert repr(formula4) == 'Im((x + y)**2) <= Re(z) * (I + w)'
 
-    formula5 = Re(x * I) + Im(y + z) > -(w**2)
+    formula5 = Re(x * I) + Im(y + z) > -Re(w**2)
     # assert repr(formula5) == 'Re(x * I) + Im(y + z) > -w**2'
 
-    formula6 = -(x + I * y) < x * Im(-1 * w) - I**2
+    formula6 = -Im(x + I * y) < Im(-1 * w - I**2)
     # assert repr(formula6) == '-(x + I * y) < x * Im(-1 * w) - I**2'
 
     # ((z**2 - I / 2)).normalize()

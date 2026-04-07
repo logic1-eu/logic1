@@ -9,9 +9,9 @@ class BaseFormatter(ASTVisitor[str]):
 
     symbols: dict[type[AST], str] = {}
 
-    def group(self, s: str) -> str:
-        return s
-    
+    def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:      
+        return False
+
     def visit_rat(self, num: Rat) -> str:
         return str(num.value)
     
@@ -40,13 +40,17 @@ class BaseFormatter(ASTVisitor[str]):
 
     def visit_mul(self, mul: Mul) -> str:
         symbol = self.symbols.get(Mul, '*')
+        factors = []
         result = []
         for i, arg in enumerate(mul.args):
+            factors.append(arg)
+            if len(factors) > 1 and not self._omit_mul_symbol(factors[-2], factors[-1]):
+                result.append(symbol)
             if isinstance(arg, Add) or (i > 0 and isinstance(arg, Neg)): 
                 result.append(f'({arg.accept(self)})')
             else:
                 result.append(arg.accept(self))
-        return f" {symbol} ".join(result)
+        return f" ".join(result)
 
     def visit_pow(self, pow: Pow) -> str:
         symbol = self.symbols.get(Pow, '^')
@@ -95,8 +99,22 @@ class LatexFormatter(BaseFormatter):
         Im: '\\operatorname{Im}',
     }
 
-    def group(self, s: str) -> str:  # TODO: fix i^1000
-        return f'{{{s}}}'
+    def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:
+        while isinstance(ast1, (Conj, Pow)):
+            if isinstance(ast1, Conj):
+                ast1 = ast1.arg
+            else:
+                ast1 = ast1.base
+        while isinstance(ast2, (Conj, Pow)):
+            if isinstance(ast2, Conj):
+                ast2 = ast2.arg
+            else:                
+                ast2 = ast2.base
+        if isinstance(ast1, (Var, Im, Re)) and isinstance(ast2, (Var, Im, Re)):
+            return True
+        if isinstance(ast1, Rat) and isinstance(ast2, _I):
+            return True
+        return False
 
     def visit_rat(self, num: Rat) -> str:
         a = num.value.numerator
@@ -121,6 +139,11 @@ class LatexFormatter(BaseFormatter):
 
     def visit_conj(self, conj: Conj) -> str:
         return f'\\overline{{{conj.arg.accept(self)}}}'
+    
+    def visit_pow(self, pow: Pow) -> str:
+        if isinstance(pow.base, (Add, Mul, Neg, Pow)):
+            return f'({pow.base.accept(self)})^{{{pow.exponent}}}'
+        return f'{pow.base.accept(self)}^{{{pow.exponent}}}'
         
 
     

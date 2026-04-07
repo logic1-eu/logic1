@@ -1,24 +1,20 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Generic, Optional, Self, TypeVar
+from typing import Self
 
 import operator
 
 from logic1 import firstorder
-from logic1.firstorder.boolean import And, Or
+from logic1.firstorder.boolean import And, _F, Or, _T
 from logic1.theories.Complex.types import Formula, Number
-from logic1.theories.Complex.term import Term, Variable
+from logic1.theories.Complex.term import Im, Re, Term, Variable
 
 from gmpy2 import mpq
 
-α = TypeVar('α')
 
-
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Number]):
-
-    _hash: Optional[int] = None  # TODO: understand why we need this
+class AtomicFormula(
+        firstorder.AtomicFormula['AtomicFormula', Term, Variable, Number]):
 
     @property
     def lhs(self) -> Term:
@@ -36,7 +32,8 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
         """Compares the sort keys of the two sides of the atomic formula
         using the operator of the formula.
         """
-        ops = {Eq: operator.eq, Ne: operator.ne, Le: operator.le, Lt: operator.lt, Ge: operator.ge, Gt: operator.gt}
+        ops = {Eq: operator.eq, Ne: operator.ne, Le: operator.le, 
+               Lt: operator.lt, Ge: operator.ge, Gt: operator.gt}
         return ops[self.op](self.lhs.sort_key(), self.rhs.sort_key())
 
     def __eq__(self, other: object) -> bool:
@@ -50,10 +47,11 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
             return False
         return True
     
-    def __hash__(self) -> int:  # TODO: understand why we need this
+    def __hash__(self) -> int:
         return super().__hash__()
 
-    def __init__(self, lhs: Number | Term, rhs: Number | Term):
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        super().__init__(self, lhs, rhs)
         self.args = (
             lhs if isinstance(lhs, Term) else Term(lhs), 
             rhs if isinstance(rhs, Term) else Term(rhs)
@@ -88,10 +86,6 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
         symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
         return f'{str(self.lhs)} {symbols[self.op]} {str(self.rhs)}'
     
-    @abstractmethod
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        ...
-
     def as_latex(self) -> str:
         """Latex representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
@@ -104,20 +98,18 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
     def as_real_formula(self) -> Formula:
         """Returns an equivalent formula where all terms are real.
         """
-        Lre, Lim = self.lhs.real_part(), self.lhs.imaginary_part()
-        Rre, Rim = self.rhs.real_part(), self.rhs.imaginary_part()
         if isinstance(self, Eq):
-            return And(Lre == Rre, Lim == Rim)
+            return And(Re(self.lhs) == Re(self.rhs), Im(self.lhs) == Im(self.rhs))
         if isinstance(self, Ne):
-            return Or(Lre != Rre, Lim != Rim)
+            return Or(Re(self.lhs) != Re(self.rhs), Im(self.lhs) != Im(self.rhs))
         if isinstance(self, Ge):
-            return And(Lre >= Rre, Lim == 0, Rim == 0)
+            return And(Re(self.lhs) >= Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
         if isinstance(self, Le):
-            return And(Lre <= Rre, Lim == 0, Rim == 0)
+            return And(Re(self.lhs) <= Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
         if isinstance(self, Gt):
-            return And(Lre > Rre, Lim == 0, Rim == 0)
+            return And(Re(self.lhs) > Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
         if isinstance(self, Lt):
-            return And(Lre < Rre, Lim == 0, Rim == 0)
+            return And(Re(self.lhs) < Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
         assert False, type(self)
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
@@ -166,22 +158,21 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
         ...
         ValueError: Cannot evaluate variable x
         """
-        (Lre, Lim) = self.lhs.eval()
-        (Rre, Rim) = self.rhs.eval()
+        (lhs_re, lhs_im) = self.lhs.eval()
+        (rhs_re, rhs_im) = self.rhs.eval()
         if isinstance(self, Eq):
-            return Lre == Rre and Lim == Rim
+            return lhs_re == rhs_re and lhs_im == rhs_im
         if isinstance(self, Ne):
-            return Lre != Rre or Lim != Rim
+            return lhs_re != rhs_re or lhs_im != rhs_im
         if isinstance(self, Ge):
-            return Lre >= Rre and Lim == 0 and Rim == 0
+            return lhs_re >= rhs_re and lhs_im == 0 and rhs_im == 0
         if isinstance(self, Le):
-            return Lre <= Rre and Lim == 0 and Rim == 0
+            return lhs_re <= rhs_re and lhs_im == 0 and rhs_im == 0
         if isinstance(self, Gt):
-            return Lre > Rre and Lim == 0 and Rim == 0
+            return lhs_re > rhs_re and lhs_im == 0 and rhs_im == 0
         if isinstance(self, Lt):
-            return Lre < Rre and Lim == 0 and Rim == 0
+            return lhs_re < rhs_re and lhs_im == 0 and rhs_im == 0
         assert False, type(self)
-
 
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are *not* elements of
@@ -205,7 +196,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
         """Returns `True` if both sides of this atomic formula are real."""
         return self.lhs.is_real() and self.rhs.is_real()
 
-    def simplify(self) -> Formula:
+    def simplify(self) -> AtomicFormula | _T | _F:
         """Fast basic simplification. The result is equivalent to self.
         Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.simplify`.
@@ -244,66 +235,35 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', Term, Variable, Nu
 
 
 class Eq(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_eq(self)
+    pass
 
 
 class Ne(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_ne(self)
+    pass
 
 
-class Ge(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_ge(self)
+class RealAtomicFormula(AtomicFormula):
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term):
+        super().__init__(lhs, rhs)
+        if not self.is_real():
+            raise ValueError(f'Cannot create atomic formula {self} because it is not real')
 
 
-class Le(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_le(self)
+class Ge(RealAtomicFormula):
+    pass
 
 
-class Gt(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_gt(self)
+class Le(RealAtomicFormula):
+    pass
 
 
-class Lt(AtomicFormula):
-    
-    def accept(self, visitor: AtomicFormulaVisitor[α]) -> α:
-        return visitor.visit_lt(self)
+class Gt(RealAtomicFormula):
+    pass
 
 
-class AtomicFormulaVisitor(Generic[α]):
-
-    @abstractmethod
-    def visit_eq(self, eq: Eq) -> α:
-        ...
-
-    @abstractmethod
-    def visit_ne(self, ne: Ne) -> α:
-        ...
-
-    @abstractmethod
-    def visit_ge(self, ge: Ge) -> α:
-        ...
-
-    @abstractmethod
-    def visit_le(self, le: Le) -> α:
-        ...
-
-    @abstractmethod
-    def visit_gt(self, gt: Gt) -> α:
-        ...
-
-    @abstractmethod
-    def visit_lt(self, lt: Lt) -> α:
-        ...
+class Lt(RealAtomicFormula):
+    pass
 
 
 from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator, Normalizer, WeakNormalizer

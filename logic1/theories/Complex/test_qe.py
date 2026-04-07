@@ -8,7 +8,7 @@ def test_qe():
 
     # Ex. 7.4
     a, b, c, d = VV.get('a', 'b', 'c', 'd')
-    phi = Ex(c, All([b, a], Implies(Or(And(a == d, b ==c), And(a == c, b == 1)), a**2 == b)))
+    phi = Ex(c, All([b, a], Implies(Or(And(a == d, b == c), And(a == c, b == 1)), a**2 == b)))
     qe(phi)
 
     # some random formula
@@ -69,7 +69,8 @@ def test_circuits():
 
     # Example 1
     s, G1, G2, G3, G4, G5, G6, G7, G8, G9, C1, C2 = VV.get('s', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'C1', 'C2')
-    assume = [G1 > 0, G2 > 0, G3 > 0, G4 > 0, G5 > 0, G6 > 0, G7 > 0, G8 > 0, G9 > 0, C1 > 0, C2 > 0]
+    assume = [Re(G1) > 0, Re(G2) > 0, Re(G3) > 0, Re(G4) > 0, Re(G5) > 0, Re(G6) > 0, Re(G7) > 0, Re(G8) > 0, Re(G9) > 0, Re(C1) > 0, Re(C2) > 0,
+              Im(G1) == 0, Im(G2) == 0, Im(G3) == 0, Im(G4) == 0, Im(G5) == 0, Im(G6) == 0, Im(G7) == 0, Im(G8) == 0, Im(G9) == 0, Im(C1) == 0, Im(C2) == 0]
 
     p0 = -G4*G8*(G1*G2*G9 + G1*G3*G9 + G1*G9*G1*1 + G2*G6*G9 + G2*G6*G1*0)
     p1 = G7*C2*(G1*G3*G9 + G1*G3*G1*0 - G2*G5*G9 - G2*G5*G1*0)
@@ -85,7 +86,8 @@ def test_circuits():
 
     # Example 2
     z, A, B, C, D, E, F, G, H, I, J, K, L = VV.get('z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L')
-    assume = [A > 0, B > 0, C > 0, D > 0, E > 0, F > 0, G > 0, H > 0, I > 0, J > 0, K > 0, L > 0]
+    assume = [Re(A) > 0, Re(B) > 0, Re(C) > 0, Re(D) > 0, Re(E) > 0, Re(F) > 0, Re(G) > 0, Re(H) > 0, Re(I) > 0, Re(J) > 0, Re(K) > 0, Re(L) > 0,
+              Im(A) == 0, Im(B) == 0, Im(C) == 0, Im(D) == 0, Im(E) == 0, Im(F) == 0, Im(G) == 0, Im(H) == 0, Im(I) == 0, Im(J) == 0, Im(K) == 0, Im(L) == 0]
 
     p0 = D*K + D*J - A*L - A*H
     p1 = -2*D*K + A*L + A*G - D*J - D*I
@@ -101,7 +103,8 @@ def test_circuits():
 
     # Example 3
     s, gm1, gm2, gm3, go1, go2, gL, CC1, CC2, CL = VV.get('s', 'gm1', 'gm2', 'gm3', 'go1', 'go2', 'gL', 'CC1', 'CC2', 'CL')
-    assume = [gm1 > 0, gm2 > 0, gm3 > 0, go1 > 0, go2 > 0, gL > 0, CC1 > 0, CC2 > 0, CL > 0]
+    assume = [Re(gm1) > 0, Re(gm2) > 0, Re(gm3) > 0, Re(go1) > 0, Re(go2) > 0, Re(gL) > 0, Re(CC1) > 0, Re(CC2) > 0, Re(CL) > 0,
+              Im(gm1) == 0, Im(gm2) == 0, Im(gm3) == 0, Im(go1) == 0, Im(go2) == 0, Im(gL) == 0, Im(CC1) == 0, Im(CC2) == 0, Im(CL) == 0]
 
     Hp = -gm1 * (gm2*gm3 + s*gm2*CC1 + s**2*CC1*CC2)
     Hq = go1*go2*gL + s*gm2*gm3*CC2 + s**2*(gm3 + gL - gm2)*CC1*CC2 + s**3*CC1*CC2*CL
