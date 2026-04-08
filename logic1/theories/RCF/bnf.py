@@ -15,10 +15,14 @@ class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable,
     """
 
     def simplify(self, f: Formula) -> Formula:
-        """Implements the abstract method
-        :meth:`.abc.bnf.BooleanNormalForm.simplify`.
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.simplify`.
         """
         return _simplify(f)
+
+    def final_simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.final_simplify`.
+        """
+        return _simplify(f, explode_always=False)
 
 
 cnf = BooleanNormalForm().cnf
