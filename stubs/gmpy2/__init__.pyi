@@ -109,7 +109,7 @@ class mpz:
 
     def __init__(self, arg: int) -> None:
         ...
-    
+
     def __gt__(self, other: object) -> bool:
         ...
 

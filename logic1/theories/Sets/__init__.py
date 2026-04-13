@@ -11,10 +11,10 @@ __all__ = [
     'AtomicFormula', 'C', 'C_', 'Eq', 'Ne', 'oo', 'Variable', 'VV',
 
     'cnf', 'dnf',
-    
+
     'qe',
-    
+
     'is_valid', 'simplify',
-    
+
     'Formula'
 ]

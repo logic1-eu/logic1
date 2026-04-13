@@ -27,12 +27,12 @@ class AtomicFormula(
         """The right hand side term of an atomic formula.
         """
         return self.args[1]
-    
+
     def __bool__(self) -> bool:  # TODO: discuss
         """Compares the sort keys of the two sides of the atomic formula
         using the operator of the formula.
         """
-        ops = {Eq: operator.eq, Ne: operator.ne, Le: operator.le, 
+        ops = {Eq: operator.eq, Ne: operator.ne, Le: operator.le,
                Lt: operator.lt, Ge: operator.ge, Gt: operator.gt}
         return ops[self.op](self.lhs.sort_key(), self.rhs.sort_key())
 
@@ -46,14 +46,14 @@ class AtomicFormula(
         if self.rhs.sort_key() != other.rhs.sort_key():
             return False
         return True
-    
+
     def __hash__(self) -> int:
         return super().__hash__()
 
     def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
         super().__init__(self, lhs, rhs)
         self.args = (
-            lhs if isinstance(lhs, Term) else Term(lhs), 
+            lhs if isinstance(lhs, Term) else Term(lhs),
             rhs if isinstance(rhs, Term) else Term(rhs)
         )
 
@@ -77,7 +77,7 @@ class AtomicFormula(
 
     def __repr__(self) -> str:
         symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
-        return f'{repr(self.lhs)} {symbols[self.op]} {repr(self.rhs)}' 
+        return f'{repr(self.lhs)} {symbols[self.op]} {repr(self.rhs)}'
 
     def __str__(self) -> str:
         """String representation of this atomic formula. Implements the
@@ -85,7 +85,7 @@ class AtomicFormula(
         """
         symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
         return f'{str(self.lhs)} {symbols[self.op]} {str(self.rhs)}'
-    
+
     def as_latex(self) -> str:
         """Latex representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
@@ -93,8 +93,8 @@ class AtomicFormula(
         symbols = {
             Eq: '=', Ne: '\\neq', Le: '\\leq', Lt: '<', Ge: '\\geq', Gt: '>'
         }
-        return f'{self.lhs.as_latex()} {symbols[self.op]} {self.rhs.as_latex()}' 
-    
+        return f'{self.lhs.as_latex()} {symbols[self.op]} {self.rhs.as_latex()}'
+
     def as_real_formula(self) -> Formula:
         """Returns an equivalent formula where all terms are real.
         """
@@ -143,8 +143,8 @@ class AtomicFormula(
         return {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}[cls]
 
     def eval(self) -> bool:
-        """Evaluates an atomic formula where both sides are constants. 
-        Returns `True` if the formula is true, `False` if the formula is false, 
+        """Evaluates an atomic formula where both sides are constants.
+        Returns `True` if the formula is true, `False` if the formula is false,
         and raises `ValueError` if the formula contains variables.
 
         >>> from logic1.theories.Complex import *
@@ -186,12 +186,12 @@ class AtomicFormula(
         for v in self.rhs.vars():
             if v not in quantified:
                 yield v
-    
+
     def is_imaginary(self) -> bool:
         """Returns `True` if both sides of this atomic formula are imaginary.
         """
         return self.lhs.is_imaginary() and self.rhs.is_imaginary()
-    
+
     def is_real(self) -> bool:
         """Returns `True` if both sides of this atomic formula are real."""
         return self.lhs.is_real() and self.rhs.is_real()
@@ -224,7 +224,7 @@ class AtomicFormula(
             else:
                 return self.op(lhs, 0)
         assert False, type(self)
-        
+
     def subs(self, sigma: Mapping[Variable, Number | Term]) -> Self:
         """Formal simultaneous term substitution into the two argument terms of
         the atomic formula. Implements the abstract method

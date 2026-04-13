@@ -44,4 +44,3 @@ def test_str():
 
 def test_latex():
     ...  # TODO
-

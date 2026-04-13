@@ -1,7 +1,7 @@
 """A theory package for Real Closed Fields.
 """
 
-from .atomic import (POLYLIB, AtomicFormula, cache_clear, cache_info, init_env, 
+from .atomic import (POLYLIB, AtomicFormula, cache_clear, cache_info, init_env,
                      init_env_arg, Eq, Ne, Ge, Le, Gt, Lt, Term, Variable, VV)
 from .bnf import cnf, dnf
 from .parser import l1
@@ -13,7 +13,7 @@ from .types import Formula
 from . import node
 
 __all__ = [
-    'POLYLIB', 'AtomicFormula', 'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term', 
+    'POLYLIB', 'AtomicFormula', 'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term',
     'Variable', 'VV',
 
     'cnf', 'dnf',

@@ -37,7 +37,7 @@ def test_example2():
     q1 = -A*E + 2*D*B - A*C + D*F
     q2 = (-1)*D*(F + B)
     H = (p0 + p1*z + p2*z**2, q0 + q1*z + q2*z**2)
-    
+
 
 def test_example3():
     s, gm1, gm2, gm3, go1, go2, gL, CC1, CC2, CL = VV.get("s", "gm1", "gm2", "gm3", "go1", "go2", "gL", "CC1", "CC2", "CL")

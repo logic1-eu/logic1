@@ -9,18 +9,18 @@ class BaseFormatter(ASTVisitor[str]):
 
     symbols: dict[type[AST], str] = {}
 
-    def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:      
+    def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:
         return False
 
     def visit_rat(self, num: Rat) -> str:
         return str(num.value)
-    
+
     def visit_i(self, _: _I) -> str:
         return self.symbols.get(_I, 'i')
-    
+
     def visit_var(self, var: Var) -> str:
         return var.name
-    
+
     def visit_add(self, add: Add) -> str:
         symbol_plus = self.symbols.get(Add, '+')
         symbol_minus = self.symbols.get(Neg, '-')
@@ -46,7 +46,7 @@ class BaseFormatter(ASTVisitor[str]):
             factors.append(arg)
             if len(factors) > 1 and not self._omit_mul_symbol(factors[-2], factors[-1]):
                 result.append(symbol)
-            if isinstance(arg, Add) or (i > 0 and isinstance(arg, Neg)): 
+            if isinstance(arg, Add) or (i > 0 and isinstance(arg, Neg)):
                 result.append(f'({arg.accept(self)})')
             else:
                 result.append(arg.accept(self))
@@ -80,7 +80,7 @@ class BaseFormatter(ASTVisitor[str]):
 
 
 class ReprFormatter(BaseFormatter):
-    
+
     symbols = {
         _I: 'I',
         Pow: '**'
@@ -92,7 +92,7 @@ class StrFormatter(BaseFormatter):
 
 
 class LatexFormatter(BaseFormatter):
-    
+
     symbols = {
         Mul: '\\cdot',
         Re: '\\operatorname{Re}',
@@ -108,7 +108,7 @@ class LatexFormatter(BaseFormatter):
         while isinstance(ast2, (Conj, Pow)):
             if isinstance(ast2, Conj):
                 ast2 = ast2.arg
-            else:                
+            else:
                 ast2 = ast2.base
         if isinstance(ast1, (Var, Im, Re)) and isinstance(ast2, (Var, Im, Re)):
             return True
@@ -123,7 +123,7 @@ class LatexFormatter(BaseFormatter):
             return str(a)
         else:
             return f'\\frac{{{str(a)}}}{{{str(b)}}}'
-        
+
     def visit_var(self, var: Var) -> str:
         if "_" in var.name:
             base, *indices = var.name.split("_")
@@ -139,13 +139,8 @@ class LatexFormatter(BaseFormatter):
 
     def visit_conj(self, conj: Conj) -> str:
         return f'\\overline{{{conj.arg.accept(self)}}}'
-    
+
     def visit_pow(self, pow: Pow) -> str:
         if isinstance(pow.base, (Add, Mul, Neg, Pow)):
             return f'({pow.base.accept(self)})^{{{pow.exponent}}}'
         return f'{pow.base.accept(self)}^{{{pow.exponent}}}'
-        
-
-    
-
-    

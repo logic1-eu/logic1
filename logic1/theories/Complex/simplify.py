@@ -39,21 +39,21 @@ def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: di
 
     G: nx.Graph = nx.Graph()
     G.add_nodes_from(nodes)
-    for node, other in edge_weights:    
+    for node, other in edge_weights:
         savings = min_costs[node] + min_costs[other] - edge_weights[(node, other)]
         if savings > 0:
             G.add_edge(node, other, weight=savings)
-            
+
     matching = nx.max_weight_matching(G)
     for node, other in matching:
         nodes.remove(node)
         nodes.remove(other)
-    for node in nodes:    
+    for node in nodes:
         maybe_other = min_others[node]
         if maybe_other is not None:
-            matching.add((node, maybe_other))    
+            matching.add((node, maybe_other))
     return matching
-    
+
 
 
 @dataclass(frozen=True)
@@ -65,8 +65,8 @@ class Options(abc.simplify.Options):
 
 
 class ComplexityVisitor(ASTVisitor[float]):
-    """Visitor that computes a measure of the complexity of a AST, used to 
-    guide the simplification process. The complexity is defined as 1 plus the 
+    """Visitor that computes a measure of the complexity of a AST, used to
+    guide the simplification process. The complexity is defined as 1 plus the
     sum of the complexities of the children, with
     some adjustments for certain operations.
     """
@@ -79,13 +79,13 @@ class ComplexityVisitor(ASTVisitor[float]):
             return 1.0
         else:
             return 2.0
-        
+
     def visit_i(self, _: _I) -> float:
         """Returns the complexity of the imaginary unit. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_i`.
         """
         return 1.0
-    
+
     def visit_var(self, var: Var) -> float:
         """Returns the complexity of a variable. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_var`.
@@ -97,8 +97,8 @@ class ComplexityVisitor(ASTVisitor[float]):
         abstract method :meth:`.Complex.ASTVisitor.visit_add`.
         """
         return 1.0 + sum((arg.arg if isinstance(arg, Neg) else arg).accept(self) for arg in add.args)
-    
-    def visit_mul(self, mul: Mul) -> float:   
+
+    def visit_mul(self, mul: Mul) -> float:
         """Returns the complexity of a multiplication. Implements
         the abstract method :meth:`.Complex.ASTVisitor.visit_mul`.
         """
@@ -115,19 +115,19 @@ class ComplexityVisitor(ASTVisitor[float]):
         abstract method :meth:`.Complex.ASTVisitor.visit_neg`.
         """
         return 1.0 + neg.arg.accept(self)
-    
+
     def visit_conj(self, conj: Conj) -> float:
         """Returns the complexity of a conjugation. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_conj`.
         """
         return 1.0 + conj.arg.accept(self)
-    
+
     def visit_re(self, re: Re) -> float:
         """Returns the complexity of a real part. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_re`.
         """
         return 1.0 + re.arg.accept(self)
-        
+
     def visit_im(self, im: Im) -> float:
         """Returns the complexity of an imaginary part. Implements
         the abstract method :meth:`.Complex.ASTVisitor.visit_im`.
@@ -164,7 +164,7 @@ class InternalRepresentation(
                 raise InternalRepresentation.Inconsistent()
             self._atoms.add(simple_atom)
         return abc.simplify.RESTART.NONE
-    
+
     @staticmethod
     def _complexity(atom: AtomicFormula) -> float:
         """Returns a measure of the complexity of the given atomic
@@ -231,12 +231,12 @@ class InternalRepresentation(
         result = set(atom for atom in result if not atom in refs)
         for atom in result:
             if atom.to_complement() in refs:
-                raise InternalRepresentation.Inconsistent()    
+                raise InternalRepresentation.Inconsistent()
         if gand is Or:
             return [atom.to_complement() for atom in result]
         else:
             return list(result)
-        
+
     @staticmethod
     def _merge_atoms(atom1: AtomicFormula, atom2: AtomicFormula) -> Optional[AtomicFormula | _T | _F]:
         """Given two atomic formulas, returns a
@@ -263,7 +263,7 @@ class InternalRepresentation(
             if remove is None or remove not in atom.fvars():
                 atoms.add(atom)
         return self.__class__(_atoms=atoms, _options=self._options)
-    
+
 
 @dataclass(frozen=True)
 class Simplify(abc.simplify.Simplify[

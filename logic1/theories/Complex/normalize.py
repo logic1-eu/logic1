@@ -15,7 +15,7 @@ from logic1.theories.Complex.ast import _I, AST, I, Add, ASTVisitor, Conj, Ident
 """Type variable for the result type of `ASTVisitor` methods."""
 
 class ArithmeticEvaluator(ASTVisitor[α]):
-    """Abstract visitor that evaluates a AST to an element of α, 
+    """Abstract visitor that evaluates a AST to an element of α,
     given implementations of addition, negation and multiplication.
     """
 
@@ -57,13 +57,13 @@ class ArithmeticEvaluator(ASTVisitor[α]):
         """Evaluates a negation by using the `_neg` method.
         """
         return self._neg(neg.arg.accept(self))
-    
+
     def visit_pow(self, pow: Pow) -> α:
         """Evaluates a power.
         """
         if pow.exponent == 0:
             return Rat(1).accept(self)
-        elif pow.exponent % 2 == 0:    
+        elif pow.exponent % 2 == 0:
             a = Pow(pow.base, pow.exponent // 2).accept(self)
             return self._mul(a, a)
         else:
@@ -73,24 +73,24 @@ class ArithmeticEvaluator(ASTVisitor[α]):
 
 
 class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
-    """Visitor that evaluates a AST to a constant. The result is a pair 
-    of rational numbers representing the real and imaginary parts of the 
+    """Visitor that evaluates a AST to a constant. The result is a pair
+    of rational numbers representing the real and imaginary parts of the
     complex number. Raises a ValueError if the AST contains variables.
     """
 
     def _add(self, a: tuple[mpq, mpq], b: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
         """Adds two complex numbers represented as pairs of rational
-        numbers (real, imag). Implements the abstract method 
+        numbers (real, imag). Implements the abstract method
         :meth:`.ArithmeticEvaluator._add`.
 
         >>> ConstantEvaluator()._add((mpq(1), mpq(2)), (mpq(3), mpq(4)))
         (mpq(4,1), mpq(6,1))
         """
         return a[0] + b[0], a[1] + b[1]
-    
+
     def _neg(self, a: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
         """Negates a complex number represented as a pair of rational
-        numbers (real, imag). Implements the abstract method 
+        numbers (real, imag). Implements the abstract method
         :meth:`.ArithmeticEvaluator._neg`.
 
         >>> ConstantEvaluator()._neg((mpq(1), mpq(2)))
@@ -100,7 +100,7 @@ class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
 
     def _mul(self, a: tuple[mpq, mpq], b: tuple[mpq, mpq]) -> tuple[mpq, mpq]:
         """Multiplies two complex numbers represented as pairs of
-        rational numbers (real, imag). Implements the abstract method 
+        rational numbers (real, imag). Implements the abstract method
         :meth:`.ArithmeticEvaluator._mul`.
 
         >>> ConstantEvaluator()._mul((mpq(1), mpq(2)), (mpq(3), mpq(4)))
@@ -122,7 +122,7 @@ class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
         """Evaluates the imaginary unit term to a complex number
         represented as a pair of rational numbers (real, imag).
         Implements the abstract method :meth:`.TermVisitor.visit_i`.
-        
+
         >>> ConstantEvaluator().visit_i(I)
         (mpq(0,1), mpq(1,1))
         """
@@ -167,13 +167,13 @@ class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
         """Evaluates an imaginary part to a complex number represented as
         a pair of rational numbers (real, imag).
         Implements the abstract method :meth:`.TermVisitor.visit_im`.
-        
+
         >>> ConstantEvaluator().visit_im(Im(1 + 2 * I))
         (mpq(2,1), mpq(0,1))
         """
         _, b = im.arg.accept(self)
         return b, mpq(0)
-    
+
 
 @dataclass
 @total_ordering
@@ -206,7 +206,7 @@ class AddSortKey:
             return self.total_degree <= other.total_degree
         for i in range(len(self.factors)):
             if i == len(other.factors):
-                return False 
+                return False
             if self.factors[i] != other.factors[i]:
                 factor1, degree1 = self.factors[i]
                 factor2, degree2 = other.factors[i]
@@ -250,10 +250,10 @@ class MulSortKey:
 
 
 class WeakNormalizer(IdentityASTVisitor):
-    """Visitor that normalizes a AST by rearranging sums and products, 
+    """Visitor that normalizes a AST by rearranging sums and products,
     and applying obvious simplifications, but not expanding any nodes.
     """
-    
+
     def _add_sort_key(self, ast: AST) -> tuple[int, tuple[tuple[SortKey, int], ...]]:
         total_degree = 0
         pairs = []
@@ -280,7 +280,7 @@ class WeakNormalizer(IdentityASTVisitor):
     def visit_add(self, add: Add) -> AST:
         """Normalizes a sum by collecting constant terms and
         rearranging non-constant terms in a canonical order.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y, z = Var('x'), Var('y'), Var('z')
         >>> (y + x + z + x - z).accept(WeakNormalizer())
@@ -312,7 +312,7 @@ class WeakNormalizer(IdentityASTVisitor):
             if isinstance(arg, Mul) and isinstance(arg.args[0], Neg):
                 coeff = coeff * Rat(-1)
                 arg = Mul(arg.args[0].arg, *arg.args[1:])
-            products[arg] = products.get(arg, 0) + coeff 
+            products[arg] = products.get(arg, 0) + coeff
         # put all products with their coefficients back together and simplify if possible
         result = []
         sorted_products = sorted(products, key=AddSortKey, reverse=True)
@@ -321,7 +321,7 @@ class WeakNormalizer(IdentityASTVisitor):
             a, b = products[prod].eval()
             if a == mpq(0) and b == mpq(0):
                 continue
-            elif a == mpq(1) and b == mpq(0): 
+            elif a == mpq(1) and b == mpq(0):
                 result.append(prod)
             elif a == mpq(-1) and b == mpq(0):
                 if i == 0 and isinstance(prod, Mul):
@@ -343,7 +343,7 @@ class WeakNormalizer(IdentityASTVisitor):
         else:
             result.append(AST.from_real_imag(a, b))
         return Add(*result)
-    
+
     def visit_mul(self, mul: Mul) -> AST:
         """
         Normalizes a product by collecting constant factors and
@@ -396,7 +396,7 @@ class WeakNormalizer(IdentityASTVisitor):
                 continue
             if isinstance(factor, Neg):
                 negated = not negated if exp % 2 == 1 else negated
-                factor = factor.arg  
+                factor = factor.arg
             if exp == 1:
                 result.append(factor)
             else:
@@ -448,7 +448,7 @@ class WeakNormalizer(IdentityASTVisitor):
             return Pow(base, pow.exponent)
 
     def visit_neg(self, neg: Neg) -> AST:
-        """Normalizes a negation by evaluating constants, simplifying double 
+        """Normalizes a negation by evaluating constants, simplifying double
         negations and moving the negation inside products.
 
         >>> from logic1.theories.Complex.ast import *
@@ -472,7 +472,7 @@ class WeakNormalizer(IdentityASTVisitor):
             return Neg(arg)
 
     def visit_conj(self, conj: Conj) -> AST:
-        """Normalizes a conjugation by evaluating constants and simplifying 
+        """Normalizes a conjugation by evaluating constants and simplifying
         double conjugations, and simplifying conjugations of real and imaginary parts.
 
         >>> from logic1.theories.Complex.ast import *
@@ -496,11 +496,11 @@ class WeakNormalizer(IdentityASTVisitor):
             return arg
         else:
             return Conj(arg)
-    
+
     def visit_re(self, re: Re) -> AST:
         """Normalizes a real part by evaluating constants and simplifying
         real parts of real and imaginary parts, and of conjugates.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x = Var('x')
         >>> WeakNormalizer().visit_re(Re(1 + I))
@@ -526,7 +526,7 @@ class WeakNormalizer(IdentityASTVisitor):
     def visit_im(self, im: Im) -> AST:
         """Normalizes an imaginary part by evaluating constants and simplifying
         imaginary parts of real and imaginary parts, and of conjugates.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x = Var('x')
         >>> WeakNormalizer().visit_im(Im(1 + I))
@@ -556,9 +556,9 @@ class Normalizer(WeakNormalizer):
     """
 
     def visit_mul(self, mul: Mul) -> AST:
-        """Expands a product by distributing it over sums and normalizing the 
+        """Expands a product by distributing it over sums and normalizing the
         factors recursively.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y, z = Var('x'), Var('y'), Var('z')
         >>> Normalizer().visit_mul(x * (y + z))
@@ -571,10 +571,10 @@ class Normalizer(WeakNormalizer):
                 return Add(*arg_args).accept(self)
         result = super().visit_mul(mul)
         return result
-    
+
     def visit_pow(self, pow: Pow) -> AST:
         """Expands powers of sums and products and normalizes them recursively.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y = Var('x'), Var('y')
         >>> Normalizer().visit_pow((x + y)**2)
@@ -591,9 +591,9 @@ class Normalizer(WeakNormalizer):
         return node
 
     def visit_neg(self, neg: Neg) -> AST:
-        """Expands a negation by distributing it over sums and normalizing the 
+        """Expands a negation by distributing it over sums and normalizing the
         argument recursively.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y = Var('x'), Var('y')
         >>> Normalizer().visit_neg(-(x + y))
@@ -605,9 +605,9 @@ class Normalizer(WeakNormalizer):
         return node
 
     def visit_conj(self, conj: Conj) -> AST:
-        """Propagates a conjugation by distributing it over sums and products 
+        """Propagates a conjugation by distributing it over sums and products
         and normalizing the argument recursively.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y = Var('x'), Var('y')
         >>> Normalizer().visit_conj(Conj(x + y))
@@ -632,7 +632,7 @@ class Normalizer(WeakNormalizer):
         return node
 
     def visit_re(self, re: Re) -> AST:
-        """Propagates a real part by distributing it over sums and products 
+        """Propagates a real part by distributing it over sums and products
         and normalizing the argument recursively.
 
         >>> from logic1.theories.Complex.ast import *
@@ -661,9 +661,9 @@ class Normalizer(WeakNormalizer):
         return node
 
     def visit_im(self, im: Im) -> AST:
-        """Propagates an imaginary part by distributing it over sums and 
+        """Propagates an imaginary part by distributing it over sums and
         products and normalizing the argument recursively.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> x, y = Var('x'), Var('y')
         >>> Normalizer().visit_im(Im(x + y))
@@ -694,19 +694,19 @@ class ComplexNormalizer(Normalizer):
     """Visitor that normalizes a AST as in `Normalizer`, but also
     replaces all occurrences of `Re` and `Im`.
     This yields a unique normal form.
-    
+
     >>> from logic1.theories.Complex.ast import *
     >>> z = Var('z')
     >>> (Re(z) + I * Im(z)).accept(ComplexNormalizer())
     z
     >>> (Re(z)**2 + Im(z)**2).accept(ComplexNormalizer())
-    z * ~z 
+    z * ~z
     """
 
     def visit_re(self, re: Re) -> AST:
         """Replaces a real part with its equivalent expression in
         terms of its argument and its conjugate.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> z = Var('z')
         >>> ComplexNormalizer().visit_re(Re(z))
@@ -725,41 +725,41 @@ class ComplexNormalizer(Normalizer):
         """
         return ((im.arg - Conj(im.arg)) / (2 * I)).accept(self)
 
-    
+
 class RealNormalizer(Normalizer):
 
     def visit_re(self, re: Re) -> AST:
         if isinstance(re.arg, Var):
             return re
         return super().visit_re(re)
-    
+
     def visit_im(self, im: Im) -> AST:
         if isinstance(im.arg, Var):
             return im
         return super().visit_im(im)
 
     def visit_var(self, var: Var) -> AST:
-        """Replaces a variable with its equivalent expression in terms of its 
+        """Replaces a variable with its equivalent expression in terms of its
         real and imaginary parts.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> z = Var('z')
         >>> RealNormalizer().visit_var(z)
         Re(z) + I * Im(z)
         """
         return Re(var) + I * Im(var)
-    
+
     def visit_conj(self, conj: Conj) -> AST:
         """Replaces a conjugation with its equivalent expression in
         terms of its argument and its real and imaginary parts.
-        
+
         >>> from logic1.theories.Complex.ast import *
         >>> z = Var('z')
         >>> RealNormalizer().visit_conj(Conj(z))
         Re(z) - I * Im(z)
         """
         return (Re(conj.arg) - I * Im(conj.arg)).accept(self)
-    
+
 
 def conjugate_normal_form(ast: AST) -> AST:
     return ast.accept(ComplexNormalizer())

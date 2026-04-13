@@ -31,7 +31,7 @@ class SortKey(Generic[η]):
         """The operation of the underlying AST node.
         """
         return self.ast.op
-    
+
     @property
     def args(self) -> tuple[object, ...]:
         """The arguments of the underlying AST node, where each argument
@@ -56,29 +56,29 @@ class SortKey(Generic[η]):
             return self.args <= other.args
         else:
             return ORDER.index(self.op) < ORDER.index(other.op)
-        
+
 
 class AST:
-   
+
     @property
     def op(self) -> type[Self]:
         """The operation of this AST node, which is just the class of this node.
         """
         return type(self)
-    
+
     @property
     def args(self) -> tuple[object, ...]:  # type: ignore[empty-body]
         """The arguments of this AST node. This should be overridden by
-        subclasses to return the appropriate arguments so that 
+        subclasses to return the appropriate arguments so that
         `self == self.op(*self.args)`.
         """
         ...
-    
+
     def __add__(self, other: Number | AST) -> Add:
         if isinstance(other, AST):
             return Add(self, other)
         return self + AST.from_number(other)
-        
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AST):
             return self.sort_key() == other.sort_key()
@@ -86,13 +86,13 @@ class AST:
 
     def __ge__(self, other: AST) -> bool:
         return self.sort_key() >= other.sort_key()
-        
+
     def __gt__(self, other: AST) -> bool:
         return self.sort_key() > other.sort_key()
 
     def __hash__(self) -> int:
         return hash((tuple(str(cls) for cls in self.op.mro()), self.args))
-    
+
     @abstractmethod
     def __init__(self, *args: object) -> None:
         ...
@@ -110,7 +110,7 @@ class AST:
         if isinstance(other, AST):
             return Mul(self, other)
         return self * AST.from_number(other)
-        
+
     def __ne__(self, other: object) -> bool:
         if isinstance(other, AST):
             return self.sort_key() != other.sort_key()
@@ -125,7 +125,7 @@ class AST:
     def __radd__(self, other: Number | AST) -> Add:
         assert not isinstance(other, AST)
         return AST.from_number(other) + self
-    
+
     def __repr__(self) -> str:
         """String representation of this AST node that can be evaluated to
         reconstruct the node. For a more human-readable string
@@ -140,7 +140,7 @@ class AST:
     def __rsub__(self, other: Number | AST) -> Add:
         assert not isinstance(other, AST)
         return AST.from_number(other) - self
-    
+
     def __str__(self) -> str:
         return self.accept(StrFormatter())
 
@@ -168,7 +168,7 @@ class AST:
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
-    
+
     @abstractmethod
     def accept(self, visitor: ASTVisitor[α]) -> α:
         """Accept a visitor."""
@@ -178,7 +178,7 @@ class AST:
         """LaTeX representation as a string.
         """
         return self.accept(LatexFormatter())
-    
+
     def lc(self) -> AST:
         """Returns the left-most coefficient of this AST node.
         """
@@ -196,14 +196,14 @@ class AST:
             return Rat(1)
 
     def eval(self) -> tuple[mpq, mpq]:
-        """Evaluate this AST node as a complex number and return the real and 
-        imaginary part as a tuple of mpq. If this AST node is not constant, this 
+        """Evaluate this AST node as a complex number and return the real and
+        imaginary part as a tuple of mpq. If this AST node is not constant, this
         method raises a ValueError.
         """
         return self.accept(ConstantEvaluator())
-    
+
     def factors(self) -> list[AST]:
-        """Return a list of factors of this AST node, where each factor is a 
+        """Return a list of factors of this AST node, where each factor is a
         AST node that is not a multiplication.
 
         >>> x = Var('x')
@@ -216,7 +216,7 @@ class AST:
             return list(self.args)
         else:
             return [self]
-        
+
     @staticmethod
     def from_real_imag(real: mpq, imag: mpq) -> AST:
         """Construct a AST node from a given real and imaginary part.
@@ -252,7 +252,7 @@ class AST:
                 return Add(Rat(real), Neg(_I()))
             else:
                 return Add(Rat(real), Mul(Rat(imag), _I()))
-    
+
     @staticmethod
     def from_number(value: Number) -> AST:
         """Construct a AST node from a given number.
@@ -294,7 +294,7 @@ class AST:
             return True
         except ValueError:
             return False
-        
+
     def is_variable(self) -> bool:
         """Return :obj:`True` if this AST node is a variable.
 
@@ -323,14 +323,14 @@ class AST:
         """Return a unique normal form of this AST node
         """
         return self.accept(ComplexNormalizer())
-    
+
     def _repr_latex_(self) -> str:
         """LaTeX representation for Jupyter notebooks.
         """
         result = f'$\\displaystyle {self.as_latex()}$'
         if len(result) > 5000:
             raise ValueError('Latex output too long')
-        return result 
+        return result
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for comparing AST nodes.
@@ -338,23 +338,23 @@ class AST:
         return SortKey(self)
 
     def subs(self, sigma: Mapping[Var, Number | AST]) -> AST:
-        """Formal substitution of variables in this AST node according to the 
-        given mapping. The mapping can map variables to either numbers or AST 
+        """Formal substitution of variables in this AST node according to the
+        given mapping. The mapping can map variables to either numbers or AST
         nodes.
         """
         return self.accept(VariableSubstitutor(sigma))
 
 
 class Rat(AST):
-    """A rational number, represented as a mpq. Implements the abstract class 
+    """A rational number, represented as a mpq. Implements the abstract class
     :class:`.AST`.
     """
-    
+
     value: mpq
 
     @property
     def args(self) -> tuple[mpq]:
-        """The arguments of this AST node, which is just the rational number 
+        """The arguments of this AST node, which is just the rational number
         itself.
         """
         return (self.value,)
@@ -380,7 +380,7 @@ class Rat(AST):
             return Neg(Rat(-value))
         else:
             return super().__new__(cls)
-        
+
 
     def accept(self, visitor: ASTVisitor[α]) -> α:
         """Implements the abstract method :meth:`.AST.accept`."""
@@ -388,20 +388,20 @@ class Rat(AST):
 
 
 class _I(AST):
-    """The imaginary unit. This is a singleton class, and the only instance 
+    """The imaginary unit. This is a singleton class, and the only instance
     is `I`. Implements the abstract class :class:`.AST`.
     """
 
     _instance: Optional[_I] = None
     """The singleton instance of this class.
     """
-    
+
     @property
     def args(self) -> tuple[()]:
         """The imaginary unit has no arguments.
         """
         return ()
-    
+
     def __init__(self) -> None:
         """Initialize the imaginary unit. This is a singleton class, so
         this method should not be called directly. Use `I` instead.
@@ -417,8 +417,8 @@ class _I(AST):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
-    
-    
+
+
 I: Final = _I()
 """The singleton instance of the imaginary unit.
 """
@@ -432,7 +432,7 @@ class Var(AST):
     name: str
     """The name of this variable.
     """
-    
+
     @property
     def args(self) -> tuple[str]:
         """The arguments of this variable, which are just the name of the
@@ -450,7 +450,7 @@ class Var(AST):
         """
         return visitor.visit_var(self)
 
-    
+
 class MonoidalOperation(AST):
     """A monoidal operation, which is an associative operation with an
     identity element. This is a base class for addition and
@@ -474,7 +474,7 @@ class MonoidalOperation(AST):
 
     def __init__(self, *args: AST) -> None:
         """Initialize this monoidal operation with the given arguments.
-        If any of the arguments is itself a monoidal operation of the same 
+        If any of the arguments is itself a monoidal operation of the same
         type, then the arguments are flattened into this operation.
         """
         args_flat = []
@@ -495,7 +495,7 @@ class MonoidalOperation(AST):
         if len(args) == 1:
             return args[0]
         return super().__new__(cls)
-    
+
 
 class Add(MonoidalOperation):
     """Addition. Implements the abstract class :class:`.MonoidalOperation`.
@@ -529,11 +529,11 @@ class Mul(MonoidalOperation):
 class Pow(AST):
     """Exponentiation. Implements the abstract class :class:`.AST`.
     """
-    
+
     base: AST
     """The base of this power node.
     """
-    
+
     exponent: int
     """The exponent of this power node. Must be a non-negative integer.
     """
@@ -543,7 +543,7 @@ class Pow(AST):
         """The arguments of this node, which is the base and the exponent.
         """
         return (self.base, self.exponent)
-    
+
     def __init__(self, base: AST, exponent: int) -> None:
         """Initialize this power node with the given base and exponent.
         The exponent must be a non-negative integer.
@@ -558,7 +558,7 @@ class Pow(AST):
         """
         return visitor.visit_pow(self)
 
-        
+
 class UnaryOperation(AST):
     """A unary operation, which is an operation with one argument.
     This is a base class for negation, conjugation, real part, and
@@ -574,7 +574,7 @@ class UnaryOperation(AST):
         argument of this unary operation.
         """
         return (self.arg,)
-    
+
     def __init__(self, arg: Number | AST) -> None:
         """Initialize this unary operation with the given argument,
         which can be either an AST node or a number.
@@ -595,7 +595,7 @@ class Neg(UnaryOperation):
         """Implements the abstract method :meth:`.AST.accept`.
         """
         return visitor.visit_neg(self)
-    
+
 
 class Conj(UnaryOperation):
     """Complex conjugation. Implements the abstract class
@@ -615,7 +615,7 @@ class Re(UnaryOperation):
     def accept(self, visitor: ASTVisitor[α]) -> α:
         """Implements the abstract method :meth:`.AST.accept`.
         """
-        return visitor.visit_re(self)   
+        return visitor.visit_re(self)
 
 
 class Im(UnaryOperation):
@@ -698,31 +698,31 @@ class IdentityASTVisitor(ASTVisitor[AST]):
     """Visitor that returns the same AST node, but with all children
     visited. Useful as a base class for other visitors.
     """
-    
+
     def visit_rat(self, num: Rat) -> AST:
         """Return the same rational number. Implements the abstract
         method :meth:`.ASTVisitor.visit_rat`.
         """
         return num
-    
+
     def visit_i(self, i: _I) -> AST:
         """Return the imaginary unit. Implements the abstract method
         :meth:`.ASTVisitor.visit_i`.
         """
         return i
-    
+
     def visit_var(self, var: Var) -> AST:
         """Return the same variable. Implements the abstract method
         :meth:`.ASTVisitor.visit_var`.
         """
         return var
-    
+
     def visit_add(self, add: Add) -> AST:
         """Return the same addition node, but with all arguments
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_add`.
         """
         return Add(*[arg.accept(self) for arg in add.args])
-    
+
     def visit_mul(self, mul: Mul) -> AST:
         """Return the same multiplication node, but with all arguments
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_mul`.
@@ -758,21 +758,21 @@ class IdentityASTVisitor(ASTVisitor[AST]):
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_im`.
         """
         return Im(im.arg.accept(self))
-    
+
 
 class VariableSubstitutor(IdentityASTVisitor):
-    """Visitor that substitutes variables according to a given mapping. See 
+    """Visitor that substitutes variables according to a given mapping. See
     also :meth:`.AST.subs`.
     """
-    
+
     mapping: Mapping[Var, Number | AST]
 
     def __init__(self, mapping: Mapping[Var, Number | AST]) -> None:
-        """Initialize the substitutor with the given mapping containing either 
+        """Initialize the substitutor with the given mapping containing either
         AST nodes or numbers.
         """
         self.mapping = mapping
-    
+
     def visit_variable(self, var: Var) -> AST:
         """Return the substituted AST node for the given variable, or the
         variable itself if not found in the mapping.
@@ -782,7 +782,7 @@ class VariableSubstitutor(IdentityASTVisitor):
             return value
         else:
             return AST.from_number(value)
-    
+
 
 from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter
 from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator

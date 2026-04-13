@@ -19,9 +19,9 @@ from logic1.theories.Complex.types import Number, RationalNumber
 
 @dataclass
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
-    
+
     _names: set[str] = field(default_factory=set)
-     
+
     @property
     def stack(self) -> list[set[str]]:
         return [self._names]
@@ -51,13 +51,13 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
             i += 1
             v = f'G{i:04d}{suffix}'
         return self[v]
-    
+
     def pop(self) -> None:
         raise NotImplementedError()
 
     def push(self) -> None:
         raise NotImplementedError()
-    
+
     def reset(self) -> None:
         self._names = set()
 
@@ -86,7 +86,7 @@ class SortKey(Generic[τ]):
 
     def __le__(self, other: SortKey) -> bool:
         return self.term._ast.sort_key() <= other.term._ast.sort_key()
-        
+
 
 class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
@@ -95,7 +95,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def __init__(self, number: Number) -> None:
         """Initialize a term from a number.
-        
+
         >>> Term(2)
         2
         >>> Term(1.5)
@@ -104,7 +104,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         1 + 2 * I
         """
         self._ast = Term._normal_form(ast.AST.from_number(number))
-    
+
     def __add__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
             return Term._from_ast(self._ast + other._ast)
@@ -114,17 +114,17 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         if isinstance(other, Term):
             return Eq(self, other)
         return self == Term(other)
-        
+
     def __ge__(self, other: Number | Term) -> Ge:
         if isinstance(other, Term):
             return Ge(self, other)
         return self >= Term(other)
-        
+
     def __gt__(self, other: Number | Term) -> Gt:
         if isinstance(other, Term):
             return Gt(self, other)
         return self > Term(other)
-        
+
     def __hash__(self) -> int:
         return hash(self._ast)
 
@@ -140,12 +140,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         if isinstance(other, Term):
             return Lt(self, other)
         return self < Term(other)
-        
+
     def __mul__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
             return Term._from_ast(self._ast * other._ast)
         return self * Term(other)
-        
+
     def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
         if isinstance(other, Term):
             return Ne(self, other)
@@ -160,7 +160,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def __radd__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
         return Term(other) + self
-    
+
     def __repr__(self) -> str:
         """String representation of this term that can be evaluated to
         reconstruct the term. For a more human-readable string
@@ -175,7 +175,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def __rsub__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
         return Term(other) - self
-    
+
     def __str__(self) -> str:
         return str(self._ast)
 
@@ -183,7 +183,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         if isinstance(other, Term):
             return Term._from_ast(self._ast - other._ast)
         return self - Term(other)
-        
+
     def __truediv__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
             return Term._from_ast(self._ast / other._ast)
@@ -193,7 +193,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
-    
+
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
@@ -216,7 +216,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         if isinstance(maybe_var, ast.Var):
             return VV[maybe_var.name]
         raise ValueError(f'Term {self} is not a variable')
-    
+
     def conjugate(self) -> Term:
         """The complex conjugate of this term.
 
@@ -227,12 +227,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         -2 * I
         """
         return Term._from_ast(ast.Conj(self._ast))
-    
+
     def eval(self) -> tuple[mpq, mpq]:
-        """Evaluate this term to a pair of rational numbers representing its 
-        real and imaginary parts. Raises a ValueError if this term is not 
+        """Evaluate this term to a pair of rational numbers representing its
+        real and imaginary parts. Raises a ValueError if this term is not
         constant.
-        
+
         >>> (1 + 2 * I).eval()
         (mpq(1,1), mpq(2,1))
         >>> x = VV['x']
@@ -242,7 +242,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         ValueError: Cannot evaluate variable x
         """
         return self._ast.eval()
-            
+
     @classmethod
     def _from_ast(cls, ast: ast.AST) -> Self:
         """Construct a term from an AST.
@@ -259,7 +259,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         1 + 2 * I
         """
         return Term(real) + Term(imag) * I
-    
+
     def imaginary_part(self) -> Term:
         """The imaginary part of this term.
 
@@ -281,7 +281,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         True
         """
         return self._ast.is_constant()
-        
+
     def is_imaginary(self) -> bool:
         """Return :obj:`True` if this term is imaginary, i.e., its real
         part is zero.
@@ -329,7 +329,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         True
         """
         return self._ast.is_zero()
-    
+
     def lc(self) -> Term:
         """Return the leading coefficient of this term.
         """
@@ -346,7 +346,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
                     result = result * Term._from_ast(arg)
             return result
         return Term(1)
-    
+
     def real_part(self) -> Term:
         """Return the real part of this term.
 
@@ -362,7 +362,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """LaTeX representation for Jupyter notebooks.
         """
         return self._ast._repr_latex_()
-    
+
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
         the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
@@ -371,10 +371,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def subs(self, sigma: Mapping[Variable, Number | Term]) -> Term:
         raise NotImplementedError()
-    
+
     def _summands(self) -> Iterator[tuple[Mapping[Term, int], Term]]:
         """An iterator that yields each summand of this term
-        as a pair of a mapping from terms to their exponents, and a coefficient in 
+        as a pair of a mapping from terms to their exponents, and a coefficient in
         decreasing order of the leading term.
         """
         constant = Term(0)
@@ -420,7 +420,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
-    @property    
+    @property
     def name(self) -> str:
         """The name of this variable.
         """
@@ -436,7 +436,7 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
         abstract method :meth:`.firstorder.atomic.Variable.fresh`.
         """
         return VV.fresh(suffix=f'_{str(self)}')
-    
+
 
 I: Final[Term] = Term(1j)
 
