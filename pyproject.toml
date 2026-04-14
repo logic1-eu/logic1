@@ -15,6 +15,7 @@ maintainers = [
 ]
 readme = "README.md"
 dependencies = [
+  "gmpy2",
   "more-itertools",
   "pyeda",
 ]
