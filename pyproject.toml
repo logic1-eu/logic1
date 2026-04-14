@@ -36,7 +36,7 @@ annotate = true
 inplace = true
 
 [tool.setuptools]
-ext-modules = [{name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"], include-dirs = ["/Users/sturm/miniforge3/envs/logic1_dev/lib/python3.12/site-packages/gmpy2"] } ]
+ext-modules = [{name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"]}]
 
 [tool.setuptools.packages.find]
 include = ["logic1*"]
