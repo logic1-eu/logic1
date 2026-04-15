@@ -171,7 +171,7 @@ class InternalRepresentation(
         formula, used to guide the simplification process.
         """
         visitor = ComplexityVisitor()
-        return 1.0 + atom.lhs._ast.accept(visitor) + atom.rhs._ast.accept(visitor)
+        return 1.0 + atom.lhs.normal_ast.accept(visitor) + atom.rhs.normal_ast.accept(visitor)
 
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method

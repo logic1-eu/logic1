@@ -16,7 +16,6 @@ from logic1.theories.Complex.types import Number, RationalNumber
 α = TypeVar('α')
 τ = TypeVar('τ', bound='Term')
 
-
 @dataclass
 class VariableSet(firstorder.atomic.VariableSet['Variable']):
 
@@ -79,19 +78,28 @@ class SortKey(Generic[τ]):
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, SortKey):
             return False
-        return self.term._ast.sort_key() == other.term._ast.sort_key()
+        return self.term.normal_ast.sort_key() == other.term.normal_ast.sort_key()
 
     def __hash__(self) -> int:
         return hash(self.term)
 
     def __le__(self, other: SortKey) -> bool:
-        return self.term._ast.sort_key() <= other.term._ast.sort_key()
+        return self.term.normal_ast.sort_key() <= other.term.normal_ast.sort_key()
 
 
 class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
+    _normalizer: ClassVar[Callable[[ast.AST], ast.AST]] = conjugate_normal_form
     _ast: ast.AST
-    _normal_form: ClassVar[Callable[[ast.AST], ast.AST]] = conjugate_normal_form
+    _current_normal_form: Callable[[ast.AST], ast.AST]
+
+    @property
+    def normal_ast(self) -> ast.AST:
+        """Return the normal form of this term as an AST."""
+        if self._current_normal_form != Term._normalizer:
+            self._ast = Term._normalizer(self._ast)
+            self._current_normal_form = Term._normalizer
+        return self._ast
 
     def __init__(self, number: Number) -> None:
         """Initialize a term from a number.
@@ -103,11 +111,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> Term(1 + 2j)
         1 + 2 * I
         """
-        self._ast = Term._normal_form(ast.AST.from_number(number))
+        self._ast = Term._normalizer(ast.AST.from_number(number))
+        self._current_normal_form = Term._normalizer
 
     def __add__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
-            return Term._from_ast(self._ast + other._ast)
+            return Term._from_ast(self.normal_ast + other.normal_ast)
         return self + Term(other)
 
     def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
@@ -126,7 +135,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self > Term(other)
 
     def __hash__(self) -> int:
-        return hash(self._ast)
+        return hash(self.normal_ast)
 
     def __invert__(self) -> Term:
         return self.conjugate()
@@ -143,7 +152,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def __mul__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
-            return Term._from_ast(self._ast * other._ast)
+            return Term._from_ast(self.normal_ast * other.normal_ast)
         return self * Term(other)
 
     def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
@@ -152,10 +161,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self != Term(other)
 
     def __neg__(self) -> Term:
-        return Term._from_ast(-self._ast)
+        return Term._from_ast(-self.normal_ast)
 
     def __pow__(self, other: int) -> Term:
-        return Term._from_ast(self._ast ** other)
+        return Term._from_ast(self.normal_ast ** other)
 
     def __radd__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
@@ -166,7 +175,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         reconstruct the term. For a more human-readable string
         representation, use :meth:`.Term.__str__` or :meth:`.Term.as_latex`.
         """
-        return repr(self._ast)
+        return repr(self.normal_ast)
 
     def __rmul__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
@@ -177,16 +186,16 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term(other) - self
 
     def __str__(self) -> str:
-        return str(self._ast)
+        return str(self.normal_ast)
 
     def __sub__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
-            return Term._from_ast(self._ast - other._ast)
+            return Term._from_ast(self.normal_ast - other.normal_ast)
         return self - Term(other)
 
     def __truediv__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
-            return Term._from_ast(self._ast / other._ast)
+            return Term._from_ast(self.normal_ast / other.normal_ast)
         return self / Term(other)
 
     def __xor__(self, other: Never) -> Term:
@@ -198,7 +207,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """LaTeX representation as a string. Implements the abstract method
         :meth:`.firstorder.atomic.Term.as_latex`.
         """
-        return self._ast.as_latex()
+        return self.normal_ast.as_latex()
 
     def as_variable(self) -> Variable:
         """Return this term as a variable if it is one, and raise a ValueError
@@ -212,7 +221,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         ...
         ValueError: Term x + 1 is not a variable
         """
-        maybe_var = conjugate_normal_form(self._ast)
+        maybe_var = conjugate_normal_form(self.normal_ast)
         if isinstance(maybe_var, ast.Var):
             return VV[maybe_var.name]
         raise ValueError(f'Term {self} is not a variable')
@@ -226,7 +235,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> (2 * I).conjugate()
         -2 * I
         """
-        return Term._from_ast(ast.Conj(self._ast))
+        return Term._from_ast(ast.Conj(self.normal_ast))
 
     def eval(self) -> tuple[mpq, mpq]:
         """Evaluate this term to a pair of rational numbers representing its
@@ -241,14 +250,15 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         ...
         ValueError: Cannot evaluate variable x
         """
-        return self._ast.eval()
+        return self.normal_ast.eval()
 
     @classmethod
     def _from_ast(cls, ast: ast.AST) -> Self:
         """Construct a term from an AST.
         """
         term = cls.__new__(cls)
-        term._ast = cls._normal_form(ast)
+        term._ast = cls._normalizer(ast)
+        term._current_normal_form = cls._normalizer
         return term
 
     @staticmethod
@@ -269,7 +279,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> (x + 2).imaginary_part()
         -1/2 * I * x + 1/2 * I * ~x
         """
-        return Term._from_ast(ast.Im(self._ast))
+        return Term._from_ast(ast.Im(self.normal_ast))
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
@@ -280,7 +290,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> (2 * I).is_constant()
         True
         """
-        return self._ast.is_constant()
+        return self.normal_ast.is_constant()
 
     def is_imaginary(self) -> bool:
         """Return :obj:`True` if this term is imaginary, i.e., its real
@@ -317,7 +327,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> I.is_variable()
         False
         """
-        return isinstance(conjugate_normal_form(self._ast), ast.Var)
+        return isinstance(conjugate_normal_form(self.normal_ast), ast.Var)
 
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is zero.
@@ -328,20 +338,20 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> (x - x).is_zero()
         True
         """
-        return self._ast.is_zero()
+        return self.normal_ast.is_zero()
 
     def lc(self) -> Term:
         """Return the leading coefficient of this term.
         """
         if self.is_constant():
             return self
-        if isinstance(self._ast, ast.Add):
-            return Term._from_ast(self._ast.args[0]).lc()
-        if isinstance(self._ast, ast.Neg):
-            return -Term._from_ast(self._ast.arg).lc()
-        if isinstance(self._ast, ast.Mul):
+        if isinstance(self.normal_ast, ast.Add):
+            return Term._from_ast(self.normal_ast.args[0]).lc()
+        if isinstance(self.normal_ast, ast.Neg):
+            return -Term._from_ast(self.normal_ast.arg).lc()
+        if isinstance(self.normal_ast, ast.Mul):
             result = Term(1)
-            for arg in self._ast.args:
+            for arg in self.normal_ast.args:
                 if arg.is_constant():
                     result = result * Term._from_ast(arg)
             return result
@@ -356,12 +366,20 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> x.real_part()
         1/2 * x + 1/2 * ~x
         """
-        return Term._from_ast(ast.Re(self._ast))
+        return Term._from_ast(ast.Re(self.normal_ast))
 
     def _repr_latex_(self) -> str:
         """LaTeX representation for Jupyter notebooks.
         """
-        return self._ast._repr_latex_()
+        return self.normal_ast._repr_latex_()
+
+    @classmethod
+    def set_normal_form(cls, normalizer: Callable[[ast.AST], ast.AST]) -> Callable[[ast.AST], ast.AST]:
+        """Return a function that normalizes an AST using the given normalizer.
+        """
+        ret = cls._normalizer
+        cls._normalizer = normalizer
+        return ret
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
@@ -378,7 +396,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         decreasing order of the leading term.
         """
         constant = Term(0)
-        products = self._ast.args if isinstance(self._ast, ast.Add) else [self._ast]
+        products = self.normal_ast.args if isinstance(self.normal_ast, ast.Add) else [self.normal_ast]
         for product in products:
             if product.is_constant():
                 constant = constant + Term._from_ast(product)
@@ -408,7 +426,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         the abstract method :meth:`.firstorder.atomic.Term.vars`.
         """
         result = set()
-        stack = [self._ast]
+        stack = [self.normal_ast]
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Var):
@@ -424,7 +442,7 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
     def name(self) -> str:
         """The name of this variable.
         """
-        _ast = conjugate_normal_form(self._ast)
+        _ast = conjugate_normal_form(self.normal_ast)
         assert isinstance(_ast, ast.Var)
         return _ast.name
 

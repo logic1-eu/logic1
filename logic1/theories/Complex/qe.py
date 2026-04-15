@@ -80,7 +80,7 @@ def real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
     in the theory of real closed fields.
     """
     assert atom.is_real()
-    lhs = cartesian_normal_form((atom.lhs - atom.rhs)._ast).accept(RCF_Evaluator())
+    lhs = cartesian_normal_form((atom.lhs - atom.rhs).normal_ast).accept(RCF_Evaluator())
     if isinstance(atom, Eq):
         return RCF.Eq(lhs, 0)
     elif isinstance(atom, Ne):
@@ -110,7 +110,7 @@ def formula_to_rcf(formula: Formula) -> RCF.Formula:
             formula = formula.as_real_formula()
             return formula_to_rcf(formula)
     if isinstance(formula, (All, Ex)):
-        var = conjugate_normal_form(formula.var._ast)
+        var = conjugate_normal_form(formula.var.normal_ast)
         assert isinstance(var, Var)
         var_re = RCF.VV[f"{var.name}_re"]
         var_im = RCF.VV[f"{var.name}_im"]
