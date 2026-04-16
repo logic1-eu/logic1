@@ -783,6 +783,5 @@ class VariableSubstitutor(IdentityASTVisitor):
         else:
             return AST.from_number(value)
 
-
 from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter
 from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator

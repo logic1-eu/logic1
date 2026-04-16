@@ -9,9 +9,11 @@ from typing import Callable, ClassVar, Final, Generic, Never, Self, TypeVar
 from gmpy2 import mpq
 
 from logic1 import firstorder
-from logic1.theories.Complex import ast
-from logic1.theories.Complex.normalize import ComplexNormalizer, Normalizer, cartesian_normal_form, conjugate_normal_form
+
 from logic1.theories.Complex.types import Number, RationalNumber
+from logic1.theories.Complex import ast
+from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_normal_form
+
 
 α = TypeVar('α')
 τ = TypeVar('τ', bound='Term')

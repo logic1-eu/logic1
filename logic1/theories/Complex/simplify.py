@@ -6,10 +6,13 @@ import networkx as nx
 
 from logic1 import abc
 from logic1.firstorder.boolean import _F, F, _T, T, And, Or
-from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
-from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne
-from logic1.theories.Complex.term import I, Term, Variable
+from logic1.theories import RCF
+
 from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
+from logic1.theories.Complex.term import I, Term, Variable
+from logic1.theories.Complex.atomic import AtomicFormula, Eq
+
 
 from gmpy2 import mpz
 
@@ -294,7 +297,11 @@ def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> For
     """Returns a simplified formula that is equivalent to the given
     formula f, using the given assumptions and options.
     """
-    return Simplify(Options(**options)).simplify(f, assume)
+    rcf_assume = assume_to_rcf(assume)
+    rcf_formula = formula_to_rcf(f)
+    rcf_formula = RCF.simplify(rcf_formula, assume=rcf_assume)
+    formula = formula_to_complex(rcf_formula)
+    return Simplify(Options(**options)).simplify(formula, assume)
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Optional[bool]:
@@ -302,4 +309,9 @@ def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Opt
     assumptions and options, False if it is not valid, and None if the
     validity cannot be determined.
     """
-    return Simplify(Options(**options)).is_valid(f, assume)
+    rcf_assume = assume_to_rcf(assume)
+    rcf_formula = formula_to_rcf(f)
+    return RCF.is_valid(rcf_formula, assume=rcf_assume, **options)
+
+
+from logic1.theories.Complex.qe import assume_to_rcf, formula_to_complex, formula_to_rcf

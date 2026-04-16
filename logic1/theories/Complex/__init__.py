@@ -1,12 +1,12 @@
-# used to load the modules in the right order to avoid circular imports
-from . import types, term
+# order to avoid circular imports:
+# types, ast, format, normalize, term, atomic, qe, simplify
 
-from .atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
-from .term import Conj, I, Im, Term, Re, Variable, VV
-from .normalize import cartesian_normal_form, conjugate_normal_form
-from .qe import qe
-from .simplify import is_valid, simplify
 from .types import Formula
+from .normalize import cartesian_normal_form, conjugate_normal_form
+from .term import Conj, I, Im, Term, Re, Variable, VV
+from .atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
+from .qe import qe, real_normal_form
+from .simplify import is_valid, simplify
 
 __all__ = [
     'AtomicFormula', 'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt',
@@ -15,7 +15,7 @@ __all__ = [
 
     'cartesian_normal_form', 'conjugate_normal_form',
 
-    'qe',
+    'qe', 'real_normal_form',
 
     'is_valid', 'simplify',
 

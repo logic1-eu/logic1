@@ -7,6 +7,7 @@ import operator
 
 from logic1 import firstorder
 from logic1.firstorder.boolean import And, _F, Or, _T
+
 from logic1.theories.Complex.types import Formula, Number
 from logic1.theories.Complex.term import Im, Re, Term, Variable
 
@@ -95,23 +96,6 @@ class AtomicFormula(
         }
         return f'{self.lhs.as_latex()} {symbols[self.op]} {self.rhs.as_latex()}'
 
-    def as_real_formula(self) -> Formula:
-        """Returns an equivalent formula where all terms are real.
-        """
-        if isinstance(self, Eq):
-            return And(Re(self.lhs) == Re(self.rhs), Im(self.lhs) == Im(self.rhs))
-        if isinstance(self, Ne):
-            return Or(Re(self.lhs) != Re(self.rhs), Im(self.lhs) != Im(self.rhs))
-        if isinstance(self, Ge):
-            return And(Re(self.lhs) >= Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
-        if isinstance(self, Le):
-            return And(Re(self.lhs) <= Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
-        if isinstance(self, Gt):
-            return And(Re(self.lhs) > Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
-        if isinstance(self, Lt):
-            return And(Re(self.lhs) < Re(self.rhs), Im(self.lhs) == 0, Im(self.rhs) == 0)
-        assert False, type(self)
-
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of
         `quantified`. Yield each such variable once for each term that it
@@ -196,6 +180,24 @@ class AtomicFormula(
         """Returns `True` if both sides of this atomic formula are real."""
         return self.lhs.is_real() and self.rhs.is_real()
 
+    def real_normal_form(self) -> Formula:
+        """Returns an equivalent formula in real normal form.
+        """
+        lhs = self.lhs - self.rhs
+        if isinstance(self, Eq):
+            return And(Re(lhs) == 0, Im(lhs) == 0)
+        if isinstance(self, Ne):
+            return Or(Re(lhs) != 0, Im(lhs) != 0)
+        if isinstance(self, Ge):
+            return And(Re(lhs) >= 0, Im(lhs) == 0)
+        if isinstance(self, Le):
+            return And(Re(lhs) <= 0, Im(lhs) == 0)
+        if isinstance(self, Gt):
+            return And(Re(lhs) > 0, Im(lhs) == 0)
+        if isinstance(self, Lt):
+            return And(Re(lhs) < 0, Im(lhs) == 0)
+        assert False, type(self)
+
     def simplify(self) -> AtomicFormula | _T | _F:
         """Fast basic simplification. The result is equivalent to self.
         Implements the abstract method
@@ -264,7 +266,3 @@ class Gt(RealAtomicFormula):
 
 class Lt(RealAtomicFormula):
     pass
-
-
-from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator, Normalizer, WeakNormalizer
-from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter

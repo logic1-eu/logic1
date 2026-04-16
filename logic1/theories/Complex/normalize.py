@@ -11,6 +11,7 @@ from gmpy2 import mpq
 
 from logic1.theories.Complex.ast import _I, AST, I, Add, ASTVisitor, Conj, IdentityASTVisitor, Im, Mul, Neg, Pow, Rat, Re, SortKey, Var
 
+
 α = TypeVar('α')
 """Type variable for the result type of `ASTVisitor` methods."""
 
@@ -763,6 +764,7 @@ class RealNormalizer(Normalizer):
 
 def conjugate_normal_form(ast: AST) -> AST:
     return ast.accept(ComplexNormalizer())
+
 
 def cartesian_normal_form(ast: AST) -> AST:
     normalizer = Normalizer()

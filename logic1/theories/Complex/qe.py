@@ -3,12 +3,12 @@ from typing import Iterable, Optional
 from logic1.firstorder.boolean import _F, _T, And, Equivalent, Implies, Not, Or
 from logic1.firstorder.quantified import All, Ex
 from logic1.theories import RCF
+
+from logic1.theories.Complex.types import Formula
 from logic1.theories.Complex.ast import _I, Conj, Im, Rat, Re, Var
-from logic1.theories.Complex.simplify import simplify
+from logic1.theories.Complex.normalize import ArithmeticEvaluator, cartesian_normal_form, conjugate_normal_form
 from logic1.theories.Complex.term import VV, Term
 from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne, Ge, Gt, Le, Lt
-from logic1.theories.Complex.normalize import ArithmeticEvaluator, RealNormalizer, ComplexNormalizer, cartesian_normal_form, conjugate_normal_form
-from logic1.theories.Complex.types import Formula
 
 
 class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
@@ -96,6 +96,29 @@ def real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
     else:
         assert False, type(atom)
 
+def real_formula_to_rcf(formula: Formula) -> RCF.Formula:
+    if isinstance(formula, AtomicFormula):
+        return real_atom_to_rcf(formula)
+    if isinstance(formula, (All, Ex)):
+        var = conjugate_normal_form(formula.var.normal_ast)
+        assert isinstance(var, Var)
+        var_re = RCF.VV[f"{var.name}_re"]
+        var_im = RCF.VV[f"{var.name}_im"]
+        arg = real_formula_to_rcf(formula.arg)
+        return formula.op([var_re, var_im], arg)
+    if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
+        return formula.op(*(real_formula_to_rcf(arg) for arg in formula.args))
+    assert False, type(formula)
+
+def real_normal_form(formula: Formula) -> Formula:
+    if isinstance(formula, AtomicFormula):
+       return formula.real_normal_form()
+    if isinstance(formula, (All, Ex)):
+        return formula.op(formula.var, real_normal_form(formula.arg))
+    if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
+        return formula.op(*(real_normal_form(arg) for arg in formula.args))
+    assert False, type(formula)
+
 def formula_to_rcf(formula: Formula) -> RCF.Formula:
     """Converts a formula in the theory of complex numbers to an
     equivalent formula in the theory of real closed fields. Raises a
@@ -103,23 +126,17 @@ def formula_to_rcf(formula: Formula) -> RCF.Formula:
     that cannot be evaluated in RCF, such as the imaginary unit or
     complex conjugation.
     """
-    if isinstance(formula, AtomicFormula):
-       if formula.is_real():
-            return real_atom_to_rcf(formula)
-       else:
-            formula = formula.as_real_formula()
-            return formula_to_rcf(formula)
-    if isinstance(formula, (All, Ex)):
-        var = conjugate_normal_form(formula.var.normal_ast)
-        assert isinstance(var, Var)
-        var_re = RCF.VV[f"{var.name}_re"]
-        var_im = RCF.VV[f"{var.name}_im"]
-        arg = formula_to_rcf(formula.arg)
-        return formula.op([var_re, var_im], arg)
-    if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
-        return formula.op(*(formula_to_rcf(arg) for arg in formula.args))
-    assert False, type(formula)
+    formula = real_normal_form(formula)
+    return real_formula_to_rcf(formula)
 
+def assume_to_rcf(assume: Iterable[AtomicFormula]) -> list[RCF.AtomicFormula]:
+    assumption = formula_to_rcf(And(*assume))
+    if isinstance(assumption, RCF.AtomicFormula):
+        return [assumption]
+    elif isinstance(assumption, And):
+        return [arg for arg in assumption.args if isinstance(arg, RCF.AtomicFormula)]
+    else:
+        return []
 
 def variable_to_complex(var: RCF.Variable) -> Term:
     """Converts an RCF variable to a complex variable. The RCF variable
@@ -169,14 +186,7 @@ def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool 
     """Quantifier elimination for the theory of complex numbers. Returns a
     quantifier-free formula equivalent to the input formula.
     """
-    assumption = formula_to_rcf(And(*assume))
-    if isinstance(assumption, RCF.AtomicFormula):
-        rcf_assume = [assumption]
-    elif isinstance(assumption, And):
-        rcf_assume = [arg for arg in assumption.args
-                      if isinstance(arg, RCF.AtomicFormula)]
-    else:
-        rcf_assume = []
+    rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(formula).to_pnf()
     topmost_op = type(rcf_formula)
     if use_redlog:
@@ -196,3 +206,6 @@ def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool 
     result = formula_to_complex(rcf_qe_formula)
     result = simplify(result)
     return result
+
+
+from logic1.theories.Complex.simplify import simplify
