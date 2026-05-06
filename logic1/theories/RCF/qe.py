@@ -7,8 +7,9 @@ from typing import Iterable
 
 from logic1 import abc
 from logic1.firstorder import _T
-from logic1.theories.RCF import atomic
-from logic1.theories.RCF.atomic import AtomicFormula, Term, Variable
+from logic1.theories.RCF import term
+from logic1.theories.RCF.term import Term, Variable
+from logic1.theories.RCF.atomic import AtomicFormula
 from logic1.theories.RCF.node import Assumptions, Clustering, Generic, Node
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.types import Formula
@@ -156,12 +157,12 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, froz
     def init_env(cls, ring_vars: list[str]) -> None:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env`.
         """
-        atomic.init_env(ring_vars)
+        term.init_env(ring_vars)
 
     def init_env_arg(self) -> list[str]:
         """Implements the abstract method :meth:`.abc.qe.QuantifierElimination.init_env_arg`.
         """
-        return atomic.init_env_arg()
+        return term.init_env_arg()
 
 
 qe = virtual_substitution = VirtualSubstitution()

@@ -3,7 +3,8 @@ from typing import Final, Iterable
 
 import logic1.firstorder as firstorder
 from logic1.support.excepthook import NoTraceException
-from logic1.theories.RCF.atomic import AtomicFormula, Variable
+from logic1.theories.RCF.term import Variable
+from logic1.theories.RCF.atomic import AtomicFormula
 from logic1.theories.RCF.qe import Generic
 from logic1.theories.RCF.types import Formula
 

@@ -13,14 +13,15 @@ from typing import Collection, Iterable, Iterator, Optional, Self
 
 from gmpy2 import mpq, sign
 
-from ... import abc
-from ...firstorder import And, _F, Not, Or, _T
-from .atomic import AtomicFormula, CACHE_SIZE, DEFINITE, Eq, Ge, Le, Gt, Lt, Ne, Term, Variable
-from .substitution import _SubstValue, _Substitution  # type: ignore
-from .types import Formula
+from logic1 import abc
+from logic1.firstorder import And, _F, Not, Or, _T
+from logic1.theories.RCF.term import CACHE_SIZE, DEFINITE, Term, Variable
+from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne
+from logic1.theories.RCF.substitution import _SubstValue, _Substitution  # type: ignore
+from logic1.theories.RCF.types import Formula
 
-from .range import EndPoint, EP_INF, EP_ZERO, _Range, RANGE_R  # type: ignore
-from ...support.tracing import trace  # noqa
+from logic1.theories.RCF.range import EndPoint, EP_INF, EP_ZERO, _Range, RANGE_R  # type: ignore
+from logic1.support.tracing import trace  # noqa
 
 
 @dataclass(frozen=True)
@@ -191,7 +192,7 @@ class _BasicKnowledge:
         We assume that :data:`f` has gone through :meth:`_simpl_at` so that
         its left hand side is monic and its right hand side is zero.
 
-        >>> from .atomic import VV
+        >>> from logic1.theories.RCF import VV
         >>> a, b = VV.get('a', 'b')
         >>> f = a**2 + mpq(1,2)*a*b - 6*b**2 + mpq(1,3) <= 0
         >>> print(_BasicKnowledge.from_atom(f))
@@ -575,7 +576,7 @@ class Simplify(abc.simplify.Simplify[
                   explode_always: bool) -> Formula:
         """Simplify atomic formula.
 
-        >>> from .atomic import VV
+        >>> from logic1.theories.RCF import VV
         >>> a, b = VV.get('a', 'b')
         >>> simplify(-6 * (a+b)**2 + 3 <= 0)
         2*a**2 + 4*a*b + 2*b**2 - 1 >= 0

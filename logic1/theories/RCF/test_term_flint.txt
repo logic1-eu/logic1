@@ -1,6 +1,6 @@
 """
 >>> from logic1 import *
->>> from logic1.theories.RCF.atomic_flint import *
+>>> from logic1.theories.RCF.term.term_flint import *
 >>> from gmpy2 import mpq
 
 """
@@ -451,10 +451,10 @@ class Term:
     ----------------------------------------------------------------------------
     >>> t = x + x - x
     >>> type(t)
-    <class 'logic1.theories.RCF.atomic_flint.Term'>
+    <class 'logic1.theories.RCF.term.term_flint.Term'>
     >>> v = t.as_variable()
     >>> type(v)
-    <class 'logic1.theories.RCF.atomic_flint.Variable'>
+    <class 'logic1.theories.RCF.term.term_flint.Variable'>
     >>> v == t
     Eq(0, 0)
     >>> bool(v == t)

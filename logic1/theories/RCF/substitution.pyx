@@ -7,7 +7,8 @@ from functools import lru_cache
 from gmpy2 import mpq
 from typing import Final, Iterator, Optional, Self
 
-from .atomic import Eq, SortKey, Term, Variable
+from logic1.theories.RCF.term import SortKey, Term, Variable
+from logic1.theories.RCF.atomic import Eq
 
 
 CACHE_SIZE: Final[Optional[int]] = 2**16

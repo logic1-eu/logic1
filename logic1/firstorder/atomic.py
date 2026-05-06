@@ -52,10 +52,10 @@ class VariableSet(Generic[χ]):
         """Obtain the unique variable with name `index`.
 
         >>> from logic1.theories import RCF
-        >>> assert isinstance(RCF.VV, RCF.atomic.VariableSet)
+        >>> assert isinstance(RCF.VV, RCF.term.VariableSet)
         >>> x = RCF.VV['x']; x
         x
-        >>> assert isinstance(x, RCF.atomic.Variable)
+        >>> assert isinstance(x, RCF.term.Variable)
 
         .. seealso::
           * :meth:`get` -- obtain several variables simultaneously
@@ -67,10 +67,10 @@ class VariableSet(Generic[χ]):
         """Obtain several variables simultaneously by their names.
 
         >>> from logic1.theories import RCF
-        >>> assert isinstance(RCF.VV, RCF.atomic.VariableSet)
+        >>> assert isinstance(RCF.VV, RCF.term.VariableSet)
         >>> x, y = RCF.VV.get('x', 'y')
-        >>> assert isinstance(x, RCF.atomic.Variable)
-        >>> assert isinstance(y, RCF.atomic.Variable)
+        >>> assert isinstance(x, RCF.term.Variable)
+        >>> assert isinstance(y, RCF.term.Variable)
 
         .. seealso::
           * :meth:`__getitem__` -- obtain variable by its name
@@ -86,10 +86,10 @@ class VariableSet(Generic[χ]):
 
         >>> if __name__ == '__main__':  # to prevent doctest failure
         ...     from logic1.theories import RCF
-        ...     assert isinstance(RCF.VV, RCF.atomic.VariableSet)
+        ...     assert isinstance(RCF.VV, RCF.term.VariableSet)
         ...     RCF.VV.imp('x', 'y')
-        ...     assert isinstance(x, RCF.atomic.Variable)
-        ...     assert isinstance(y, RCF.atomic.Variable)
+        ...     assert isinstance(x, RCF.term.Variable)
+        ...     assert isinstance(y, RCF.term.Variable)
 
         .. seealso::
           * :meth:`__getitem__` -- obtain variable by its name

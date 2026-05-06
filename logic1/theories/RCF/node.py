@@ -13,7 +13,8 @@ from gmpy2 import mpq
 
 from logic1 import abc
 from logic1.firstorder import And, _F, Not, Or, _T
-from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt, Term, Variable
+from logic1.theories.RCF.term import Term, Variable
+from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
 from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF.types import Formula
 
@@ -102,7 +103,7 @@ class Generic(Enum):
 
 @dataclass
 class Node(abc.qe.Node[
-        AtomicFormula, Term, Variable, int, Assumptions, 
+        AtomicFormula, Term, Variable, int, Assumptions,
         tuple[tuple[Variable, ...], Formula, frozenset[Term]]]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
@@ -171,8 +172,8 @@ class Node(abc.qe.Node[
             return abc.qe.multiprocessing_logger
 
     def memorize(self) -> tuple[tuple[Variable, ...], Formula, frozenset[Term]]:
-        return (tuple(self.variables), 
-                self.formula, 
+        return (tuple(self.variables),
+                self.formula,
                 frozenset(self.passive_list))
 
     def process(self, assumptions: Assumptions) -> Sequence[Node]:

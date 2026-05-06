@@ -16,7 +16,7 @@ import queue
 import os
 import threading
 import time
-from typing import (Any, Collection, Generic, Iterable, Iterator, Optional,
+from typing import (Any, cast, Collection, Generic, Iterable, Iterator, Optional,
                     Self, TypeVar)
 from typing import reveal_type  # noqa
 
@@ -369,28 +369,28 @@ class NodeListProxy(Collection[ν], Generic[ν, μ]):
 class _NodeListProxy(mp.managers.BaseProxy, Generic[ν, μ]):
 
     def get_nodes(self) -> list[ν]:
-        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
+        return cast(list[ν], self._callmethod('get_nodes'))
 
     def get_memory(self) -> set[μ]:
-        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
+        return cast(set[μ], self._callmethod('get_memory'))
 
     def get_candidates(self) -> int:
-        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('get_candidates'))
 
     def get_hits(self) -> int:
-        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('get_hits'))
 
     def __len__(self) -> int:
-        return self._callmethod('__len__')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('__len__'))
 
     def append(self, node: ν) -> bool:
-        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
+        return cast(bool, self._callmethod('append', (node,)))
 
     def extend(self, nodes: Iterable[ν]) -> None:
-        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
+        return self._callmethod('extend', (nodes,))
 
     def statistics(self) -> tuple[Any, ...]:
-        return self._callmethod('statistics')  # type: ignore[func-returns-value]
+        return cast(tuple[Any, ...], self._callmethod('statistics'))
 
 
 @dataclass
@@ -506,16 +506,16 @@ class WorkingNodeListProxy(NodeListProxy[ν, μ]):
 class _WorkingNodeListProxy(_NodeListProxy[ν, μ]):
 
     def get_node_counter(self) -> Counter[int]:
-        return self._callmethod('get_node_counter')  # type: ignore[func-returns-value]
+        return cast(Counter[int], self._callmethod('get_node_counter'))
 
     def is_finished(self) -> bool:
-        return self._callmethod('is_finished')  # type: ignore[func-returns-value]
+        return cast(bool, self._callmethod('is_finished'))
 
     def pop(self) -> ν:
-        return self._callmethod('pop')  # type: ignore[func-returns-value]
+        return cast(ν, self._callmethod('pop'))
 
     def task_done(self) -> None:
-        return self._callmethod('task_done')  # type: ignore[func-returns-value]
+        return self._callmethod('task_done')
 
 
 class SyncManager(mp.managers.SyncManager, Generic[ν, μ]):

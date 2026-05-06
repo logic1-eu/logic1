@@ -1,3 +1,5 @@
+# cspell:disable
+
 [project]
 name = "logic1"
 dynamic = ["version"] # See https://setuptools-scm.readthedocs.io/en/v8.1.0/usage/
@@ -37,7 +39,10 @@ annotate = true
 inplace = true
 
 [tool.setuptools]
-ext-modules = [{name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"]}]
+ext-modules = [
+  {name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"]}
+#  {name = "logic1.theories.RCF.substitution", sources = ["logic1/theories/RCF/substitution.pyx"]}
+]
 
 [tool.setuptools.packages.find]
 include = ["logic1*"]
