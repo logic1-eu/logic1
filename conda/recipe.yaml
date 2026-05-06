@@ -19,13 +19,14 @@ requirements:
     - cython >=3.1.0
     - gmpy2
     - pip
-    - python >=3.12,<3.13
+    - python
     - setuptools
     - setuptools_scm
   run:
     - gmpy2
     - more-itertools
     - pyeda
+    - python-flint
     - sage
     - typing-extensions
 
