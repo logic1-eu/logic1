@@ -95,8 +95,8 @@ class LatexFormatter(BaseFormatter):
 
     symbols = {
         Mul: '\\cdot',
-        Re: '\\operatorname{Re}',
-        Im: '\\operatorname{Im}',
+        Re: '\\re',
+        Im: '\\im',
     }
 
     def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:
@@ -125,20 +125,22 @@ class LatexFormatter(BaseFormatter):
             return f'\\frac{{{str(a)}}}{{{str(b)}}}'
 
     def visit_var(self, var: Var) -> str:
+        def format_name(name: str) -> str:
+            return name if len(name) == 1 else f'\\mathrm{{{name}}}'
         if "_" in var.name:
             base, *indices = var.name.split("_")
             grouped = "_".join(f'{{{idx}}}' for idx in indices)
-            return f'\\mathit{{{base}}}_{grouped}'
+            return f'{format_name(base)}_{grouped}'
         else:
             base = var.name.rstrip('0123456789')
             index = var.name[len(base):]
             if index:
-                return f'\\mathit{{{base}}}_{{{str(index)}}}'
+                return f'{format_name(base)}_{{{str(index)}}}'
             else:
-                return f'\\mathit{{{base}}}'
+                return format_name(base)
 
     def visit_conj(self, conj: Conj) -> str:
-        return f'\\overline{{{conj.arg.accept(self)}}}'
+        return f'\\cj{{{conj.arg.accept(self)}}}'
 
     def visit_pow(self, pow: Pow) -> str:
         if isinstance(pow.base, (Add, Mul, Neg, Pow)):
