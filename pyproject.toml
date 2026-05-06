@@ -21,12 +21,12 @@ dependencies = [
   "more-itertools",
   "pyeda",
 ]
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3",
   "Typing :: Typed"
 ]
 
