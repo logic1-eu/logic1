@@ -5,9 +5,7 @@ from dataclasses import dataclass
 from enum import auto, Enum
 from fractions import Fraction
 from functools import lru_cache
-from typing import (
-    TYPE_CHECKING, Any, ClassVar, Final, Generic, Iterable, Iterator, Mapping,
-    Optional, Self, TypeVar)
+from typing import (ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self, TypeVar)
 
 from gmpy2 import mpq
 from sage.all import QQ
@@ -27,10 +25,10 @@ from sage.rings.polynomial.term_order import TermOrder
 from sage.rings.rational import Rational
 
 from logic1 import firstorder
+from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
 
 from logic1.support.tracing import trace  # noqa
 
-from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
 
 POLYLIB: Final = "SAGE"
 
@@ -127,7 +125,7 @@ class _PolynomialRing:
 polynomial_ring = _PolynomialRing()
 
 
-class VariableSet(firstorder.atomic.VariableSet['Variable']):
+class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
@@ -1077,5 +1075,3 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
         abstract method :meth:`.firstorder.atomic.Variable.fresh`.
         """
         return self.VV.fresh(suffix=f'_{str(self)}')
-
-

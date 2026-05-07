@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 import functools
 from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TypeVar
 from typing_extensions import TypeIs
 
 from IPython.lib import pretty
 
-from ..support.tracing import trace  # noqa
+from logic1.support.tracing import trace
 
 
 α = TypeVar('α', bound='AtomicFormula')
@@ -34,7 +34,7 @@ is :data:`σ` == :class:`int` in the theory of real closed fields.
 
 
 @functools.total_ordering
-class Formula(Generic[α, τ, χ, σ]):
+class Formula(ABC, Generic[α, τ, χ, σ]):
     r"""This abstract base class implements representations of and methods on
     first-order formulas recursively built using first-order operators:
 
@@ -1121,7 +1121,9 @@ class Formula(Generic[α, τ, χ, σ]):
 
 
 # The following imports are intentionally late to avoid circularity.
-from .atomic import AtomicFormula, Term, Variable
-from .boolean import And, BooleanFormula, Equivalent, Implies, involutive_not, Not, Or, _F, _T
-from .boolean import T  # noqa, used in doctests only
-from .quantified import All, Ex, Prefix, QuantifiedFormula
+from logic1.firstorder.term import Term, Variable
+from logic1.firstorder.atomic import AtomicFormula
+from logic1.firstorder.boolean import (
+    And, BooleanFormula, Equivalent, Implies, involutive_not, Not, Or, _F, _T)
+from logic1.firstorder.boolean import T  # noqa, used in doctests only
+from logic1.firstorder.quantified import All, Ex, Prefix, QuantifiedFormula

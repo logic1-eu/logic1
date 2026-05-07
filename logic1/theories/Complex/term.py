@@ -19,7 +19,7 @@ from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_n
 τ = TypeVar('τ', bound='Term')
 
 @dataclass
-class VariableSet(firstorder.atomic.VariableSet['Variable']):
+class VariableSet(firstorder.VariableSet['Variable']):
 
     _names: set[str] = field(default_factory=set)
 

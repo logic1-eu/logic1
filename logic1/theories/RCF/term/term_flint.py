@@ -352,7 +352,7 @@ class TermContext:
         return base, n
 
 
-class VariableSet(firstorder.atomic.VariableSet['Variable']):
+class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is

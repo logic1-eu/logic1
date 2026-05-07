@@ -7,10 +7,10 @@ from __future__ import annotations
 from collections import deque
 from typing import final, Sequence
 
-from .atomic import Variable
-from .formula import α, τ, χ, σ, Formula
+from logic1.firstorder.term import Variable
+from logic1.firstorder.formula import α, τ, χ, σ, Formula
 
-from ..support.tracing import trace  # noqa
+from logic1.support.tracing import trace
 
 
 class QuantifiedFormula(Formula[α, τ, χ, σ]):
