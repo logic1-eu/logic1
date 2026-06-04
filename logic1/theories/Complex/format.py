@@ -95,8 +95,8 @@ class LatexFormatter(BaseFormatter):
 
     symbols = {
         Mul: '\\cdot',
-        Re: '\\re',
-        Im: '\\im',
+        Re: '\\Re',
+        Im: '\\Im',
     }
 
     def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:
@@ -140,7 +140,7 @@ class LatexFormatter(BaseFormatter):
                 return format_name(base)
 
     def visit_conj(self, conj: Conj) -> str:
-        return f'\\cj{{{conj.arg.accept(self)}}}'
+        return f'\\overline{{{conj.arg.accept(self)}}}'
 
     def visit_pow(self, pow: Pow) -> str:
         if isinstance(pow.base, (Add, Mul, Neg, Pow)):
