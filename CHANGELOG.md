@@ -7,13 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+We are at 18 May 2025, 17:38 in GIT
+
 ### Added
+
+- Support for substituting rational functions into terms within atoms
 
 #### module `interactive`
 
+A loader for RCF for interactive use, which does the following:
+
+1. `from logic1.firstorder import *`
+2. Define python symbols `a`, ..., `z` as corresponding variables
+
 ### Fixed
 
+- Raise an exception with assumptions on bound variables in `abc.qe.QuantifierElimination.quantifier_elimination`.
+
 ### Changed
+
+#### RCF Simplifier
+
+- Add arithmetic to class `RCF.simplify._Range`.
+
+- `RCF.atomic.Term.is_definite` optionally supports assumptions
+
+- Propagates bounds on variables via interval arithmetic
+
+#### module `support`
+
+- support printing of `__str__` representation in `support.tracing`
+
+#### Infrastructure
+
+Bumped deployment target from Python 3.11/Sage 10.0 to Python 3.12/Sage 10.6
 
 ### Removed
 

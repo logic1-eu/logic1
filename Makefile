@@ -104,3 +104,6 @@ conda-build:
 	LOGIC1_GIT_REV="$$(git rev-parse HEAD)" \
 	LOGIC1_VERSION="$$(python -m setuptools_scm)" \
 	rattler-build build --recipe conda
+
+# Upload release notes:
+# gh release edit v0.2.0 --notes-file releases/v0.2.0.md
