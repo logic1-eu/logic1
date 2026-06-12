@@ -19,7 +19,7 @@ requirements:
     - cython >=3.1.0
     - gmpy2
     - pip
-    - python >=3.12
+    - python 3.14.* *_cp314
     - setuptools
     - setuptools_scm
   run:
