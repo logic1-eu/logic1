@@ -21,7 +21,8 @@ dependencies = [
   "more-itertools",
   "pyeda",
 ]
-requires-python = "3.14.* *_cp314"
+requires-python = ">=3.12"
+# requires-python = "3.14.* *_cp314"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
