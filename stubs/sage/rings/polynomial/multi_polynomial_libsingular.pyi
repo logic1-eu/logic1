@@ -37,6 +37,10 @@ class MPolynomialRing_libsingular(MPolynomialRing_base):
         # at the place of its definition.
         ...
 
+    def ideal(self, gens: list[MPolynomial_libsingular] | tuple[MPolynomial_libsingular]) -> MPolynomialIdeal:
+        # Originally untyped with `def ideal(self, *gens, **kwds)`.
+        ...
+
     def ngens(self) -> int:
         # Compare doc of gens above.
         ...
@@ -187,4 +191,16 @@ class MPolynomial_libsingular(Generic[ρ]):
         ...
 
     def variables(self) -> tuple[Self]:
+        ...
+
+class MPolynomialIdeal:
+    # actually `sage.rings.polynomial.multi_polynomial_ideal.MPolynomialIdeal`
+
+    def groebner_basis(self, algorithm='', deg_bound=None, mult_bound=None,
+                       prot=False, *args, **kwds) -> PolynomialSequence_generic:
+        ...
+
+class PolynomialSequence_generic:
+    # actually `sage.rings.polynomial.multi_polynomial_sequence.PolynomialSequence_generic`
+    def __iter__(self) -> Iterator[MPolynomial_libsingular]:
         ...
