@@ -5,13 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-We are at 18 May 2025, 17:38 in GIT
+## [Unreleased] - 3 Feb 2026 10:34
 
 ### Added
 
+- Support for input of rational coefficients as Python floats in class `RCF.Term`
+
+- Methods `primitive_part`, `subs_linear_solution`, `summands` in class `RCF.Term`
+
 - Support for substituting rational functions into terms within atoms
+
+- Option `implicit_ranges` of method `RCF.simplify`. This improves the use nonlocal information during simplification.
+
+- Alternative implementation of ...
+
+- Options `xopt` and `elimination_order` of method `RCF.qe`. This activates optimized quantifier elimination by virtual substitution for weakly parametric linear formulas.
+
+- Method `is_weakly_parametric_linear` in class `RCF.AtomicFormula`.
 
 #### module `interactive`
 
@@ -24,13 +34,35 @@ A loader for RCF for interactive use, which does the following:
 
 - Raise an exception with assumptions on bound variables in `abc.qe.QuantifierElimination.quantifier_elimination`.
 
+- Method `abc.Simplify._simpl_and_or` did not terminate in rare cases.
+
+- Arguments `prefer_order=True` and `prefer_weak=True` were missing in root node simplification in class `RCF.qe`.
+
+- Cached hashes of Terms were sent to processes with a different hash seed.
+
 ### Changed
+
+- Details in the choice of log levels in method `RCF.qe`.
+
+- Move class `RCF.qe.Node` into extra module `RCF.node`, changing the return type of method `process` in class `RCF.node.Node` from `list` to `Sequence`. Add sublasses `RCF.node.VsNode`, `RCF.node.XoptNode`, along with a number of helper classes prefixed with `_Vs` and `_Xo`, resp.
+
+- Implementation details of method `__eq__` in class `RCF.Term`
+
+- Add `@lru_cache` to methods `constant_coefficient`, `content`, `lc`, `normalize` in class `RCF.term.term_sage.Term`
+
+- Renamed subclasses `RCF.qe.CLUSTERING`, `RCF.qe.GENERIC` to `RCF.qe.Clustering`, `RCF.qe.Generic`, resp.
+
+- Attribute `abc.NodeList.memory: Set` is generic now, supporting arbitrary Hashables as set members
+
+- Instance of class `abc.qe.Assumptions` are hashable now
 
 #### RCF Simplifier
 
-- Add arithmetic to class `RCF.simplify._Range`.
+- Migrate class `RCF.simplify._Range` to Cython. Add mutable arithmetic. Remove depency on class `mpfr`, and method `is_finite` in favor of inline code.
 
-- `RCF.atomic.Term.is_definite` optionally supports assumptions
+- `RCF.Term.is_definite` optionally supports assumptions
+
+- Implementation details of method `_term_as_range` in class `RCF.simplify`
 
 - Propagates bounds on variables via interval arithmetic
 
@@ -40,9 +72,13 @@ A loader for RCF for interactive use, which does the following:
 
 #### Infrastructure
 
-Bumped deployment target from Python 3.11/Sage 10.0 to Python 3.12/Sage 10.6
+- Trigger GitHub worflows on push to main.
+
+- Bumped deployment target from Python 3.11/Sage 10.0 to Python 3.12/Sage 10.6
 
 ### Removed
+
+- Exception `RCF.qe.Failed`
 
 
 ## [0.2.0] - 2025-02-11
