@@ -1,3 +1,6 @@
+"""A theory package for Complex.
+"""
+
 # order to avoid circular imports:
 # types, ast, format, normalize, term, atomic, qe, simplify
 
