@@ -15,10 +15,10 @@ from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.types import Formula
-from logic1.theories.RCF.node.base import Assumptions, CACHE_SIZE, FoundF, Node, Statistics
+from logic1.theories.RCF.node.base import Assumptions, CACHE_SIZE, FoundF, Node as BaseNode, Statistics
 
 
-class _XoBoundType(Enum):
+class BoundType(Enum):
     EQUATION = auto()
     LOWER_BOUND = auto()
     UPPER_BOUND = auto()
@@ -26,7 +26,7 @@ class _XoBoundType(Enum):
 
 
 @dataclass
-class _XoCandidateSet:
+class CandidateSet:
     equations: set[Term] = field(default_factory=set)
     lower_bounds: set[Term] = field(default_factory=set)
     upper_bounds: set[Term] = field(default_factory=set)
@@ -83,26 +83,26 @@ class _XoCandidateSet:
                 subset.remove(candidate)
         return self
 
-    def elimination_set(self) -> _XoEliminationSet:
+    def elimination_set(self) -> EliminationSet:
         if len(self.upper_bounds) == 0 and len(self.lower_bounds) == 0:
             assert len(self.equations) > 0
             standard_terms = self.equations
             infinity = None
         elif len(self.upper_bounds) <= len(self.lower_bounds):
             standard_terms = self.upper_bounds | self.equations
-            infinity = _XoInfinity.PLUS
+            infinity = Infinity.PLUS
         else:
             standard_terms = self.lower_bounds | self.equations
-            infinity = _XoInfinity.MINUS
-        return _XoEliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
+            infinity = Infinity.MINUS
+        return EliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
 
 
 @dataclass
-class _XoEliminationSet:
+class EliminationSet:
     standard_terms: list[Term]
-    infinity: Optional[_XoInfinity]
+    infinity: Optional[Infinity]
 
-    def __iter__(self) -> Iterator[Term | _XoInfinity]:
+    def __iter__(self) -> Iterator[Term | Infinity]:
         if self.infinity is not None:
             yield self.infinity
         yield from self.standard_terms
@@ -114,39 +114,39 @@ class _XoEliminationSet:
             return len(self.standard_terms) + 1
 
     def _choice(self) -> str:
-        if self.infinity == _XoInfinity.PLUS:
+        if self.infinity == Infinity.PLUS:
             return f'{len(self)} upper bounds and equations'
-        elif self.infinity == _XoInfinity.MINUS:
+        elif self.infinity == Infinity.MINUS:
             return f'{len(self)} lower bounds and equations'
         else:
             return f'{len(self)} equations'
 
 
-class _XoInfinity(Enum):
+class Infinity(Enum):
     PLUS = auto()
     MINUS = auto()
 
-    def __mul__(self, other: mpq) -> _XoInfinity:
+    def __mul__(self, other: mpq) -> Infinity:
         if other > 0:
             return self
         elif other < 0:
-            if self is _XoInfinity.PLUS:
-                return _XoInfinity.MINUS
+            if self is Infinity.PLUS:
+                return Infinity.MINUS
             else:
-                assert self is _XoInfinity.MINUS
-                return _XoInfinity.PLUS
+                assert self is Infinity.MINUS
+                return Infinity.PLUS
         else:
             raise ValueError(f'{other}')
 
 
 @dataclass
-class XoNode(Node):
+class Node(BaseNode):
 
-    def best_elimination_set(self, X: list[Variable], assumptions: Assumptions) -> tuple[_XoEliminationSet, Variable]:
+    def best_elimination_set(self, X: list[Variable], assumptions: Assumptions) -> tuple[EliminationSet, Variable]:
         best_length = None
         if self.options.elimination_order == 0:
             x = X[-1]
-            candidate_set = XoNode.candidate_set(self.formula, x)
+            candidate_set = Node.candidate_set(self.formula, x)
             assert len(candidate_set) > 0
             candidate_set.apply_passive_list(self.passive_list)
             if len(candidate_set) == 0:
@@ -155,7 +155,7 @@ class XoNode(Node):
             return elimination_set, x
         elif self.options.elimination_order == 1:
             for x in reversed(X):
-                candidate_set = XoNode.candidate_set(self.formula, x)
+                candidate_set = Node.candidate_set(self.formula, x)
                 assert len(candidate_set) > 0
                 candidate_set.apply_passive_list(self.passive_list)
                 if len(candidate_set) == 0:
@@ -181,38 +181,38 @@ class XoNode(Node):
         assert False
 
     @staticmethod
-    def bound_type(atom: AtomicFormula, x: Variable) -> _XoBoundType:
+    def bound_type(atom: AtomicFormula, x: Variable) -> BoundType:
         c = atom.lhs.monomial_coefficient(x)
         if c == 0:
-            return _XoBoundType.NONE
+            return BoundType.NONE
         elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
-            return _XoBoundType.UPPER_BOUND
+            return BoundType.UPPER_BOUND
         elif c > 0 and isinstance(atom, Ge) or c < 0 and isinstance(atom, Le):
-            return _XoBoundType.LOWER_BOUND
+            return BoundType.LOWER_BOUND
         else:
             assert isinstance(atom, Eq)
-            return _XoBoundType.EQUATION
+            return BoundType.EQUATION
 
     @staticmethod
-    def candidate_set(formula: Formula, x: Variable) -> _XoCandidateSet:
+    def candidate_set(formula: Formula, x: Variable) -> CandidateSet:
         """Compute a candidate set using structural elimination, which covers
         generalizations of Gaussian elimination.
         """
         if isinstance(formula, AtomicFormula):
-            bound_type = XoNode.bound_type(formula, x)
-            if bound_type is _XoBoundType.NONE:
-                return _XoCandidateSet()
-            elif bound_type is _XoBoundType.UPPER_BOUND:
-                return _XoCandidateSet(upper_bounds={formula.lhs})
-            elif bound_type is _XoBoundType.LOWER_BOUND:
-                return _XoCandidateSet(lower_bounds={formula.lhs})
+            bound_type = Node.bound_type(formula, x)
+            if bound_type is BoundType.NONE:
+                return CandidateSet()
+            elif bound_type is BoundType.UPPER_BOUND:
+                return CandidateSet(upper_bounds={formula.lhs})
+            elif bound_type is BoundType.LOWER_BOUND:
+                return CandidateSet(lower_bounds={formula.lhs})
             else:
-                assert bound_type is _XoBoundType.EQUATION
-                return _XoCandidateSet(equations={formula.lhs})
+                assert bound_type is BoundType.EQUATION
+                return CandidateSet(equations={formula.lhs})
         elif isinstance(formula, And):
-            result = _XoCandidateSet()
+            result = CandidateSet()
             for arg in formula.args:
-                candidate_set_ = XoNode.candidate_set(arg, x)
+                candidate_set_ = Node.candidate_set(arg, x)
                 if candidate_set_.has_finite_solution_set:
                     Statistics.gauss_and += 1
                     return candidate_set_
@@ -221,14 +221,14 @@ class XoNode(Node):
             return result
         else:
             assert isinstance(formula, Or)
-            result = _XoCandidateSet()
+            result = CandidateSet()
             for arg in formula.args:
-                result |= XoNode.candidate_set(arg, x)
+                result |= Node.candidate_set(arg, x)
             if result.has_finite_solution_set:
                 Statistics.gauss_or += 1
             return result
 
-    def process(self, assumptions: Assumptions) -> Sequence[XoNode]:
+    def process(self, assumptions: Assumptions) -> Sequence[Node]:
         Statistics.nodes_processed += 1
         formula = self.formula
         variables = []
@@ -242,7 +242,7 @@ class XoNode(Node):
         passive_list = self.passive_list
         if not variables:
             # Return one success node.
-            return [XoNode(variables=[],
+            return [Node(variables=[],
                            formula=formula,
                            answer=[],
                            outermost_block=self.outermost_block,
@@ -253,9 +253,9 @@ class XoNode(Node):
         except FoundF:
             return []
         variables.remove(x)
-        successors: deque[XoNode] = deque()
+        successors: deque[Node] = deque()
         for testpoint in sorted(elimination_set, key=self.sort_key):
-            substituted_formula = XoNode.subs_into_formula(formula, x, testpoint, assumptions)
+            substituted_formula = Node.subs_into_formula(formula, x, testpoint, assumptions)
             if isinstance(substituted_formula, _T):
                 raise abc.qe.FoundT()
             elif isinstance(substituted_formula, _F):
@@ -263,8 +263,8 @@ class XoNode(Node):
                 # It would be correct to leave this to the else-case, but
                 # we want to avoid computing the substituted_passive_list_copy.
             else:
-                substituted_passive_list = XoNode.subs_into_passive_list(passive_list, x, testpoint)
-                node = XoNode(variables=variables.copy(),
+                substituted_passive_list = Node.subs_into_passive_list(passive_list, x, testpoint)
+                node = Node(variables=variables.copy(),
                               formula=substituted_formula,
                               answer=[],
                               outermost_block=self.outermost_block,
@@ -278,7 +278,7 @@ class XoNode(Node):
                 passive_list.add(testpoint)
         return successors
 
-    def sort_key(self, testpoint: Term | _XoInfinity) -> tuple[int, int]:
+    def sort_key(self, testpoint: Term | Infinity) -> tuple[int, int]:
         """Sort test points of an elimination set before substitution. Smaller
         test points enter the passive lists of all greater test points. The
         general idea is that test points with many variables are small, because
@@ -303,13 +303,13 @@ class XoNode(Node):
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
-    def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | _XoInfinity,
+    def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | Infinity,
                           assumptions: Assumptions) -> Formula:
         """Substitute ``testpoint`` for ``x`` in ``formula``, and apply
         simplification modulo ``assumptions``
         """
 
-        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: _XoInfinity) -> Formula:
+        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: Infinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
             if c == 0:
                 return atom
@@ -317,16 +317,16 @@ class XoNode(Node):
                 return _F()
             inf = inf * c
             if isinstance(atom, Ge):
-                return _T() if inf is _XoInfinity.PLUS else _F()
+                return _T() if inf is Infinity.PLUS else _F()
             else:
                 assert isinstance(atom, Le)
-                return _T() if inf is _XoInfinity.MINUS else _F()
+                return _T() if inf is Infinity.MINUS else _F()
 
         if isinstance(testpoint, Term):
             new_formula = formula.traverse(
                 map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, testpoint), 0))
         else:
-            assert isinstance(testpoint, _XoInfinity)
+            assert isinstance(testpoint, Infinity)
             new_formula = formula.traverse(
                 map_atoms=lambda atom: subs_infinity_at(atom, x, testpoint))
         return simplify(new_formula, assume=assumptions.atoms,
@@ -338,7 +338,7 @@ class XoNode(Node):
 
     @staticmethod
     def subs_into_passive_list(passive_list: set[Term], x: Variable,
-                               testpoint: Term | _XoInfinity) -> set[Term]:
+                               testpoint: Term | Infinity) -> set[Term]:
         """Returns a copy of ``passive_list`` with ``testpoint`` substituted for
         ``x``.
         """
@@ -353,7 +353,7 @@ class XoNode(Node):
                 else:
                     result.add(new_term.primitive_part(positive=True))
         else:
-            assert isinstance(testpoint, _XoInfinity)
+            assert isinstance(testpoint, Infinity)
             for passive_term in passive_list:
                 if passive_term.monomial_coefficient(x) == 0:
                     result.add(passive_term)

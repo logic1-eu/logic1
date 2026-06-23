@@ -9,7 +9,7 @@ from typing import Final, Optional, TYPE_CHECKING
 from logic1 import abc
 from logic1.firstorder import And, Or
 from logic1.theories.RCF.term import Term, Variable
-from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
+from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Le
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.types import Formula
 
@@ -189,5 +189,5 @@ class Node(abc.qe.Node[
                 return self.as_vs_node().process(assumptions=assumptions)
 
 
-from logic1.theories.RCF.node.vs import VsNode
-from logic1.theories.RCF.node.xopt import XoNode
+from logic1.theories.RCF.node.vs import Node as VsNode
+from logic1.theories.RCF.node.xopt import Node as XoNode
