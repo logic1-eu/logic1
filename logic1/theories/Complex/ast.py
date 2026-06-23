@@ -57,12 +57,19 @@ class SortKey(Generic[η]):
         else:
             return ORDER.index(self.op) < ORDER.index(other.op)
 
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.ast})'
+
 
 class AST:
 
     @property
     def op(self) -> type[Self]:
         """The operation of this AST node, which is just the class of this node.
+
+        >>> x = Var('x')
+        >>> x.op
+        <class 'logic1.theories.Complex.ast.Var'>
         """
         return type(self)
 
@@ -70,7 +77,13 @@ class AST:
     def args(self) -> tuple[object, ...]:  # type: ignore[empty-body]
         """The arguments of this AST node. This should be overridden by
         subclasses to return the appropriate arguments so that
-        `self == self.op(*self.args)`.
+        :code:`self == self.op(*self.args)`.
+
+        >>> x = Var('x')
+        >>> x.args
+        ('x',)
+        >>> x.op(*x.args)
+        x
         """
         ...
 
@@ -95,6 +108,8 @@ class AST:
 
     @abstractmethod
     def __init__(self, *args: object) -> None:
+        """This abstract base class is not supposed to have instances itself.
+        """
         ...
 
     def __invert__(self) -> Conj:
@@ -151,7 +166,7 @@ class AST:
 
     def __truediv__(self, other: Number | AST) -> AST:
         """Division is defined as multiplication by the inverse. If the
-        other AST node is not constant, this method raises a ValueError.
+        other AST node is not constant, this method raises a :class:`ValueError`.
         """
         if isinstance(other, AST):
             try:
@@ -198,7 +213,7 @@ class AST:
     def eval(self) -> tuple[mpq, mpq]:
         """Evaluate this AST node as a complex number and return the real and
         imaginary part as a tuple of mpq. If this AST node is not constant, this
-        method raises a ValueError.
+        method raises a :class:`ValueError`.
         """
         return self.accept(ConstantEvaluator())
 
@@ -255,7 +270,8 @@ class AST:
 
     @staticmethod
     def from_number(value: Number) -> AST:
-        """Construct a AST node from a given number.
+        """Construct a AST node from a given number. Raises a
+        :class:`ValueError` if the given value is not a number.
 
         >>> AST.from_number(2)
         2
@@ -319,10 +335,10 @@ class AST:
         """
         return isinstance(self, Rat) and self.value == mpq(0)
 
-    def normalize(self) -> AST:
-        """Return a unique normal form of this AST node
-        """
-        return self.accept(ComplexNormalizer())
+    # def normalize(self) -> AST:
+    #     """Return a unique normal form of this AST node
+    #     """
+    #     return self.accept(ComplexNormalizer())
 
     def _repr_latex_(self) -> str:
         """LaTeX representation for Jupyter notebooks.
@@ -334,6 +350,10 @@ class AST:
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for comparing AST nodes.
+
+        >>> x = Var('x')
+        >>> x.sort_key()
+        SortKey(x)
         """
         return SortKey(self)
 
@@ -346,7 +366,7 @@ class AST:
 
 
 class Rat(AST):
-    """A rational number, represented as a mpq. Implements the abstract class
+    """A rational number, represented as a :class:`mpq`. Implements the abstract class
     :class:`.AST`.
     """
 
@@ -390,6 +410,11 @@ class Rat(AST):
 class _I(AST):
     """The imaginary unit. This is a singleton class, and the only instance
     is `I`. Implements the abstract class :class:`.AST`.
+
+    >>> _I()
+    I
+    >>> _I() is I
+    True
     """
 
     _instance: Optional[_I] = None

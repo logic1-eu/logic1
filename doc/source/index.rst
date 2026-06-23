@@ -78,6 +78,7 @@ T
    api/firstorder/index.rst
    api/theories/RCF/index.rst
    api/theories/Sets/index.rst
+   api/theories/Complex/index.rst
    api/abc/index.rst
    api/support/index.rst
 
