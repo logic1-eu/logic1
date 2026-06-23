@@ -804,7 +804,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             return Gt(lhs, 0)
 
     def __hash__(self) -> int:
-        return hash(self._summands_as_hashable())
+        # We use this low-level approach because
+        # hash(self._summands_as_hashable()) was too slow.
+        return hash(repr(self._poly))
 
     def __init__(self, arg: Constant) -> None:
         """
