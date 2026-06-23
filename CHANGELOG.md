@@ -5,9 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 3 Feb 2026 10:34
+## [Unreleased] - 2026-06-23
 
 ### Added
+
+-  A Flint-based implemenation of `RCF.Term` as an alternative to the existing Sage-based implementation. So far, this can be acivated only by editing `RCF/term/__init__.py`.
 
 - Support for input of rational coefficients as Python floats in class `RCF.Term`
 
@@ -22,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Options `xopt` and `elimination_order` of method `RCF.qe`. This activates optimized quantifier elimination by virtual substitution for weakly parametric linear formulas.
 
 - Method `is_weakly_parametric_linear` in class `RCF.AtomicFormula`.
+
+- A theory `Complex` for ring arithmtic along with `I`, `Re`, `Im`, `Conj` over the complex numbers. Quantifier elimination uses reduction to real QE. See [Faross-Sturm](https://doi.org/10.48550/arXiv.2604.26400) for theoretical details.
 
 #### module `interactive`
 
@@ -40,21 +44,34 @@ A loader for RCF for interactive use, which does the following:
 
 - Cached hashes of Terms were sent to processes with a different hash seed.
 
+- `RCF.qe` raised error when applied to `Ex(x, T)` or, more generally, quantifications of formulas equivalent to truth values modulo `RCF.simplify`.
+
+- `RCF.qe` wrongly computed `F` for `Ex([a, b], a != 0)`, where the problem was the quantification of an unused variable.
+
+- `RCF.cnf` and `RCF.dnf` could return equivalent formulas that were not in the respective normal form, because final simplification split atoms.
+
+
 ### Changed
 
 - Details in the choice of log levels in method `RCF.qe`.
 
-- Move class `RCF.qe.Node` into extra module `RCF.node`, changing the return type of method `process` in class `RCF.node.Node` from `list` to `Sequence`. Add sublasses `RCF.node.VsNode`, `RCF.node.XoptNode`, along with a number of helper classes prefixed with `_Vs` and `_Xo`, resp.
+- Thorough revision of the main `Makefile`.
+
+- Move class `RCF.qe.Node` into extra module `RCF.node`, changing the return type of method `process` in class `RCF.node.Node` from `list` to `Sequence`. Add sublasses `RCF.node.VsNode`, `RCF.node.XoptNode`, along with a number of helper classes prefixed with `_Vs` and `_Xo`, respectively.
 
 - Implementation details of method `__eq__` in class `RCF.Term`
 
 - Add `@lru_cache` to methods `constant_coefficient`, `content`, `lc`, `normalize` in class `RCF.term.term_sage.Term`
 
-- Renamed subclasses `RCF.qe.CLUSTERING`, `RCF.qe.GENERIC` to `RCF.qe.Clustering`, `RCF.qe.Generic`, resp.
+- Renamed subclasses `RCF.qe.CLUSTERING`, `RCF.qe.GENERIC` to `RCF.qe.Clustering`, `RCF.qe.Generic`, respectively.
 
 - Attribute `abc.NodeList.memory: Set` is generic now, supporting arbitrary Hashables as set members
 
 - Instance of class `abc.qe.Assumptions` are hashable now
+
+- Renamed modules `RCF.typing` and `Sets.typing` to `RCF.types` and `Sets.types`, respectively.
+
+- Refactor `RCF.atomic` into `RCF.atomic` and `RCF.term`. Likewise, `firstorder.atomic`.
 
 #### RCF Simplifier
 
