@@ -10,7 +10,7 @@ Introduction
 **Logic1 – Interpreted First-order Logic in Python**
 
 Authors:
-`Nicolas Faroß <https://www.uni-saarland.de/lehrstuhl/weber-moritz/team/nicolas-faross.html>`_,
+`Nicolas Faroß <https://www.chalmers.se/en/persons/faross/>`_,
 `Thomas Sturm <https://science.thomas-sturm.de/>`_
 
 License: GPL-2.0-or-later
