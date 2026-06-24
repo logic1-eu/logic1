@@ -5,13 +5,13 @@ name = "logic1"
 dynamic = ["version"] # See https://setuptools-scm.readthedocs.io/en/v8.1.0/usage/
 description = "Interpreted first-order logic in Python"
 authors = [
-  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Nicolas Faroß", email = "faross@chalmers.se"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
 license = "GPL-2.0-or-later"
 license-files = ["./LICENSE"]
 maintainers = [
-  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Nicolas Faroß", email = "faross@chalmers.se"},
   {name = "Lorenz Leutgeb", email = "lorenz@mpi-inf.mpg.de"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
@@ -21,7 +21,7 @@ dependencies = [
   "more-itertools",
   "pyeda",
 ]
-requires-python = "3.14.* *_cp314"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
