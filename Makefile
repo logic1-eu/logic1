@@ -37,12 +37,14 @@ ign_parallel     := --ignore-glob=*parallel*
 ign_redlog       := --ignore=logic1/theories/RCF/test_redlog.txt \
 				    --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                     --ignore=logic1/theories/RCF/redlog.py
-ign_slow         := --ignore=logic1/theories/RCF/test_simplify_motor.txt \
+ign_slow         := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
+					--ignore=logic1/theories/RCF/test_simplify_motor.txt \
                     --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                     --ignore=logic1/theories/RCF/test_qe.txt
-ign_redlog_motor := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
+ign_too_slow     := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
+					--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 
-ignores := $(ign_other_backend) $(ign_redlog_motor)
+ignores := $(ign_other_backend) $(ign_too_slow)
 
 .PHONY: cython cython-clean cython-html \
         pytest pytest-run pytest-fast pytest-seq pytest-full pytest-full-seq \

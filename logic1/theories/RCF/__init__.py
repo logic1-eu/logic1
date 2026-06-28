@@ -5,6 +5,7 @@ from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
 from logic1.theories.RCF.term import (POLYLIB, cache_clear, cache_info, init_env, init_env_arg,
                                       Term, Variable, VV)
 from logic1.theories.RCF.bnf import cnf, dnf
+from logic1.theories.RCF.gsimplify import gsimplify
 from logic1.theories.RCF.parser import l1
 from logic1.theories.RCF.qe import Clustering, Generic, qe
 from logic1.theories.RCF import redlog
@@ -17,6 +18,8 @@ __all__ = [
     'Variable', 'VV',
 
     'cnf', 'dnf',
+
+    'gsimplify',
 
     'l1',
 
