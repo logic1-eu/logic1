@@ -113,7 +113,7 @@ class Node(abc.qe.Node[
 
     def __str__(self):
         s = f'Node({self.variables}, {self.formula}, ...'
-        if isinstance(self, XoNode):
+        if isinstance(self, xopt.Node):
             s += f', {self.passive_list}'
         s += ')'
         return s
@@ -135,7 +135,7 @@ class Node(abc.qe.Node[
         return result
 
     def as_vs_node(self):
-        return VsNode(variables=self.variables,
+        return vs.Node(variables=self.variables,
                       formula=self.formula,
                       answer=self.answer,
                       outermost_block=self.outermost_block,
@@ -143,12 +143,12 @@ class Node(abc.qe.Node[
                       passive_list=set())
 
     def as_xo_node(self):
-        return XoNode(variables=self.variables,
-                      formula=self.formula,
-                      answer=self.answer,
-                      outermost_block=self.outermost_block,
-                      options=self.options,
-                      passive_list=set())
+        return xopt.Node(variables=self.variables,
+                         formula=self.formula,
+                         answer=self.answer,
+                         outermost_block=self.outermost_block,
+                         options=self.options,
+                         passive_list=set())
 
     def copy(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
@@ -175,9 +175,9 @@ class Node(abc.qe.Node[
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
         """
         self.logger().debug(f'Entering process')
-        if isinstance(self, XoNode):
+        if isinstance(self, xopt.Node):
             return self.process(assumptions=assumptions)
-        elif isinstance(self, VsNode):
+        elif isinstance(self, vs.Node):
             if self.options.xopt and self.admits_xopt():
                 return self.as_xo_node().process(assumptions=assumptions)
             else:
@@ -189,5 +189,4 @@ class Node(abc.qe.Node[
                 return self.as_vs_node().process(assumptions=assumptions)
 
 
-from logic1.theories.RCF.node.vs import Node as VsNode
-from logic1.theories.RCF.node.xopt import Node as XoNode
+from logic1.theories.RCF.node import vs, xopt

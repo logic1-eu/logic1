@@ -15,10 +15,11 @@ from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.types import Formula
-from logic1.theories.RCF.node.base import Assumptions, CACHE_SIZE, FoundF, Node as BaseNode, Statistics
+from logic1.theories.RCF.node import base
+from logic1.theories.RCF.node.base import Assumptions, CACHE_SIZE, FoundF, Statistics
 
 
-class BoundType(Enum):
+class _BoundType(Enum):
     EQUATION = auto()
     LOWER_BOUND = auto()
     UPPER_BOUND = auto()
@@ -26,7 +27,7 @@ class BoundType(Enum):
 
 
 @dataclass
-class CandidateSet:
+class _CandidateSet:
     equations: set[Term] = field(default_factory=set)
     lower_bounds: set[Term] = field(default_factory=set)
     upper_bounds: set[Term] = field(default_factory=set)
@@ -67,7 +68,7 @@ class CandidateSet:
             else:
                 self.has_finite_solution_set = False
         else:
-            raise ValueError("illegal arguments in XoptCandidateSet()")
+            raise ValueError(f"illegal arguments in {self.__class__.__name__}()")
 
     def apply_passive_list(self, passive_list: Iterable[Term]) -> Self:
         for subset in (self.equations, self.lower_bounds, self.upper_bounds):
@@ -83,26 +84,26 @@ class CandidateSet:
                 subset.remove(candidate)
         return self
 
-    def elimination_set(self) -> EliminationSet:
+    def elimination_set(self) -> _EliminationSet:
         if len(self.upper_bounds) == 0 and len(self.lower_bounds) == 0:
             assert len(self.equations) > 0
             standard_terms = self.equations
             infinity = None
         elif len(self.upper_bounds) <= len(self.lower_bounds):
             standard_terms = self.upper_bounds | self.equations
-            infinity = Infinity.PLUS
+            infinity = _Infinity.PLUS
         else:
             standard_terms = self.lower_bounds | self.equations
-            infinity = Infinity.MINUS
-        return EliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
+            infinity = _Infinity.MINUS
+        return _EliminationSet(standard_terms=sorted(standard_terms), infinity=infinity)
 
 
 @dataclass
-class EliminationSet:
+class _EliminationSet:
     standard_terms: list[Term]
-    infinity: Optional[Infinity]
+    infinity: Optional[_Infinity]
 
-    def __iter__(self) -> Iterator[Term | Infinity]:
+    def __iter__(self) -> Iterator[Term | _Infinity]:
         if self.infinity is not None:
             yield self.infinity
         yield from self.standard_terms
@@ -114,35 +115,35 @@ class EliminationSet:
             return len(self.standard_terms) + 1
 
     def _choice(self) -> str:
-        if self.infinity == Infinity.PLUS:
+        if self.infinity == _Infinity.PLUS:
             return f'{len(self)} upper bounds and equations'
-        elif self.infinity == Infinity.MINUS:
+        elif self.infinity == _Infinity.MINUS:
             return f'{len(self)} lower bounds and equations'
         else:
             return f'{len(self)} equations'
 
 
-class Infinity(Enum):
+class _Infinity(Enum):
     PLUS = auto()
     MINUS = auto()
 
-    def __mul__(self, other: mpq) -> Infinity:
+    def __mul__(self, other: mpq) -> _Infinity:
         if other > 0:
             return self
         elif other < 0:
-            if self is Infinity.PLUS:
-                return Infinity.MINUS
+            if self is _Infinity.PLUS:
+                return _Infinity.MINUS
             else:
-                assert self is Infinity.MINUS
-                return Infinity.PLUS
+                assert self is _Infinity.MINUS
+                return _Infinity.PLUS
         else:
             raise ValueError(f'{other}')
 
 
 @dataclass
-class Node(BaseNode):
+class Node(base.Node):
 
-    def best_elimination_set(self, X: list[Variable], assumptions: Assumptions) -> tuple[EliminationSet, Variable]:
+    def best_elimination_set(self, X: list[Variable], assumptions: Assumptions) -> tuple[_EliminationSet, Variable]:
         best_length = None
         if self.options.elimination_order == 0:
             x = X[-1]
@@ -181,36 +182,36 @@ class Node(BaseNode):
         assert False
 
     @staticmethod
-    def bound_type(atom: AtomicFormula, x: Variable) -> BoundType:
+    def bound_type(atom: AtomicFormula, x: Variable) -> _BoundType:
         c = atom.lhs.monomial_coefficient(x)
         if c == 0:
-            return BoundType.NONE
+            return _BoundType.NONE
         elif c > 0 and isinstance(atom, Le) or c < 0 and isinstance(atom, Ge):
-            return BoundType.UPPER_BOUND
+            return _BoundType.UPPER_BOUND
         elif c > 0 and isinstance(atom, Ge) or c < 0 and isinstance(atom, Le):
-            return BoundType.LOWER_BOUND
+            return _BoundType.LOWER_BOUND
         else:
             assert isinstance(atom, Eq)
-            return BoundType.EQUATION
+            return _BoundType.EQUATION
 
     @staticmethod
-    def candidate_set(formula: Formula, x: Variable) -> CandidateSet:
+    def candidate_set(formula: Formula, x: Variable) -> _CandidateSet:
         """Compute a candidate set using structural elimination, which covers
         generalizations of Gaussian elimination.
         """
         if isinstance(formula, AtomicFormula):
             bound_type = Node.bound_type(formula, x)
-            if bound_type is BoundType.NONE:
-                return CandidateSet()
-            elif bound_type is BoundType.UPPER_BOUND:
-                return CandidateSet(upper_bounds={formula.lhs})
-            elif bound_type is BoundType.LOWER_BOUND:
-                return CandidateSet(lower_bounds={formula.lhs})
+            if bound_type is _BoundType.NONE:
+                return _CandidateSet()
+            elif bound_type is _BoundType.UPPER_BOUND:
+                return _CandidateSet(upper_bounds={formula.lhs})
+            elif bound_type is _BoundType.LOWER_BOUND:
+                return _CandidateSet(lower_bounds={formula.lhs})
             else:
-                assert bound_type is BoundType.EQUATION
-                return CandidateSet(equations={formula.lhs})
+                assert bound_type is _BoundType.EQUATION
+                return _CandidateSet(equations={formula.lhs})
         elif isinstance(formula, And):
-            result = CandidateSet()
+            result = _CandidateSet()
             for arg in formula.args:
                 candidate_set_ = Node.candidate_set(arg, x)
                 if candidate_set_.has_finite_solution_set:
@@ -221,7 +222,7 @@ class Node(BaseNode):
             return result
         else:
             assert isinstance(formula, Or)
-            result = CandidateSet()
+            result = _CandidateSet()
             for arg in formula.args:
                 result |= Node.candidate_set(arg, x)
             if result.has_finite_solution_set:
@@ -278,7 +279,7 @@ class Node(BaseNode):
                 passive_list.add(testpoint)
         return successors
 
-    def sort_key(self, testpoint: Term | Infinity) -> tuple[int, int]:
+    def sort_key(self, testpoint: Term | _Infinity) -> tuple[int, int]:
         """Sort test points of an elimination set before substitution. Smaller
         test points enter the passive lists of all greater test points. The
         general idea is that test points with many variables are small, because
@@ -303,13 +304,13 @@ class Node(BaseNode):
 
     @staticmethod
     @lru_cache(maxsize=CACHE_SIZE)
-    def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | Infinity,
+    def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | _Infinity,
                           assumptions: Assumptions) -> Formula:
         """Substitute ``testpoint`` for ``x`` in ``formula``, and apply
         simplification modulo ``assumptions``
         """
 
-        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: Infinity) -> Formula:
+        def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: _Infinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
             if c == 0:
                 return atom
@@ -317,16 +318,16 @@ class Node(BaseNode):
                 return _F()
             inf = inf * c
             if isinstance(atom, Ge):
-                return _T() if inf is Infinity.PLUS else _F()
+                return _T() if inf is _Infinity.PLUS else _F()
             else:
                 assert isinstance(atom, Le)
-                return _T() if inf is Infinity.MINUS else _F()
+                return _T() if inf is _Infinity.MINUS else _F()
 
         if isinstance(testpoint, Term):
             new_formula = formula.traverse(
                 map_atoms=lambda atom: atom.op(atom.lhs.subs_linear_solution(x, testpoint), 0))
         else:
-            assert isinstance(testpoint, Infinity)
+            assert isinstance(testpoint, _Infinity)
             new_formula = formula.traverse(
                 map_atoms=lambda atom: subs_infinity_at(atom, x, testpoint))
         return simplify(new_formula, assume=assumptions.atoms,
@@ -338,7 +339,7 @@ class Node(BaseNode):
 
     @staticmethod
     def subs_into_passive_list(passive_list: set[Term], x: Variable,
-                               testpoint: Term | Infinity) -> set[Term]:
+                               testpoint: Term | _Infinity) -> set[Term]:
         """Returns a copy of ``passive_list`` with ``testpoint`` substituted for
         ``x``.
         """
@@ -353,7 +354,7 @@ class Node(BaseNode):
                 else:
                     result.add(new_term.primitive_part(positive=True))
         else:
-            assert isinstance(testpoint, Infinity)
+            assert isinstance(testpoint, _Infinity)
             for passive_term in passive_list:
                 if passive_term.monomial_coefficient(x) == 0:
                     result.add(passive_term)
