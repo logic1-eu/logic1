@@ -85,7 +85,7 @@ class GSimplify:
                          f'{self._options.bnfsac=}, '
                          f'{self._options.bnfsm=} ...')
             return redlog.cnf(f, bnfsac=self._options.bnfsac,
-                              bnfsm=self._options.bnfsm)
+                                 bnfsm=self._options.bnfsm)
         else:
             logging.info('computing cnf using PyEda ...')
             return cnf(f)
@@ -169,55 +169,73 @@ class GSimplify:
                 if not clause.is_equational():
                     logging.debug(f'{count} clauses left')
                     count -= 1
+                    # We decide against filtering out disequalities via a
+                    # radical membership test at this point. The idea is that
+                    # adding their left hand sides to the ideal brings it closer
+                    # to the radical, which is good for our purposes.
                     this_assumed_eq_gb = Term.gbasis(assumed_eq_gb + [atom.lhs for atom in clause[Ne]])
-                    # Process the product of all equations together with
-                    # disequality and strict inequality assumptions
+
+                    # 1. Process the product of all equations of the current clause:
+                    # We may add to that product all left hand sides of disequalies
+                    # and strict inequalies in the assumptions.
                     F = {atom.lhs for atom in assume if isinstance(atom, (Ne, Gt, Lt))}
                     product = prod(F, start=clause.as_product(Eq))
                     if self.in_radical(product, this_assumed_eq_gb):
-                        continue
+                        raise NextClause()
                     h = product.reduce(this_assumed_eq_gb)
-                    simplified_equation = simplify(Eq(h, 0), assume=assume)
-                    if isinstance(simplified_equation, _T):
-                        continue
+                    simplified_product_equation = simplify(Eq(h, 0), assume=assume)
+                    if isinstance(simplified_product_equation, _T):
+                        raise NextClause()
                     new_clause = Clause()
-                    if not isinstance(simplified_equation, _F):
-                        for atom in clause[Eq]:  # !*rlgsred=T
+                    if not isinstance(simplified_product_equation, _F):
+                        # We could not learn anything from the product and look
+                        # at the single equations now.
+                        for atom in clause[Eq]:
+                            # Radical membership has implicitly been tested via the product.
                             h = atom.lhs.reduce(this_assumed_eq_gb)
                             simplified_atom = simplify(Eq(h, 0), assume=assume)
+                            # It is tempting to believe that the next if cannot become true.
+                            # However, we do now know how exactly assume is used by simplify.
                             if isinstance(simplified_atom, _T):
                                 raise NextClause()
                             if isinstance(simplified_atom, _F):
                                 continue
-                            new_clause[Eq].add(Eq(h, 0))
+                            new_clause[Eq].add(Eq(h, 0))  # !*rlgsred=T
 
-                    # Equations are fine now. Process all inequalities. We test radical membership for
-                    # the strict ones but not for the weak ones anymore. [AD: but we are missing sth here]
+                    # 2. Process all inequalities:
+                    # Recall that weak inequalities are split and do not occur explicitly.
                     for rel in (Gt, Lt):
                         for atom in clause[rel]:
+                            # [AD: We miss using assume in the following radical membership test.]
                             if self.in_radical(atom.lhs, this_assumed_eq_gb):
                                 continue
                             h = atom.lhs.reduce(this_assumed_eq_gb)
+                            # [TS: if Eq(atom.lhs, 0) is in the clause, then we could simplify the
+                            # weak inequality when looking for T. This happens systematically due
+                            # to splitting. More generally, one could add negations of all
+                            # siblings to assume. AD: Note the difference between Eq(atom.lhs, 0)
+                            # and Eq(h, 0).]
                             simplified_atom = simplify(rel(h, 0), assume=assume)
                             if isinstance(simplified_atom, _T):
                                 raise NextClause()
-                                # AD: We lose sth due to splitting, might not matter
                             if isinstance(simplified_atom, _F):
                                 continue
                             new_clause[rel].add(rel(h, 0))  # !*rlgsred=T
 
+                    # 3. Finally process all disequalities.
                     H = set()
                     for atom in clause[Ne]:  # !*rlgsred=T
+                        if self.in_radical(atom.lhs, assumed_eq_gb):
+                            continue
                         h = atom.lhs.reduce(assumed_eq_gb)
                         simplified_atom = simplify(Ne(h, 0), assume=assume)
                         if isinstance(simplified_atom, _T):
-                            assert False
                             continue
                         if isinstance(simplified_atom, _F):
-                            assert False
                             raise NextClause()
                         H.add(h)
-                    new_clause[Ne] = {Ne(g, 0) for g in Term.gbasis(H)}  # !*rlgssub=T
+                    G = Term.gbasis(H)
+                    new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
 
                     new_clauses.append(new_clause)
 
