@@ -200,6 +200,12 @@ class MPolynomialIdeal:
                        prot=False, *args, **kwds) -> PolynomialSequence_generic:
         ...
 
+    def radical(self) -> MPolynomialIdeal:
+    # This is probably not quite correct.
+        ...
+
+
+
 class PolynomialSequence_generic:
     # actually `sage.rings.polynomial.multi_polynomial_sequence.PolynomialSequence_generic`
     def __iter__(self) -> Iterator[MPolynomial_libsingular]:
