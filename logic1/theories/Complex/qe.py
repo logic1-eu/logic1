@@ -16,24 +16,24 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
     theory of real closed fields. Raises a ValueError if the term
     contains any complex-specific operations that cannot be evaluated
     in RCF, such as the imaginary unit or complex conjugation.
-    Implements the abstract class :class:`.Complex.ArithmeticEvaluator`.
+    Implements the abstract class :class:`.ast.ArithmeticEvaluator`.
     """
 
-    def _add(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
+    def add(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
         """Returns the sum of the RCF terms a and b. Implements
-        abstract method :meth:`.Complex.ArithmeticEvaluator._add`.
+        abstract method :meth:`.Complex.ArithmeticEvaluator.add`.
         """
         return a + b
 
-    def _neg(self, a: RCF.Term) -> RCF.Term:
+    def neg(self, a: RCF.Term) -> RCF.Term:
         """Returns the negation of the RCF term a. Implements the
-        abstract method :meth:`.Complex.ArithmeticEvaluator._neg`.
+        abstract method :meth:`.Complex.ArithmeticEvaluator.neg`.
         """
         return -a
 
-    def _mul(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
+    def mul(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
         """Returns the product of the RCF terms a and b. Implements the
-        abstract method :meth:`.Complex.ArithmeticEvaluator._mul`.
+        abstract method :meth:`.Complex.ArithmeticEvaluator.mul`.
         """
         return a * b
 
@@ -74,10 +74,14 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         else:
             raise ValueError(f"Cannot evaluate imaginary part of non-variable term {im.arg} in RCF")
 
+
 def real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
-    """Converts an atomic formula in the theory of complex numbers that is
-    already known to be a real formula to an equivalent atomic formula
-    in the theory of real closed fields.
+    """Convert a real atomic formula in the theory of complex numbers to
+    an equivalent atomic formula in the theory of real closed fields.
+
+    >>> z = VV['z']
+    >>> real_atom_to_rcf(z * ~z == 0)
+    z_im**2 + z_re**2 == 0
     """
     assert atom.is_real()
     lhs = cartesian_normal_form((atom.lhs - atom.rhs).normal_ast).accept(RCF_Evaluator())
@@ -120,14 +124,17 @@ def real_normal_form(formula: Formula) -> Formula:
     assert False, type(formula)
 
 def formula_to_rcf(formula: Formula) -> RCF.Formula:
-    """Converts a formula in the theory of complex numbers to an
-    equivalent formula in the theory of real closed fields. Raises a
-    ValueError if the formula contains any complex-specific operations
-    that cannot be evaluated in RCF, such as the imaginary unit or
-    complex conjugation.
+    """Convert a formula in the theory of complex numbers to an
+    equivalent formula in the theory of real closed fields.
+
+    >>> z = VV['z']
+    >>> phi = Ex(z, z**2 == -1)
+    >>> formula_to_rcf(phi)
+    Ex(z_re, Ex(z_im, And(-z_im**2 + z_re**2 + 1 == 0, 2*z_im*z_re == 0)))
     """
     formula = real_normal_form(formula)
     return real_formula_to_rcf(formula)
+
 
 def assume_to_rcf(assume: Iterable[AtomicFormula]) -> list[RCF.AtomicFormula]:
     assumption = formula_to_rcf(And(*assume))
@@ -139,10 +146,14 @@ def assume_to_rcf(assume: Iterable[AtomicFormula]) -> list[RCF.AtomicFormula]:
         return []
 
 def variable_to_complex(var: RCF.Variable) -> Term:
-    """Converts an RCF variable to a complex variable. The RCF variable
-    must be of the form x_re or x_im for some variable name x, where
-    x_re corresponds to the real part of the complex variable and x_im
-    corresponds to the imaginary part.
+    """Convert a RCF variable to a complex variable. The RCF variable
+    name must be of the form :code:`*_re` or :code:`*_im`.
+
+    >>> z_re, z_im = RCF.VV.get('z_re', 'z_im')
+    >>> variable_to_complex(z_re)
+    1/2 * z + 1/2 * ~z
+    >>> variable_to_complex(z_im)
+    -1/2 * I * z + 1/2 * I * ~z
     """
     name = str(var)  # TODO: implement .name
     if name.endswith('_re'):
@@ -152,12 +163,14 @@ def variable_to_complex(var: RCF.Variable) -> Term:
     else:
         raise ValueError(f"Unknown variable {name} in RCF formula")
 
-
 def term_to_complex(term: RCF.Term) -> Term:
-    """Converts an RCF term to a complex term. The RCF term must be a
-    polynomial in variables of the form x_re and x_im for some variable
-    name x, where x_re corresponds to the real part of the complex
-    variable and x_im corresponds to the imaginary part.
+    """Convert a RCF term to a complex term. The RCF term must be a
+    polynomial in variables of the form :code:`*_re` and :code:`*_im`.
+
+    >>> z_re, z_im = RCF.VV.get('z_re', 'z_im')
+    >>> term = z_im**2 + z_re**2
+    >>> term_to_complex(term)
+    z * ~z
     """
     result: Term = Term(0)
     for vars, coeff in term.summands():
@@ -166,7 +179,6 @@ def term_to_complex(term: RCF.Term) -> Term:
             power_product = power_product * variable_to_complex(var) ** exp
         result = result + coeff * power_product
     return result
-
 
 def formula_to_complex(formula: RCF.Formula) -> Formula:
     OPS: dict[type[RCF.AtomicFormula], type[AtomicFormula]] = {
@@ -181,10 +193,28 @@ def formula_to_complex(formula: RCF.Formula) -> Formula:
         return formula.op(*(formula_to_complex(arg) for arg in formula.args))
     assert False, type(formula)
 
-
 def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool = False, **options) -> Formula:
-    """Quantifier elimination for the theory of complex numbers. Returns a
-    quantifier-free formula equivalent to the input formula.
+    """Return a quantifier-free formula equivalent to the input formula.
+
+    :param formula:
+        The input formula to which quantifier elimination will be applied.
+
+    :param assume:
+        A list of atomic formulas that are assumed to hold. The return value
+        is equivalent modulo those assumptions.
+
+    :param use_redlog:
+        If :obj:`True`, use :func:`RCF.redlog.qe` internallyto perform
+        real quantifier elimination. By default, :func:`RCF.qe` is used.
+
+    :param options:
+        Additional keyword arguments to be passed to :func:`RCF.qe` or
+        :func:`RCF.redlog.qe`.
+
+    >>> z = VV['z']
+    >>> phi = Ex(z, z**2 == -1)
+    >>> qe(phi)
+    T
     """
     rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(formula).to_pnf()

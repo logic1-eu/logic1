@@ -6,116 +6,163 @@
 Abstract Syntax Trees
 *********************
 
+
 .. automodule:: logic1.theories.Complex.ast
 
-  Abstract AST Nodes, SortKey
-  ******************************
+  .. autodata:: α
+  .. autodata:: η
+
+  Base Classes
+  ************
 
   .. autoclass:: AST
+    :members:
     :special-members:
-
-    .. autoproperty:: op
-
-    .. autoproperty:: args
-
-    .. automethod:: __init__
-
-    .. method:: +, ~, *, -, **, /
-                __add__(other: Number | AST) -> Add
-                __invert__() -> Conj
-                __mul__(other: Number | AST) -> Mul
-                __neg__() -> Neg
-                __pow__(other: int) -> Pow
-                __radd__(other: Number | AST) -> Add
-                __rmul__(other: Number | AST) -> Mul
-                __rsub__(other: Number | AST) -> Add
-                __sub__(other: Number | AST) -> Add
-                __truediv__(self, other: Number | AST) -> AST
-
-      Arithmetic operations on AST nodes are available as overloaded operators.
-
-    .. method:: ==, >=, >, <=, <, !=
-                __eq__(other: object) -> bool
-                __ge__(other: AST) -> bool
-                __gt__(other: AST) -> bool
-                __le__(other: AST) -> bool
-                __lt__(other: AST) -> bool
-                __ne__(other: object) -> bool
-
-      Comparison of AST nodes via their :class:`SortKey`. See also :meth:`sort_key`.
-
-    .. automethod:: accept
-    .. automethod:: as_latex
-    .. automethod:: lc
-    .. automethod:: eval
-    .. automethod:: factors
-    .. automethod:: from_real_imag
-    .. automethod:: from_number
-    .. automethod:: is_constant
-    .. automethod:: is_variable
-    .. automethod:: is_zero
-    .. automethod:: _repr_latex_
-    .. automethod:: sort_key
-    .. automethod:: subs
-
-  .. autoclass:: SortKey
-    :special-members:
+    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
 
   .. autoclass:: MonoidalOperation
+    :members:
     :special-members:
-
-    .. automethod:: __init__
 
   .. autoclass:: UnaryOperation
+    :members:
     :special-members:
 
 
-  Concrete AST Nodes
-  ******************
+  AST Nodes
+  *********
 
   .. autoclass:: Rat
+    :members:
     :special-members:
-
-    .. automethod:: __init__
 
   .. autoclass:: _I
+    :members:
     :special-members:
 
+  .. autodata:: I
+
   .. autoclass:: Var
+    :members:
     :special-members:
 
   .. autoclass:: Add
+    :members:
     :special-members:
 
   .. autoclass:: Mul
+    :members:
     :special-members:
 
   .. autoclass:: Pow
+    :members:
     :special-members:
 
   .. autoclass:: Neg
+    :members:
     :special-members:
 
   .. autoclass:: Conj
+    :members:
     :special-members:
 
   .. autoclass:: Re
+    :members:
     :special-members:
 
   .. autoclass:: Im
+    :members:
     :special-members:
 
-  AST Visitors
-  ************
+  Sort Key
+  ********
+
+  .. autoclass:: SortKey
+    :members:
+    :special-members:
+    :exclude-members: __init__, __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
+
+
+  Visitors
+  ********
 
   .. autoclass:: ASTVisitor
+    :members:
+    :special-members:
+    :exclude-members: __weakref__
 
   .. autoclass:: IdentityASTVisitor
+    :members:
+    :special-members:
 
   .. autoclass:: VariableSubstitutor
+    :members:
+    :special-members:
 
 
 Printing
 ********
 
 .. automodule:: logic1.theories.Complex.format
+
+  .. autoclass:: BaseFormatter
+    :members:
+    :special-members:
+
+  .. autoclass:: ReprFormatter
+    :members:
+    :special-members:
+
+  .. autoclass:: StrFormatter
+    :members:
+    :special-members:
+
+  .. autoclass:: LatexFormatter
+    :members:
+    :special-members:
+
+Normalization
+*************
+
+.. automodule:: logic1.theories.Complex.normalize
+
+  .. autoclass:: ArithmeticEvaluator
+    :members:
+    :special-members:
+
+  .. autoclass:: ConstantEvaluator
+    :members:
+    :special-members:
+
+  .. autoclass:: WeakNormalizer
+    :members:
+    :special-members:
+
+  .. autoclass:: AddSortKey
+    :members:
+    :special-members:
+    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__
+
+  .. autoclass:: MulSortKey
+    :members:
+    :special-members:
+    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__
+
+  .. autoclass:: Normalizer
+    :members:
+    :special-members:
+
+  .. autoclass:: ComplexNormalizer
+    :members:
+    :special-members:
+
+  .. autoclass:: RealNormalizer
+    :members:
+    :special-members:
+
+  .. autofunction:: conjugate_normal_form
+
+  .. autofunction:: cartesian_normal_form
+
+SortKeys
+********

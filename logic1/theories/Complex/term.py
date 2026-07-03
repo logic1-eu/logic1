@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-from enum import Enum, auto
 import functools
 from typing import Callable, ClassVar, Final, Generic, Never, Self, TypeVar
 
@@ -12,6 +11,7 @@ from logic1 import firstorder
 
 from logic1.theories.Complex.types import Number, RationalNumber
 from logic1.theories.Complex import ast
+from logic1.theories.Complex.format import ReprFormatter, StrFormatter
 from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_normal_form
 
 
@@ -78,14 +78,24 @@ class SortKey(Generic[τ]):
     """
 
     def __eq__(self, other: object) -> bool:
+        """Return :obj:`True` if the underlying terms are equivalent.
+        """
         if not isinstance(other, SortKey):
             return False
         return self.term.normal_ast.sort_key() == other.term.normal_ast.sort_key()
 
     def __hash__(self) -> int:
+        """Return a hash value of the underlying term.
+
+        >>> z = VV['x']
+        >>> hash(SortKey(z)) == hash(z)
+        True
+        """
         return hash(self.term)
 
     def __le__(self, other: SortKey) -> bool:
+        """Comparison of terms based on :class:`.ast.SortKey`.
+        """
         return self.term.normal_ast.sort_key() <= other.term.normal_ast.sort_key()
 
 
@@ -97,7 +107,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     @property
     def normal_ast(self) -> ast.AST:
-        """Return the normal form of this term as an AST."""
+        """Return the normal form of this term as AST.
+        """
         if self._current_normal_form != Term._normalizer:
             self._ast = Term._normalizer(self._ast)
             self._current_normal_form = Term._normalizer
@@ -177,7 +188,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         reconstruct the term. For a more human-readable string
         representation, use :meth:`.Term.__str__` or :meth:`.Term.as_latex`.
         """
-        return repr(self.normal_ast)
+        return self.normal_ast.accept(ReprFormatter())
 
     def __rmul__(self, other: Number | Term) -> Term:
         assert not isinstance(other, Term)
@@ -187,8 +198,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         assert not isinstance(other, Term)
         return Term(other) - self
 
+    def __rtruediv__(self, other: Number | Term) -> Term:
+        assert not isinstance(other, Term)
+        return Term(other) / self
+
     def __str__(self) -> str:
-        return str(self.normal_ast)
+        return self.normal_ast.accept(StrFormatter())
 
     def __sub__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
@@ -344,6 +359,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def lc(self) -> Term:
         """Return the leading coefficient of this term.
+
+        >>> z = VV['z']
+        >>> (3 * z - 2).lc()
+        3
+        >>> (-z * ~z).lc()
+        -1
         """
         if self.is_constant():
             return self
@@ -354,8 +375,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         if isinstance(self.normal_ast, ast.Mul):
             result = Term(1)
             for arg in self.normal_ast.args:
-                if arg.is_constant():
-                    result = result * Term._from_ast(arg)
+                result = result * Term._from_ast(arg).lc()
             return result
         return Term(1)
 
@@ -390,7 +410,15 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return SortKey(self)
 
     def subs(self, sigma: Mapping[Variable, Number | Term]) -> Term:
-        raise NotImplementedError()
+        ast_sigma: dict[ast.Var, ast.AST] = {}
+        for var, value in sigma.items():
+            ast_var = conjugate_normal_form(var.normal_ast)
+            assert isinstance(ast_var, ast.Var)
+            if isinstance(value, Term):
+                ast_sigma[ast_var] = value.normal_ast
+            else:
+                ast_sigma[ast_var] = ast.AST.from_number(value)
+        return Term._from_ast(self.normal_ast.subs(ast_sigma))
 
     def _summands(self) -> Iterator[tuple[Mapping[Term, int], Term]]:
         """An iterator that yields each summand of this term
@@ -459,10 +487,15 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
 
 I: Final[Term] = Term(1j)
+"""The imaginary unit.
+
+>>> I**2
+-1
+"""
 
 
 def Re(term: Term) -> Term:
-    """The real part of a term.
+    """Return the real part of a term.
 
     >>> Re(2 * I)
     0
@@ -474,7 +507,7 @@ def Re(term: Term) -> Term:
 
 
 def Im(term: Term) -> Term:
-    """The imaginary part of a term.
+    """Return the imaginary part of a term.
 
     >>> Im(2 * I)
     2
@@ -486,7 +519,7 @@ def Im(term: Term) -> Term:
 
 
 def Conj(term: Term) -> Term:
-    """The complex conjugate of a term.
+    """Return the complex conjugate of a term.
 
     >>> x = VV['x']
     >>> Conj(x + 2)
