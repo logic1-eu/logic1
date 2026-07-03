@@ -1,5 +1,7 @@
 
 
+from typing import ClassVar
+
 from gmpy2 import mpz
 
 from logic1.theories.Complex.ast import _I, AST, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Re, Var, Rat
@@ -7,7 +9,7 @@ from logic1.theories.Complex.ast import _I, AST, ASTVisitor, Add, Conj, Im, Mul,
 
 class BaseFormatter(ASTVisitor[str]):
 
-    symbols: dict[type[AST], str] = {}
+    symbols: ClassVar[dict[type[AST], str]] = {}
 
     def _omit_mul_symbol(self, ast1: AST, ast2: AST) -> bool:
         return False

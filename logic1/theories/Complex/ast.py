@@ -13,55 +13,33 @@ from logic1.theories.Complex.types import _RATIONAL_NUMBER_TYPES, Number, _NUMBE
 
 
 α = TypeVar('α')
+"""A generic type variable used for the return type of :class:`ASTVisitor`.
+"""
+
 η = TypeVar('η', bound='AST')
-
-
-@dataclass
-@total_ordering
-class SortKey(Generic[η]):
-    """A sort key for AST nodes.
-    """
-
-    ast: η
-    """The AST for which this is a sort key.
-    """
-
-    @property
-    def op(self) -> type[AST]:
-        """The operation of the underlying AST node.
-        """
-        return self.ast.op
-
-    @property
-    def args(self) -> tuple[object, ...]:
-        """The arguments of the underlying AST node, where each argument
-        that is itself an AST node is replaced by its sort key.
-        """
-        return tuple(SortKey(arg) if isinstance(arg, AST) else arg for arg in self.ast.args)
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, SortKey):
-            return False
-        if self.ast is other.ast:
-            return True
-        return self.op == other.op and self.args == other.args
-
-    def __hash__(self) -> int:
-        return hash(self.ast)
-
-    def __le__(self, other: SortKey) -> bool:
-        ORDER = (Rat, _I, Var, Conj, Re, Im, Pow, Neg, Mul, Add)
-        assert self.op in ORDER and other.op in ORDER
-        if self.op == other.op:
-            return self.args <= other.args
-        else:
-            return ORDER.index(self.op) < ORDER.index(other.op)
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.ast})'
+"""
+A type variable for AST nodes used to parameterize :class:`SortKey`.
+"""
 
 
 class AST:
+    """Abstract base class for all AST nodes that implements basic functionality.
+    AST nodes can be constructed using the constructors of the subclasses or
+    using arithmetic operations.
+
+    >>> ast = Re(Add(Var('x'), Mul(Rat(2), _I())))
+    >>> ast
+    Re(Add(Var('x'), Mul(Rat(mpq(2,1)), _I())))
+    >>> print(ast)
+    Re(x + 2 * i)
+
+    >>> x = Var('x')
+    >>> ast = (Im(x) - I)**2
+    >>> ast
+    Pow(Add(Im(Var('x')), Neg(_I())), 2)
+    >>> print(ast)
+    (Im(x) - i)^2
+    """
 
     @property
     def op(self) -> type[Self]:
@@ -83,27 +61,42 @@ class AST:
         >>> x.args
         ('x',)
         >>> x.op(*x.args)
-        x
+        Var('x')
         """
         ...
 
     def __add__(self, other: Number | AST) -> Add:
+        """Construct an addition node from this AST node and another AST node
+        or number.
+
+        >>> x = Var('x')
+        >>> x + 2
+        Add(Var('x'), Rat(mpq(2,1)))
+        """
         if isinstance(other, AST):
             return Add(self, other)
         return self + AST.from_number(other)
 
     def __eq__(self, other: object) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         if isinstance(other, AST):
             return self.sort_key() == other.sort_key()
         return False
 
     def __ge__(self, other: AST) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         return self.sort_key() >= other.sort_key()
 
     def __gt__(self, other: AST) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         return self.sort_key() > other.sort_key()
 
     def __hash__(self) -> int:
+        """Hash of this AST node based its operation and arguments.
+        """
         return hash((tuple(str(cls) for cls in self.op.mro()), self.args))
 
     @abstractmethod
@@ -113,60 +106,160 @@ class AST:
         ...
 
     def __invert__(self) -> Conj:
+        """Construct a conjugation node from this AST node.
+
+        >>> x = Var('x')
+        >>> ~x
+        Conj(Var('x'))
+        """
         return Conj(self)
 
     def __le__(self, other: AST) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         return self.sort_key() <= other.sort_key()
 
     def __lt__(self, other: AST) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         return self.sort_key() < other.sort_key()
 
     def __mul__(self, other: Number | AST) -> Mul:
+        """Construct a multiplication node from this AST node and another
+        AST node or number.
+
+        >>> x = Var('x')
+        >>> x * 2
+        Mul(Var('x'), Rat(mpq(2,1)))
+        """
         if isinstance(other, AST):
             return Mul(self, other)
         return self * AST.from_number(other)
 
     def __ne__(self, other: object) -> bool:
+        """Comparison of AST nodes based on :class:`SortKey`.
+        """
         if isinstance(other, AST):
             return self.sort_key() != other.sort_key()
         return True
 
     def __neg__(self) -> Neg:
+        """Construct a negation node from this AST node.
+
+        >>> x = Var('x')
+        >>> -x
+        Neg(Var('x'))
+        """
         return Neg(self)
 
     def __pow__(self, other: int) -> Pow:
+        """Construct a power node from this AST node and an exponent.
+
+        >>> x = Var('x')
+        >>> x ** 2
+        Pow(Var('x'), 2)
+        """
         return Pow(self, other)
 
     def __radd__(self, other: Number | AST) -> Add:
+        """Construct an addition node from a number as left summand and this AST
+        node as right summand. All other cases are handled by :meth:`__add__`.
+
+        >>> x = Var('x')
+        >>> 2 + x
+        Add(Rat(mpq(2,1)), Var('x'))
+        """
         assert not isinstance(other, AST)
         return AST.from_number(other) + self
 
     def __repr__(self) -> str:
         """String representation of this AST node that can be evaluated to
         reconstruct the node. For a more human-readable string
-        representation, use :meth:`.AST.__str__` or :meth:`.AST.as_latex`.
+        representation, use :meth:`__str__` or :meth:`as_latex`.
+
+        >>> x = Var('x')
+        >>> repr(x + 2)
+        "Add(Var('x'), Rat(mpq(2,1)))"
         """
-        return self.accept(ReprFormatter())
+        return f"{self.__class__.__name__}({', '.join(repr(arg) for arg in self.args)})"
 
     def __rmul__(self, other: Number | AST) -> Mul:
+        """Construct a multiplication node from a number as left factor and
+        this AST node as right factor. All other cases are handled by
+        :meth:`__mul__`.
+
+        >>> x = Var('x')
+        >>> 2 * x
+        Mul(Rat(mpq(2,1)), Var('x'))
+        """
         assert not isinstance(other, AST)
         return AST.from_number(other) * self
 
     def __rsub__(self, other: Number | AST) -> Add:
+        """Construct an addition node from a number as left summand and the
+        negation of this AST node as right summand. All other cases are handled
+        by :meth:`__sub__`.
+
+        >>> x = Var('x')
+        >>> 2 - x
+        Add(Rat(mpq(2,1)), Neg(Var('x')))
+        """
         assert not isinstance(other, AST)
         return AST.from_number(other) - self
 
+    def __rtruediv__(self, other: Number | AST) -> AST:
+        """Construct a AST node representing the division of a number by this
+        AST node. Division is defined as multiplication by the inverse.
+        Raise a :class:`ValueError` if this AST node is not constant.
+        All other cases are handled by :meth:`__truediv__`.
+
+        >>> 1 / I
+        Mul(Rat(mpq(1,1)), Neg(_I()))
+        >>> x = Var('x')
+        >>> 1 / x
+        Traceback (most recent call last):
+          ...
+        ValueError: Cannot divide by a non-constant AST node
+        """
+        assert not isinstance(other, AST)
+        return AST.from_number(other) / self
+
     def __str__(self) -> str:
+        """Human-readable string representation of this AST node.
+
+        >>> x = Var('x')
+        >>> str(x + 2)
+        'x + 2'
+        """
         return self.accept(StrFormatter())
 
     def __sub__(self, other: Number | AST) -> Add:
+        """Construct an addition node from this AST node and the negation of
+        another AST node or number.
+
+        >>> x = Var('x')
+        >>> x - 2
+        Add(Var('x'), Neg(Rat(mpq(2,1))))
+        """
         if isinstance(other, AST):
             return self + (-other)
         return self - AST.from_number(other)
 
     def __truediv__(self, other: Number | AST) -> AST:
-        """Division is defined as multiplication by the inverse. If the
-        other AST node is not constant, this method raises a :class:`ValueError`.
+        """Construct a AST node representing the division of this AST node by
+        another AST node or number. Division is defined as multiplication by
+        the inverse. Raise a :class:`ValueError` if the other AST node is not
+        constant.
+
+        >>> x = Var('x')
+        >>> x / 2
+        Mul(Var('x'), Rat(mpq(1,2)))
+        >>> print(x / (1 + I))
+        x * (1/2 + -1/2 * i)
+        >>> I / x
+        Traceback (most recent call last):
+          ...
+        ValueError: Cannot divide by a non-constant AST node
         """
         if isinstance(other, AST):
             try:
@@ -180,40 +273,36 @@ class AST:
         return self / AST.from_number(other)
 
     def __xor__(self, other: Never) -> AST:
+        """Raise a :class:`NotImplementedError` because the :code:`**`
+        operator should be used for constructing power nodes instead.
+        See :meth:`__pow__`.
+        """
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
     @abstractmethod
     def accept(self, visitor: ASTVisitor[α]) -> α:
-        """Accept a visitor."""
+        """Accept a AST visitor."""
         ...
 
     def as_latex(self) -> str:
-        """LaTeX representation as a string.
+        """LaTeX representation of this AST node.
         """
         return self.accept(LatexFormatter())
 
-    def lc(self) -> AST:
-        """Returns the left-most coefficient of this AST node.
-        """
-        if self.is_constant():
-            return self
-        elif isinstance(self, Add):
-            return self.args[0].lc()
-        elif isinstance(self, Neg):
-            return -self.arg.lc()
-        elif isinstance(self, Mul) and self.args[0].is_constant():
-            return self.args[0] * Mul(*self.args[1:]).lc()
-        elif isinstance(self, Mul) and isinstance(self.args[0], Neg):
-            return -Mul(*self.args[1:]).lc()
-        else:
-            return Rat(1)
-
     def eval(self) -> tuple[mpq, mpq]:
         """Evaluate this AST node as a complex number and return the real and
-        imaginary part as a tuple of mpq. If this AST node is not constant, this
-        method raises a :class:`ValueError`.
+        imaginary part as :class:`mpq`. Raises a :class:`ValueError` if the AST
+        node is not constant.
+
+        >>> x = Var('x')
+        >>> (2 * I).eval()
+        (mpq(0,1), mpq(2,1))
+        >>> (x + 1).eval()
+        Traceback (most recent call last):
+          ...
+        ValueError: Cannot evaluate variable x
         """
         return self.accept(ConstantEvaluator())
 
@@ -223,9 +312,9 @@ class AST:
 
         >>> x = Var('x')
         >>> (2 * x * I).factors()
-        [2, x, I]
+        [Rat(mpq(2,1)), Var('x'), _I()]
         >>> (x + 1).factors()
-        [x + 1]
+        [Add(Var('x'), Rat(mpq(1,1)))]
         """
         if isinstance(self, Mul):
             return list(self.args)
@@ -237,19 +326,19 @@ class AST:
         """Construct a AST node from a given real and imaginary part.
 
         >>> AST.from_real_imag(mpq(2), mpq(0))
-        2
+        Rat(mpq(2,1))
         >>> AST.from_real_imag(mpq(0), mpq(1))
-        I
+        _I()
         >>> AST.from_real_imag(mpq(0), mpq(-1))
-        -I
+        Neg(_I())
         >>> AST.from_real_imag(mpq(0), mpq(3))
-        3 * I
+        Mul(Rat(mpq(3,1)), _I())
         >>> AST.from_real_imag(mpq(2), mpq(1))
-        2 + I
+        Add(Rat(mpq(2,1)), _I())
         >>> AST.from_real_imag(mpq(2), mpq(-1))
-        2 - I
+        Add(Rat(mpq(2,1)), Neg(_I()))
         >>> AST.from_real_imag(mpq(2), mpq(3))
-        2 + 3 * I
+        Add(Rat(mpq(2,1)), Mul(Rat(mpq(3,1)), _I()))
         """
         if imag == mpq(0):
             return Rat(real)
@@ -270,19 +359,19 @@ class AST:
 
     @staticmethod
     def from_number(value: Number) -> AST:
-        """Construct a AST node from a given number. Raises a
+        """Construct a AST node from a given :data:`Number`. Raise a
         :class:`ValueError` if the given value is not a number.
 
         >>> AST.from_number(2)
-        2
+        Rat(mpq(2,1))
         >>> AST.from_number(3.5)
-        7/2
+        Rat(mpq(7,2))
         >>> AST.from_number(Fraction(1, 3))
-        1/3
+        Rat(mpq(1,3))
         >>> AST.from_number(mpq(1, 4))
-        1/4
+        Rat(mpq(1,4))
         >>> AST.from_number(2 + 3j)
-        2 + 3 * I
+        Add(Rat(mpq(2,1)), Mul(Rat(mpq(3,1)), _I()))
         >>> AST.from_number("x")
         Traceback (most recent call last):
           ...
@@ -335,10 +424,27 @@ class AST:
         """
         return isinstance(self, Rat) and self.value == mpq(0)
 
-    # def normalize(self) -> AST:
-    #     """Return a unique normal form of this AST node
-    #     """
-    #     return self.accept(ComplexNormalizer())
+    def lc(self) -> AST:
+        """Return the left-most constant coefficient of this AST node.
+
+        >>> x = Var('x')
+        >>> (2 * x + 3).lc()
+        Mul(Rat(mpq(2,1)), Rat(mpq(1,1)))
+        >>> (x + 2 * I).lc()
+        Rat(mpq(1,1))
+        """
+        if self.is_constant():
+            return self
+        elif isinstance(self, Add):
+            return self.args[0].lc()
+        elif isinstance(self, Neg):
+            return -self.arg.lc()
+        elif isinstance(self, Mul) and self.args[0].is_constant():
+            return self.args[0] * Mul(*self.args[1:]).lc()
+        elif isinstance(self, Mul) and isinstance(self.args[0], Neg):
+            return -Mul(*self.args[1:]).lc()
+        else:
+            return Rat(1)
 
     def _repr_latex_(self) -> str:
         """LaTeX representation for Jupyter notebooks.
@@ -353,7 +459,7 @@ class AST:
 
         >>> x = Var('x')
         >>> x.sort_key()
-        SortKey(x)
+        SortKey(Var('x'))
         """
         return SortKey(self)
 
@@ -361,28 +467,45 @@ class AST:
         """Formal substitution of variables in this AST node according to the
         given mapping. The mapping can map variables to either numbers or AST
         nodes.
+
+        >>> x = Var('x')
+        >>> (x + 2).subs({x: I})
+        Add(_I(), Rat(mpq(2,1)))
+        >>> (x + 2).subs({x: 3})
+        Add(Rat(mpq(3,1)), Rat(mpq(2,1)))
         """
         return self.accept(VariableSubstitutor(sigma))
 
 
 class Rat(AST):
-    """A rational number, represented as a :class:`mpq`. Implements the abstract class
-    :class:`.AST`.
+    """A non-negative rational number node.
+    Implements the abstract class :class:`.AST`.
+
+    >>> Rat(2)
+    Rat(mpq(2,1))
+    >>>
     """
 
     value: mpq
+    """The value of this rational number.
+    """
 
     @property
     def args(self) -> tuple[mpq]:
-        """The arguments of this AST node, which is just the rational number
-        itself.
+        """A tuple containing the value of this rational number.
+
+        >>> Rat(2).args
+        (mpq(2,1),)
         """
         return (self.value,)
 
     def __init__(self, value: RationalNumber) -> None:
         """Initialize this rational number with the given value. The
-        value must be non-negative, otherwise this AST node is represented
-        as a negation of a rational number with a non-negative value.
+        value must be non-negative, otherwise this node is represented
+        by a negation via :meth:`__new__`.
+
+        >>> Rat(2)
+        Rat(mpq(2,1))
         """
         if isinstance(value, (int, float)):
             self.value = mpq(value)
@@ -396,23 +519,29 @@ class Rat(AST):
         assert self.value >= mpq(0)
 
     def __new__(cls, value: RationalNumber):
+        """Create a new instance of :class:`Rat` from the given value.
+        If the value is negative, return a :class:`.Neg` node instead.
+
+        >>> Rat(-2)
+        Neg(Rat(mpq(2,1)))
+        """
         if value < 0:
             return Neg(Rat(-value))
         else:
             return super().__new__(cls)
 
-
     def accept(self, visitor: ASTVisitor[α]) -> α:
-        """Implements the abstract method :meth:`.AST.accept`."""
+        """Implements the abstract method :meth:`.AST.accept`.
+        """
         return visitor.visit_rat(self)
 
 
 class _I(AST):
-    """The imaginary unit. This is a singleton class, and the only instance
-    is `I`. Implements the abstract class :class:`.AST`.
+    """The imaginary unit node. This is a singleton class and the only instance
+    is :obj:`I`. Implements the abstract class :class:`.AST`.
 
     >>> _I()
-    I
+    _I()
     >>> _I() is I
     True
     """
@@ -424,12 +553,15 @@ class _I(AST):
     @property
     def args(self) -> tuple[()]:
         """The imaginary unit has no arguments.
+
+        >>> I.args
+        ()
         """
         return ()
 
     def __init__(self) -> None:
-        """Initialize the imaginary unit. This is a singleton class, so
-        this method should not be called directly. Use `I` instead.
+        """This class is a singleton, so the constructor is private and should
+        not be called directly.
         """
         pass
 
@@ -439,6 +571,9 @@ class _I(AST):
         return visitor.visit_i(self)
 
     def __new__(cls):
+        """Create a new instance of the imaginary unit. This is a singleton
+        class, so this method always returns the same instance.
+        """
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
@@ -450,8 +585,11 @@ I: Final = _I()
 
 
 class Var(AST):
-    """A variable, represented by a string name. Implements the
-    abstract class :class:`.AST`.
+    """A variable node. Implements the abstract class :class:`.AST`.
+
+    >>> x = Var('x')
+    >>> x
+    Var('x')
     """
 
     name: str
@@ -460,8 +598,10 @@ class Var(AST):
 
     @property
     def args(self) -> tuple[str]:
-        """The arguments of this variable, which are just the name of the
-        variable itself.
+        """A tuple containing the name of this variable.
+
+        >>> Var('x').args
+        ('x',)
         """
         return (self.name,)
 
@@ -477,9 +617,13 @@ class Var(AST):
 
 
 class MonoidalOperation(AST):
-    """A monoidal operation, which is an associative operation with an
-    identity element. This is a base class for addition and
-    multiplication. Implements parts the abstract class :class:`.AST`.
+    """A base class for monoidal operations, i.e. associative operations with
+    identity element. It implements parts of the abstract class :class:`.AST`
+    for the subclasses :class:`.Add` and :class:`.Mul`.
+
+    >>> x = Var('x')
+    >>> Add(Rat(1), x, I)
+    Add(Rat(mpq(1,1)), Var('x'), _I())
     """
 
     _args: tuple[AST, ...]
@@ -494,13 +638,19 @@ class MonoidalOperation(AST):
     @property
     def args(self) -> tuple[AST, ...]:
         """The arguments of this AST node.
+
+        >>> Add(Rat(1), Rat(2)).args
+        (Rat(mpq(1,1)), Rat(mpq(2,1)))
         """
         return self._args
 
     def __init__(self, *args: AST) -> None:
         """Initialize this monoidal operation with the given arguments.
         If any of the arguments is itself a monoidal operation of the same
-        type, then the arguments are flattened into this operation.
+        type, then the argument is flattened.
+
+        >>> Add(Rat(1), Add(Rat(2), Rat(3)))
+        Add(Rat(mpq(1,1)), Rat(mpq(2,1)), Rat(mpq(3,1)))
         """
         args_flat = []
         for arg in args:
@@ -514,6 +664,12 @@ class MonoidalOperation(AST):
         """Create a new instance of this monoidal operation with the
         given arguments. If no arguments are given, return the identity
         element. If only one argument is given, return that argument.
+
+        >>> x = Var('x')
+        >>> Add(x)
+        Var('x')
+        >>> Add()
+        Rat(mpq(0,1))
         """
         if not args:
             return cls.identity
@@ -523,7 +679,8 @@ class MonoidalOperation(AST):
 
 
 class Add(MonoidalOperation):
-    """Addition. Implements the abstract class :class:`.MonoidalOperation`.
+    """An addition node. Implements the abstract class
+    :class:`.MonoidalOperation`.
     """
 
     identity: ClassVar[Rat] = Rat(0)
@@ -537,7 +694,7 @@ class Add(MonoidalOperation):
 
 
 class Mul(MonoidalOperation):
-    """Multiplication. Implements the abstract class
+    """A multiplication node. Implements the abstract class
     :class:`.MonoidalOperation`.
     """
 
@@ -552,7 +709,11 @@ class Mul(MonoidalOperation):
 
 
 class Pow(AST):
-    """Exponentiation. Implements the abstract class :class:`.AST`.
+    """A power node. Implements the abstract class :class:`.AST`.
+
+    >>> x = Var('x')
+    >>> Pow(x, 2)
+    Pow(Var('x'), 2)
     """
 
     base: AST
@@ -565,7 +726,10 @@ class Pow(AST):
 
     @property
     def args(self) -> tuple[AST, int]:
-        """The arguments of this node, which is the base and the exponent.
+        """A tuple containing the base and exponent of this power node.
+
+        >>> (I ** 2).args
+        (_I(), 2)
         """
         return (self.base, self.exponent)
 
@@ -585,35 +749,39 @@ class Pow(AST):
 
 
 class UnaryOperation(AST):
-    """A unary operation, which is an operation with one argument.
-    This is a base class for negation, conjugation, real part, and
-    imaginary part. Implements parts the abstract class :class:`.AST`.
+    """A base class for unary operations, i.e. operations with only one
+    argument. It implements parts of the abstract class :class:`.AST` for the
+    subclasses :class:`.Neg`, :class:`.Conj`, :class:`.Re` and :class:`.Im`.
+
+    >>> Neg(I)
+    Neg(_I())
     """
 
     arg: AST
-    """The single argument of this unary operation."""
+    """The single argument of this AST node.
+    """
 
     @property
     def args(self) -> tuple[AST]:
-        """The arguments of this AST node, which is just the single
-        argument of this unary operation.
+        """A tuple containing the single argument of this AST node.
+
+        >>> Neg(I).args
+        (_I(),)
         """
         return (self.arg,)
 
-    def __init__(self, arg: Number | AST) -> None:
-        """Initialize this unary operation with the given argument,
-        which can be either an AST node or a number.
-        If it is a number, it is converted to a AST node using
-        :meth:`.AST.from_number`.
+    def __init__(self, arg: AST) -> None:
+        """Initialize this unary operation with the given argument.
         """
-        if isinstance(arg, AST):
-            self.arg = arg
-        else:
-            self.arg = AST.from_number(arg)
+        self.arg = arg
 
 
 class Neg(UnaryOperation):
-    """Negation. Implements the abstract class :class:`.UnaryOperation`.
+    """A negation node. Implements the abstract class :class:`.UnaryOperation`.
+
+    >>> x = Var('x')
+    >>> Neg(x)
+    Neg(Var('x'))
     """
 
     def accept(self, visitor: ASTVisitor[α]) -> α:
@@ -623,8 +791,12 @@ class Neg(UnaryOperation):
 
 
 class Conj(UnaryOperation):
-    """Complex conjugation. Implements the abstract class
+    """A complex conjugation node. Implements the abstract class
     :class:`.UnaryOperation`.
+
+    >>> x = Var('x')
+    >>> Conj(x)
+    Conj(Var('x'))
     """
 
     def accept(self, visitor: ASTVisitor[α]) -> α:
@@ -634,7 +806,11 @@ class Conj(UnaryOperation):
 
 
 class Re(UnaryOperation):
-    """Real part. Implements the abstract class :class:`.UnaryOperation`.
+    """A real part node. Implements the abstract class :class:`.UnaryOperation`.
+
+    >>> x = Var('x')
+    >>> Re(x)
+    Re(Var('x'))
     """
 
     def accept(self, visitor: ASTVisitor[α]) -> α:
@@ -644,7 +820,12 @@ class Re(UnaryOperation):
 
 
 class Im(UnaryOperation):
-    """Imaginary part. Implements the abstract class :class:`.UnaryOperation`.
+    """An imaginary part node. Implements the abstract
+    class :class:`.UnaryOperation`.
+
+    >>> x = Var('x')
+    >>> Im(x)
+    Im(Var('x'))
     """
 
     def accept(self, visitor: ASTVisitor[α]) -> α:
@@ -653,9 +834,97 @@ class Im(UnaryOperation):
         return visitor.visit_im(self)
 
 
+@dataclass
+@total_ordering
+class SortKey(Generic[η]):
+    """A sort key for AST nodes.
+    """
+
+    ORDER: ClassVar[tuple[type[AST], ...]] = (Rat, _I, Var, Conj, Re, Im, Pow, Neg, Mul, Add)
+    """The order of AST node types for sorting.
+    """
+
+    ast: η
+    """The AST for which this is a sort key.
+    """
+
+    @property
+    def op(self) -> type[AST]:
+        """The operation of the underlying AST node.
+        """
+        return self.ast.op
+
+    @property
+    def args(self) -> tuple[object, ...]:
+        """The arguments of the underlying AST node, where each argument
+        that is itself an AST node is replaced by its sort key.
+        """
+        return tuple(SortKey(arg) if isinstance(arg, AST) else arg for arg in self.ast.args)
+
+    def __eq__(self, other: object) -> bool:
+        """Equality check of the underlying AST nodes based on their operation
+        and arguments.
+
+        >>> x = Var('x')
+        >>> y = Var('y')
+        >>> SortKey(x) == SortKey(x)
+        True
+        >>> SortKey(x) == SortKey(y)
+        False
+        >>> SortKey(x) == SortKey(I)
+        False
+        """
+        if not isinstance(other, SortKey):
+            return False
+        if self.ast is other.ast:
+            return True
+        return self.op == other.op and self.args == other.args
+
+    def __hash__(self) -> int:
+        """Hash of the underlying AST node.
+
+        >>> x = Var('x')
+        >>> hash(SortKey(x)) == hash(x)
+        True
+        """
+        return hash(self.ast)
+
+    def __le__(self, other: SortKey) -> bool:
+        """Comparison of the underlying AST nodes first by their operation
+        according to :attr:`ORDER`, then recursively by their arguments.
+        The remaining comparison operators are derived from this using
+        :func:`functools.total_ordering`.
+
+        >>> x = Var('x')
+        >>> y = Var('y')
+        >>> SortKey(x) <= SortKey(I)
+        False
+        >>> SortKey(x) <= SortKey(y)
+        True
+        >>> SortKey(x) <= SortKey(x)
+        True
+        """
+        assert self.op in self.ORDER and other.op in self.ORDER
+        if self.op == other.op:
+            return self.args <= other.args
+        else:
+            return self.ORDER.index(self.op) < self.ORDER.index(other.op)
+
+    def __repr__(self) -> str:
+        """String representation of this sort key that can be evaluated to
+        reconstruct the sort key.
+
+        >>> x = Var('x')
+        >>> repr(SortKey(x))
+        "SortKey(Var('x'))"
+        """
+        return f'{self.__class__.__name__}({repr(self.ast)})'
+
+
 class ASTVisitor(Generic[α]):
-    """Visitor for AST nodes. This is used to implement various operations
-    on AST nodes, such as normalization, evaluation, etc.
+    """Abstract visitor for AST nodes. It is used to implement various
+    operations on AST nodes such as printing (:class:`.StrFormatter`) and
+    normalization (:class:`.Normalizer`).
     """
 
     @abstractmethod
@@ -727,60 +996,97 @@ class IdentityASTVisitor(ASTVisitor[AST]):
     def visit_rat(self, num: Rat) -> AST:
         """Return the same rational number. Implements the abstract
         method :meth:`.ASTVisitor.visit_rat`.
+
+        >>> IdentityASTVisitor().visit_rat(Rat(mpq(2,1)))
+        Rat(mpq(2,1))
         """
         return num
 
     def visit_i(self, i: _I) -> AST:
         """Return the imaginary unit. Implements the abstract method
         :meth:`.ASTVisitor.visit_i`.
+
+        >>> IdentityASTVisitor().visit_i(I)
+        _I()
         """
         return i
 
     def visit_var(self, var: Var) -> AST:
         """Return the same variable. Implements the abstract method
         :meth:`.ASTVisitor.visit_var`.
+
+        >>> IdentityASTVisitor().visit_var(Var('x'))
+        Var('x')
         """
         return var
 
     def visit_add(self, add: Add) -> AST:
         """Return the same addition node, but with all arguments
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_add`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_add(x + 2)
+        Add(Var('x'), Rat(mpq(2,1)))
         """
         return Add(*[arg.accept(self) for arg in add.args])
 
     def visit_mul(self, mul: Mul) -> AST:
         """Return the same multiplication node, but with all arguments
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_mul`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_mul(x * 2)
+        Mul(Var('x'), Rat(mpq(2,1)))
         """
         return Mul(*[arg.accept(self) for arg in mul.args])
 
     def visit_pow(self, pow: Pow) -> AST:
         """Return the same power node, but with the base visited.
         Implements the abstract method :meth:`.ASTVisitor.visit_pow`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_pow(x ** 2)
+        Pow(Var('x'), 2)
         """
         return Pow(pow.base.accept(self), pow.exponent)
 
     def visit_neg(self, neg: Neg) -> AST:
         """Return the same negation node, but with the argument
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_neg`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_neg(Neg(x))
+        Neg(Var('x'))
         """
         return Neg(neg.arg.accept(self))
 
     def visit_conj(self, conj: Conj) -> AST:
         """Return the same conjugation node, but with the argument
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_conj`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_conj(Conj(x))
+        Conj(Var('x'))
         """
         return Conj(conj.arg.accept(self))
 
     def visit_re(self, re: Re) -> AST:
         """Return the same real part node, but with the argument
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_re`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_re(Re(x))
+        Re(Var('x'))
         """
         return Re(re.arg.accept(self))
 
     def visit_im(self, im: Im) -> AST:
         """Return the same imaginary part node, but with the argument
         visited. Implements the abstract method :meth:`.ASTVisitor.visit_im`.
+
+        >>> x = Var('x')
+        >>> IdentityASTVisitor().visit_im(Im(x))
+        Im(Var('x'))
         """
         return Im(im.arg.accept(self))
 
@@ -790,17 +1096,25 @@ class VariableSubstitutor(IdentityASTVisitor):
     also :meth:`.AST.subs`.
     """
 
-    mapping: Mapping[Var, Number | AST]
+    mapping: dict[Var, Number | AST]
 
     def __init__(self, mapping: Mapping[Var, Number | AST]) -> None:
-        """Initialize the substitutor with the given mapping containing either
+        """Initialize the substitutor with a given mapping containing either
         AST nodes or numbers.
         """
-        self.mapping = mapping
+        self.mapping = dict(mapping)
 
-    def visit_variable(self, var: Var) -> AST:
+    def visit_var(self, var: Var) -> AST:
         """Return the substituted AST node for the given variable, or the
         variable itself if not found in the mapping.
+
+        >>> x = Var('x')
+        >>> y = Var('y')
+        >>> visitor = VariableSubstitutor({x: I})
+        >>> x.accept(visitor)
+        _I()
+        >>> y.accept(visitor)
+        Var('y')
         """
         value = self.mapping.get(var, var)
         if isinstance(value, AST):
@@ -808,5 +1122,5 @@ class VariableSubstitutor(IdentityASTVisitor):
         else:
             return AST.from_number(value)
 
-from logic1.theories.Complex.format import LatexFormatter, ReprFormatter, StrFormatter
-from logic1.theories.Complex.normalize import ComplexNormalizer, ConstantEvaluator
+from logic1.theories.Complex.format import LatexFormatter, StrFormatter
+from logic1.theories.Complex.normalize import ConstantEvaluator

@@ -9,23 +9,63 @@ Variables, Terms, Atoms
 
 .. automodule:: logic1.theories.Complex.types
 
+  .. autodata:: RationalNumber
+  .. autodata:: Number
+  .. autodata:: Formula
+
 .. automodule:: logic1.theories.Complex.term
 
-  .. autoclass:: logic1.theories.Complex.term.Variable
+  .. autodata:: κ
 
-  .. autoclass:: logic1.theories.Complex.term.Term
+  .. autoclass:: Term
+    :members:
+    :special-members:
+
+  .. autoclass:: Variable
+    :members:
+    :special-members:
+
+  .. autoclass:: VariableSet
+    :members:
+    :special-members:
 
 
 .. automodule:: logic1.theories.Complex.atomic
 
   .. autoclass:: AtomicFormula
+    :members:
+    :special-members:
 
+  .. autoclass:: RealAtomicFormula
+    :members:
+    :special-members:
 
-  .. class:: Eq
-             Ge
-             Gt
-             Le
-             Lt
-             Ne
+  .. autoclass:: Eq
+    :members:
+    :special-members:
+    :exclude-members: __init__
 
-        Bases: :class:`.AtomicFormula`
+  .. autoclass:: Ne
+    :members:
+    :special-members:
+    :exclude-members: __init__
+
+  .. autoclass:: Le
+    :members:
+    :special-members:
+    :exclude-members: __init__
+
+  .. autoclass:: Ge
+    :members:
+    :special-members:
+    :exclude-members: __init__
+
+  .. autoclass:: Lt
+    :members:
+    :special-members:
+    :exclude-members: __init__
+
+  .. autoclass:: Gt
+    :members:
+    :special-members:
+    :exclude-members: __init__

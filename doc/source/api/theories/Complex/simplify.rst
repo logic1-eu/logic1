@@ -2,10 +2,8 @@
 
 *Complex*
 
-********************************
-Normalization and Simplification
-********************************
-
-.. automodule:: logic1.theories.Complex.normalize
+**************
+Simplification
+**************
 
 .. automodule:: logic1.theories.Complex.simplify
