@@ -16,6 +16,14 @@ class NextClause(Exception):
     pass
 
 
+@dataclass(frozen=True)
+class Options:
+    use_redlog_cnf: bool = True
+    bnfsac: bool = True
+    bnfsm: bool = True
+    radical: bool = True
+
+
 @dataclass(init=False)
 class Clause:
 
@@ -100,6 +108,7 @@ class GlobalPremise:
     _atoms: dict[type[AtomicFormula], set[AtomicFormula]]
     _basis: set[Term]
     _have_gbasis: bool
+    _options: Options
 
     @property
     def assume(self) -> list[AtomicFormula]:
@@ -108,14 +117,14 @@ class GlobalPremise:
     @property
     def gbasis(self) -> list[Term]:
         if not self._have_gbasis:
-            self._gbasis = Term.gbasis(self._basis, radical=True)
+            self._gbasis = Term.gbasis(self._basis, radical=self._options.radical)
             self._have_gbasis = True
         return self._gbasis
 
     def __getitem__(self, key: type[AtomicFormula]) -> set[AtomicFormula]:
         return self._atoms[key]
 
-    def __init__(self, assume: Iterable[AtomicFormula]) -> None:
+    def __init__(self, assume: Iterable[AtomicFormula], options: Options) -> None:
         self._atoms = {Eq: set(), Ne: set(), Ge: set(), Gt: set(), Le: set(), Lt: set()}
         self._basis = set()
         for atom in assume:
@@ -124,6 +133,7 @@ class GlobalPremise:
             if key is Eq:
                 self._basis.add(atom.lhs)
         self._have_gbasis = False
+        self._options = options
 
     def add(self, atom: AtomicFormula) -> None:
         key = type(atom)
@@ -141,13 +151,6 @@ class GlobalPremise:
         if not isinstance(rels, tuple):
             rels = (rels,)
         return [atom.lhs for rel in rels for atom in self[rel]]
-
-
-@dataclass(frozen=True)
-class Options:
-    use_redlog_cnf: bool = True
-    bnfsac: bool = True
-    bnfsm: bool = True
 
 
 @dataclass
@@ -220,7 +223,7 @@ class GSimplify:
         # Remove equational clauses entailed by the assumed equations. Add all
         # other equational clauses to the assumed equations.
         logging.info(f'processing equational clauses ({count} clauses left)')
-        global_premise = GlobalPremise(assume)
+        global_premise = GlobalPremise(assume, self._options)
         for clause in clauses:
             atom = clause.as_atom()
             if atom is None:
@@ -251,14 +254,12 @@ class GSimplify:
                 # radical membership test at this point. The idea is that
                 # adding their left hand sides to the ideal brings it closer
                 # to the radical, which is good for our purposes.
-                clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=True)
+                clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=self._options.radical)
 
                 # 1. Process the product of all equations of the current clause:
                 # We may add to that product all left hand sides of disequalities
                 # and strict inequalies in the assumptions.
                 product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
-                # if self.in_radical(product, clause_gbasis):
-                #     raise NextClause()
                 h = product.reduce(clause_gbasis)
                 simplified_product_equation = simplify(Eq(h, 0), assume=global_premise.assume)
                 if isinstance(simplified_product_equation, _T):
@@ -284,8 +285,6 @@ class GSimplify:
                 for rel in (Gt, Lt):
                     for atom in clause[rel]:
                         # AD: Schreib die Schleife unten
-                        # if self.in_radical(atom.lhs, clause_gbasis):
-                        #     continue
                         h = atom.lhs.reduce(clause_gbasis)
                         # [TS: if Eq(atom.lhs, 0) is in the clause, then we could simplify the
                         # weak inequality when looking for T. This happens systematically due
@@ -302,8 +301,6 @@ class GSimplify:
                 # 3. Finally process all disequalities.
                 H = set()
                 for atom in clause[Ne]:  # !*rlgsred=T
-                    # if self.in_radical(atom.lhs, global_premise.gbasis):
-                    #     continue
                     h = atom.lhs.reduce(global_premise.gbasis)
                     simplified_atom = simplify(Ne(h, 0), assume=global_premise.assume)
                     if isinstance(simplified_atom, _T):
@@ -311,7 +308,7 @@ class GSimplify:
                     if isinstance(simplified_atom, _F):
                         raise NextClause()
                     H.add(h)
-                G = Term.gbasis(H, radical=True)
+                G = Term.gbasis(H, radical=self._options.radical)
                 new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
                 new_clauses.append(new_clause)
 
