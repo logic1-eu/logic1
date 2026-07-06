@@ -231,8 +231,6 @@ class GSimplify:
             logging.debug(f'{count} clauses left')
             count -= 1
             if isinstance(atom, Eq):
-                # if self.in_radical(atom.lhs, global_premise.gbasis):
-                #     continue
                 h = atom.lhs.reduce(global_premise.gbasis)
                 simplified_equation = simplify(Eq(h, 0), assume=global_premise.assume)
                 if isinstance(simplified_equation, _T):
@@ -269,7 +267,6 @@ class GSimplify:
                     # We could not learn anything from the product and look
                     # at the single equations now.
                     for atom in clause[Eq]:
-                        # Radical membership has implicitly been tested via the product.
                         h = atom.lhs.reduce(clause_gbasis)
                         simplified_atom = simplify(Eq(h, 0), assume=global_premise.assume)
                         # It is tempting to believe that the next if cannot become true.
