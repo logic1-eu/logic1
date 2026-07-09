@@ -29,6 +29,7 @@ Variables, Terms, Atoms
     :members:
     :special-members:
 
+  .. autodata:: VV
 
 .. automodule:: logic1.theories.Complex.atomic
 

@@ -6,11 +6,15 @@
 Abstract Syntax Trees
 *********************
 
+Types
+*****
 
-.. automodule:: logic1.theories.Complex.ast
+.. automodule:: logic1.theories.Complex.types
 
   .. autodata:: α
   .. autodata:: η
+
+.. automodule:: logic1.theories.Complex.ast
 
   Base Classes
   ************
@@ -74,15 +78,6 @@ Abstract Syntax Trees
     :members:
     :special-members:
 
-  Sort Key
-  ********
-
-  .. autoclass:: SortKey
-    :members:
-    :special-members:
-    :exclude-members: __init__, __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
-
-
   Visitors
   ********
 
@@ -138,25 +133,11 @@ Normalization
     :members:
     :special-members:
 
-  .. autoclass:: AddSortKey
-    :members:
-    :special-members:
-    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__
-
-  .. autoclass:: MulSortKey
-    :members:
-    :special-members:
-    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__
-
   .. autoclass:: Normalizer
     :members:
     :special-members:
 
-  .. autoclass:: ComplexNormalizer
-    :members:
-    :special-members:
-
-  .. autoclass:: RealNormalizer
+  .. autoclass:: ConjugateNormalizer
     :members:
     :special-members:
 
@@ -166,3 +147,18 @@ Normalization
 
 SortKeys
 ********
+
+.. autoclass:: logic1.theories.Complex.ast.SortKey
+  :members:
+  :special-members:
+  :exclude-members: __init__, __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
+
+.. autoclass:: logic1.theories.Complex.normalize.AddSortKey
+  :members:
+  :special-members:
+  :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__
+
+.. autoclass:: logic1.theories.Complex.normalize.MulSortKey
+  :members:
+  :special-members:
+  :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __repr__, __weakref__

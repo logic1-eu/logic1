@@ -3,23 +3,20 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 import functools
-from typing import Callable, ClassVar, Final, Generic, Never, Self, TypeVar
+from typing import Callable, ClassVar, Final, Generic, Never, Self
 
 from gmpy2 import mpq
 
 from logic1 import firstorder
 
-from logic1.theories.Complex.types import Number, RationalNumber
+from logic1.theories.Complex.types import Number, RationalNumber, τ
 from logic1.theories.Complex import ast
 from logic1.theories.Complex.format import ReprFormatter, StrFormatter
 from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_normal_form
 
 
-α = TypeVar('α')
-τ = TypeVar('τ', bound='Term')
-
 @dataclass
-class VariableSet(firstorder.VariableSet['Variable']):
+class VariableSet(firstorder.term.VariableSet['Variable']):
 
     _names: set[str] = field(default_factory=set)
 
@@ -29,7 +26,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
 
     def __getitem__(self, index: str) -> Variable:
         """Implements the abstract method
-        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        :meth:`.firstorder.term.VariableSet.__getitem__`.
         """
         if not isinstance(index, str):
             raise ValueError(f'expecting string as index; {index} is {type(index)}')
@@ -63,14 +60,14 @@ class VariableSet(firstorder.VariableSet['Variable']):
         self._names = set()
 
 
-VV: Final = VariableSet()
+VV: Final[VariableSet] = VariableSet()
 
 
 @dataclass
 @functools.total_ordering
 class SortKey(Generic[τ]):
     """A sort key for terms. Implements the abstract class
-    :class:`.firstorder.atomic.Term.SortKey`.
+    :class:`.firstorder.term.Term.SortKey`.
     """
 
     term: τ
@@ -85,7 +82,7 @@ class SortKey(Generic[τ]):
         return self.term.normal_ast.sort_key() == other.term.normal_ast.sort_key()
 
     def __hash__(self) -> int:
-        """Return a hash value of the underlying term.
+        """Return the hash value of the underlying term.
 
         >>> z = VV['x']
         >>> hash(SortKey(z)) == hash(z)
@@ -107,7 +104,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     @property
     def normal_ast(self) -> ast.AST:
-        """Return the normal form of this term as AST.
+        """The normal form of this term as AST.
         """
         if self._current_normal_form != Term._normalizer:
             self._ast = Term._normalizer(self._ast)
@@ -128,6 +125,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         self._current_normal_form = Term._normalizer
 
     def __add__(self, other: Number | Term) -> Term:
+        """Add this term to another term or a number.
+
+        >>> z = VV['z']
+        >>> z + 2
+        z + 2
+        """
         if isinstance(other, Term):
             return Term._from_ast(self.normal_ast + other.normal_ast)
         return self + Term(other)
@@ -148,9 +151,16 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self > Term(other)
 
     def __hash__(self) -> int:
+        """Return the hash value of this term.
+        """
         return hash(self.normal_ast)
 
     def __invert__(self) -> Term:
+        """Return the complex conjugate of this term.
+
+        >>> I.conjugate()
+        -I
+        """
         return self.conjugate()
 
     def __le__(self, other: Number | Term) -> Le:
@@ -177,6 +187,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term._from_ast(-self.normal_ast)
 
     def __pow__(self, other: int) -> Term:
+        """Raise this term to a non-negative integer power.
+
+        >>> I ** 2
+        -1
+        """
         return Term._from_ast(self.normal_ast ** other)
 
     def __radd__(self, other: Number | Term) -> Term:
@@ -203,6 +218,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term(other) / self
 
     def __str__(self) -> str:
+        """Return a human-readable string representation of this term.
+
+        >>> z = VV['z']
+        >>> str(z ** 2 + I)
+        'z^2 + i'
+        """
         return self.normal_ast.accept(StrFormatter())
 
     def __sub__(self, other: Number | Term) -> Term:
@@ -221,14 +242,14 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
             "in Python, and has the wrong precedence")
 
     def as_latex(self) -> str:
-        """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.atomic.Term.as_latex`.
+        """Return a LaTeX representation as a string. Implements the abstract
+        method :meth:`.firstorder.term.Term.as_latex`.
         """
         return self.normal_ast.as_latex()
 
     def as_variable(self) -> Variable:
-        """Return this term as a variable if it is one, and raise a ValueError
-        otherwise.
+        """Return this term as a variable. Raises a :class:`ValueError`
+        if this term is not a variable.
 
         >>> x = VV['x']
         >>> x.as_variable()
@@ -244,7 +265,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         raise ValueError(f'Term {self} is not a variable')
 
     def conjugate(self) -> Term:
-        """The complex conjugate of this term.
+        """Return the complex conjugate of this term.
 
         >>> x = VV['x']
         >>> (x + 2).conjugate()
@@ -288,13 +309,13 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term(real) + Term(imag) * I
 
     def imaginary_part(self) -> Term:
-        """The imaginary part of this term.
+        """Return the imaginary part of this term.
 
         >>> (2 * I).imaginary_part()
         2
-        >>> x = VV['x']
-        >>> (x + 2).imaginary_part()
-        -1/2 * I * x + 1/2 * I * ~x
+        >>> z = VV['z']
+        >>> (z + 2).imaginary_part()
+        -1/2 * I * z + 1/2 * I * ~z
         """
         return Term._from_ast(ast.Im(self.normal_ast))
 
@@ -384,9 +405,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
         >>> (2 * I).real_part()
         0
-        >>> x = VV['x']
-        >>> x.real_part()
-        1/2 * x + 1/2 * ~x
+        >>> z = VV['z']
+        >>> z.real_part()
+        1/2 * z + 1/2 * ~z
         """
         return Term._from_ast(ast.Re(self.normal_ast))
 
@@ -404,8 +425,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return ret
 
     def sort_key(self) -> SortKey[Self]:
-        """A sort key suitable for ordering instances of this class. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        """Return a sort key suitable for ordering terms. Implements the
+        abstract method :meth:`.firstorder.term.Term.sort_key`.
+
+        >>> z = VV['z']
+        >>> z.sort_key() < (z + 1).sort_key()
+        True
         """
         return SortKey(self)
 
@@ -421,9 +446,13 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term._from_ast(self.normal_ast.subs(ast_sigma))
 
     def _summands(self) -> Iterator[tuple[Mapping[Term, int], Term]]:
-        """An iterator that yields each summand of this term
-        as a pair of a mapping from terms to their exponents, and a coefficient in
-        decreasing order of the leading term.
+        """Return an iterator that yields each summand of this term
+        as a pair of a mapping from terms to their exponents, and a coefficient
+        in decreasing order of the leading term.
+
+        >>> z = VV['z']
+        >>> list((z**2 + 2 * z + 1)._summands())
+        [({z: 2}, 1), ({z: 1}, 2), ({}, 1)]
         """
         constant = Term(0)
         products = self.normal_ast.args if isinstance(self.normal_ast, ast.Add) else [self.normal_ast]
@@ -452,8 +481,13 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         yield ({}, constant)
 
     def vars(self) -> Iterator[Variable]:
-        """An iterator that yields each variable of this term once. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.vars`.
+        """Return an iterator that yields each variable of this term once.
+        Implements the abstract method :meth:`.firstorder.term.Term.vars`.
+
+        >>> a, b, c = VV.get('a', 'b', 'c')
+        >>> vars = (a + b * c).vars()
+        >>> list(sorted(vars, key=Term.sort_key))
+        [a, b, c]
         """
         result = set()
         stack = [self.normal_ast]
@@ -471,17 +505,28 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
     @property
     def name(self) -> str:
         """The name of this variable.
+
+        >>> z = VV['z']
+        >>> z.name
+        'z'
         """
         _ast = conjugate_normal_form(self.normal_ast)
         assert isinstance(_ast, ast.Var)
         return _ast.name
 
     def __init__(self) -> None:
+        """This constructor is not meant to be called directly. Use :data:`VV`
+        to create variables.
+        """
         raise NotImplementedError("Use VV[...] to create variables")
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
-        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
+        abstract method :meth:`.firstorder.term.Variable.fresh`.
+
+        >>> z = VV['z']
+        >>> z.fresh()
+        G0001_z
         """
         return VV.fresh(suffix=f'_{str(self)}')
 

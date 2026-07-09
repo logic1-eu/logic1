@@ -2,27 +2,21 @@ from collections.abc import Iterable, Set
 from dataclasses import dataclass, field
 from typing import Optional, Self, TypeVar
 
+from gmpy2 import mpz
 import networkx as nx
 
 from logic1 import abc
 from logic1.firstorder.boolean import _F, F, _T, T, And, Or
 from logic1.theories import RCF
 
-from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.types import α, Formula, Number
 from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
 from logic1.theories.Complex.term import I, Term, Variable
 from logic1.theories.Complex.atomic import AtomicFormula, Eq
 
 
-from gmpy2 import mpz
-
-α = TypeVar('α')
-"""Type variable representing the type of nodes in the graph used for
-finding a minimum weight partial edge cover.
-"""
-
 def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: dict[tuple[α, α], float]) -> Set[tuple[α, α]]:
-    """Given a set of nodes with associated costs and a set of edges
+    """Given a set of nodes of type α with associated costs and a set of edges
     with associated weights, returns a set of edges that covers some of
     the nodes and minimizes the total cost of the uncovered nodes plus
     the total weight of the edges in the cover.
