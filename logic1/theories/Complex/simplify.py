@@ -2,27 +2,21 @@ from collections.abc import Iterable, Set
 from dataclasses import dataclass, field
 from typing import Optional, Self, TypeVar
 
+from gmpy2 import mpz
 import networkx as nx
 
 from logic1 import abc
 from logic1.firstorder.boolean import _F, F, _T, T, And, Or
 from logic1.theories import RCF
 
-from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.types import α, Formula, Number
 from logic1.theories.Complex.ast import _I, ASTVisitor, Add, Conj, Im, Mul, Neg, Pow, Rat, Re, Var
 from logic1.theories.Complex.term import I, Term, Variable
 from logic1.theories.Complex.atomic import AtomicFormula, Eq
 
 
-from gmpy2 import mpz
-
-α = TypeVar('α')
-"""Type variable representing the type of nodes in the graph used for
-finding a minimum weight partial edge cover.
-"""
-
 def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: dict[tuple[α, α], float]) -> Set[tuple[α, α]]:
-    """Given a set of nodes with associated costs and a set of edges
+    """Given a set of nodes of type α with associated costs and a set of edges
     with associated weights, returns a set of edges that covers some of
     the nodes and minimizes the total cost of the uncovered nodes plus
     the total weight of the edges in the cover.
@@ -68,15 +62,19 @@ class Options(abc.simplify.Options):
 
 
 class ComplexityVisitor(ASTVisitor[float]):
-    """Visitor that computes a measure of the complexity of a AST, used to
-    guide the simplification process. The complexity is defined as 1 plus the
-    sum of the complexities of the children, with
-    some adjustments for certain operations.
+    """Visitor that computes a measure of the complexity of a :class:`.ast.AST`,
+    used to guide the simplification process. The complexity is defined as
+    :code:`1` plus the sum of the complexities of the children.
     """
 
     def visit_rat(self, num: Rat) -> float:
-        """Returns the complexity of a rational number. Implements the
+        """Return the complexity of a rational number. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_rat`.
+
+        >>> ComplexityVisitor().visit_rat(Rat(2))
+        1.0
+        >>> ComplexityVisitor().visit_rat(Rat(0.5))
+        2.0
         """
         if num.value.denominator == mpz(1):
             return 1.0
@@ -84,56 +82,91 @@ class ComplexityVisitor(ASTVisitor[float]):
             return 2.0
 
     def visit_i(self, _: _I) -> float:
-        """Returns the complexity of the imaginary unit. Implements the
+        """Return the complexity of the imaginary unit. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_i`.
+
+        >>> ComplexityVisitor().visit_i(I)
+        1.0
         """
         return 1.0
 
     def visit_var(self, var: Var) -> float:
-        """Returns the complexity of a variable. Implements the
+        """Return the complexity of a variable. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_var`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_var(z)
+        1.0
         """
         return 1.0
 
     def visit_add(self, add: Add) -> float:
-        """Returns the complexity of an addition. Implements the
+        """Return the complexity of an addition. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_add`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_add(z + 2)
+        3.0
         """
         return 1.0 + sum((arg.arg if isinstance(arg, Neg) else arg).accept(self) for arg in add.args)
 
     def visit_mul(self, mul: Mul) -> float:
-        """Returns the complexity of a multiplication. Implements
+        """Return the complexity of a multiplication. Implements
         the abstract method :meth:`.Complex.ASTVisitor.visit_mul`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_mul(z * 2)
+        3.0
         """
         return 1.0 + sum(arg.accept(self) for arg in mul.args)
 
     def visit_pow(self, pow: Pow) -> float:
-        """Returns the complexity of a power. Implements the
+        """Return the complexity of a power. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_pow`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_pow(z ** 5)
+        2.0
         """
         return 1.0 + pow.base.accept(self)
 
     def visit_neg(self, neg: Neg) -> float:
-        """Returns the complexity of a negation. Implements the
+        """Return the complexity of a negation. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_neg`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_neg(-z)
+        2.0
         """
         return 1.0 + neg.arg.accept(self)
 
     def visit_conj(self, conj: Conj) -> float:
-        """Returns the complexity of a conjugation. Implements the
+        """Return the complexity of a conjugation. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_conj`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_conj(~z)
+        2.0
         """
         return 1.0 + conj.arg.accept(self)
 
     def visit_re(self, re: Re) -> float:
-        """Returns the complexity of a real part. Implements the
+        """Return the complexity of a real part. Implements the
         abstract method :meth:`.Complex.ASTVisitor.visit_re`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_re(Re(z))
+        2.0
         """
         return 1.0 + re.arg.accept(self)
 
     def visit_im(self, im: Im) -> float:
-        """Returns the complexity of an imaginary part. Implements
+        """Return the complexity of an imaginary part. Implements
         the abstract method :meth:`.Complex.ASTVisitor.visit_im`.
+
+        >>> z = Var('z')
+        >>> ComplexityVisitor().visit_im(Im(z))
+        2.0
         """
         return 1.0 + im.arg.accept(self)
 
@@ -170,7 +203,7 @@ class InternalRepresentation(
 
     @staticmethod
     def _complexity(atom: AtomicFormula) -> float:
-        """Returns a measure of the complexity of the given atomic
+        """Return a measure of the complexity of the given atomic
         formula, used to guide the simplification process.
         """
         visitor = ComplexityVisitor()
@@ -294,7 +327,7 @@ class Simplify(abc.simplify.Simplify[
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
-    """Returns a simplified formula that is equivalent to the given
+    """Return a simplified formula that is equivalent to the given
     formula f, using the given assumptions and options.
     """
     rcf_assume = assume_to_rcf(assume)
