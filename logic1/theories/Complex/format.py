@@ -1,7 +1,5 @@
 from typing import ClassVar
 
-from typing import ClassVar
-
 from gmpy2 import mpz
 
 from logic1.theories.Complex.ast import (
