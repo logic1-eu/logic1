@@ -42,10 +42,10 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 def _caches():
-    from logic1.theories.RCF.node.xopt import Node as XoNode
+    from logic1.theories.RCF.node.xopt import Node
     from logic1.theories.RCF.simplify import Simplify
     from logic1.theories.RCF.substitution import _SubstValue
-    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at, XoNode.subs_into_formula]
+    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at, Node.subs_into_formula]
 
 def cache_clear():
     for cache in _caches():
