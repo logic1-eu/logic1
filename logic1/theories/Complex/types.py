@@ -5,7 +5,6 @@ from gmpy2 import mpq
 
 from logic1 import firstorder
 
-
 RationalNumber: TypeAlias = int | float | Fraction | mpq
 """Type alias for rational number types.
 """

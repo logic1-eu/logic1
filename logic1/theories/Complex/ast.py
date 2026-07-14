@@ -631,6 +631,9 @@ class MonoidalOperation(AST):
     @property
     def args(self) -> tuple[AST, ...]:
         """The arguments of this AST node.
+
+        >>> Add(Rat(1), Rat(2)).args
+        (Rat(mpq(1,1)), Rat(mpq(2,1)))
         """
         return self._args
 
@@ -653,6 +656,12 @@ class MonoidalOperation(AST):
         """Create a new instance of this monoidal operation with the
         given arguments. If no arguments are given, return the identity
         element. If only one argument is given, return that argument.
+
+        >>> x = Var('x')
+        >>> Add(x)
+        Var('x')
+        >>> Add()
+        Rat(mpq(0,1))
         """
         if not args:
             return cls.identity

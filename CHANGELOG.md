@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-06-23
+## [Unreleased] - 2026-06-30
 
 ### Added
 
@@ -72,7 +72,7 @@ cached hashes of Terms from being sent to processes with a different hash seed i
 
 - Refactor class `qe.Node` into new additional module `node`, changing the return type of method `process` in class `Node` from `list` to `Sequence`. Add sublasses `node.vs.Node` and `node.xopt.Node` with corresponding helper classes.
 
-- Move and rename subclasses `qe.CLUSTERING`, `qe.GENERIC` to `node.vs._Clustering`, `node.vs._Generic`, respectively.
+- Move and rename subclasses `qe.CLUSTERING`, `qe.GENERIC` to `node.base.Clustering`, `node.base.Generic`, respectively.
 
 - Add `@lru_cache` to methods `constant_coefficient`, `content`, `lc`, `normalize` in class `term.term_sage.Term`. Caching for `lc` required adapting implementation details of `Term.__eq__`.
 
