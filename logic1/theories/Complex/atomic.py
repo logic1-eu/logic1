@@ -119,15 +119,28 @@ class AtomicFormula(
         ORDER = [Eq, Ne, Le, Lt, Ge, Gt]
         return ORDER.index(self.op) <= ORDER.index(other.op)
 
-    def __repr__(self) -> str:   # TODO: use ==?
-        """Return a string representation of this atomic formula.
+    def __repr__(self) -> str:
+        """Return a string representation of this atomic formula that is
+        valid Python code and can be evaluated to reconstruct the original
+        atomic formula. Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.__repr__`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> repr(z == 0)
+        'z == 0'
         """
-        symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
+        symbols = {Eq: '==', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
         return f'{repr(self.lhs)} {symbols[self.op]} {repr(self.rhs)}'
 
     def __str__(self) -> str:
         """Return a string representation of this atomic formula. Implements the
         abstract method :meth:`.firstorder.atomic.AtomicFormula.__str__`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> str(z == 0)
+        'z = 0'
         """
         symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
         return f'{str(self.lhs)} {symbols[self.op]} {str(self.rhs)}'
@@ -135,6 +148,11 @@ class AtomicFormula(
     def as_latex(self) -> str:
         """Return a LaTeX representation of this atomic formula. Implements the
         abstract method :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z * ~z >= 0).as_latex()
+        'z \\\\overline{z} \\\\geq 0'
         """
         symbols = {
             Eq: '=', Ne: '\\neq', Le: '\\leq', Lt: '<', Ge: '\\geq', Gt: '>'
@@ -257,7 +275,7 @@ class AtomicFormula(
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> (z == 0).real_normal_form()
-        And(1/2 * z + 1/2 * ~z = 0, -1/2 * I * z + 1/2 * I * ~z = 0)
+        And(1/2 * z + 1/2 * ~z == 0, -1/2 * I * z + 1/2 * I * ~z == 0)
         >>> (z != 0).real_normal_form()
         Or(1/2 * z + 1/2 * ~z != 0, -1/2 * I * z + 1/2 * I * ~z != 0)
         """
@@ -286,7 +304,7 @@ class AtomicFormula(
         >>> (z * ~z == Re(z)**2 + Im(z)**2).simplify()
         T
         >>> (Re(z) == 0).simplify()
-        z + ~z = 0
+        z + ~z == 0
         >>> (-Re(z) > z * ~z).simplify()
         z * ~z + 1/2 * z + 1/2 * ~z < 0
         """
@@ -322,10 +340,9 @@ class AtomicFormula(
         >>> from logic1.theories.Complex import *
         >>> a, b = VV.get('a', 'b')
         >>> (a + b == 0).subs({a: 1, b: a})
-        a + 1 = 0
+        a + 1 == 0
         """
         return self.op(self.lhs.subs(sigma), self.rhs.subs(sigma))
-
 
 
 class Eq(AtomicFormula):
@@ -334,7 +351,7 @@ class Eq(AtomicFormula):
     >>> from logic1.theories.Complex import *
     >>> z = VV['z']
     >>> z == 0
-    z = 0
+    z == 0
     """
 
     def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
@@ -343,7 +360,7 @@ class Eq(AtomicFormula):
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> Eq(z, 0)
-        z = 0
+        z == 0
         """
         super().__init__(lhs, rhs)
 

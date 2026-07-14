@@ -20,6 +20,7 @@ Variables, Terms, Atoms
   .. autoclass:: Term
     :members:
     :special-members:
+    :exclude-members: __radd__, __rsub__, __rmul__, __rtruediv__
 
   .. autoclass:: Variable
     :members:
@@ -30,6 +31,12 @@ Variables, Terms, Atoms
     :special-members:
 
   .. autodata:: VV
+
+  .. autofunction:: Re
+
+  .. autofunction:: Im
+
+  .. autofunction:: Conj
 
 .. automodule:: logic1.theories.Complex.atomic
 
@@ -44,29 +51,29 @@ Variables, Terms, Atoms
   .. autoclass:: Eq
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
 
   .. autoclass:: Ne
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
 
   .. autoclass:: Le
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
 
   .. autoclass:: Ge
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
 
   .. autoclass:: Lt
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
 
   .. autoclass:: Gt
     :members:
     :special-members:
-    :exclude-members: __init__
+    :exclude-members:
