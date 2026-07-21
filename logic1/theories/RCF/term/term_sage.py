@@ -34,8 +34,7 @@ POLYLIB: Final = "SAGE"
 
 
 τ = TypeVar('τ', bound='Term')
-"""A type variable denoting a type of terms with upper bound
-:class:`logic1.theories.RCF.Term`.
+"""A type variable denoting a type of terms with upper bound :class:`Term`.
 """
 
 CACHE_SIZE: Final[Optional[int]] = 2**16
@@ -134,9 +133,9 @@ class VariableSet(firstorder.VariableSet['Variable']):
     .. seealso::
         Final methods inherited from parent class:
 
-        * :meth:`.firstorder.atomic.VariableSet.get`
+        * :meth:`.firstorder.term.VariableSet.get`
             -- obtain several variables simultaneously
-        * :meth:`.firstorder.atomic.VariableSet.imp`
+        * :meth:`.firstorder.term.VariableSet.imp`
             -- import variables into global namespace
     """
 
@@ -145,13 +144,13 @@ class VariableSet(firstorder.VariableSet['Variable']):
     @property
     def stack(self) -> list[MPolynomialRing]:
         """Implements abstract property
-        :attr:`.firstorder.atomic.VariableSet.stack`.
+        :attr:`.firstorder.term.VariableSet.stack`.
         """
         return self.polynomial_ring.stack
 
     def __getitem__(self, index: str) -> Variable:
         """Implements abstract method
-        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        :meth:`.firstorder.term.VariableSet.__getitem__`.
         """
         match index:
             case str():
@@ -303,10 +302,12 @@ class DEFINITE(Enum):
         NEGATIVE_SEMI + NEGATIVE_SEMI = NEGATIVE_SEMI
 
         This addition is commutative:
+
         >>> all(DEFINITE.add(x, y) is DEFINITE.add(y, x) for x in l for y in l)
         True
 
-        DEFINITE.zero is a (unique) neutral element:
+        :attr:`DEFINITE.ZERO` is a (unique) neutral element:
+
         >>> all(DEFINITE.add(x, DEFINITE.ZERO) is x for x in l)
         True
         """
@@ -334,7 +335,7 @@ class DEFINITE(Enum):
 
     @staticmethod
     def from_constant(q: int | mpq | Rational) -> DEFINITE:
-        """Compute DEFINITE of a number.
+        """Compute :class:`DEFINITE` of a number.
 
         >>> print(DEFINITE.from_constant(mpq(42)))
         DEFINITE.POSITIVE
@@ -355,11 +356,12 @@ class DEFINITE(Enum):
 
     @staticmethod
     def mul(x: DEFINITE, y: DEFINITE) -> DEFINITE:
-        """Compute DEFINITE of a product from DEFINITE of the factors.
+        """Compute :class:`DEFINITE` of a product from :class:`DEFINITE` of the factors.
 
         >>> l = list(DEFINITE)
 
         The multiplication table:
+
         >>> for x in l:
         ...     for y in l:
         ...             print(f'{x.name} * {y.name} = {DEFINITE.mul(x,y).name}')
@@ -402,10 +404,12 @@ class DEFINITE(Enum):
         NEGATIVE_SEMI * NEGATIVE_SEMI = POSITIVE_SEMI
 
         This multiplication is commutative:
+
         >>> all(DEFINITE.mul(x, y) is DEFINITE.mul(y, x) for x in l for y in l)
         True
 
-        DEFINITE.POSITIVE is a (unique) neutral element:
+        :attr:`DEFINITE.POSITIVE` is a (unique) neutral element:
+
         >>> all(DEFINITE.mul(x, DEFINITE.POSITIVE) is x for x in l)
         True
         """
@@ -434,6 +438,8 @@ class DEFINITE(Enum):
 
     @staticmethod
     def square(x: DEFINITE) -> DEFINITE:
+        """Compute :class:`DEFINITE` of a square.
+        """
         if x is DEFINITE.UNKNOWN:
             return DEFINITE.POSITIVE_SEMI
         return DEFINITE.mul(x, x)
@@ -441,6 +447,13 @@ class DEFINITE(Enum):
 
 @dataclass
 class SortKey(Generic[τ]):
+    """
+    Sort key for comparing terms.
+
+    >>> x = VV['x']
+    >>> SortKey(x) < SortKey(x + 1)
+    True
+    """
 
     term: τ
 
@@ -649,7 +662,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.atomic.Term.as_latex`.
+        :meth:`.firstorder.term.Term.as_latex`.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y = VV.get('x', 'y')
@@ -750,20 +763,18 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
-        """A polynomial factorization of this term.
-
-        :returns: A pair `(unit, D)`, where `unit` is a rational number, the
-          keys of `D` are irreducible factors, and the corresponding values are
-          their multiplicities. All irreducible factors are monic. Note that
-          the return value is uniquely determined by this specification.
+        """A polynomial factorization of this term. Returns a pair `(unit, D)`,
+        where `unit` is a rational number, the keys of `D` are irreducible
+        factors, and the corresponding values are their multiplicities. All
+        irreducible factors are monic. Note that the return value is uniquely
+        determined by this specification.
 
         >>> x, y = VV.get('x', 'y')
         >>> t = -x**2 + y**2
         >>> t.factor() == (mpq(-1,1), {x - y: 1, x + y: 1})
         True
 
-        It is noteworthy that Sage factorization over QQ does not always yield
-        monic factors.
+        It is noteworthy that Sage factorization over :external:mod:`QQ <sage.rings.rational_field>` does not always yield monic factors.
 
         >>> a, b = VV.get('a', 'b')
         >>> t = 2*a**2 + 4*a*b + 2*b**2 - 1
@@ -997,7 +1008,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        the abstract method :meth:`.firstorder.term.Term.sort_key`.
         """
         return SortKey(self)
 
@@ -1056,7 +1067,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.vars`.
+        the abstract method :meth:`.firstorder.term.Term.vars`.
 
         .. seealso::
             :external:meth:`MPolynomial_libsingular.variables()
@@ -1072,6 +1083,6 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
-        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
+        abstract method :meth:`.firstorder.term.Variable.fresh`.
         """
         return self.VV.fresh(suffix=f'_{str(self)}')

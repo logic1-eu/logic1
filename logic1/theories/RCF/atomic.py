@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Final, Iterator, Mapping, Self
 
 from gmpy2 import mpq
 
-from logic1 import firstorder
+import logic1
 from logic1.firstorder import _T, _F
 from logic1.support.excepthook import NoTraceException
 
@@ -12,7 +12,10 @@ if TYPE_CHECKING:
     from logic1.theories.RCF.types import Formula
 
 
-class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Term', 'Variable', int]):
+class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.AtomicFormula',
+                                                    'logic1.theories.RCF.term.Term',
+                                                    'logic1.theories.RCF.term.Variable',
+                                                    int]):
 
     @property
     def lhs(self) -> Term:

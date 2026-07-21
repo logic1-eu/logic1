@@ -28,8 +28,8 @@ class VariableSet(ABC, Generic[χ]):
 
     .. seealso::
       Derived classes in various theories and their unique instances:
-      :class:`.RCF.atomic.VariableSet`, :data:`.RCF.atomic.VV` for Real Closed
-      Fields and :class:`.Sets.atomic.VariableSet`, :data:`.Sets.atomic.VV`
+      :class:`.RCF.term.VariableSet`, :data:`.RCF.term.VV` for Real Closed
+      Fields and :class:`.Sets.term.VariableSet`, :data:`.Sets.term.VV`
       for Sets.
     """
 

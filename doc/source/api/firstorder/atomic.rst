@@ -6,52 +6,14 @@
 Variables, Terms, Atoms
 ***********************
 
-.. automodule:: logic1.firstorder.atomic
-
-  Generic Types
-  *************
-
-  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`, and
-  :data:`.atomic.χ` with the same names and definitions as in module
-  :mod:`.formula`.
-
-  .. data:: α
-    :value: TypeVar('α', bound='AtomicFormula')
-    :canonical: logic1.firstorder.atomic.α
-
-    A type variable denoting a type of atomic formulas with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
-
-  .. data:: τ
-    :value: TypeVar('τ', bound='Term')
-    :canonical: logic1.firstorder.atomic.τ
-
-    A type variable denoting a type of terms with upper bound
-    :class:`logic1.firstorder.atomic.Term`.
-
-  .. data:: χ
-    :value: TypeVar('χ', bound='Variable')
-    :canonical: logic1.firstorder.atomic.χ
-
-    A type variable denoting a type of variables with upper bound
-    :class:`logic1.firstorder.atomic.Variable`.
-
-  .. data:: σ
-    :value: TypeVar('σ')
-    :canonical: logic1.firstorder.atomic.σ
-
-    A type variable denoting a type that is admissible in addition to terms as a
-    dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
-    :data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
-    any variables. A typical example is setting :data:`σ` to :class:`int` in the
-    theory of real closed fields.
-
+.. automodule:: logic1.firstorder.term
 
   Set of Variables
   ********************
 
   .. autoclass:: VariableSet
     :special-members:
+    :exclude-members: __init__, __new__
 
     .. automethod:: __getitem__
 
@@ -77,7 +39,7 @@ Variables, Terms, Atoms
         <.firstorder.atomic.VariableSet.fresh>` within asychronous doctests in a
         reproducable way. In the following example,
         :meth:`.Formula.to_pnf` indirectly uses
-        :meth:`.RCF.atomic.VariableSet.fresh`:
+        :meth:`.RCF.term.VariableSet.fresh`:
 
         >>> from logic1.firstorder import *
         >>> from logic1.theories.RCF import *
@@ -117,6 +79,9 @@ Variables, Terms, Atoms
     :members:
     :undoc-members:
 
+
+.. automodule:: logic1.firstorder.atomic
+
   Atomic Formulas
   ***************
 
@@ -125,3 +90,43 @@ Variables, Terms, Atoms
     :undoc-members:
     :exclude-members: atoms
     :special-members: __le__, __str__
+
+
+  Generic Types
+  *************
+
+  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`, and
+  :data:`.atomic.χ` with the same names and definitions as in module
+  :mod:`.formula`.
+
+  .. data:: α
+    :value: TypeVar('α', bound='AtomicFormula')
+    :canonical: logic1.firstorder.atomic.α
+
+    A type variable denoting a type of atomic formulas with upper bound
+    :class:`logic1.firstorder.atomic.AtomicFormula`.
+
+  .. data:: τ
+    :value: TypeVar('τ', bound='Term')
+    :canonical: logic1.firstorder.atomic.τ
+
+    A type variable denoting a type of terms with upper bound
+    :class:`logic1.firstorder.term.Term`.
+
+  .. data:: χ
+    :value: TypeVar('χ', bound='Variable')
+    :canonical: logic1.firstorder.atomic.χ
+
+    A type variable denoting a type of variables with upper bound
+    :class:`logic1.firstorder.term.Variable`.
+
+  .. data:: σ
+    :value: TypeVar('σ')
+    :canonical: logic1.firstorder.atomic.σ
+
+    A type variable denoting a type that is admissible in addition to terms as a
+    dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
+    :data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
+    any variables. A typical example is setting :data:`σ` to :class:`int` in the
+    theory of real closed fields.
+
