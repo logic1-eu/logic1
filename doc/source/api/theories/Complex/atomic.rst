@@ -6,12 +6,8 @@
 Variables, Terms, Atoms
 ***********************
 
-
-.. automodule:: logic1.theories.Complex.types
-
-  .. autodata:: RationalNumber
-  .. autodata:: Number
-  .. autodata:: Formula
+Terms and Variables
+*******************
 
 .. automodule:: logic1.theories.Complex.term
 
@@ -20,7 +16,7 @@ Variables, Terms, Atoms
   .. autoclass:: Term
     :members:
     :special-members:
-    :exclude-members: __radd__, __rsub__, __rmul__, __rtruediv__
+    :exclude-members: __hash__, __radd__, __rsub__, __rmul__, __rtruediv__
 
   .. autoclass:: Variable
     :members:
@@ -37,6 +33,11 @@ Variables, Terms, Atoms
   .. autofunction:: Im
 
   .. autofunction:: Conj
+
+  .. autodata:: I
+
+Atomic Formulas
+***************
 
 .. automodule:: logic1.theories.Complex.atomic
 

@@ -7,3 +7,5 @@ Simplification
 **************
 
 .. automodule:: logic1.theories.Complex.simplify
+
+    .. autofunction:: simplify

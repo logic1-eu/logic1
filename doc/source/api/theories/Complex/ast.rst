@@ -9,11 +9,6 @@ Abstract Syntax Trees
 Types
 *****
 
-.. automodule:: logic1.theories.Complex.types
-
-  .. autodata:: α
-  .. autodata:: η
-
 .. automodule:: logic1.theories.Complex.ast
 
   Base Classes
@@ -22,7 +17,7 @@ Types
   .. autoclass:: AST
     :members:
     :special-members:
-    :exclude-members: __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
+    :exclude-members: __radd__, __rsub__, __rmul__, __rtruediv__, __lt__, __gt__, __ge__, __ne__, __hash__, __weakref__
 
   .. autoclass:: MonoidalOperation
     :members:

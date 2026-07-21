@@ -7,3 +7,5 @@ Quantifier Elimination
 **********************
 
 .. automodule:: logic1.theories.Complex.qe
+
+    .. autofunction:: qe
