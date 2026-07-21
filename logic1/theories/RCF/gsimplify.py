@@ -225,8 +225,8 @@ class GSimplify:
         count = len(clauses)
         new_clauses = []
 
-        # Pass 1: Identify equational clauses and add them to the global premise,
-        # unless already entailed.
+        # Pass 1: Identify atomic and equational clauses and add them to the
+        # global premise, unless already entailed.
         logging.info(f'processing equational clauses ({count} clauses left)')
         global_premise = GlobalPremise(assume, self._options)
         for clause in clauses:
@@ -245,22 +245,17 @@ class GSimplify:
             global_premise.add(atom)
             new_clauses.append(clause)
 
-        # Pass 2: Simplify the other clauses
+        # Pass 2: Simplify the other clauses modulo global premise.
         logging.info(f'processing non-equational clauses ({count} clauses left)')
         for clause in clauses:
             if clause.as_atom() is not None:
                 continue
             logging.debug(f'{count} clauses left')
             count -= 1
-            # We decide against filtering out disequalities via a
-            # radical membership test at this point. The idea is that
-            # adding their left hand sides to the ideal brings it closer
-            # to the radical, which is good for our purposes.
-            clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=self._options.radical)
 
             new_clause = Clause()
 
-            # 1. Build the left hand side atoms of the new clause:
+            # 1. Build the atoms of /\ Eq for the new clause /\ Eq -> \/ (Gt, Lt, Eq)
             H = set()
             for atom in clause[Ne]:  # !*rlgsred=T
                 h = atom.lhs.reduce(global_premise.gbasis)
@@ -268,46 +263,56 @@ class GSimplify:
             G = Term.gbasis(H, radical=self._options.radical)
             new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
 
-            # 2. Determine the relevant right hand side relations of the clause.
-            # Eq may be dropped via a test on the product of left hand sides of Eq taken from
-            # clause and Ne, Gt, Lt taken from the global premise. Recall that weak inequalities
-            # are split and do not occur explicitly.
+            # 2. For the simplification of \/ (Gt, Lt, Eq) we use a Gröbner basis of /\ Eq together
+            # with the equations of `global_premise`.
+            clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=self._options.radical)
+
+            # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain left
+            # hand sides of the global premise. We might discover T or redundancy of \/ Eq.
             product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
-            product = product.reduce(global_premise.gbasis)
-            test = simplify(Eq(product, 0), assume=global_premise.assume)
-            if isinstance(test, _T):
+            product = product.reduce(clause_gbasis)
+            test_formula = simplify(Eq(product, 0), assume=global_premise.assume)
+            if isinstance(test_formula, _T):
                 continue
-            elif isinstance(test, _F):
+            # Recall that weak inequalities have been split and do not occur explicitly.
+            elif isinstance(test_formula, _F):
                 rhs_rels = [Gt, Lt]
             else:
-                rhs_rels = [Eq, Gt, Lt]
+                rhs_rels = [Gt, Lt, Eq]
 
-            # 3. Build the right hand side atoms of the new clause.
+            # 2.2. Simplify \/ (Gt, Lt) or \/ (Gt, Lt, Eq), depending on the previous if
             for rel in rhs_rels:
                 for atom in clause[rel]:
                     h = atom.lhs.reduce(clause_gbasis)
                     new_clause[rel].add(rel(h, 0))  # !*rlgsred=T
 
-            # Starting with `new clause`, we compute a `test_clause`. If
-            # `test_clause` is recoginizably equivalent to T, then `new_clause`
-            # is redundant modulo `global_premise.assume` and thus dropped.
+            # This concludes the computation of `new_clause`
+
+            # 3. We next compute a `test_clause` of the form with the following idea:
+            # `test_clause` combines `new_clause` with redundant information from `global_premise`.
+            # If `test_clause` is eventually recoginized to be true, then `new_clause` is redundant
+            # modulo `global_premise` and can be dropped.
+
+            # Start with `new_clause` of the form /\ Eq -> \/ (Gt, Lt, Eq)
             test_clause = new_clause.copy()
 
-            # Patch the disequalities
+            # Instead of /\ Eq use the Gröbner basis computed above, combining /\ Eq with the
+            # equations of `global_premise`
             test_clause[Ne] = set()
             for f in clause_gbasis:
                 test_clause.add(Ne(f, 0))
 
-            # Add `product == 0`
+            # Add to \/ Eq the atom `product == 0`
             test_clause.add(Eq(product, 0))
 
-            # Add further redundant information from `global_premise`
+            # Add to \/ (Gt, Lt, Eq) information from disequalities and inequalities in
+            # `global_premise` modulo `clause_gbasis`
             for rel in (Ne, Ge, Gt, Le, Lt):
                 for f in global_premise.term_list_of(rel):
                     h = f.reduce(clause_gbasis)
                     test_clause.add(rel.complement()(h, 0))
 
-            # Test `test_clause`
+            # Finally test `test_clause`, where `assume` is not required
             test_formula = simplify(test_clause.to_formula())
             assert test_formula is not _F
             if isinstance(test_formula, _T):
