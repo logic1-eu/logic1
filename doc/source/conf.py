@@ -43,6 +43,7 @@ intersphinx_mapping = {
     'sympy': ('https://docs.sympy.org/latest', None),
     'python': ('https://docs.python.org/3', None),
     'sage': ('https://doc.sagemath.org/html/en/reference/', None),
+    'sage-rings-standard': ('https://doc.sagemath.org/html/en/reference/rings_standard/', None),
     'sage-polynomial-rings': ('https://doc.sagemath.org/html/en/reference/polynomial_rings/', None),
     'gmpy2': ('https://gmpy2.readthedocs.io/en/latest/', None),
 }

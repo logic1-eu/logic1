@@ -774,7 +774,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> t.factor() == (mpq(-1,1), {x - y: 1, x + y: 1})
         True
 
-        It is noteworthy that Sage factorization over :external:mod:`QQ <sage.rings.rational_field>` does not always yield monic factors.
+        It is noteworthy that Sage factorization over :external:class:`QQ <sage.rings.rational_field.RationalField>` does not always yield monic factors.
 
         >>> a, b = VV.get('a', 'b')
         >>> t = 2*a**2 + 4*a*b + 2*b**2 - 1
