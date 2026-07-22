@@ -3,7 +3,7 @@ from typing import Final, TypeAlias, TypeVar
 
 from gmpy2 import mpq
 
-from logic1 import firstorder
+import logic1
 
 
 RationalNumber: TypeAlias = int | float | Fraction | mpq
@@ -22,7 +22,11 @@ _NUMBER_TYPES: Final = _RATIONAL_NUMBER_TYPES + (complex,)
 """Tuple of all complex number types used for instance checking.
 """
 
-Formula: TypeAlias = firstorder.Formula['AtomicFormula', 'Term', 'Variable', Number]
+Formula: TypeAlias = logic1.firstorder.Formula[
+    'logic1.theories.Complex.atomic.AtomicFormula',
+    'logic1.theories.Complex.term.Term',
+    'logic1.theories.Complex.term.Variable',
+    Number]
 """
 Type alias for formulas in the theory of complex numbers.
 """
@@ -43,5 +47,4 @@ Type variable for terms used to parameterize :class:`.term.SortKey`.
 
 
 from logic1.theories.Complex.ast import AST
-from logic1.theories.Complex.term import Term, Variable
-from logic1.theories.Complex.atomic import AtomicFormula
+from logic1.theories.Complex.term import Term

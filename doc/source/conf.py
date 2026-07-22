@@ -96,3 +96,5 @@ html_theme_options = {
 }
 
 html_title = 'Logic1'
+
+nitpicky = False  # generate warnings for all broken references

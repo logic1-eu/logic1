@@ -95,10 +95,6 @@ Printing
 
 .. automodule:: logic1.theories.Complex.format
 
-  .. autoclass:: BaseFormatter
-    :members:
-    :special-members:
-
   .. autoclass:: ReprFormatter
     :members:
     :special-members:

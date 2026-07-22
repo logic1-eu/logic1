@@ -164,8 +164,9 @@ class Term(ABC, Generic[τ, χ, σ, κ]):
         .. note::
           We reserve Python's rich comparisons :external:obj:`__lt__
           <operator.__lt__>`, :external:obj:`__le__ <operator.__le__>` etc. as
-          constructors for instances of subclasses of :class:`.AtomicFormula`.
-          For example, :obj:`.RCF.atomic.Term.__lt__` constructs an inequality
+          constructors for instances of subclasses of
+          :class:`.firstorder.atomic.AtomicFormula`.
+          For example, :meth:`.RCF.term.Term.__lt__` constructs an inequality.
 
           >>> from logic1.theories.RCF import *
           >>> a, b = VV.get('a', 'b')

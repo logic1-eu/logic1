@@ -11,8 +11,6 @@ Terms and Variables
 
 .. automodule:: logic1.theories.Complex.term
 
-  .. autodata:: κ
-
   .. autoclass:: Term
     :members:
     :special-members:

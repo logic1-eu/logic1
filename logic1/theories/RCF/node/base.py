@@ -59,7 +59,7 @@ class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
 class Clustering(Enum):
     """Clustering strategies available.
 
-    Required by :class:`.qe.Options`.
+    Required by :class:`.RCF.qe.Options`.
     """
     NONE = auto()
     """No clustering at all
@@ -78,7 +78,7 @@ class Generic(Enum):
     """Available degrees of genericity. For details on generic quantifier
     elimination see
 
-    Required by :class:`.qe.Options`.
+    Required by :class:`.RCF.qe.Options`.
     """
     NONE = auto()
     """Regular quantifier elimination, not making any assumptions.

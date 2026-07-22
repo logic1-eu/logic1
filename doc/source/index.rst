@@ -52,7 +52,7 @@ Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b^2 <= 
 
 Consider the infinite real sequence defined by :math:`x_{i+2} = |x_{i+1}| -
 x_{i}`. Logic1 can check that this sequence has period 9 for all possible
-choices of :math:`x_1`, :math:`x_2`. The final output :data:`T` is a constant
+choices of :math:`x_1`, :math:`x_2`. The final output :code:`T` is a constant
 logical operator representing "True":
 
 >>> from logic1 import *

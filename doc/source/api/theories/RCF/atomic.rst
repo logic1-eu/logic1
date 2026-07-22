@@ -59,12 +59,12 @@ Variables, Terms, Atoms
       Arithmetic operations on Terms are available as overloaded operators.
 
     .. method:: ==, >=, >, <=, <, !=
-                __eq__(other: Term | int) -> Eq
-                __ge__(other: Term | int) -> Ge | Le
-                __gt__(other: Term | int) -> Gt | Lt
-                __le__(other: Term | int) -> Ge | Le
-                __lt__(other: Term | int) -> Gt | Lt
-                __ne__(other: Term | int) -> Ne
+                __eq__(other: Term | int) -> logic1.theories.RCF.atomic.Eq
+                __ge__(other: Term | int) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
+                __gt__(other: Term | int) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
+                __le__(other: Term | int) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
+                __lt__(other: Term | int) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
+                __ne__(other: Term | int) -> logic1.theories.RCF.atomic.Ne
 
       Construction of instances of :class:`Eq <.RCF.atomic.Eq>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Gt <.RCF.atomic.Gt>`, :class:`Le <.RCF.atomic.Le>`, :class:`Lt <.RCF.atomic.Lt>`, :class:`Ne <.RCF.atomic.Ne>` is available via overloaded operators.
 
@@ -122,7 +122,7 @@ Variables, Terms, Atoms
 
     .. property:: lhs
                   rhs
-      :type: Term
+      :type: logic1.theories.RCF.term.Term
 
       The left hand side term and the right hand side term of an atomic formula.
 
