@@ -40,12 +40,14 @@ autodoc_type_aliases = {}
 # _extra_footer = ''
 
 intersphinx_mapping = {
-    'sympy': ('https://docs.sympy.org/latest', None),
+    'gmpy2': ('https://gmpy2.readthedocs.io/en/latest/', None),
     'python': ('https://docs.python.org/3', None),
     'sage': ('https://doc.sagemath.org/html/en/reference/', None),
-    'sage-rings-standard': ('https://doc.sagemath.org/html/en/reference/rings_standard/', None),
     'sage-polynomial-rings': ('https://doc.sagemath.org/html/en/reference/polynomial_rings/', None),
-    'gmpy2': ('https://gmpy2.readthedocs.io/en/latest/', None),
+    'sage-rings-standard': ('https://doc.sagemath.org/html/en/reference/rings_standard/', None),
+    # Further Sage intersphinx inventories can be derived from the subdirectory
+    # names of the Sage documentation at https://doc.sagemath.org/html/en/reference/
+    'sympy': ('https://docs.sympy.org/latest', None),
 }
 
 language = 'en'
