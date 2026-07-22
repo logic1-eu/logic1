@@ -779,7 +779,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         yield from result
 
 
-class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
+class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']]):
     """Variable in the theory of complex numbers. Implements the abstract class
     :class:`.firstorder.term.Variable`. Variables are created using the global
     variable set :data:`VV`.
