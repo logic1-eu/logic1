@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import logging
 from math import prod
-from typing import cast, Final, Iterable, Optional, Self
+from typing import cast, final, Iterable, Optional
 
 from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.theories.RCF import redlog
@@ -12,10 +12,6 @@ from logic1.theories.RCF.term import Term, VV
 from logic1.theories.RCF.types import Formula
 
 
-class NextClause(Exception):
-    pass
-
-
 @dataclass(frozen=True)
 class Options:
     use_redlog_cnf: bool = True
@@ -23,7 +19,7 @@ class Options:
     bnfsm: bool = True
     radical: bool = True
 
-
+@final
 @dataclass(init=False)
 class Clause:
 
@@ -42,7 +38,7 @@ class Clause:
             args = ()
         for arg in args:
             assert isinstance(arg, AtomicFormula)
-            self._add(arg)
+            self.add(arg)
 
     def __len__(self) -> int:
         return sum(len(value) for value in self._atoms.values())
@@ -56,11 +52,11 @@ class Clause:
                  if self[rel]]
         return f'Clause({", ".join(parts)})'
 
-    def _add(self, atom: AtomicFormula) -> None:
+    def add(self, atom: AtomicFormula) -> None:
         rel = type(atom)
         if rel in (Ge, Le):
-            strict_rel = rel.strict_part()
-            self[strict_rel].add(strict_rel(atom.lhs, 0))
+            strict_part = rel.strict_part()
+            self[strict_part].add(strict_part(atom.lhs, 0))
             self[Eq].add(Eq(atom.lhs, 0))
         else:
             self[rel].add(atom)
@@ -91,6 +87,15 @@ class Clause:
             return Eq(self.product_of(Eq), 0)
         else:
             return None
+
+    def copy(self) -> Clause:
+        new_clause = Clause()
+        for rel in (Eq, Ne, Gt, Lt):
+            new_clause[rel] = self[rel].copy()
+        return new_clause
+
+    def get(self, rel: type[AtomicFormula]) -> set[AtomicFormula]:
+        return self._atoms.get(rel, set())
 
     def product_of(self, rel: type[AtomicFormula]) -> Term:
         return prod((atom.lhs for atom in self[rel]), start=Term(1))
@@ -220,8 +225,8 @@ class GSimplify:
         count = len(clauses)
         new_clauses = []
 
-        # Remove equational clauses entailed by the assumed equations. Add all
-        # other equational clauses to the assumed equations.
+        # Pass 1: Identify atomic and equational clauses and add them to the
+        # global premise, unless already entailed.
         logging.info(f'processing equational clauses ({count} clauses left)')
         global_premise = GlobalPremise(assume, self._options)
         for clause in clauses:
@@ -240,82 +245,86 @@ class GSimplify:
             global_premise.add(atom)
             new_clauses.append(clause)
 
-        # Now simplify the other clauses.
+        # Pass 2: Simplify the other clauses modulo global premise.
         logging.info(f'processing non-equational clauses ({count} clauses left)')
         for clause in clauses:
-            try:
-                if clause.as_atom() is not None:
-                    raise NextClause()
-                logging.debug(f'{count} clauses left')
-                count -= 1
-                # We decide against filtering out disequalities via a
-                # radical membership test at this point. The idea is that
-                # adding their left hand sides to the ideal brings it closer
-                # to the radical, which is good for our purposes.
-                clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=self._options.radical)
+            if clause.as_atom() is not None:
+                continue
+            logging.debug(f'{count} clauses left')
+            count -= 1
 
-                # 1. Process the product of all equations of the current clause:
-                # We may add to that product all left hand sides of disequalities
-                # and strict inequalies in the assumptions.
-                product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
-                h = product.reduce(clause_gbasis)
-                simplified_product_equation = simplify(Eq(h, 0), assume=global_premise.assume)
-                if isinstance(simplified_product_equation, _T):
-                    raise NextClause()
-                new_clause = Clause()
-                if not isinstance(simplified_product_equation, _F):
-                    # We could not learn anything from the product and look
-                    # at the single equations now.
-                    for atom in clause[Eq]:
-                        h = atom.lhs.reduce(clause_gbasis)
-                        simplified_atom = simplify(Eq(h, 0), assume=global_premise.assume)
-                        # It is tempting to believe that the next if cannot become true.
-                        # However, we do now know how exactly assume is used by simplify.
-                        if isinstance(simplified_atom, _T):
-                            raise NextClause()
-                        if isinstance(simplified_atom, _F):
-                            continue
-                        new_clause[Eq].add(Eq(h, 0))  # !*rlgsred=T
+            new_clause = Clause()
 
-                # 2. Process all inequalities:
-                # Recall that weak inequalities are split and do not occur explicitly.
-                for rel in (Gt, Lt):
-                    for atom in clause[rel]:
-                        # AD: Schreib die Schleife unten
-                        h = atom.lhs.reduce(clause_gbasis)
-                        # [TS: if Eq(atom.lhs, 0) is in the clause, then we could simplify the
-                        # weak inequality when looking for T. This happens systematically due
-                        # to splitting. More generally, one could add negations of all
-                        # siblings to assume. AD: Note the difference between Eq(atom.lhs, 0)
-                        # and Eq(h, 0).]
-                        simplified_atom = simplify(rel(h, 0), assume=global_premise.assume)
-                        if isinstance(simplified_atom, _T):
-                            raise NextClause()
-                        if isinstance(simplified_atom, _F):
-                            continue
-                        new_clause[rel].add(rel(h, 0))  # !*rlgsred=T
+            # 1. Build the atoms of /\ Eq for the new clause /\ Eq -> \/ (Gt, Lt, Eq)
+            H = set()
+            for atom in clause[Ne]:  # !*rlgsred=T
+                h = atom.lhs.reduce(global_premise.gbasis)
+                H.add(h)
+            G = Term.gbasis(H, radical=self._options.radical)
+            new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
 
-                # 3. Finally process all disequalities.
-                H = set()
-                for atom in clause[Ne]:  # !*rlgsred=T
-                    h = atom.lhs.reduce(global_premise.gbasis)
-                    simplified_atom = simplify(Ne(h, 0), assume=global_premise.assume)
-                    if isinstance(simplified_atom, _T):
-                        continue
-                    if isinstance(simplified_atom, _F):
-                        raise NextClause()
-                    H.add(h)
-                G = Term.gbasis(H, radical=self._options.radical)
-                new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
-                new_clauses.append(new_clause)
+            # 2. For the simplification of \/ (Gt, Lt, Eq) we use a Gröbner basis of /\ Eq together
+            # with the equations of `global_premise`.
+            clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne), radical=self._options.radical)
 
-            except NextClause:
-                pass
+            # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain left
+            # hand sides of the global premise. We might discover T or redundancy of \/ Eq.
+            product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
+            product = product.reduce(clause_gbasis)
+            test_formula = simplify(Eq(product, 0), assume=global_premise.assume)
+            if isinstance(test_formula, _T):
+                continue
+            # Recall that weak inequalities have been split and do not occur explicitly.
+            elif isinstance(test_formula, _F):
+                rhs_rels = [Gt, Lt]
+            else:
+                rhs_rels = [Gt, Lt, Eq]
+
+            # 2.2. Simplify \/ (Gt, Lt) or \/ (Gt, Lt, Eq), depending on the previous if
+            for rel in rhs_rels:
+                for atom in clause[rel]:
+                    h = atom.lhs.reduce(clause_gbasis)
+                    new_clause[rel].add(rel(h, 0))  # !*rlgsred=T
+
+            # This concludes the computation of `new_clause`
+
+            # 3. We next compute a `test_clause` of the form with the following idea:
+            # `test_clause` combines `new_clause` with redundant information from `global_premise`.
+            # If `test_clause` is eventually recoginized to be true, then `new_clause` is redundant
+            # modulo `global_premise` and can be dropped.
+
+            # Start with `new_clause` of the form /\ Eq -> \/ (Gt, Lt, Eq)
+            test_clause = new_clause.copy()
+
+            # Instead of /\ Eq use the Gröbner basis computed above, combining /\ Eq with the
+            # equations of `global_premise`
+            test_clause[Ne] = set()
+            for f in clause_gbasis:
+                test_clause.add(Ne(f, 0))
+
+            # Add to \/ Eq the atom `product == 0`
+            test_clause.add(Eq(product, 0))
+
+            # Add to \/ (Gt, Lt, Eq) information from disequalities and inequalities in
+            # `global_premise` modulo `clause_gbasis`
+            for rel in (Ne, Ge, Gt, Le, Lt):
+                for f in global_premise.term_list_of(rel):
+                    h = f.reduce(clause_gbasis)
+                    test_clause.add(rel.complement()(h, 0))
+
+            # Finally test `test_clause`, where `assume` is not required
+            test_formula = simplify(test_clause.to_formula())
+            assert test_formula is not _F
+            if isinstance(test_formula, _T):
+                continue
+
+            new_clauses.append(new_clause)
 
         return new_clauses
 
-    def in_radical(self, f: Term, G: list[Term]) -> bool:
-        # Y = VV.fresh()
+    def _in_radical(self, f: Term, G: list[Term]) -> bool:
+        # Currently unsused. With `Y = VV.fresh()` there would be efficiency
+        # problems with a growing SAGE polynomial ring.
         Y = VV['SecretRabinovichVariable']
         return Term(1) in Term.gbasis(G + [1 - Y * f])
 
