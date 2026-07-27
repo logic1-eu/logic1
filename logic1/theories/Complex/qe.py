@@ -1,3 +1,6 @@
+"""Quantifier elimination for the theory :mod:`Complex <logic1.theories.Complex>`.
+"""
+
 from typing import Iterable, Optional
 
 from logic1.firstorder.boolean import _F, _T, And, Equivalent, Implies, Not, Or
@@ -67,7 +70,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         return RCF.Term(num.value)
 
     def visit_i(self, _: ast._I) -> RCF.Term:
-        """Raise a :class:`ValueError` since the imaginary unit can not be
+        """Raise a :class:`ValueError` since the imaginary unit cannot be
         evaluated in RCF. Implements the abstract method
         :meth:`.Complex.TermVisitor.visit_i`.
 
@@ -79,7 +82,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         raise ValueError("Cannot evaluate imaginary unit in RCF")
 
     def visit_var(self, var: ast.Var) -> RCF.Term:
-        """Raise a :class:`ValueError` since complex variables can not be
+        """Raise a :class:`ValueError` since complex variables cannot be
         evaluated in RCF. Implements the abstract method
         :meth:`.Complex.TermVisitor.visit_var`.
 
@@ -92,7 +95,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         raise ValueError(f"Cannot evaluate complex variable {var} in RCF")
 
     def visit_conj(self, conj: ast.Conj) -> RCF.Term:
-        """Raise a :class:`ValueError` since complex conjugation can not be
+        """Raise a :class:`ValueError` since complex conjugation cannot be
         evaluated in RCF. Implements the abstract method
         :meth:`.Complex.TermVisitor.visit_conj`.
 
@@ -143,12 +146,12 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
             raise ValueError(f"Cannot evaluate imaginary part of non-variable term {im.arg} in RCF")
 
 
-def real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
+def _real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
     """Convert a real atomic formula in the theory of complex numbers to
     an equivalent atomic formula in the theory of real closed fields.
 
     >>> z = VV['z']
-    >>> real_atom_to_rcf(z * ~z == 0)
+    >>> _real_atom_to_rcf(z * ~z == 0)
     z_im**2 + z_re**2 == 0
     """
     assert atom.is_real()
@@ -178,7 +181,7 @@ def real_formula_to_rcf(formula: Formula) -> RCF.Formula:
     All(z_re, All(z_im, z_im**2 + z_re**2 == 0))
     """
     if isinstance(formula, AtomicFormula):
-        return real_atom_to_rcf(formula)
+        return _real_atom_to_rcf(formula)
     if isinstance(formula, (All, Ex)):
         var = conjugate_normal_form(formula.var.normal_ast)
         assert isinstance(var, ast.Var)
@@ -191,7 +194,13 @@ def real_formula_to_rcf(formula: Formula) -> RCF.Formula:
     assert False, type(formula)
 
 def real_normal_form(formula: Formula) -> Formula:
-    # TODO: rename?
+    """Convert all atoms in the formula into real normal form.
+
+    >>> z = VV['z']
+    >>> phi = Ex(z, z * ~z == 0)
+    >>> real_normal_form(phi)
+    Ex(z, And(z * ~z == 0, 0 == 0))
+    """
     if isinstance(formula, AtomicFormula):
        return formula.real_normal_form()
     if isinstance(formula, (All, Ex)):
@@ -232,14 +241,14 @@ def assume_to_rcf(assume: Iterable[AtomicFormula]) -> list[RCF.AtomicFormula]:
     else:
         return []
 
-def variable_to_complex(var: RCF.Variable) -> Term:
+def _variable_to_complex(var: RCF.Variable) -> Term:
     """Convert a RCF variable to a complex variable. The RCF variable
     name must be of the form :code:`*_re` or :code:`*_im`.
 
     >>> z_re, z_im = RCF.VV.get('z_re', 'z_im')
-    >>> variable_to_complex(z_re)
+    >>> _variable_to_complex(z_re)
     1/2 * z + 1/2 * ~z
-    >>> variable_to_complex(z_im)
+    >>> _variable_to_complex(z_im)
     -1/2 * I * z + 1/2 * I * ~z
     """
     name = str(var)  # TODO: implement .name
@@ -263,7 +272,7 @@ def term_to_complex(term: RCF.Term) -> Term:
     for vars, coeff in term.summands():
         power_product = Term(1)
         for var, exp in vars.items():
-            power_product = power_product * variable_to_complex(var) ** exp
+            power_product = power_product * _variable_to_complex(var) ** exp
         result = result + coeff * power_product
     return result
 
@@ -301,12 +310,12 @@ def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool 
         is equivalent modulo those assumptions.
 
     :param use_redlog:
-        If :obj:`True`, use :func:`RCF.redlog.qe` internallyto perform
-        real quantifier elimination. By default, :func:`RCF.qe` is used.
+        If :obj:`True`, use :func:`.RCF.redlog.qe` internally to perform
+        real quantifier elimination. By default, :func:`.RCF.qe.qe` is used.
 
     :param options:
-        Additional keyword arguments to be passed to :func:`RCF.qe` or
-        :func:`RCF.redlog.qe`.
+        Additional keyword arguments to be passed to :func:`.RCF.qe.qe` or
+        :func:`.RCF.redlog.qe`.
 
     >>> z = VV['z']
     >>> phi = Ex(z, z**2 == -1)

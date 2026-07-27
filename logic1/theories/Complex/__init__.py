@@ -1,4 +1,5 @@
-"""A theory package for Complex.
+"""A first-order theory of complex numbers following
+`[Faross-Sturm] <https://doi.org/10.48550/arXiv.2604.26400>`_.
 """
 
 # order to avoid circular imports:

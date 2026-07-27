@@ -6,13 +6,15 @@
 Abstract Syntax Trees
 *********************
 
-Types
-*****
+.. attention::
+    The classes in this module are not intended to be used directly by the user.
+    Instead, one should use :ref:`Terms <api-Complex-atomic-terms>` and
+    :ref:`AtomicFormulas <api-Complex-atomic-atoms>`.
+
+ASTs and Visitors
+*****************
 
 .. automodule:: logic1.theories.Complex.ast
-
-  Base Classes
-  ************
 
   .. autoclass:: AST
     :members:
@@ -26,10 +28,6 @@ Types
   .. autoclass:: UnaryOperation
     :members:
     :special-members:
-
-
-  AST Nodes
-  *********
 
   .. autoclass:: Rat
     :members:
@@ -72,9 +70,6 @@ Types
   .. autoclass:: Im
     :members:
     :special-members:
-
-  Visitors
-  ********
 
   .. autoclass:: ASTVisitor
     :members:

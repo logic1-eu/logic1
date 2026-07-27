@@ -1,3 +1,6 @@
+"""String and LaTeX formatters for complex ASTs.
+"""
+
 from typing import ClassVar
 
 from gmpy2 import mpz
@@ -262,6 +265,7 @@ class LatexFormatter(ReprFormatter):
         """
         def format_name(name: str) -> str:
             return name if len(name) == 1 else f'\\mathrm{{{name}}}'
+
         if "_" in var.name:
             base, *indices = var.name.split("_")
             grouped = "_".join(f'{{{idx}}}' for idx in indices)

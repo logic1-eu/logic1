@@ -1,5 +1,4 @@
-"""This module provides visitors and functions for evaluating and
-normalizing ASTs.
+"""Visitors and functions for evaluating and normalizing complex ASTs.
 """
 
 from abc import abstractmethod
@@ -77,7 +76,7 @@ class ArithmeticEvaluator(ASTVisitor[α]):
 
 
 class ConstantEvaluator(ArithmeticEvaluator[tuple[mpq, mpq]]):
-    """Visitor based on :class:`.ArithmeticEvaluator` that evaluates a AST to
+    """Visitor based on :class:`.ArithmeticEvaluator` that evaluates an AST to
     a constant. The result is a complex number represented as a pair of real and
     imaginary parts. Raises a :class:`ValueError` if the AST contains variables.
 
@@ -201,7 +200,7 @@ class AddSortKey:
     """
 
     def __init__(self, ast: AST) -> None:
-        """Initialize the sort key of a AST node.
+        """Initialize the sort key of an AST node.
         """
         if isinstance(ast, Neg):
             ast = ast.arg
@@ -277,7 +276,7 @@ class MulSortKey:
         return tuple(MulSortKey(arg) if isinstance(arg, AST) else arg for arg in self.ast.args)
 
     def __init__(self, ast: AST) -> None:
-        """Initialize the sort key of a AST node. The AST node must not be a
+        """Initialize the sort key of an AST node. The AST node must not be a
         constant, a negation or a product.
         """
         assert not ast.is_constant()
@@ -310,7 +309,7 @@ class MulSortKey:
 
 
 class WeakNormalizer(IdentityASTVisitor):
-    """Visitor that normalizes a AST by rearranging sums and products,
+    """Visitor that normalizes an AST by rearranging sums and products,
     and applying local simplifications, but not expanding any nodes.
     """
 
@@ -753,8 +752,8 @@ class ConjugateNormalizer(Normalizer):
 
 
 def conjugate_normal_form(ast: AST) -> AST:
-    """Return the conjugate normal form of a AST which is a polynomial
-    expression in the the variables and their conjugates. It is a unique
+    """Return the conjugate normal form of an AST which is a polynomial
+    expression in the variables and their conjugates. It is a unique
     normal form.
 
     >>> z = Var('z')
@@ -767,7 +766,7 @@ def conjugate_normal_form(ast: AST) -> AST:
 
 
 def cartesian_normal_form(ast: AST) -> AST:
-    """Return the cartesian normal form of a AST which is of the form
+    """Return the Cartesian normal form of an AST which is of the form
     :code:`f + I * g` where :code:`f` and :code:`g` are polynomial expressions
     in the real and imaginary parts of variables. It is a unique normal form.
 

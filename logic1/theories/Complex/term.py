@@ -1,3 +1,6 @@
+"""Terms and variables in the theory :mod:`Complex <logic1.theories.Complex>`.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
@@ -17,15 +20,15 @@ from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_n
 
 @dataclass
 class VariableSet(firstorder.term.VariableSet['Variable']):
-    """Set of variables used in the theory of complex numbers.
+    """Infinite set of variables used in the theory of complex numbers.
     Implements the abstract class :class:`.firstorder.term.VariableSet`.
+    :class:`Variables <.Variable>` are obtained from the global instance
+    :data:`VV`.
 
     >>> VV['z']
     z
     >>> VV.get('a', 'b')
     (a, b)
-
-    .. seealso:: :data:`VV`
     """
 
     _names: set[str] = field(default_factory=set)
@@ -112,7 +115,7 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
 
 
 VV: Final[VariableSet] = VariableSet()
-"""The global set of variables used in the theory of complex numbers.
+"""The global :class:`VariableSet` used in the theory of complex numbers.
 
 >>> VV['z']
 z
@@ -125,11 +128,17 @@ z
 @functools.total_ordering
 class SortKey(Generic[τ]):
     """A sort key for terms. Implements the abstract class
-    :class:`.firstorder.term.Term.SortKey`.
+    :class:`.firstorder.term.SortKey`.
+
+    >>> z = VV['z']
+    >>> SortKey(z) < SortKey(z + 1)
+    True
+
+    .. seealso:: :meth:`.Term.sort_key`
     """
 
     term: τ
-    """The term for which this is a sort key.
+    """The :class:`.Term` for which this is a sort key.
     """
 
     def __eq__(self, other: object) -> bool:
@@ -171,7 +180,7 @@ class SortKey(Generic[τ]):
 class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     """Term in the theory of complex numbers. Implements the abstract class
     :class:`.firstorder.term.Term`. It is represented internally as
-    :class:`.ast.AST` in normal form. The default normal form is
+    :class:`AST <.ast.AST>` in normal form. The default normal form is
     :func:`.conjugate_normal_form`, but it can be changed globally using
     :meth:`.set_normal_form`.
 
@@ -181,22 +190,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     >>> Re(z)
     1/2 * z + 1/2 * ~z
 
-    Atomic formulas can be constructed from terms using the standard comparison
-    operators. Note that inequalities can only be constructed if both sides
-    are real, otherwise a :class:`ValueError` is raised.
-
-    >>> z = VV['z']
-    >>> z == 1
-    z == 1
-    >>> Re(z) >= 0
-    1/2 * z + 1/2 * ~z >= 0
-    >>> z > 0
-    Traceback (most recent call last):
-    ...
-    ValueError: Cannot create atomic formula z > 0 because it is not real
-
     .. seealso::
-        :class:`.Variable`, :data:`VV`, :func:`.Re`, :func:`.Im`, :func:`.Conj`
+        :class:`Variable`, :data:`VV`, :func:`Re`, :func:`Im`, :func:`Conj`,
+        :class:`AtomicFormula <.Complex.atomic.AtomicFormula>`
     """
 
     _normalizer: ClassVar[Callable[[ast.AST], ast.AST]] = conjugate_normal_form
@@ -424,7 +420,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term(other) - self
 
     def __rtruediv__(self, other: Number | Term) -> Term:
-        """Divide a number by this term. Raise a :class:`ValueError`if
+        """Divide a number by this term. Raise a :class:`ValueError` if
         this term is not constant. All other cases are handled by
         :meth:`__truediv__`.
 
@@ -479,8 +475,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return self / Term(other)
 
     def __xor__(self, other: Never) -> Term:
-        """Raise a :class:`NotImplementedError`. The operator :code:`**`
-        should be used for exponentiation instead. See :meth:`__pow__`.
+        """Raise a :class:`NotImplementedError`. The operator
+        :meth:`** <.Complex.term.Term.__pow__>` is used for
+        exponentiation instead.
         """
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
@@ -514,13 +511,15 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         raise ValueError(f'Term {self} is not a variable')
 
     def conjugate(self) -> Term:
-        """Return the complex conjugate of this term.
+        """Return the complex conjugate of this term.'
 
         >>> z = VV['z']
         >>> (z + 2).conjugate()
         ~z + 2
         >>> (2 * I).conjugate()
         -2 * I
+
+        .. seealso:: :func:`.Conj`, :meth:`~ <.Complex.term.Term.__invert__>`
         """
         return Term._from_ast(ast.Conj(self.normal_ast))
 
@@ -568,6 +567,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> z = VV['z']
         >>> (z + 2).imaginary_part()
         -1/2 * I * z + 1/2 * I * ~z
+
+        .. seealso:: :func:`.Im`
         """
         return Term._from_ast(ast.Im(self.normal_ast))
 
@@ -660,6 +661,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> z = VV['z']
         >>> z.real_part()
         1/2 * z + 1/2 * ~z
+
+        .. seealso:: :func:`.Re`
         """
         return Term._from_ast(ast.Re(self.normal_ast))
 
@@ -689,6 +692,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> _ = Term.set_normal_form(old)
         >>> z
         z
+
+        .. seealso::
+            :func:`.conjugate_normal_form`,
+            :func:`.cartesian_normal_form`
         """
         ret = cls._normalizer
         cls._normalizer = normalizer
@@ -781,7 +788,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
 class Variable(Term, firstorder.Variable['Variable', Number, SortKey['Variable']]):
     """Variable in the theory of complex numbers. Implements the abstract class
-    :class:`.firstorder.term.Variable`. Variables are created using the global
+    :class:`.firstorder.term.Variable`. Variables are obtained from the global
     variable set :data:`VV`.
 
     >>> VV['z']

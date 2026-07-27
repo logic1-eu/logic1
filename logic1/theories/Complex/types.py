@@ -1,3 +1,6 @@
+"""Shared type variables and aliases for the theory of complex numbers.
+"""
+
 from fractions import Fraction
 from typing import Final, TypeAlias, TypeVar
 
@@ -5,6 +8,19 @@ from gmpy2 import mpq
 
 import logic1
 
+α = TypeVar('α')
+"""Generic type variable.
+"""
+
+η = TypeVar('η', bound='logic1.theories.Complex.ast.AST')
+"""
+Type variable for AST nodes.
+"""
+
+τ = TypeVar('τ', bound='logic1.theories.Complex.term.Term')
+"""
+Type variable for terms.
+"""
 
 RationalNumber: TypeAlias = int | float | Fraction | mpq
 """Type alias for rational number types.
@@ -30,21 +46,6 @@ Formula: TypeAlias = logic1.firstorder.Formula[
 """
 Type alias for formulas in the theory of complex numbers.
 """
-
-α = TypeVar('α')
-"""Generic type variable.
-"""
-
-η = TypeVar('η', bound='AST')
-"""
-Type variable for AST nodes used to parameterize :class:`.ast.SortKey`.
-"""
-
-τ = TypeVar('τ', bound='Term')
-"""
-Type variable for terms used to parameterize :class:`.term.SortKey`.
-"""
-
 
 from logic1.theories.Complex.ast import AST
 from logic1.theories.Complex.term import Term

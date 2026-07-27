@@ -1,3 +1,6 @@
+"""Abstract syntax trees for complex expressions.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -202,7 +205,7 @@ class AST(ABC):
         return AST.from_number(other) - self
 
     def __rtruediv__(self, other: Number | AST) -> AST:
-        """Construct a AST node representing the division of a number by this
+        """Construct an AST node representing the division of a number by this
         AST node. Division is defined as multiplication by the inverse.
         Raise a :class:`ValueError` if this AST node is not constant.
         All other cases are handled by :meth:`__truediv__`.
@@ -240,7 +243,7 @@ class AST(ABC):
         return self - AST.from_number(other)
 
     def __truediv__(self, other: Number | AST) -> AST:
-        """Construct a AST node representing the division of this AST node by
+        """Construct an AST node representing the division of this AST node by
         another AST node or number. Division is defined as multiplication by
         the inverse. Raise a :class:`ValueError` if the other AST node is not
         constant.
@@ -277,7 +280,7 @@ class AST(ABC):
 
     @abstractmethod
     def accept(self, visitor: ASTVisitor[α]) -> α:
-        """Accept a AST visitor."""
+        """Accept an AST visitor."""
         ...
 
     def as_latex(self) -> str:
@@ -321,7 +324,7 @@ class AST(ABC):
 
     @staticmethod
     def from_real_imag(real: mpq, imag: mpq) -> AST:
-        """Construct a AST node from a given real and imaginary part.
+        """Construct an AST node from given real and imaginary parts.
 
         >>> AST.from_real_imag(mpq(2), mpq(-1))
         Add(Rat(mpq(2,1)), Neg(_I()))
@@ -345,7 +348,7 @@ class AST(ABC):
 
     @staticmethod
     def from_number(value: Number) -> AST:  # TODO: how to handle wrong types in general?
-        """Construct a AST node from a given :data:`Number`. Raise a
+        """Construct an AST node from a given :data:`Number`. Raise a
         :class:`ValueError` if the given value is not a number.
 
         >>> AST.from_number(3.5)
@@ -507,8 +510,7 @@ class Rat(AST):
 
     def __new__(cls, value: RationalNumber):
         """Create a new instance of :class:`Rat` from the given value.
-        If the value is negative, create a instance of :class:`.Neg` node
-        instead.
+        If the value is negative, create an instance of :class:`.Neg` instead.
 
         >>> Rat(2)
         Rat(mpq(2,1))
@@ -642,7 +644,7 @@ class MonoidalOperation(AST):
         """Initialize this monoidal operation with the given arguments.
         If any of the arguments is itself a monoidal operation of the same
         type, then the argument is flattened. This abstract class is not
-        supposedto have instances itself.
+        supposed to have instances itself.
         """
         args_flat = []
         for arg in args:
@@ -680,7 +682,7 @@ class Add(MonoidalOperation):  # TODO: overwrite args just for docstring?
     """
 
     identity: ClassVar[Rat] = Rat(0)
-    """The identity element of addition, which is the rational number $0$.
+    """The identity element of addition, which is the rational number :math:`0`.
     """
 
     def __init__(self, *args: AST) -> None:

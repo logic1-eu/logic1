@@ -1,3 +1,6 @@
+"""Atomic formulas in the theory :mod:`Complex <logic1.theories.Complex>`.
+"""
+
 from __future__ import annotations
 
 from abc import abstractmethod
@@ -28,7 +31,7 @@ class AtomicFormula(
 
     @property
     def lhs(self) -> Term:
-        """The left hand side term of this atomic formula.
+        """The left-hand side term of this atomic formula.
 
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
@@ -39,7 +42,7 @@ class AtomicFormula(
 
     @property
     def rhs(self) -> Term:
-        """The right hand side term of this atomic formula.
+        """The right-hand side term of this atomic formula.
 
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
@@ -69,6 +72,15 @@ class AtomicFormula(
         return ops[self.op](self.lhs.sort_key(), self.rhs.sort_key())
 
     def __eq__(self, other: object) -> bool:
+        """Return :obj:`True` if two formulas have the same relation and sides.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0) == (z == 0)
+        True
+        >>> (z == 0) == (z != 0)
+        False
+        """
         if not isinstance(other, AtomicFormula):
             return False
         if self.op != other.op:

@@ -1,3 +1,6 @@
+"""Simplification for complex formulas.
+"""
+
 from collections.abc import Iterable, Set
 from dataclasses import dataclass, field
 from typing import Optional, Self, TypeVar
@@ -16,10 +19,13 @@ from logic1.theories.Complex.atomic import AtomicFormula, Eq
 
 
 def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: dict[tuple[α, α], float]) -> Set[tuple[α, α]]:
-    """Given a set of nodes of type α with associated costs and a set of edges
-    with associated weights, returns a set of edges that covers some of
-    the nodes and minimizes the total cost of the uncovered nodes plus
-    the total weight of the edges in the cover.
+    """Return a partial edge cover minimizing edge and uncovered-node costs.
+
+    >>> nodes_costs = {'a': 1, 'b': 2, 'c': 4}
+    >>> edge_weights = {('a', 'b'): 1, ('b', 'c'): 2}
+    >>> cover = min_weight_partial_edge_cover(nodes_costs, edge_weights)
+    >>> [(min(u, v), max(u, v)) for u, v in sorted(cover)]
+    [('b', 'c')]
     """
     nodes = set(nodes_costs.keys())
 
@@ -338,9 +344,9 @@ def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> For
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Optional[bool]:
-    """Returns True if the formula f is valid under the given
-    assumptions and options, False if it is not valid, and None if the
-    validity cannot be determined.
+    """Return :obj:`True` if the formula is valid under the given
+    assumptions and options, :obj:`False` if it is not valid, and :obj:`None`
+    if the validity cannot be determined.
     """
     rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(f)
