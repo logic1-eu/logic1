@@ -6,7 +6,7 @@
 Quantifier Elimination
 **********************
 
-.. automodule:: logic1.theories.RCF.qe
+.. automodule:: logic1.theories.RCF.node
 
   Assumptions
   ***********
@@ -23,11 +23,13 @@ Quantifier Elimination
   Options
   *******
 
-  .. autoclass:: CLUSTERING
+  .. autoclass:: Clustering
     :members:
 
-  .. autoclass:: GENERIC
+  .. autoclass:: Generic
     :members:
+
+.. automodule:: logic1.theories.RCF.qe
 
   .. autoclass:: Options
     :members: clustering, generic, traditional_guards

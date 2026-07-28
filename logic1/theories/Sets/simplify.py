@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from ...firstorder import And, _F, Or, _T
 from .atomic import AtomicFormula, C, C_, Eq, Index, Ne, oo, Variable
-from .typing import Formula
+from .types import Formula
 
 from ...support.tracing import trace  # noqa
 

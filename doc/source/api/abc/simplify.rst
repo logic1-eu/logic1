@@ -63,5 +63,8 @@ Simplification
   Simplification and Validity
   ***************************
 
+  .. autoclass:: Options
+    :exclude-members: __init__, __new__
+
   .. autoclass:: Simplify
     :members:

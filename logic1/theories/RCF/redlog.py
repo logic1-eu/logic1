@@ -3,9 +3,10 @@ from typing import Final, Iterable
 
 import logic1.firstorder as firstorder
 from logic1.support.excepthook import NoTraceException
-from logic1.theories.RCF.atomic import AtomicFormula, Variable
-from logic1.theories.RCF.qe import GENERIC
-from logic1.theories.RCF.typing import Formula
+from logic1.theories.RCF.term import Variable
+from logic1.theories.RCF.atomic import AtomicFormula
+from logic1.theories.RCF.qe import Generic
+from logic1.theories.RCF.types import Formula
 
 _START: Final = '889e0d7343405c079195e7b8903c8c9e'
 _END: Final = 'b0061974914468de549a2af8ced10316'
@@ -141,7 +142,7 @@ def _eval(s: str, variables: set[Variable]) -> object:
     return eval(s, locals() | {str(v): v for v in variables})
 
 
-def gqe(f: Formula, generic: GENERIC = GENERIC.FULL) -> tuple[list[AtomicFormula], Formula]:
+def gqe(f: Formula, generic: Generic = Generic.FULL) -> tuple[list[AtomicFormula], Formula]:
     """Generic real quantifier elimination using the Redlog function `rlgqe
     <https://www.redlog.eu/documentation/service.php?key=rlgqe>`_.
 
@@ -151,26 +152,26 @@ def gqe(f: Formula, generic: GENERIC = GENERIC.FULL) -> tuple[list[AtomicFormula
     :returns:
       A pair `(assumptions, f')`. The formula `f'` is a quantifier-free
       equivalent of `f` modulo the `assumptions`. All assumptions are
-      instances of :class:`.Ne`; if `generic=GENERIC.MONOMIAL`, then all left
+      instances of :class:`.Ne`; if `generic=Generic.MONOMIAL`, then all left
       hand sides of assumptions are monomial .
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
     >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
-    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.MONOMIAL)
-    ([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
-    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.FULL)
-    ([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
+    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.MONOMIAL)
+    ([b != 0], Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0))
+    >>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
+    ([a + 1 != 0], 4*a*c - b**2 + 4*c <= 0)
 
     .. seealso::
-      :meth:`.qe` with `generic` in :attr:`.GENERIC.FULL`, :attr:`.GENERIC.MONOMIAL`.
+      :meth:`.qe` with `generic` in :attr:`.Generic.FULL`, :attr:`.Generic.MONOMIAL`.
     """
     match generic:
-        case GENERIC.NONE:
-            raise NoTraceException('GENERIC.NONE is not supported - use redlog.qe instead')
-        case GENERIC.MONOMIAL:
+        case Generic.NONE:
+            raise NoTraceException('Generic.NONE is not supported - use redlog.qe instead')
+        case Generic.MONOMIAL:
             rl_switches = 'off rlqegenct;'
-        case GENERIC.FULL:
+        case Generic.FULL:
             rl_switches = 'on rlqegenct;'
         case _:
             assert False, generic
@@ -209,7 +210,7 @@ def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
     >>> redlog.qe(All(x, Ex(y, x**2 + x*y + b > 0 and x + a*y**2 + b <= 0)));
     a < 0
     >>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), [b != 0])
-    Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0)
+    Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0)
     >>> redlog.qe(All(x, Ex(y, And(b + x**2 + x*y > 0, a*y**2 + b + x <= 0))))
     And(b > 0, a < 0)
     """

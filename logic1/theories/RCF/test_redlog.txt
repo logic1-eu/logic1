@@ -7,16 +7,16 @@
 
 # redlog.gqe:
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.NONE)
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.NONE)
 Traceback (most recent call last):
 ...
-logic1.support.excepthook.NoTraceException: GENERIC.NONE is not supported - use redlog.qe instead
+logic1.support.excepthook.NoTraceException: Generic.NONE is not supported - use redlog.qe instead
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.MONOMIAL)
-([b != 0], Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0))
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.MONOMIAL)
+([b != 0], Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0))
 
->>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=GENERIC.FULL)
-([a + 1 != 0], 4*a*c - b^2 + 4*c <= 0)
+>>> redlog.gqe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
+([a + 1 != 0], 4*a*c - b**2 + 4*c <= 0)
 
 
 # redlog.qe
@@ -24,10 +24,10 @@ logic1.support.excepthook.NoTraceException: GENERIC.NONE is not supported - use 
 >>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0))
 Or(And(c == 0, b == 0, a + 1 == 0),
    And(b != 0, a + 1 == 0),
-   And(a + 1 != 0, 4*a*c - b^2 + 4*c <= 0))
+   And(a + 1 != 0, 4*a*c - b**2 + 4*c <= 0))
 
 >>> redlog.qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), [b != 0])
-Or(a + 1 == 0, 4*a*c - b^2 + 4*c <= 0)
+Or(a + 1 == 0, 4*a*c - b**2 + 4*c <= 0)
 
 Hong's Example:
 >>> redlog.qe(All(x, Ex(y, And(x**2 + x*y + b > 0, x + a*y**2 + b <= 0))))
@@ -36,7 +36,7 @@ And(b > 0, a < 0)
 From test_qe.txt:
 >>> phi_6 = Ex(x, And(a * x + b <= 0, x <= b))
 >>> redlog.qe(phi_6)
-Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a**2*b + a*b >= 0))
 
 Period 9:
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))

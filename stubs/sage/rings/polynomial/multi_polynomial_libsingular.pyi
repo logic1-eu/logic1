@@ -4,6 +4,7 @@ from typing import Generic, Iterable, Iterator, Optional, Self, TypeAlias, TypeV
 
 # Strangely, the following import is not made in
 # sage/rings/polynomial/multi_polynomial_libsingular.pyx
+from sage.rings.integer import Integer
 from sage.rings.polynomial.multi_polynomial_ring_base import MPolynomialRing_base
 from sage.rings.polynomial.polynomial_element import Polynomial_generic_dense
 from sage.rings.ring import Ring
@@ -34,6 +35,10 @@ class MPolynomialRing_libsingular(MPolynomialRing_base):
         # sage.structure.parent_gens.ParentWithGens. There is an attribute
         # element_class available, but I see no easy way to type this properly
         # at the place of its definition.
+        ...
+
+    def ngens(self) -> int:
+        # Compare doc of gens above.
         ...
 
 
@@ -109,6 +114,9 @@ class MPolynomial_libsingular(Generic[ρ]):
     def coefficient(self, degrees: _dict[Self, int]) -> Self:
         ...
 
+    def coefficients(self) -> list[ρ]:
+        ...
+
     def constant_coefficient(self) -> ρ:
         # Returns an element of the base ring of Self, which is always ZZ in
         # logic1.
@@ -145,6 +153,9 @@ class MPolynomial_libsingular(Generic[ρ]):
         ...
 
     def is_zero(self) -> bool:
+        ...
+
+    def iterator_exp_coeff(self, as_ETuples: bool=True) -> list[tuple[tuple[Integer, ...], ρ]]:
         ...
 
     def lc(self) -> ρ:

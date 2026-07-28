@@ -1,7 +1,7 @@
 from ... import abc
 from .atomic import AtomicFormula, Variable
 from .simplify import simplify as _simplify
-from .typing import Formula, Never
+from .types import Formula, Never
 
 
 class BooleanNormalForm(
@@ -15,8 +15,12 @@ class BooleanNormalForm(
     """
 
     def simplify(self, f: Formula) -> Formula:
-        """Implements the abstract method
-        :meth:`.abc.bnf.BooleanNormalForm.simplify`.
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.simplify`.
+        """
+        return _simplify(f)
+
+    def final_simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.final_simplify`.
         """
         return _simplify(f)
 

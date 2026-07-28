@@ -1,8 +1,9 @@
-from ... import abc
+from logic1 import abc
 
-from .atomic import AtomicFormula, Term, Variable
-from .simplify import simplify as _simplify
-from .typing import Formula
+from logic1.theories.RCF.term import Term, Variable
+from logic1.theories.RCF.atomic import AtomicFormula
+from logic1.theories.RCF.simplify import simplify as _simplify
+from logic1.theories.RCF.types import Formula
 
 
 class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, int]):
@@ -15,10 +16,14 @@ class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable,
     """
 
     def simplify(self, f: Formula) -> Formula:
-        """Implements the abstract method
-        :meth:`.abc.bnf.BooleanNormalForm.simplify`.
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.simplify`.
         """
         return _simplify(f)
+
+    def final_simplify(self, f: Formula) -> Formula:
+        """Implements the abstract method :meth:`.abc.bnf.BooleanNormalForm.final_simplify`.
+        """
+        return _simplify(f, explode_always=False)
 
 
 cnf = BooleanNormalForm().cnf

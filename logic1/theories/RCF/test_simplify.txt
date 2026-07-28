@@ -136,7 +136,7 @@ And(y == 0, x == 0)
 >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> simplify(-5*(a-b)*(a+b) <= 0)
-a^2 - b^2 >= 0
+a**2 - b**2 >= 0
 
 >>> i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
 
@@ -166,3 +166,8 @@ x6 != 0)))
 ...          Or(And(x5 < 0, x4 + x5 + x6 == 0), And(x5 >= 0, x4 - x5 + x6 == 0)))
 >>> simplify(f2)
 And(x6 == 0, x5 == 0, x4 == 0)
+
+>>> x, a, b, c = VV.get('x', 'a', 'b', 'c')
+>>> phi = And(2*a > 0, a != 0, 4*a**2*c - a*b**2 == 0)
+>>> simplify(phi)
+And(a > 0, 4*a*c - b**2 == 0)

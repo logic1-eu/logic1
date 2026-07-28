@@ -234,6 +234,12 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
             arg = queue.popleft()
             if Formula.is_atomic(arg):
                 simplified_arg = self.simpl_at(ir.transform_atom(arg), context=gand)
+                if not Formula.is_atomic(simplified_arg):
+                    # Simplifying the atomic formula produced a non-atomic `simplified_arg`
+                    # that has not yet been simplified modulo `ir`. To guarantee termination,
+                    # this recursive call must eventually reach a `simplified_arg` for which
+                    # `simpl_at` returns only atoms.
+                    simplified_arg = self._simpl_nnf(simplified_arg, ir)
             else:
                 simplified_arg = self._simpl_nnf(arg, ir)
             if isinstance(simplified_arg, gand.definite()):

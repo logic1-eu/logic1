@@ -12,7 +12,7 @@ from logic1.support.tracing import trace  # noqa
 from logic1.theories.Sets.atomic import AtomicFormula, C, Eq, Ne, Variable
 from logic1.theories.Sets.bnf import dnf
 from logic1.theories.Sets.simplify import simplify
-from logic1.theories.Sets.typing import Formula
+from logic1.theories.Sets.types import Formula
 
 
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
@@ -30,7 +30,7 @@ class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
 
 
 @dataclass
-class Node(abc.qe.Node[Formula, Variable, Assumptions]):
+class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Formula]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination` for
@@ -44,6 +44,9 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
         """
         return Node(variables=self.variables, formula=self.formula, options=self.options)
+
+    def memorize(self) -> Formula:
+        return self.formula
 
     def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
@@ -128,8 +131,8 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
 
 
 @dataclass
-class QuantifierElimination(abc.qe.QuantifierElimination[
-        Node, Assumptions, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
+class QuantifierElimination(abc.qe.QuantifierElimination[Node, Formula,
+        Assumptions, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
     """
     Quantifier elimination for the theory of sets with cardinality constraints.
 

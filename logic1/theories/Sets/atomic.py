@@ -4,8 +4,8 @@ import logging
 import string
 from typing import Any, ClassVar, Final, Iterator, Never, Optional, Self, TypeAlias
 
-from ... import firstorder
-from ...firstorder import _F, _T
+from logic1 import firstorder
+from logic1.firstorder import _F, _T
 
 
 logging.basicConfig(
@@ -23,7 +23,7 @@ represented by :data:`oo`
 """
 
 
-class VariableSet(firstorder.atomic.VariableSet['Variable']):
+class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Sets.
     Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
@@ -430,4 +430,4 @@ class C_(AtomicFormula):
         return cls._instances[index]
 
 
-from .typing import Formula
+from logic1.theories.Sets.types import Formula

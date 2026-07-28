@@ -9,9 +9,10 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Logic1'
-copyright = '2023 by N. Faroß, T. Sturm'
-author = 'N. Faroß, <a: href="https://science.thomas-sturm.de">T. Sturm</a>'
+copyright = '2023-%Y, N. Faroß and T. Sturm'
+author = '<a href="https://www.chalmers.se/en/persons/faross/">N. Faroß</a>, <a href="https://science.thomas-sturm.de/">T. Sturm</a>'
 release = '0.1'
+version = '0.1'
 
 # General configuration
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -40,15 +41,19 @@ autodoc_type_aliases = {}
 # _extra_footer = ''
 
 intersphinx_mapping = {
-    'sympy': ('https://docs.sympy.org/latest', None),
+    'gmpy2': ('https://gmpy2.readthedocs.io/en/latest/', None),
     'python': ('https://docs.python.org/3', None),
     'sage': ('https://doc.sagemath.org/html/en/reference/', None),
-    'sage-polynomial-rings': ('https://doc.sagemath.org/html/en/reference/polynomial_rings/', None)
+    'sage-polynomial-rings': ('https://doc.sagemath.org/html/en/reference/polynomial_rings/', None),
+    'sage-rings-standard': ('https://doc.sagemath.org/html/en/reference/rings_standard/', None),
+    # Further Sage intersphinx inventories can be derived from the subdirectory
+    # names of the Sage documentation at https://doc.sagemath.org/html/en/reference/
+    'sympy': ('https://docs.sympy.org/latest', None),
 }
 
 language = 'en'
 
-# nitpicky = False
+nitpicky = False
 
 # pygments_style = 'tango'
 
@@ -66,6 +71,8 @@ html_context = {
 html_css_files = [
     "custom.css"
 ]
+
+html_js_files = ["sidebar-toggle.js"]
 
 html_last_updated_fmt = ''
 
@@ -85,7 +92,7 @@ html_theme_options = {
     'collapse_navbar': False,
     'home_page_in_toc': True,
     'max_navbar_depth': 12,
-    'repository_url': 'https://github.com/thomas-sturm/logic1',
+    'repository_url': 'https://github.com/logic1-eu/logic1',
     'show_navbar_depth': 12,  # default is 1
     'show_toc_level': 1,  # default is 1
     'use_repository_button': True

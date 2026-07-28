@@ -8,26 +8,34 @@ package:
 
 build:
   number: 0
-  noarch: python
-  script: python -m pip install . -vv --no-deps --no-build-isolation
+  script:
+    - export CFLAGS="${CFLAGS} -I${SP_DIR}/gmpy2"
+    - python -m pip install . -vv --no-deps --no-build-isolation
 
 requirements:
+  build:
+    - ${{ compiler('c') }}
   host:
-    - python >=3.11,<3.12
+    - cython >=3.1.0
+    - gmpy2
     - pip
+    - python 3.14.* *_cp314
+    - setuptools
     - setuptools_scm
   run:
+    - gmpy2
     - more-itertools
     - pyeda
+    - python-flint
     - sage
     - typing-extensions
 
 tests:
-  - python:
-      imports:
-        - logic1
-      pip_check: false
   - script:
+      - export DOT_SAGE="${PWD}/.sage"
+      - python -c "import logic1"
+  - script:
+      - export DOT_SAGE="${PWD}/.sage"
       - python -m doctest -o NORMALIZE_WHITESPACE logic1/theories/Sets/test_qe.txt
     files:
       source:

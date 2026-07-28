@@ -1,0 +1,1002 @@
+"""
+>>> from logic1 import *
+>>> from logic1.theories.RCF.term.term_flint import *
+>>> from gmpy2 import mpq
+
+"""
+
+class _:
+    """
+    >>> null = Term(0)
+
+    >>> R = TermContext(['x', 'y'])
+    >>> R
+    TermContext(('x', 'y'))
+
+    >>> x, y = R.get_vars()
+    >>> x
+    x
+    >>> x._poly, x._poly.context()
+    (x, fmpq_mpoly_ctx(2, '<Ordering.deglex: 'deglex'>', ('x', 'y')))
+
+    >>> S = TermContext(('z', 'x'))
+    >>> S
+    TermContext(('x', 'z'))
+    >>> S_x, z = list(S.get_vars())
+    >>> S_x
+    x
+    >>> S_x._poly, S_x._poly.context()
+    (x, fmpq_mpoly_ctx(2, '<Ordering.deglex: 'deglex'>', ('x', 'z')))
+
+    >>> bool(S_x == x)
+    True
+
+    >>> binomial = (x + z) ** 2
+    >>> print(f'{repr(binomial)=}, {str(binomial)=}, {binomial.as_latex()=}')
+    repr(binomial)='x**2 + 2*x*z + z**2', str(binomial)='x^2 + 2*x*z + z^2', binomial.as_latex()='x^{2} + 2 x z + z^{2}'
+    >>> binomial
+    x**2 + 2*x*z + z**2
+    >>> print(binomial)
+    x^2 + 2*x*z + z^2
+
+    >>> coerced_sum = x + S_x
+    >>> coerced_sum._poly, coerced_sum._poly.context()
+    (2*x, fmpq_mpoly_ctx(3, '<Ordering.deglex: 'deglex'>', ('x', 'y', 'z')))
+
+    >>> zero = x - S_x
+    >>> zero._poly, zero._poly.context()
+    (0, fmpq_mpoly_ctx(3, '<Ordering.deglex: 'deglex'>', ('x', 'y', 'z')))
+
+    """
+
+class TermContext:
+    """
+
+    >>> VV._reset()
+
+    ----------------------------------------------------------------------------
+    Test __init__:
+    ----------------------------------------------------------------------------
+    >>> R = TermContext(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
+
+    ----------------------------------------------------------------------------
+    Test __repr__:
+    ----------------------------------------------------------------------------
+    >>> R
+    TermContext(('G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'))
+
+    ----------------------------------------------------------------------------
+    Test __str__:
+    ----------------------------------------------------------------------------
+    >>> print(R)
+    TermContext(('G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'))
+
+    ----------------------------------------------------------------------------
+    Test coerce:
+    ----------------------------------------------------------------------------
+    >>> R = TermContext(['x', 'y'])
+    >>> c = Term(1)
+    >>> c.term_context() == TermContext(())
+    True
+    >>> c.term_context() is TermContext(())
+    False
+    >>> c = R.coerce(c)
+    >>> c.term_context() == R
+    True
+
+    >>> x = VV['x']
+    >>> x.term_context()
+    TermContext(('x',))
+    >>> R_x = R.coerce(x)
+    >>> R_x.term_context() == R
+    True
+
+    >>> f = x + 1
+    >>> R_f = R.coerce(f)
+    >>> R_f.term_context() == R
+    True
+
+    ----------------------------------------------------------------------------
+    Test get_names:
+    ----------------------------------------------------------------------------
+    >>> R = TermContext(['G0001', 'G0002', 'a', 'b', 'c', 'x', 'y'])
+    >>> R.get_names()
+    ('G0001', 'G0002', 'a', 'b', 'c', 'x', 'y')
+
+    ----------------------------------------------------------------------------
+    Test get_var_by_index:
+    ----------------------------------------------------------------------------
+    >>> R.get_var_by_index(2)
+    a
+    >>> R.get_var_by_index(6)
+    y
+    >>> R.get_var_by_index(7)
+    Traceback (most recent call last):
+    ...
+    IndexError: generator index out of range
+    >>> R.get_var_by_index(0).__class__.__name__
+    'Variable'
+
+    ----------------------------------------------------------------------------
+    Test get_var_by_name:
+    ----------------------------------------------------------------------------
+    >>> R.get_var_by_name('x')
+    x
+    >>> R.get_var_by_name('z')
+    Traceback (most recent call last):
+    ...
+    ValueError: variable not in context
+
+    ----------------------------------------------------------------------------
+    Test get_vars:
+    ----------------------------------------------------------------------------
+    >>> R.get_vars()
+    (G0001, G0002, a, b, c, x, y)
+
+    """
+
+class VariableSet:
+    """
+    >>> VV._reset()
+
+    ----------------------------------------------------------------------------
+    Test __getitem__:
+    ----------------------------------------------------------------------------
+    >>> VV['a']
+    a
+    >>> VV['c']
+    c
+
+    ----------------------------------------------------------------------------
+    Test stash:
+    ----------------------------------------------------------------------------
+    >>> VV.stash()
+    >>> VV['b']
+    b
+    >>> VV['d']
+    d
+    >>> VV.stack == [{'a', 'c'}, {'b', 'd'}]
+    True
+
+    ----------------------------------------------------------------------------
+    Test merge:
+    ----------------------------------------------------------------------------
+    >>> VV.merge()
+    >>> VV.stack == [{'a', 'b', 'c', 'd'}]
+    True
+
+    ----------------------------------------------------------------------------
+    Test the property _used:
+    ----------------------------------------------------------------------------
+    >>> VV._used == {'a', 'b', 'c', 'd'}
+    True
+
+    ----------------------------------------------------------------------------
+    Test __getitem__:
+    ----------------------------------------------------------------------------
+    >>> VV.stash()
+    >>> repr(VV)
+    '{...}'
+    >>> VV['a']
+    a
+
+    ----------------------------------------------------------------------------
+    Test __init__:
+    ----------------------------------------------------------------------------
+    >>> VariableSet()
+    {...}
+
+    ----------------------------------------------------------------------------
+    Test __repr__:
+    ----------------------------------------------------------------------------
+    >>> repr(VV)
+    '{a, ...}'
+
+    ----------------------------------------------------------------------------
+    Test fresh:
+    ----------------------------------------------------------------------------
+    >>> VV.fresh()
+    G0001
+    >>> VV
+    {G0001, a, ...}
+    >>> VV['d']
+    d
+    >>> VV.fresh()
+    G0002
+
+    ----------------------------------------------------------------------------
+    Test merge:
+    ----------------------------------------------------------------------------
+    >>> VV.stash()
+    >>> VV.fresh()
+    G0001
+
+    >>> VV.stack == [{'a', 'b', 'd', 'c'}, {'G0001', 'a', 'G0002', 'd'}, {'G0001'}]
+    True
+    >>> VV.merge()
+    >>> VV.stack == [{'d', 'b', 'a', 'c'}, {'d', 'G0002', 'G0001', 'a'}]
+    True
+    >>> VV.merge()
+    >>> VV.stack == [{'G0002', 'b', 'G0001', 'a', 'c', 'd'}]
+    True
+
+    Test merge at bottom of stack:
+    >>> VV.merge()
+    Traceback (most recent call last):
+    ...
+    ValueError: illegal merge at bottom of stack
+    >>> VV.stack == [{'b', 'G0001', 'd', 'a', 'c', 'G0002'}]
+    True
+
+    ----------------------------------------------------------------------------
+    Test _drop:
+    ----------------------------------------------------------------------------
+    >>> VV.stash()
+    >>> VV['will_be_lost']
+    will_be_lost
+    >>> VV.stack == [{'d', 'G0001', 'c', 'G0002', 'b', 'a'}, {'will_be_lost'}]
+    True
+    >>> VV._drop()
+    >>> VV.stack == [{'d', 'a', 'b', 'c', 'G0002', 'G0001'}]
+    True
+
+    Test _drop at bottom of stack:
+    >>> VV._drop()
+    Traceback (most recent call last):
+    ...
+    ValueError: illegal _drop at bottom of stack
+
+    Test get, which is inherited from logic1.firstorder.atomic.VariableSet:
+    >>> VV.get('d', 'e')
+    (d, e)
+
+    The method imp also inherited from logic1.firstorder.atomic.VariableSet
+    cannot be tested because we are not interactive here.
+
+    >>> VV.stack == [{'b', 'c', 'G0001', 'G0002', 'e', 'd', 'a'}]
+    True
+
+    """
+
+class Term:
+    """
+    >>> VV._reset()
+
+    ----------------------------------------------------------------------------
+    Test __add__:
+    ----------------------------------------------------------------------------
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> x + y
+    x + y
+    >>> y + x
+    x + y
+    >>> x + 1
+    x + 1
+
+    ----------------------------------------------------------------------------
+    Test __radd__:
+    ----------------------------------------------------------------------------
+    >>> 1 + x
+    x + 1
+
+    ----------------------------------------------------------------------------
+    Test __eq__:
+    ----------------------------------------------------------------------------
+    >>> x == x
+    Eq(0, 0)
+    >>> bool(x == x)
+    True
+    >>> x == y
+    x - y == 0
+    >>> bool(x == y)
+    False
+    >>> x - x == Term(0)
+    Eq(0, 0)
+    >>> bool(x - x == Term(0))
+    True
+    >>> x - x + 1 == Term(1)
+    Eq(0, 0)
+    >>> bool(x - x + 1 == Term(1))
+    True
+
+    The following is an invariant required by __hash__. It is asserted on the
+    toplevel of the class. We double-check here:
+    >>> hash(mpq(0)) == 0
+    True
+
+    ----------------------------------------------------------------------------
+    Test __hash__:
+    ----------------------------------------------------------------------------
+    >>> d = {x: 1, y: 2}
+    >>> d[x]
+    1
+    >>> hash(x - x) == hash(Term(0))
+    True
+    >>> hash(x - x + 1) == hash(Term(1))
+    True
+    >>> _ = hash(x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1)
+
+        ----------------------------------------------------------------------------
+    Test __ init__:
+    ----------------------------------------------------------------------------
+    >>> Term(Fraction(1, 2))
+    1/2
+    >>> Term(42)
+    42
+    >>> Term(mpq(1, 2))
+    1/2
+
+    ----------------------------------------------------------------------------
+    Test __iter__:
+    ----------------------------------------------------------------------------
+    >>> list(Term(0))
+    []
+    >>> list(Term(2))
+    [(mpq(2,1), 1)]
+    >>> list(x - x)
+    []
+    >>> t = (x - y + 2) ** 2
+    >>> [(abs(coef), power_product) for coef, power_product in t]
+    [(mpq(1,1), x**2), (mpq(2,1), x*y), (mpq(1,1), y**2), (mpq(4,1), x), (mpq(4,1), y), (mpq(4,1), 1)]
+
+    ----------------------------------------------------------------------------
+    Test __mul__:
+    ----------------------------------------------------------------------------
+    >>> x * y
+    x*y
+    >>> (x + y) * (y + x)
+    x**2 + 2*x*y + y**2
+    >>> x * 2
+    2*x
+
+    ----------------------------------------------------------------------------
+    Test __rmul__:
+    ----------------------------------------------------------------------------
+    >>> 2 * x
+    2*x
+
+    ----------------------------------------------------------------------------
+    Test __neg__:
+    ----------------------------------------------------------------------------
+    >>> -(x + y)
+    -x - y
+
+    ----------------------------------------------------------------------------
+    Test __pow__:
+    ----------------------------------------------------------------------------
+    >>> f = x + y
+    >>> f ** 0
+    1
+    >>> f ** 1
+    x + y
+    >>> f ** 2
+    x**2 + 2*x*y + y**2
+
+    The following is for repeated squaring:
+    >>> f ** 5
+    x**5 + 5*x**4*y + 10*x**3*y**2 + 10*x**2*y**3 + 5*x*y**4 + y**5
+
+    ----------------------------------------------------------------------------
+    Test __repr__:
+    ----------------------------------------------------------------------------
+    >>> f = (x + y) ** 2
+    >>> f
+    x**2 + 2*x*y + y**2
+
+    ----------------------------------------------------------------------------
+    Test __str__:
+    ----------------------------------------------------------------------------
+    >>> print(f)
+    x^2 + 2*x*y + y^2
+    >>> print(Term(0))
+    0
+    >>> print(Term(1))
+    1
+    >>> print(Term(-1))
+    -1
+    >>> print(Term(2))
+    2
+    >>> print(Term(-2))
+    -2
+    >>> print(x)
+    x
+    >>> print(x - 2 * y)
+    x - 2*y
+    >>> print(2 * y - x)
+    -x + 2*y
+    >>> print((7 * x + y + mpq(-1, 2)) ** 2)
+    49*x^2 + 14*x*y + y^2 - 7*x - y + 1/4
+
+    ----------------------------------------------------------------------------
+    Test __sub__:
+    ----------------------------------------------------------------------------
+    >>> x - y
+    x - y
+    >>> (x - y) * (x + y)
+    x**2 - y**2
+    >>> x - 1
+    x - 1
+
+    ----------------------------------------------------------------------------
+    Test __rsub__:
+    ----------------------------------------------------------------------------
+    >>> 1 - x
+    -x + 1
+
+    ----------------------------------------------------------------------------
+    Test __truediv__:
+    ----------------------------------------------------------------------------
+    >>> Term(2) / Term(3)
+    2/3
+    >>> x / 0
+    Traceback (most recent call last):
+    ...
+    ZeroDivisionError: fmpq_mpoly division by zero
+    >>> x / x
+    1
+    >>> (x + y) ** 2 / x
+    Traceback (most recent call last):
+    ...
+    flint.utils.flint_exceptions.DomainError: fmpq_mpoly division is not exact
+    >>> (x + y) ** 2 / 2
+    1/2*x**2 + x*y + 1/2*y**2
+
+    ----------------------------------------------------------------------------
+    Test as_fraction
+    ----------------------------------------------------------------------------
+    ...
+
+    ----------------------------------------------------------------------------
+    Test as_variable:
+    ----------------------------------------------------------------------------
+    >>> t = x + x - x
+    >>> type(t)
+    <class 'logic1.theories.RCF.term.term_flint.Term'>
+    >>> v = t.as_variable()
+    >>> type(v)
+    <class 'logic1.theories.RCF.term.term_flint.Variable'>
+    >>> v == t
+    Eq(0, 0)
+    >>> bool(v == t)
+    True
+
+    >>> VV.stash()
+    >>> will_be_lost = VV['will_be_lost']
+    >>> VV._drop()
+    >>> R.coerce(will_be_lost)
+    Traceback (most recent call last):
+    ...
+    AssertionError: will_be_lost uses a context with unknown variables {'will_be_lost'}
+
+    ----------------------------------------------------------------------------
+    Test coefficient:
+    ----------------------------------------------------------------------------
+    >>> f = (x - y + 2) ** 2; f
+    x**2 - 2*x*y + y**2 + 4*x - 4*y + 4
+    >>> f.coefficient({x: 1, y: 1})
+    -2
+    >>> f.coefficient({x: 1})
+    -2*y + 4
+
+    >>> f = x * y + y + 5
+    >>> f.coefficient({x: 0, y: 1})
+    1
+    >>> f.coefficient({x: 0})
+    y + 5
+
+    >>> f = (1 + y + y**2) * (1 + x + x**2)
+    >>> f.coefficient({x: 0})
+    y**2 + y + 1
+
+    ----------------------------------------------------------------------------
+    Test constant_coefficient:
+    ----------------------------------------------------------------------------
+    >>> Term(0).constant_coefficient()
+    mpq(0,1)
+    >>> Term(-2).constant_coefficient()
+    mpq(-2,1)
+
+    >>> (x - x).constant_coefficient()
+    mpq(0,1)
+    >>> f = 3 * x**2
+    >>> f.constant_coefficient()
+    mpq(0,1)
+    >>> f = 3 * x**2 - 2 * y + 7 * x**2 * y**2 + 5
+    >>> f.constant_coefficient()
+    mpq(5,1)
+
+    ----------------------------------------------------------------------------
+    Test content:
+    ----------------------------------------------------------------------------
+    All integers:
+    >>> (12 * x + 18 * y + 24).content()
+    mpq(6,1)
+
+    Simple fractions:
+    >>> (mpq(2, 3) * x + mpq(4, 9) * y + mpq(8, 15)).content()
+    mpq(2,45)
+
+    Same denominators:
+    >>> (mpq(6, 7) * x + mpq(9, 7) * y + mpq(15, 7)).content()
+    mpq(3,7)
+
+    Relatively prime case:
+    >>> (mpq(5, 6) * x + mpq(7, 10) * y + mpq(11, 15)).content()
+    mpq(1,30)
+
+    Negative coefficients:
+    >>> (mpq(-6, 8) * x + mpq(9, 12) * y - mpq(15, 20)).content()
+    mpq(3,4)
+
+    Zero:
+    >>> (Term(0)).content()
+    mpq(0,1)
+
+    ----------------------------------------------------------------------------
+    Test degree:
+    ----------------------------------------------------------------------------
+    >>> Term(3).degree(x)
+    0
+    >>> x.degree(x)
+    1
+    >>> x.degree(y)
+    0
+    >>> (x**2).degree(x)
+    2
+    >>> (y**3).degree(y)
+    3
+    >>> (x**2 * y**3).degree(x)
+    2
+    >>> (x**2 * y**3).degree(y)
+    3
+    >>> (x*y + x**2).degree(x)
+    2
+    >>> (x*y + x**2).degree(y)
+    1
+    >>> ((x - y + 2)**2).degree(x)
+    2
+    >>> (2*y*x**2 + x + 1).degree(x)
+    2
+    >>> (2*y*x**2 + x + 1).degree(y)
+    1
+    >>> (x*y + 1).degree(z)
+    0
+
+    ----------------------------------------------------------------------------
+    Test derivative:
+    ----------------------------------------------------------------------------
+    Single variable:
+    >>> (x ** 3).derivative(x)
+    3*x**2
+    >>> (x ** 3).derivative(y)
+    0
+
+    Multivariate polynomial:
+    >>> (x ** 2 * y ** 3 * z).derivative(x)
+    2*x*y**3*z
+    >>> (x ** 2 * y ** 3 * z).derivative(y)
+    3*x**2*y**2*z
+    >>> (x ** 2 * y ** 3 * z).derivative(z)
+    x**2*y**3
+
+    Higher-order derivatives:
+    >>> (x ** 4).derivative(x, 2)
+    12*x**2
+    >>> (x ** 4).derivative(x, 4)
+    24
+    >>> (x ** 4).derivative(x, 5)
+    0
+
+    Rational coefficients:
+    >>> (mpq(1, 2) * x ** 2 + mpq(3, 4) * y ** 3).derivative(x)
+    x
+    >>> (mpq(1, 2) * x ** 2 + mpq(3, 4) * y ** 3).derivative(y)
+    9/4*y**2
+
+    Sum of terms:
+    >>> (x ** 2 * y + x * z ** 2 + y ** 2 * z).derivative(x)
+    2*x*y + z**2
+    >>> (x ** 2 * y + x * z ** 2 + y ** 2 * z).derivative(y)
+    x**2 + 2*y*z
+    >>> (x ** 2 * y + x * z ** 2 + y ** 2 * z).derivative(z)
+    2*x*z + y**2
+
+    Constants:
+    >>> Term(mpq(5)).derivative(x)
+    0
+
+    ----------------------------------------------------------------------------
+    Test factor:
+    ----------------------------------------------------------------------------
+    Difference of squares:
+    >>> unit, D = (-x**2 + y**2).factor()
+    >>> unit
+    mpq(-1,1)
+    >>> sorted(D.items(), key=lambda item: repr(item[0]))
+    [(x + y, 1), (x - y, 1)]
+
+    Repeated factor:
+    >>> unit, D = (x**3 - mpq(2) * x**2 + x).factor()
+    >>> unit
+    mpq(1,1)
+    >>> sorted(D.items(), key=lambda item: repr(item[0]))
+    [(x, 1), (x - 1, 2)]
+
+    Irreducible polynomial:
+    >>> unit, D = (x**2 + y**2 + z**2).factor()
+    >>> unit
+    mpq(1,1)
+    >>> sorted(D.items(), key=lambda item: repr(item[0]))
+    [(x**2 + y**2 + z**2, 1)]
+
+    Rational unit:
+    >>> unit, D = (mpq(3, 4) * x**2 - mpq(3, 4)).factor()
+    >>> unit
+    mpq(3,4)
+    >>> sorted(D.items(), key=lambda item: repr(item[0]))
+    [(x + 1, 1), (x - 1, 1)]
+
+    Three variables:
+    >>> unit, D = (x**2 * z - y**2 * z).factor()
+    >>> unit
+    mpq(1,1)
+    >>> sorted(D.items(), key=lambda item: repr(item[0]))
+    [(x + y, 1), (x - y, 1), (z, 1)]
+
+    Constant:
+    >>> Term(mpq(6)).factor()
+    (mpq(6,1), {})
+
+    Zero:
+    >>> Term(mpq(0)).factor()
+    (mpq(0,1), {})
+
+    ----------------------------------------------------------------------------
+    Test from_raw:
+    ----------------------------------------------------------------------------
+    From a variable's raw polynomial:
+    >>> Term.from_raw(x._poly)
+    x
+
+    From a constant polynomial:
+    >>> ctx = fmpq_mpoly_ctx.get((), 'deglex')
+    >>> p = ctx.constant(fmpq(3, 4))
+    >>> Term.from_raw(p)
+    3/4
+
+    From coerced polynomials in a shared context:
+    >>> Term.from_raw((x**2 + z)._poly)
+    x**2 + z
+
+    ----------------------------------------------------------------------------
+    Test from_sage/to_sage:
+    ----------------------------------------------------------------------------
+    >>> tests = (y, f, f**2, x**2 + y**2 + 1, Term(0), Term(1), Term(mpq(1, 2)), Term(mpq(-3, 4)))
+    >>> all(Term.from_sage(test.to_sage()) == test for test in tests)
+    True
+
+    ----------------------------------------------------------------------------
+    Test is_constant:
+    ----------------------------------------------------------------------------
+    >>> Term(0).is_constant()
+    True
+    >>> Term(1).is_constant()
+    True
+    >>> Term(-2).is_constant()
+    True
+    >>> (x - x).is_constant()
+    True
+    >>> x.is_constant()
+    False
+    >>> ((x + y) ** 2).is_constant()
+    False
+
+    ----------------------------------------------------------------------------
+    Test is_definite:
+    ----------------------------------------------------------------------------
+    >>> print(Term(0).is_definite())
+    DEFINITE.ZERO
+
+    >>> f = x**2 + y**2
+    >>> print(f.is_definite())
+    DEFINITE.POSITIVE_SEMI
+
+    >>> g = -x**2 - y**2 - 1
+    >>> print(g.is_definite())
+    DEFINITE.NEGATIVE
+
+    >>> h = (x - y) ** 2
+    >>> print(h.is_definite())
+    DEFINITE.UNKNOWN
+
+    >>> print(h.is_definite(assume={x: DEFINITE.POSITIVE, y: DEFINITE.NEGATIVE}))
+    DEFINITE.POSITIVE
+
+    >>> print(h.is_definite(assume={x: DEFINITE.NEGATIVE_SEMI, y: DEFINITE.POSITIVE_SEMI}))
+    DEFINITE.POSITIVE_SEMI
+
+    ----------------------------------------------------------------------------
+    Test is_monomial:
+    ----------------------------------------------------------------------------
+    >>> Term(0).is_monomial()
+    False
+    >>> Term(1).is_monomial()
+    True
+    >>> Term(2).is_monomial()
+    False
+    >>> Term(-1).is_monomial()
+    False
+    >>> (x - x).is_monomial()
+    False
+    >>> (x - x + 1).is_monomial()
+    True
+    >>> x.is_monomial()
+    True
+    >>> (x + 1).is_monomial()
+    False
+    >>> (x**2 * y).is_monomial()
+    True
+    >>> (2 * x**2 * y).is_monomial()
+    False
+
+    ----------------------------------------------------------------------------
+    Test is_variable:
+    ----------------------------------------------------------------------------
+    >>> Term(0).is_variable()
+    False
+    >>> Term(1).is_variable()
+    False
+    >>> (x - x).is_variable()
+    False
+    >>> (x - x + 1).is_variable()
+    False
+    >>> x.is_variable()
+    True
+    >>> (x ** 2).is_variable()
+    False
+    >>> (x * y).is_variable()
+    False
+    >>> (x + 1).is_variable()
+    False
+
+    ----------------------------------------------------------------------------
+    Test is_weakly_parametric_linear:
+    ----------------------------------------------------------------------------
+    >>> a, b = VV.get('a', 'b')
+    >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+    >>> term.is_weakly_parametric_linear({x, y})
+    True
+    >>> term.is_weakly_parametric_linear({a})
+    False
+    >>> term.is_weakly_parametric_linear({b})
+    False
+
+    ----------------------------------------------------------------------------
+    Test is_zero:
+    ----------------------------------------------------------------------------
+    >>> Term(0).is_zero()
+    True
+    >>> Term(1).is_zero()
+    False
+    >>> (x - x).is_zero()
+    True
+    >>> x.is_zero()
+    False
+
+    ----------------------------------------------------------------------------
+    Test lc:
+    ----------------------------------------------------------------------------
+    >>> Term(0).lc()
+    mpq(0,1)
+    >>> Term(1).lc()
+    mpq(1,1)
+    >>> (x - x).lc()
+    mpq(0,1)
+    >>> (x - x + 1).lc()
+    mpq(1,1)
+    >>> f = mpq(-1, 2) * x ** 2 + x * y
+    >>> f
+    -1/2*x**2 + x*y
+    >>> f.lc()
+    mpq(-1,2)
+
+    ----------------------------------------------------------------------------
+    Test monomial_coefficient:
+    ----------------------------------------------------------------------------
+    >>> t = mpq(2, 3) * x**2 * y + mpq(5, 7) * x - mpq(1, 4)
+
+    Existing monomial:
+    >>> t.monomial_coefficient(x**2 * y)
+    mpq(2,3)
+    >>> t.monomial_coefficient(x)
+    mpq(5,7)
+
+    Constant term:
+    >>> t.monomial_coefficient(Term(1))
+    mpq(-1,4)
+
+    Missing monomial:
+    >>> t.monomial_coefficient(y)
+    mpq(0,1)
+    >>> t.monomial_coefficient(x**2)
+    mpq(0,1)
+
+    Constant polynomial:
+    >>> Term(5).monomial_coefficient(x)
+    mpq(0,1)
+    >>> Term(5).monomial_coefficient(Term(1))
+    mpq(5,1)
+
+    Zero polynomial:
+    >>> Term(0).monomial_coefficient(Term(1))
+    mpq(0,1)
+
+    ----------------------------------------------------------------------------
+    Test monomials:
+    ----------------------------------------------------------------------------
+    >>> f = (x + y) ** 5
+    >>> list(f.monomials())
+    [x**5, x**4*y, x**3*y**2, x**2*y**3, x*y**4, y**5]
+
+    >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
+    >>> list(motzkin.monomials())
+    [x**4*y**2, x**2*y**4, x**2*y**2, 1]
+
+    >>> list(Term(0).monomials())
+    []
+
+    >>> list(Term(1).monomials())
+    [1]
+
+    ----------------------------------------------------------------------------
+    Test pseudo_quo_rem:
+    ----------------------------------------------------------------------------
+    >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+
+    >>> f = a * x**2 + b*x + c
+    >>> g = c * x + b
+    >>> q, r = f.pseudo_quo_rem(g, x); q, r
+    (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
+
+    >>> bool(c**(2 - 1 + 1) * f == q * g + r)
+    True
+
+    ----------------------------------------------------------------------------
+    Test quo_rem:
+    ----------------------------------------------------------------------------
+    >>> f = 2*y*x**2 + x + 1
+    >>> f.quo_rem(x)
+    (2*x*y + 1, 1)
+
+    >>> f.quo_rem(y)
+    (2*x**2, x + 1)
+
+    >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
+    (2/3*x*y + 1/3, 1)
+
+    ----------------------------------------------------------------------------
+    Test reduce:
+    ----------------------------------------------------------------------------
+    >>> f1 = -2 * x**2 + x**3
+    >>> f2 = -2 * y + x* y
+    >>> f3 = -x**2 + y**2
+    >>> F = [f1, f2, f3]
+    >>> g = x*y - 3*x*y**2
+    >>> g.reduce(F)
+    -6*y**2 + 2*y
+
+    ----------------------------------------------------------------------------
+    Test subs_linear_solution:
+    ----------------------------------------------------------------------------
+    Simple substitution:
+    >>> t = 3 * x + 2
+    >>> mp = x + 5
+    >>> t.subs_linear_solution(x, mp)
+    -13
+
+    Parametric case:
+    >>> t = 2 * x + y
+    >>> mp = x - z
+    >>> t.subs_linear_solution(x, mp)
+    y + 2*z
+
+    Rational coefficients:
+    >>> t = mpq(1, 2) * x + mpq(3, 4)
+    >>> mp = mpq(2, 3) * x + mpq(1, 5)
+    >>> t.subs_linear_solution(x, mp)
+    3/5
+
+    Zero constant term in self:
+    >>> t = 3 * x
+    >>> mp = x + 2
+    >>> t.subs_linear_solution(x, mp)
+    -6
+
+    Zero constant term in minimal_polynomial:
+    >>> t = 2 * x + 1
+    >>> mp = 3 * x
+    >>> t.subs_linear_solution(x, mp)
+    1
+
+    Both zero constant terms:
+    >>> t = 4 * x
+    >>> mp = 2 * x
+    >>> t.subs_linear_solution(x, mp)
+    0
+
+    Self is purely constant (zero coefficient of x):
+    >>> t = Term(7)
+    >>> mp = x + 3
+    >>> t.subs_linear_solution(x, mp)
+    7
+
+    ----------------------------------------------------------------------------
+    Test summands:
+    ----------------------------------------------------------------------------
+    >>> f = (x + y) ** 5
+    >>> list(f.summands())  # doctest: +NORMALIZE_WHITESPACE
+    [({x: 5}, mpq(1,1)), ({x: 4, y: 1}, mpq(5,1)),
+     ({x: 3, y: 2}, mpq(10,1)), ({x: 2, y: 3}, mpq(10,1)),
+     ({x: 1, y: 4}, mpq(5,1)), ({y: 5}, mpq(1,1))]
+
+    >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
+    >>> list(motzkin.summands())  # doctest: +NORMALIZE_WHITESPACE
+    [({x: 4, y: 2}, mpq(1,1)), ({x: 2, y: 4}, mpq(1,1)),
+     ({x: 2, y: 2}, mpq(-3,1)), ({}, mpq(1,1))]
+
+    >>> list(Term(0).summands())
+    []
+
+    >>> list(Term(1).summands())
+    [({}, mpq(1,1))]
+
+    ----------------------------------------------------------------------------
+    Test _summands_as_hashable:
+    ----------------------------------------------------------------------------
+    >>> f._summands_as_hashable()  # doctest: +NORMALIZE_WHITESPACE
+    (((('x', 5),), mpq(1,1)), ((('x', 4), ('y', 1)), mpq(5,1)),
+     ((('x', 3), ('y', 2)), mpq(10,1)), ((('x', 2), ('y', 3)), mpq(10,1)),
+     ((('x', 1), ('y', 4)), mpq(5,1)), ((('y', 5),), mpq(1,1)))
+
+    >>> motzkin._summands_as_hashable()  # doctest: +NORMALIZE_WHITESPACE
+    (((('x', 4), ('y', 2)), mpq(1,1)), ((('x', 2), ('y', 4)), mpq(1,1)),
+     ((('x', 2), ('y', 2)), mpq(-3,1)), ((), mpq(1,1)))
+
+    >>> Term(0)._summands_as_hashable()
+    ()
+
+    >>> Term(1)._summands_as_hashable()
+    (((), mpq(1,1)),)
+
+    ----------------------------------------------------------------------------
+    Test vars:
+    ----------------------------------------------------------------------------
+    Single variable:
+    >>> list((x).vars())
+    [x]
+
+    Multiple variables:
+    >>> list((x**2 + y).vars())
+    [x, y]
+
+    Three variables in deglex order:
+    >>> list((z + x*y).vars())
+    [x, y, z]
+
+    Constant:
+    >>> list(Term(5).vars())
+    []
+
+    Zero:
+    >>> list(Term(0).vars())
+    []
+
+    Regression: x - x is different from 0 in flint:
+    >>> list((x - x).vars())
+    []
+
+    Variable absent after cancellation:
+    >>> list((x + y - y).vars())
+    [x]
+
+    """

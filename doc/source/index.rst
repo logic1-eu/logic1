@@ -10,7 +10,7 @@ Introduction
 **Logic1 – Interpreted First-order Logic in Python**
 
 Authors:
-`Nicolas Faroß <https://www.uni-saarland.de/lehrstuhl/weber-moritz/team/nicolas-faross.html>`_,
+`Nicolas Faroß <https://www.chalmers.se/en/persons/faross/>`_,
 `Thomas Sturm <https://science.thomas-sturm.de/>`_
 
 License: GPL-2.0-or-later
@@ -52,7 +52,7 @@ Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b^2 <= 
 
 Consider the infinite real sequence defined by :math:`x_{i+2} = |x_{i+1}| -
 x_{i}`. Logic1 can check that this sequence has period 9 for all possible
-choices of :math:`x_1`, :math:`x_2`. The final output :data:`T` is a constant
+choices of :math:`x_1`, :math:`x_2`. The final output :code:`T` is a constant
 logical operator representing "True":
 
 >>> from logic1 import *
@@ -78,6 +78,7 @@ T
    api/firstorder/index.rst
    api/theories/RCF/index.rst
    api/theories/Sets/index.rst
+   api/theories/Complex/index.rst
    api/abc/index.rst
    api/support/index.rst
 

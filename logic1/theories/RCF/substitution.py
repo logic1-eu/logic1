@@ -5,7 +5,8 @@ from functools import lru_cache
 from gmpy2 import mpq
 from typing import Final, Iterator, Optional, Self
 
-from .atomic import CACHE_SIZE, Eq, SortKey, Term, Variable
+from logic1.theories.RCF.term import CACHE_SIZE, SortKey, Term, Variable
+from logic1.theories.RCF.atomic import Eq
 
 
 @dataclass(frozen=True)

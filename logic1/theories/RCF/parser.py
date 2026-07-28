@@ -1,9 +1,10 @@
 import ast
 from typing import Any
 
-from ... import abc
-from ...firstorder import And, Formula
-from .atomic import Eq, Ne, Le, Lt, Gt, Ge, Term, AtomicFormula, Variable, VV
+from logic1 import abc
+from logic1.firstorder import And, Formula
+from logic1.theories.RCF.term import Term, Variable, VV
+from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Le, Lt, Gt, Ge
 
 
 class L1Parser(abc.parser.L1Parser[AtomicFormula, Term, Variable, int]):

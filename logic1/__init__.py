@@ -14,6 +14,6 @@ from .firstorder import (Formula, AtomicFormula, Term, Variable,  # noqa
 
 from . import theories
 
-from .theories import RCF, Sets  # noqa
+from .theories import Complex, RCF, Sets  # noqa
 
 __all__ = firstorder.__all__ + theories.__all__

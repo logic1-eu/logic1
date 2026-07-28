@@ -1,6 +1,7 @@
 import datetime
 import logging
 import time
+import sys
 
 
 class DeltaTimeFormatter(logging.Formatter):
@@ -19,7 +20,13 @@ class DeltaTimeFormatter(logging.Formatter):
     0:00:00.012: Hello world!
     """
 
-    _time_since_start_time = time.time() - logging._startTime  # type: ignore
+    assert sys.version_info.major >= 3, 'Python 3 is required to use this module.'
+    if sys.version_info.minor < 13:
+        _start_time = logging._startTime  # type: ignore
+    else:
+        _start_time = logging._startTime / 1e9  # type: ignore
+
+    _time_since_start_time = time.time() - _start_time
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = record.relativeCreated / 1000 - self._time_since_start_time
@@ -31,14 +38,14 @@ class DeltaTimeFormatter(logging.Formatter):
         """Get the reference time in seconds since the :ref:`epoch <epoch>`.
         This is compatible with the output of :func:`.time.time`.
         """
-        return self._time_since_start_time + logging._startTime  # type: ignore
+        return self._time_since_start_time + self._start_time  # type: ignore
 
     def set_reference_time(self, reference_time: float) -> None:
         """Set the reference time to `reference_time` seconds since the
         :ref:`epoch <epoch>`. This specification of `reference_time` is
         compatible with the output of :func:`.time.time`.
         """
-        self._time_since_start_time = reference_time - logging._startTime  # type: ignore
+        self._time_since_start_time = reference_time - self._start_time  # type: ignore
 
 
 class RateFilter(logging.Filter):

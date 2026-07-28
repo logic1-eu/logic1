@@ -8,8 +8,8 @@ formulas with a binary relation symbol :math:`r`. For instance, if `R` is
 the following discussion:
 
 >>> from logic1.theories.RCF import Eq, Ne, Ge, Le, Gt, Lt
->>> Eq(0, 0).op
- <class 'logic1.theories.RCF.atomic.Eq'>
+>>> Eq(0, 0).op  # doctest: +ELLIPSIS
+ <class 'logic1.theories.RCF.atomic...Eq'>
 
 Assume that :math:`r` is defined on a domain :math:`D`. Then the
 *complement relation* of :math:`r` is defined as :math:`\overline{r} = D^2
@@ -17,13 +17,13 @@ Assume that :math:`r` is defined on a domain :math:`D`. Then the
 e.g.:
 
 >>> rels = (Eq, Ne, Ge, Le, Gt, Lt)
->>> tuple(r.complement() for r in rels)
-(<class 'logic1.theories.RCF.atomic.Ne'>,
- <class 'logic1.theories.RCF.atomic.Eq'>,
- <class 'logic1.theories.RCF.atomic.Lt'>,
- <class 'logic1.theories.RCF.atomic.Gt'>,
- <class 'logic1.theories.RCF.atomic.Le'>,
- <class 'logic1.theories.RCF.atomic.Ge'>)
+>>> tuple(r.complement() for r in rels)  # doctest: +ELLIPSIS
+(<class 'logic1.theories.RCF.atomic...Ne'>,
+ <class 'logic1.theories.RCF.atomic...Eq'>,
+ <class 'logic1.theories.RCF.atomic...Lt'>,
+ <class 'logic1.theories.RCF.atomic...Gt'>,
+ <class 'logic1.theories.RCF.atomic...Le'>,
+ <class 'logic1.theories.RCF.atomic...Ge'>)
 
 Since :math:`\overline{r}(s, t)` is equivalent to :math:`\neg r(s, t)`, the
 availability of complement relations is relevant for the computation of
@@ -34,13 +34,13 @@ The *converse relation* of :math:`r` is defined as
 :math:`r^{-1} = \{ (x, y) \in D : (y, x) \in r \}`.
 It is avaialable as a class method :meth:`R.converse`, e.g.:
 
->>> tuple(r.converse() for r in rels)
-(<class 'logic1.theories.RCF.atomic.Eq'>,
- <class 'logic1.theories.RCF.atomic.Ne'>,
- <class 'logic1.theories.RCF.atomic.Le'>,
- <class 'logic1.theories.RCF.atomic.Ge'>,
- <class 'logic1.theories.RCF.atomic.Lt'>,
- <class 'logic1.theories.RCF.atomic.Gt'>)
+>>> tuple(r.converse() for r in rels)  # doctest: +ELLIPSIS
+(<class 'logic1.theories.RCF.atomic...Eq'>,
+ <class 'logic1.theories.RCF.atomic...Ne'>,
+ <class 'logic1.theories.RCF.atomic...Le'>,
+ <class 'logic1.theories.RCF.atomic...Ge'>,
+ <class 'logic1.theories.RCF.atomic...Lt'>,
+ <class 'logic1.theories.RCF.atomic...Gt'>)
 
 The converse relation is the inverse with respect to composition.
 
@@ -49,13 +49,13 @@ Finally, the *dual relation* of :math:`r` is defined as
 :meth:`R.dual`. Generally, :math:`\overline{r}^{-1} = \overline{r^{-1}}`,
 e.g.:
 
->>> tuple(r.dual() for r in rels)
-(<class 'logic1.theories.RCF.atomic.Ne'>,
- <class 'logic1.theories.RCF.atomic.Eq'>,
- <class 'logic1.theories.RCF.atomic.Gt'>,
- <class 'logic1.theories.RCF.atomic.Lt'>,
- <class 'logic1.theories.RCF.atomic.Ge'>,
- <class 'logic1.theories.RCF.atomic.Le'>)
+>>> tuple(r.dual() for r in rels)  # doctest: +ELLIPSIS
+(<class 'logic1.theories.RCF.atomic...Ne'>,
+ <class 'logic1.theories.RCF.atomic...Eq'>,
+ <class 'logic1.theories.RCF.atomic...Gt'>,
+ <class 'logic1.theories.RCF.atomic...Lt'>,
+ <class 'logic1.theories.RCF.atomic...Ge'>,
+ <class 'logic1.theories.RCF.atomic...Le'>)
 >>> all(r.dual() == r.complement().converse() for r in rels)
 True
 >>> all(r.dual() == r.converse().complement() for r in rels)
