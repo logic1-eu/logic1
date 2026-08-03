@@ -17,19 +17,20 @@ from logic1.support.tracing import trace
 
 τ = TypeVar('τ', bound='Term')
 """A type variable denoting a type of terms with upper bound
-:class:`logic1.firstorder.atomic.Term`.
+:class:`logic1.firstorder.term.Term`.
 """
 
 χ = TypeVar('χ', bound='Variable')
 """A type variable denoting a type of variables with upper bound
-:class:`logic1.firstorder.atomic.Variable`.
+:class:`logic1.firstorder.term.Variable`.
 """
 
 σ = TypeVar('σ')
-"""A type variable denoting a type admissible as a dictionary entry in
-:meth:`.subs`, in addition to terms. Instances of type :data:`.σ` that are
-passed to :meth:`.subs` must not contain any variables. A typical example
-is :data:`σ` == :class:`int` in the theory of real closed fields.
+"""A type variable denoting a type that is admissible in addition to terms as a
+dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
+:data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
+any variables. A typical example is setting :data:`σ` to :class:`int` in the
+theory of real closed fields.
 """
 
 
@@ -356,7 +357,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False
 
     def as_redlog(self) -> str:
-        r"""Redlog representation as a string, which can be used elsewhere.
+        """Redlog representation as a string, which can be used elsewhere.
         """
         match self:
             case All():
@@ -449,7 +450,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
             * :meth:`qvars` -- all quantified variables
-            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
+            * :meth:`Term.vars() <.firstorder.term.Term.vars>` -- all occurring variables
         """
         match self:
             case All() | Ex():
@@ -576,7 +577,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
             * :meth:`qvars` -- all quantified variables
-            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
+            * :meth:`Term.vars() <.firstorder.term.Term.vars>` -- all occurring variables
         """
         match self:
             case All() | Ex():
@@ -667,7 +668,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
     @staticmethod
     def is_term(t: τ | σ) -> TypeIs[τ]:
         """Type narrowing :func:`isinstance` test for
-        :class:`.firstorder.atomic.Term`.
+        :class:`.firstorder.term.Term`.
         """
         return isinstance(t, Term)
 
@@ -748,7 +749,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         .. seealso::
             * :meth:`bvars` -- all occurring bound variables
             * :meth:`fvars` -- all occurring free variables
-            * :meth:`Term.vars() <.firstorder.atomic.Term.vars>` -- all occurring variables
+            * :meth:`Term.vars() <.firstorder.term.Term.vars>` -- all occurring variables
         """
         match self:
             case All() | Ex():
@@ -992,15 +993,16 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         """Convert to Negation Normal Form.
 
         A Negation Normal Form (NNF) is an equivalent formula within which the
-        application of :class:`Not` is restricted to atomic formulas, i.e.,
-        instances of :class:`AtomicFormula`, and truth values :data:`T` and
-        :data:`F`. The only other operators admitted are :class:`And`,
-        :class:`Or`, :class:`Ex`, and :class:`All`.
+        application of :class:`.Not` is restricted to atomic formulas, i.e.,
+        instances of :class:`AtomicFormula <.firstorder.atomic.AtomicFormula>`,
+        and truth values :data:`.T` and :data:`.F`. The only other operators
+        admitted are :class:`.And`, :class:`.Or`, :class:`.Ex`, and
+        :class:`.All`.
 
         If the input is quanitfier-free, :meth:`to_nnf` will not introduce any
         quanitfiers.
 
-        If `to_positive` is `True`, :class:`Not` is eliminated via replacing
+        If `to_positive` is `True`, :class:`.Not` is eliminated via replacing
         relation symbols with their complements. The result is then even a
         Positive Normal Form.
 
@@ -1055,12 +1057,12 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         """Convert to Prenex Normal Form.
 
         A Prenex Normal Form (PNF) is a Negation Normal Form (NNF) in which all
-        quantifiers :class:`Ex` and :class:`All` stand at the beginning of the
+        quantifiers :class:`.Ex` and :class:`.All` stand at the beginning of the
         formula. The method used here minimizes the number of quantifier
         alternations in the prenex block [Burhenne-1990]_.
 
         If the minimal number of alternations in the result can be achieved
-        with both :class:`Ex` and :class:`All` as the first quantifier in the
+        with both :class:`.Ex` and :class:`.All` as the first quantifier in the
         result, then the former is preferred. This preference can be changed
         with a keyword argument `prefer_universal=True`.
 
@@ -1087,7 +1089,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         """Apply `tr` to all atomic formulas.
 
         Replaces each atomic subformula of `self` with the :class:`Formula`
-        `map_atoms(self)`. If `sort_levels' is :obj:`True`, all subformulas
+        `map_atoms(self)`. If `sort_levels` is :obj:`True`, all subformulas
         built from commutative  boolean operators (:class:`.And`, :class:`.Or`,
         :class:`.Equivalent`) are sorted after the application of `map_atoms`.
 

@@ -15,10 +15,10 @@ from logic1.theories.Complex.atomic import AtomicFormula, Eq, Ne, Ge, Gt, Le, Lt
 
 
 class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
-    """Visitor that evaluates a :class:`.ast.AST` to a term in the
+    """Visitor that evaluates a :class:`.AST` to a term in the
     theory of real closed fields. Raise a :class:`ValueError` if the AST
     contains any complex-specific operations that cannot be evaluated.
-    Implements the abstract class :class:`.ast.ArithmeticEvaluator`.
+    Implements the abstract class :class:`.ArithmeticEvaluator`.
 
     >>> z = ast.Var('z')
     >>> (ast.Re(z) + 1).accept(RCF_Evaluator())
@@ -31,7 +31,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
 
     def add(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
         """Return the sum of two RCF terms. Implements
-        abstract method :meth:`.Complex.ArithmeticEvaluator.add`.
+        abstract method :meth:`.ArithmeticEvaluator.add`.
 
         >>> x, y = RCF.VV.get('x', 'y')
         >>> RCF_Evaluator().add(x, y)
@@ -41,7 +41,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
 
     def neg(self, a: RCF.Term) -> RCF.Term:
         """Return the negation of a RCF term. Implements the
-        abstract method :meth:`.Complex.ArithmeticEvaluator.neg`.
+        abstract method :meth:`.ArithmeticEvaluator.neg`.
 
         >>> x = RCF.VV['x']
         >>> RCF_Evaluator().neg(x)
@@ -51,7 +51,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
 
     def mul(self, a: RCF.Term, b: RCF.Term) -> RCF.Term:
         """Return the product of two RCF terms. Implements the
-        abstract method :meth:`.Complex.ArithmeticEvaluator.mul`.
+        abstract method :meth:`.ArithmeticEvaluator.mul`.
 
         >>> x, y = RCF.VV.get('x', 'y')
         >>> RCF_Evaluator().mul(x, y)
@@ -62,7 +62,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
     def visit_rat(self, num: ast.Rat) -> RCF.Term:
         """Return the RCF term corresponding to a rational number.
         Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_rat`.
+        :meth:`.ASTVisitor.visit_rat`.
 
         >>> RCF_Evaluator().visit_rat(ast.Rat(2))
         2
@@ -72,7 +72,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
     def visit_i(self, _: ast._I) -> RCF.Term:
         """Raise a :class:`ValueError` since the imaginary unit cannot be
         evaluated in RCF. Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_i`.
+        :meth:`.ASTVisitor.visit_i`.
 
         >>> RCF_Evaluator().visit_i(ast.I)
         Traceback (most recent call last):
@@ -84,7 +84,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
     def visit_var(self, var: ast.Var) -> RCF.Term:
         """Raise a :class:`ValueError` since complex variables cannot be
         evaluated in RCF. Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_var`.
+        :meth:`.ASTVisitor.visit_var`.
 
         >>> z = ast.Var('z')
         >>> RCF_Evaluator().visit_var(z)
@@ -97,7 +97,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
     def visit_conj(self, conj: ast.Conj) -> RCF.Term:
         """Raise a :class:`ValueError` since complex conjugation cannot be
         evaluated in RCF. Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_conj`.
+        :meth:`.ASTVisitor.visit_conj`.
 
         >>> z = ast.Var('z')
         >>> RCF_Evaluator().visit_conj(z)
@@ -111,7 +111,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         """Return the RCF term corresponding to the real part of a complex
         variable. If the argument of :code:`re` is not a variable, raise a
         :class:`ValueError`. Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_re`.
+        :meth:`.ASTVisitor.visit_re`.
 
         >>> z = ast.Var('z')
         >>> RCF_Evaluator().visit_re(ast.Re(z))
@@ -130,7 +130,7 @@ class RCF_Evaluator(ArithmeticEvaluator[RCF.Term]):
         """Return the RCF term corresponding to the imaginary part of a complex
         variable. If the argument of :code:`im` is not a variable, raise a
         :class:`ValueError`. Implements the abstract method
-        :meth:`.Complex.TermVisitor.visit_im`.
+        :meth:`.ASTVisitor.visit_im`.
 
         >>> z = ast.Var('z')
         >>> RCF_Evaluator().visit_im(ast.Im(z))
@@ -171,6 +171,7 @@ def _real_atom_to_rcf(atom: AtomicFormula) -> RCF.AtomicFormula:
     else:
         assert False, type(atom)
 
+
 def real_formula_to_rcf(formula: Formula) -> RCF.Formula:
     """Convert a real formula in the theory of complex numbers to an
     equivalent formula in the theory of real closed fields.
@@ -193,6 +194,7 @@ def real_formula_to_rcf(formula: Formula) -> RCF.Formula:
         return formula.op(*(real_formula_to_rcf(arg) for arg in formula.args))
     assert False, type(formula)
 
+
 def real_normal_form(formula: Formula) -> Formula:
     """Convert all atoms in the formula into real normal form.
 
@@ -208,6 +210,7 @@ def real_normal_form(formula: Formula) -> Formula:
     if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
         return formula.op(*(real_normal_form(arg) for arg in formula.args))
     assert False, type(formula)
+
 
 def formula_to_rcf(formula: Formula) -> RCF.Formula:
     """Convert a formula in the theory of complex numbers to an
@@ -241,6 +244,7 @@ def assume_to_rcf(assume: Iterable[AtomicFormula]) -> list[RCF.AtomicFormula]:
     else:
         return []
 
+
 def _variable_to_complex(var: RCF.Variable) -> Term:
     """Convert a RCF variable to a complex variable. The RCF variable
     name must be of the form :code:`*_re` or :code:`*_im`.
@@ -259,6 +263,7 @@ def _variable_to_complex(var: RCF.Variable) -> Term:
     else:
         raise ValueError(f"Unknown variable {name} in RCF formula")
 
+
 def term_to_complex(term: RCF.Term) -> Term:
     """Convert a RCF term to a complex term. The RCF term must be a
     polynomial in variables of the form :code:`*_re` and :code:`*_im`.
@@ -275,6 +280,7 @@ def term_to_complex(term: RCF.Term) -> Term:
             power_product = power_product * _variable_to_complex(var) ** exp
         result = result + coeff * power_product
     return result
+
 
 def formula_to_complex(formula: RCF.Formula) -> Formula:
     """Convert a formula in the theory of real closed fields to an equivalent
@@ -298,6 +304,7 @@ def formula_to_complex(formula: RCF.Formula) -> Formula:
     if isinstance(formula, (And, Or, Not, Implies, Equivalent, _T, _F)):
         return formula.op(*(formula_to_complex(arg) for arg in formula.args))
     assert False, type(formula)
+
 
 def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool = False, **options) -> Formula:
     """Return a quantifier-free formula equivalent to the input formula.

@@ -12,19 +12,19 @@ Quantifier Elimination
   ***********
 
   .. autoclass:: Assumptions
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Nodes
   *****
 
   .. autoclass:: Node
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Quantifier Elimination
   **********************
 
   .. autoclass:: QuantifierElimination
-    :special-members:
+    :exclude-members: __init__, __new__
 
   User Interface
   **************

@@ -21,6 +21,8 @@ dependencies:
   - coverage
   - cython
   - pytest-cython
+  - graphviz
+  - python-graphviz
   - jupyter
   - line_profiler
   - more-itertools

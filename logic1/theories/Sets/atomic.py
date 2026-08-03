@@ -32,9 +32,9 @@ class VariableSet(firstorder.VariableSet['Variable']):
     .. seealso::
         Final methods inherited from parent class:
 
-        * :meth:`.firstorder.atomic.VariableSet.get`
+        * :meth:`.firstorder.term.VariableSet.get`
             -- obtain several variables simultaneously
-        * :meth:`.firstorder.atomic.VariableSet.imp`
+        * :meth:`.firstorder.term.VariableSet.imp`
             -- import variables into global namespace
     """
 
@@ -46,7 +46,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
 
     def __getitem__(self, index: str) -> Variable:
         """Implements abstract method
-        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        :meth:`.firstorder.term.VariableSet.__getitem__`.
         """
         match index:
             case str():
@@ -71,7 +71,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
         ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
+        gensym(). If the optional argument :code:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
         """
         i = 1
@@ -121,7 +121,7 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.atomic.Term.as_latex`.
+        :meth:`.firstorder.term.Term.as_latex`.
         """
         base = self.string.rstrip(string.digits)
         index = self.string[len(base):]
@@ -131,13 +131,13 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
-        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
+        abstract method :meth:`.firstorder.term.Variable.fresh`.
         """
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def sort_key(self) -> str:
         """A sort key suitable for ordering instances of this class. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        the abstract method :meth:`.firstorder.term.Term.sort_key`.
         """
         return self.string
 
@@ -154,7 +154,7 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields this variable. Implements the abstract
-        method :meth:`.firstorder.atomic.Term.vars`.
+        method :meth:`.firstorder.term.Term.vars`.
         """
         yield self
 

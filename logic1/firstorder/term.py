@@ -24,12 +24,12 @@ class VariableSet(ABC, Generic[χ]):
     """The infinite set of all variables of a theory. Variables are uniquely
     identified by their name, which is a :external:class:`str`. Subclasses
     within theories are singletons, and their unique instance is assigned to a
-    module variable :data:`VV` there.
+    module variable :code:`VV` there.
 
     .. seealso::
       Derived classes in various theories and their unique instances:
       :class:`.RCF.term.VariableSet`, :data:`.RCF.term.VV` for Real Closed
-      Fields and :class:`.Sets.term.VariableSet`, :data:`.Sets.term.VV`
+      Fields and :class:`.Sets.atomic.VariableSet`, :data:`.Sets.atomic.VV`
       for Sets.
     """
 
@@ -139,7 +139,7 @@ class Term(ABC, Generic[τ, χ, σ, κ]):
     cannot be used in the static method :meth:`.sort_key`.
 
     .. seealso::
-      Derived classes in various theories: :class:`.RCF.atomic.Term` for Real
+      Derived classes in various theories: :class:`.RCF.term.Term` for Real
       Closed Fields.
 
     .. note::
@@ -209,7 +209,7 @@ class Variable(Term[χ, χ, σ, κ]):
     to be implemented for the various theories.
 
     .. seealso::
-      Derived classes in various theories: :class:`.RCF.atomic.Variable` for
+      Derived classes in various theories: :class:`.RCF.term.Variable` for
       Real Closed Fields and :class:`.Sets.atomic.Variable` for Sets.
     """
 

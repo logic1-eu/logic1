@@ -34,7 +34,7 @@ from ..support.tracing import trace  # noqa
 
 
 class RESTART(Enum):
-    """Used for the return value of :meth:`.InternalRepresentation:add`.
+    """Used for the return value of :meth:`.InternalRepresentation.add`.
     """
     NONE = auto()
     """No formulas of the current level require resimplification.

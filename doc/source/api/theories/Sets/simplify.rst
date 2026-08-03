@@ -12,13 +12,13 @@ Simplification
   ************************
 
   .. autoclass:: InternalRepresentation
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Simplification and Validity
   ***************************
 
   .. autoclass:: Simplify
-    :special-members:
+    :exclude-members: __init__, __new__
 
   User Interface
   **************

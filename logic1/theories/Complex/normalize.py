@@ -15,8 +15,9 @@ from logic1.theories.Complex.ast import (
 
 
 class ArithmeticEvaluator(ASTVisitor[α]):
-    """Abstract visitor that evaluates an AST to an element of :data:`.types.α`,
-    given implementations of addition, negation and multiplication.
+    """Abstract visitor that evaluates an AST to an element of
+    :class:`.α`, given implementations of addition, negation and
+    multiplication.
 
     .. seealso::
         :class:`.ConstantEvaluator`, :class:`.qe.RCF_Evaluator`
@@ -719,7 +720,7 @@ class Normalizer(WeakNormalizer):
 
 class ConjugateNormalizer(Normalizer):
     """Visitor based on :class:`.Normalizer` that additionally replaces all
-    occurrences of :class:`ast.Re` and :class:`ast.Im`. This yields a unique
+    occurrences of :class:`.Re` and :class:`.Im`. This yields a unique
     normal form.
 
     >>> z = Var('z')

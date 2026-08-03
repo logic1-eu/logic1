@@ -26,6 +26,10 @@ from logic1.support.tracing import trace  # noqa
 
 @dataclass(frozen=True)
 class Options(abc.simplify.Options):
+    """Options for :class:`.Simplify`. Implements the abstract class
+    :class:`.abc.simplify.Options`.
+    """
+
     explode_always: bool = True
     implicit_ranges: bool = True
     lift: bool = True

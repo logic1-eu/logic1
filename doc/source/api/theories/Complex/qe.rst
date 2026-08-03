@@ -8,7 +8,7 @@ Quantifier Elimination
 
 .. automodule:: logic1.theories.Complex.qe
 
-    .. note::
+     .. note::
         The function :func:`qe <.Complex.qe.qe>` implements quantifier
         elimination for the theory of complex numbers. It takes a formula as
         input and returns an equivalent quantifier-free formula modulo
@@ -28,7 +28,13 @@ Quantifier Elimination
         quantifier elimination :func:`qe <logic1.theories.RCF.qe.qe>`
         for real closed fields.
 
+    User Interface
+    **************
+
     .. autofunction:: qe
+
+    RCF--Complex Conversion
+    ***********************
 
     .. attention::
         The following functions are not intended to be

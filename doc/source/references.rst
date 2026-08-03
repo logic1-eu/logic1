@@ -26,6 +26,11 @@ References
   `doi:10.1023/A:1006031329384
   <https://doi.org/doi:10.1023/A:1006031329384>`_
 
+.. [FarossSturm-2026]
+  N. Faross, T. Sturm. Pseudo-Complex Quantifier Elimination. To appear in
+  Proc. CASC 2026. Preprint at
+  `<https://doi.org/10.48550/arXiv.2604.26400>`_
+
 .. [Kosta-2016]
   M. Kosta. New Concepts for Real Quantifier Elimination by Virtual
   Substitution. Doctoral dissertation, Saarland University, Germany, December

@@ -9,7 +9,7 @@ Boolean Normal Forms
 .. automodule:: logic1.theories.Sets.bnf
 
   .. autoclass:: BooleanNormalForm
-    :special-members:
+    :exclude-members: __init__, __new__
 
 
   User Interface

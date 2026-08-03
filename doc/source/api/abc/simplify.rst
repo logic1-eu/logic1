@@ -51,13 +51,24 @@ Simplification
     A type variable denoting a type of variables with upper bound
     :class:`logic1.abc.simplify.InternalRepresentation`.
 
+  .. data:: ω
+    :value: TypeVar('ω', bound='Options')
+    :canonical: logic1.abc.simplify.ω
+
+    A type variable denoting a options for :meth:`.Simplify.simplify` with upper
+    bound :class:`.Options`.
+
 
   Internal Representations
   ************************
 
+  .. autoclass:: RESTART
+    :members:
+
   .. autoclass:: InternalRepresentation
     :members: add, extract, next_
     :special-members:
+    :exclude-members: __init__, __new__
 
 
   Simplification and Validity

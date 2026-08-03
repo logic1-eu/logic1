@@ -59,7 +59,7 @@ which provides an interface to various theories via further subclassing.
 For some of its methods, :class:`AtomicFormula
 <.firstorder.atomic.AtomicFormula>` already provides implementations, which
 delegate theory-specific parts to an abstract class
-:class:`Term <.firstorder.atomic.Term>` for argument terms of atomic formulas.
+:class:`Term <.firstorder.term.Term>` for argument terms of atomic formulas.
 
 We give an example using the theory RCF of Real Closed Fields, which is
 implemented not in :mod:`.logic1.firstorder` but in

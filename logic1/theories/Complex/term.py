@@ -38,7 +38,7 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
     @property
     def stack(self) -> list[set[str]]:
         """Return the current stack of variable names. Implements the abstract
-        method :meth:`.firstorder.term.VariableSet.stack`.
+        property :attr:`.firstorder.term.VariableSet.stack`.
 
         >>> VV.reset()
         >>> z = VV['z']
@@ -74,7 +74,7 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
     def fresh(self, suffix: str = '') -> Variable:
         """Return a fresh variable, by default from the sequence G0001, G0002,
         ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
+        gensym(). If the optional argument :code:`suffix` is specified, the
         sequence G0001<suffix>, G0002<suffix>, ... is used instead.
 
         >>> VV.fresh()
@@ -100,8 +100,7 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
         raise NotImplementedError()
 
     def reset(self) -> None:
-        """Clear all used variable names. Implements the abstract
-        method :meth:`.firstorder.term.VariableSet.reset`.
+        """Clear all used variable names.
 
         >>> VV.reset()
         >>> z = VV['z']
@@ -127,8 +126,7 @@ z
 @dataclass
 @functools.total_ordering
 class SortKey(Generic[τ]):
-    """A sort key for terms. Implements the abstract class
-    :class:`.firstorder.term.SortKey`.
+    """A sort key for terms.
 
     >>> z = VV['z']
     >>> SortKey(z) < SortKey(z + 1)

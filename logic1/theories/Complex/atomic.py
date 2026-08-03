@@ -134,8 +134,7 @@ class AtomicFormula(
     def __repr__(self) -> str:
         """Return a string representation of this atomic formula that is
         valid Python code and can be evaluated to reconstruct the original
-        atomic formula. Implements the abstract method
-        :meth:`.firstorder.atomic.AtomicFormula.__repr__`.
+        atomic formula.
 
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
@@ -213,7 +212,7 @@ class AtomicFormula(
 
     def eval(self) -> bool:
         """Evaluate an atomic formula where both sides are constants.
-        Return :obj:`True` if the formula equivalent to :obj:`T`.
+        Return :obj:`True` if the formula equivalent to :obj:`.T`.
         Raises :class:`ValueError` if the formula contains variables.
 
         >>> from logic1.theories.Complex import *

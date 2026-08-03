@@ -66,14 +66,14 @@ going to describe the occurring classes starting at the top.
     :canonical: logic1.firstorder.formula.τ
 
     A type variable denoting a type of terms with upper bound
-    :class:`logic1.firstorder.atomic.Term`.
+    :class:`logic1.firstorder.term.Term`.
 
   .. data:: χ
     :value: TypeVar('χ', bound='Variable')
     :canonical: logic1.firstorder.formula.χ
 
     A type variable denoting a type of variables with upper bound
-    :class:`logic1.firstorder.atomic.Variable`.
+    :class:`logic1.firstorder.term.Variable`.
 
   .. data:: σ
     :value: TypeVar('σ')
@@ -90,6 +90,7 @@ going to describe the occurring classes starting at the top.
 
   .. autoclass:: Formula
     :special-members:
+    :exclude-members: __init__, __new__
 
     .. autoproperty:: op
 
@@ -158,6 +159,8 @@ going to describe the occurring classes starting at the top.
 
     .. automethod:: as_latex
 
+    .. automethod:: as_redlog
+
     .. automethod:: atoms
 
     .. automethod:: bvars
@@ -170,29 +173,29 @@ going to describe the occurring classes starting at the top.
 
     .. automethod:: fvars
 
-    .. method:: is_all(f: Formula[α, τ, χ, σ]) -> TypeIs[All[α, τ, χ, σ]]
-                is_and(f: Formula[α, τ, χ, σ]) -> TypeIs[And[α, τ, χ, σ]]
-                is_atomic(f: Formula[α, τ, χ, σ]) -> TypeIs[α]
-                is_boolean_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[BooleanFormula[α, τ, χ, σ]]
-                is_equivalent(f: Formula[α, τ, χ, σ]) -> TypeIs[Equivalent[α, τ, χ, σ]]
-                is_ex(f: Formula[α, τ, χ, σ]) -> TypeIs[Ex[α, τ, χ, σ]]
-                is_false(f: Formula[α, τ, χ, σ]) -> TypeIs[_F[α, τ, χ, σ]]
-                is_implies(f: Formula[α, τ, χ, σ]) -> TypeIs[Implies[α, τ, χ, σ]]
-                is_not(f: Formula[α, τ, χ, σ]) -> TypeIs[Not[α, τ, χ, σ]]
-                is_or(f: Formula[α, τ, χ, σ]) -> TypeIs[Or[α, τ, χ, σ]]
-                is_quantified_formula(f: Formula[α, τ, χ, σ]) -> TypeIs[QuantifiedFormula[α, τ, χ, σ]]
-                is_true(f: Formula[α, τ, χ, σ]) -> TypeIs[_T[α, τ, χ, σ]]
+    .. method:: is_all(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[All[α, τ, χ, σ]]
+                is_and(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[And[α, τ, χ, σ]]
+                is_atomic(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[α]
+                is_boolean_formula(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[BooleanFormula[α, τ, χ, σ]]
+                is_equivalent(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[Equivalent[α, τ, χ, σ]]
+                is_ex(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[Ex[α, τ, χ, σ]]
+                is_false(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[_F[α, τ, χ, σ]]
+                is_implies(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[Implies[α, τ, χ, σ]]
+                is_not(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[Not[α, τ, χ, σ]]
+                is_or(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[Or[α, τ, χ, σ]]
+                is_quantified_formula(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[QuantifiedFormula[α, τ, χ, σ]]
+                is_true(f: Formula[α, τ, χ, σ]) -> typing.TypeIs[_T[α, τ, χ, σ]]
       :staticmethod:
 
       Type narrowing :func:`isinstance` tests for respective subclasses of
       :class:`.Formula`.
 
-    .. method:: is_term(t: τ | σ) -> TypeIs[τ]
-                is_variable(x: object) -> TypeIs[χ]
+    .. method:: is_term(t: τ | σ) -> typing.TypeIs[τ]
+                is_variable(x: object) -> typing.TypeIs[χ]
       :staticmethod:
 
       Type narrowing :func:`isinstance` tests for
-      :class:`.firstorder.atomic.Term` and :class:`.firstorder.atomic.Variable`,
+      :class:`.firstorder.term.Term` and :class:`.firstorder.term.Variable`,
       respectively,
 
     .. automethod:: matrix

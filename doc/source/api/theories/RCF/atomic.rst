@@ -106,7 +106,6 @@ Variables, Terms, Atoms
 
 
   .. autoclass:: Variable
-    :special-members:
     :exclude-members: __init__, __new__
 
     .. automethod:: fresh
@@ -118,7 +117,7 @@ Variables, Terms, Atoms
 .. automodule:: logic1.theories.RCF.atomic
 
   .. autoclass:: AtomicFormula
-    :special-members:
+    :exclude-members: __init__, __new__
 
     .. property:: lhs
                   rhs

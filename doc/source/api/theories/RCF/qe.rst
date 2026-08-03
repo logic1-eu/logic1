@@ -12,13 +12,13 @@ Quantifier Elimination
   ***********
 
   .. autoclass:: Assumptions
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Nodes
   *****
 
   .. autoclass:: Node
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Options
   *******
@@ -33,13 +33,13 @@ Quantifier Elimination
 
   .. autoclass:: Options
     :members: clustering, generic, traditional_guards
-    :special-members:
+    :exclude-members: __init__, __new__
 
   Quantifier Elimination
   **********************
 
   .. autoclass:: VirtualSubstitution
-    :special-members:
+    :exclude-members: __init__, __new__
 
   User Interface
   **************

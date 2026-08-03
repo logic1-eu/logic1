@@ -9,7 +9,7 @@ Variables and Atoms
 .. automodule:: logic1.theories.Sets.atomic
 
   .. autoclass:: VariableSet
-    :special-members:
+    :exclude-members: __init__, __new__
 
     .. automethod:: __getitem__
 
@@ -21,8 +21,8 @@ Variables and Atoms
       :abstractmethod:
 
       Implement abstract methods
-      :meth:`.logic1.firstorder.atomic.VariableSet.pop` and
-      :meth:`.logic1.firstorder.atomic.VariableSet.push`.
+      :meth:`.logic1.firstorder.term.VariableSet.pop` and
+      :meth:`.logic1.firstorder.term.VariableSet.push`.
 
 
   .. data:: VV
@@ -31,7 +31,7 @@ Variables and Atoms
     The unique instance of :class:`.VariableSet`.
 
   .. autoclass:: Variable
-    :special-members:
+    :exclude-members: __init__, __new__
 
     .. method:: ==, !=
                 __eq__(other: Variable) -> Eq
@@ -52,7 +52,7 @@ Variables and Atoms
 
 
   .. autoclass:: AtomicFormula
-    :special-members:
+    :exclude-members: __init__, __new__
 
     .. automethod:: __le__
 

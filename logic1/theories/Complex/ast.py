@@ -348,8 +348,8 @@ class AST(ABC):
 
     @staticmethod
     def from_number(value: Number) -> AST:  # TODO: how to handle wrong types in general?
-        """Construct an AST node from a given :data:`Number`. Raise a
-        :class:`ValueError` if the given value is not a number.
+        """Construct an AST node from a given :data:`Number <.types.Number>`.
+        Raise a :class:`ValueError` if the given value is not a number.
 
         >>> AST.from_number(3.5)
         Rat(mpq(7,2))

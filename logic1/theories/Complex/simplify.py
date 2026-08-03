@@ -19,7 +19,11 @@ from logic1.theories.Complex.atomic import AtomicFormula, Eq
 
 
 def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: dict[tuple[α, α], float]) -> Set[tuple[α, α]]:
-    """Return a partial edge cover minimizing edge and uncovered-node costs.
+    """Return a minimum weight partial edge cover.
+
+    A partial edge cover is a subset of edges. The cost of a partial edge cover
+    is the sum of the weights of the edges in the cover plus the costs of the
+    nodes that are not covered by any edge.
 
     >>> nodes_costs = {'a': 1, 'b': 2, 'c': 4}
     >>> edge_weights = {('a', 'b'): 1, ('b', 'c'): 2}
@@ -62,20 +66,25 @@ def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: di
 @dataclass(frozen=True)
 class Options(abc.simplify.Options):
     """Options for the simplification process. Currently empty, but can
-    be extended in the future.
+    be extended in the future. Implements the abstract class
+    :class:`.abc.simplify.Options`.
     """
     pass
 
 
 class ComplexityVisitor(ASTVisitor[float]):
-    """Visitor that computes a measure of the complexity of a :class:`.ast.AST`,
-    used to guide the simplification process. The complexity is defined as
-    :code:`1` plus the sum of the complexities of the children.
+    """Visitor that computes the complexity of a :class:`.ast.AST`. The
+    complexity is defined as :code:`1` plus the sum of the complexities of the
+    children.
+
+    >>> z = Var('z')
+    >>> ComplexityVisitor().visit_add(z + 2)
+    3.0
     """
 
     def visit_rat(self, num: Rat) -> float:
         """Return the complexity of a rational number. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_rat`.
+        abstract method :meth:`.ast.ASTVisitor.visit_rat`.
 
         >>> ComplexityVisitor().visit_rat(Rat(2))
         1.0
@@ -89,7 +98,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_i(self, _: _I) -> float:
         """Return the complexity of the imaginary unit. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_i`.
+        abstract method :meth:`.ast.ASTVisitor.visit_i`.
 
         >>> ComplexityVisitor().visit_i(I)
         1.0
@@ -98,7 +107,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_var(self, var: Var) -> float:
         """Return the complexity of a variable. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_var`.
+        abstract method :meth:`.ast.ASTVisitor.visit_var`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_var(z)
@@ -108,7 +117,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_add(self, add: Add) -> float:
         """Return the complexity of an addition. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_add`.
+        abstract method :meth:`.ast.ASTVisitor.visit_add`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_add(z + 2)
@@ -118,7 +127,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_mul(self, mul: Mul) -> float:
         """Return the complexity of a multiplication. Implements
-        the abstract method :meth:`.Complex.ASTVisitor.visit_mul`.
+        the abstract method :meth:`.ast.ASTVisitor.visit_mul`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_mul(z * 2)
@@ -128,7 +137,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_pow(self, pow: Pow) -> float:
         """Return the complexity of a power. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_pow`.
+        abstract method :meth:`.ast.ASTVisitor.visit_pow`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_pow(z ** 5)
@@ -138,7 +147,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_neg(self, neg: Neg) -> float:
         """Return the complexity of a negation. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_neg`.
+        abstract method :meth:`.ast.ASTVisitor.visit_neg`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_neg(-z)
@@ -148,7 +157,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_conj(self, conj: Conj) -> float:
         """Return the complexity of a conjugation. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_conj`.
+        abstract method :meth:`.ast.ASTVisitor.visit_conj`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_conj(~z)
@@ -158,7 +167,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_re(self, re: Re) -> float:
         """Return the complexity of a real part. Implements the
-        abstract method :meth:`.Complex.ASTVisitor.visit_re`.
+        abstract method :meth:`.ast.ASTVisitor.visit_re`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_re(Re(z))
@@ -168,7 +177,7 @@ class ComplexityVisitor(ASTVisitor[float]):
 
     def visit_im(self, im: Im) -> float:
         """Return the complexity of an imaginary part. Implements
-        the abstract method :meth:`.Complex.ASTVisitor.visit_im`.
+        the abstract method :meth:`.ast.ASTVisitor.visit_im`.
 
         >>> z = Var('z')
         >>> ComplexityVisitor().visit_im(Im(z))
@@ -180,10 +189,19 @@ class ComplexityVisitor(ASTVisitor[float]):
 @dataclass
 class InternalRepresentation(
         abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, Number]):
-    """Internal representation of a set of atomic formulas used for
-    simplification. Implements the abstract class
-    :class:`.abc.simplify.InternalRepresentation` for the theory of
-    complex numbers.
+    """Internal representation of a set of atomic formulas that are merged
+    on :meth:`.extract`. Implements the abstract class
+    :class:`.abc.simplify.InternalRepresentation`.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> rep = InternalRepresentation()
+    >>> _ = rep.add(And, [Re(z) == 0, Im(z) == 0])
+    >>> _ = rep.add(And, [z**2 == 1])
+    >>> atoms = rep.extract(And, InternalRepresentation())
+    >>> atoms.sort()
+    >>> atoms
+    [z == 0, z**2 - 1 == 0]
     """
 
     _atoms: set[AtomicFormula] = field(default_factory=set)
@@ -210,7 +228,14 @@ class InternalRepresentation(
     @staticmethod
     def _complexity(atom: AtomicFormula) -> float:
         """Return a measure of the complexity of the given atomic
-        formula, used to guide the simplification process.
+        formula used to guide the simplification process.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> InternalRepresentation._complexity(Re(z) == 2)
+        12.0
+
+        .. seealso:: :class:`ComplexityVisitor`
         """
         visitor = ComplexityVisitor()
         return 1.0 + atom.lhs.normal_ast.accept(visitor) + atom.rhs.normal_ast.accept(visitor)
@@ -281,9 +306,15 @@ class InternalRepresentation(
 
     @staticmethod
     def _merge_atoms(atom1: AtomicFormula, atom2: AtomicFormula) -> Optional[AtomicFormula | _T | _F]:
-        """Given two atomic formulas, returns a
-        single atomic formula that is equivalent to both of them, or
-        None if no such formula can be found.
+        """Return a new atomic formula that is equivalent to the conjunction of
+        the two given atomic formulas, or :obj:`None` if they cannot be merged.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> InternalRepresentation._merge_atoms(Re(z) == 2, Im(z) == 3)
+        z - 2 + 3 * I == 0
+        >>> InternalRepresentation._merge_atoms(Re(z) == 2, Im(z) > 0) is None
+        True
         """
         if not isinstance(atom1, Eq) or not isinstance(atom2, Eq):
             return None
@@ -310,15 +341,19 @@ class InternalRepresentation(
 @dataclass(frozen=True)
 class Simplify(abc.simplify.Simplify[
         AtomicFormula, Term, Variable, Number, InternalRepresentation, Options]):
-    """Simplification procedure for the theory of complex numbers.
-    Implements the abstract class :class:`.abc.simplify.Simplify`.
+    """Basic simplifier for merging pairs of atomic formulas using
+    :class:`.InternalRepresentation`. Implements the abstract
+    class :class:`.abc.simplify.Simplify`.
+
+    .. seealso:: :func:`.simplify`, :func:`.is_valid`
     """
 
     _options: Options = field(default_factory=Options)
 
     def create_initial_representation(self, assume: Iterable[AtomicFormula]) \
             -> InternalRepresentation:
-        """Implements the abstract method
+        """Return an initial internal representation of the given assumptions
+        and default options. Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
         """
         rep = InternalRepresentation(_options=self._options)
@@ -326,27 +361,46 @@ class Simplify(abc.simplify.Simplify[
         return rep
 
     def simpl_at(self, atom: AtomicFormula, context: Optional[type[And] | type[Or]]) -> Formula:
-        """Implements the abstract method
-        :meth:`.abc.simplify.Simplify.simpl_at`.
+        """Return a simplified version of the given atomic formula.
+        Implements the abstract method :meth:`.abc.simplify.Simplify.simpl_at`.
         """
         return atom.simplify()
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
     """Return a simplified formula that is equivalent to the given
-    formula f, using the given assumptions and options.
+    formula using the given assumptions and options. The options are directly
+    passed to :func:`.RCF.simplify.simplify`, which is used internally.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> simplify(And(z**2 == 1, Re(z) > 0))
+    z - 1 == 0
+    >>> simplify(Re(z) == 0, assume=[Im(z) == 1])
+    z - I == 0
     """
     rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(f)
-    rcf_formula = RCF.simplify(rcf_formula, assume=rcf_assume)
+    rcf_formula = RCF.simplify(rcf_formula, assume=rcf_assume, **options)
     formula = formula_to_complex(rcf_formula)
-    return Simplify(Options(**options)).simplify(formula, assume)
+    return Simplify(Options()).simplify(formula, assume)
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Optional[bool]:
     """Return :obj:`True` if the formula is valid under the given
-    assumptions and options, :obj:`False` if it is not valid, and :obj:`None`
-    if the validity cannot be determined.
+    assumptions, :obj:`False` if it is not valid, and :obj:`None`
+    if the validity cannot be determined. The options are directly
+    passed to :func:`.RCF.simplify.is_valid`, which is used internally.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> is_valid(z * ~z >= 0)
+    True
+    >>> is_valid(Re(z) > 0, assume=[z == 0])
+    False
+    >>> print(is_valid(z == 0))
+    None
     """
     rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(f)

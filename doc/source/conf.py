@@ -53,7 +53,7 @@ intersphinx_mapping = {
 
 language = 'en'
 
-nitpicky = False
+nitpicky = True
 
 # pygments_style = 'tango'
 

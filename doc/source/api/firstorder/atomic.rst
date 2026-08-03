@@ -36,7 +36,7 @@ Variables, Terms, Atoms
         situations.
 
         They allow to obtain variables from :meth:`fresh()
-        <.firstorder.atomic.VariableSet.fresh>` within asychronous doctests in a
+        <.firstorder.term.VariableSet.fresh>` within asychronous doctests in a
         reproducable way. In the following example,
         :meth:`.Formula.to_pnf` indirectly uses
         :meth:`.RCF.term.VariableSet.fresh`:
@@ -101,28 +101,28 @@ Variables, Terms, Atoms
 
   .. data:: α
     :value: TypeVar('α', bound='AtomicFormula')
-    :canonical: logic1.firstorder.atomic.α
+    :canonical: logic1.firstorder.term.α
 
     A type variable denoting a type of atomic formulas with upper bound
     :class:`logic1.firstorder.atomic.AtomicFormula`.
 
   .. data:: τ
     :value: TypeVar('τ', bound='Term')
-    :canonical: logic1.firstorder.atomic.τ
+    :canonical: logic1.firstorder.term.τ
 
     A type variable denoting a type of terms with upper bound
     :class:`logic1.firstorder.term.Term`.
 
   .. data:: χ
     :value: TypeVar('χ', bound='Variable')
-    :canonical: logic1.firstorder.atomic.χ
+    :canonical: logic1.firstorder.term.χ
 
     A type variable denoting a type of variables with upper bound
     :class:`logic1.firstorder.term.Variable`.
 
   .. data:: σ
     :value: TypeVar('σ')
-    :canonical: logic1.firstorder.atomic.σ
+    :canonical: logic1.firstorder.term.σ
 
     A type variable denoting a type that is admissible in addition to terms as a
     dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
@@ -130,3 +130,8 @@ Variables, Terms, Atoms
     any variables. A typical example is setting :data:`σ` to :class:`int` in the
     theory of real closed fields.
 
+  .. data:: κ
+    :value: TypeVar('κ')
+    :canonical: logic1.firstorder.term.κ
+
+    A type variable denoting a sort key.

@@ -246,11 +246,11 @@ class VariableSet:
     ...
     ValueError: illegal _drop at bottom of stack
 
-    Test get, which is inherited from logic1.firstorder.atomic.VariableSet:
+    Test get, which is inherited from logic1.firstorder.term.VariableSet:
     >>> VV.get('d', 'e')
     (d, e)
 
-    The method imp also inherited from logic1.firstorder.atomic.VariableSet
+    The method imp also inherited from logic1.firstorder.term.VariableSet
     cannot be tested because we are not interactive here.
 
     >>> VV.stack == [{'b', 'c', 'G0001', 'G0002', 'e', 'd', 'a'}]
