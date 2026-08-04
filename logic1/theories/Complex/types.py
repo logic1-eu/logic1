@@ -13,13 +13,11 @@ import logic1
 """
 
 η = TypeVar('η', bound='logic1.theories.Complex.ast.AST')
-"""
-Type variable for AST nodes.
+"""Type variable for AST nodes.
 """
 
 τ = TypeVar('τ', bound='logic1.theories.Complex.term.Term')
-"""
-Type variable for terms.
+"""Type variable for terms.
 """
 
 RationalNumber: TypeAlias = int | float | Fraction | mpq
@@ -43,8 +41,7 @@ Formula: TypeAlias = logic1.firstorder.Formula[
     'logic1.theories.Complex.term.Term',
     'logic1.theories.Complex.term.Variable',
     Number]
-"""
-Type alias for formulas in the theory of complex numbers.
+"""Type alias for :class:`.firstorder.formula.Formula` in the theory of complex numbers.
 """
 
 from logic1.theories.Complex.ast import AST

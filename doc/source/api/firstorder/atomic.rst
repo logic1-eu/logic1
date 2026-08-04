@@ -15,6 +15,17 @@ Variables, Terms, Atoms
     :special-members:
     :exclude-members: __init__, __new__
 
+    .. property:: stack
+      :abstractmethod:
+
+      The class internally keeps track of variables already used. This is
+      relevant when creating unused variables via :meth:`Variable.fresh`. The
+      :attr:`stack` can hold such internal states.
+
+      .. seealso::
+        * :meth:`.push` -- push information to :attr:`.stack` and reset
+        * :meth:`.pop` -- restore information from :attr:`.stack`
+
     .. automethod:: __getitem__
 
     .. automethod:: get
@@ -35,11 +46,10 @@ Variables, Terms, Atoms
         :attr:`.stack`, :meth:`.push`, and :meth:`pop` are reserved for special
         situations.
 
-        They allow to obtain variables from :meth:`fresh()
-        <.firstorder.term.VariableSet.fresh>` within asychronous doctests in a
-        reproducable way. In the following example,
+        They allow to obtain variables from :meth:`Variable.fresh` within asychronous
+        doctests in a reproducable way. In the following example,
         :meth:`.Formula.to_pnf` indirectly uses
-        :meth:`.RCF.term.VariableSet.fresh`:
+        :meth:`Variable.fresh`:
 
         >>> from logic1.firstorder import *
         >>> from logic1.theories.RCF import *

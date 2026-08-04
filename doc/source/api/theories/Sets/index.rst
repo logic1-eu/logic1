@@ -13,3 +13,4 @@ Sets
    simplify.rst
    bnf.rst
    qe.rst
+   types.rst

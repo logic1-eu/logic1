@@ -29,7 +29,8 @@ Quantifier Elimination
   User Interface
   **************
 
-  .. autofunction:: qe
+  .. autofunction:: qe(f: Sets.types.Formula, assume: Iterable[Sets.atomic.AtomicFormula] = [], **options) -> Optional[Sets.types.Formula]
+
 
   .. rubric:: Some examples
 

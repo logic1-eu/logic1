@@ -14,8 +14,8 @@ Boolean Normal Forms
   User Interface
   **************
 
-  .. function:: cnf(f: Formula) -> Formula
-                dnf(f: Formula) -> Formula
+  .. function:: cnf(f: RCF.types.Formula) -> RCF.types.Formula
+                dnf(f: RCF.types.Formula) -> RCF.types.Formula
 
     Compute a conjunctive or disjunctive normal form, respectively.
 
@@ -24,7 +24,7 @@ Boolean Normal Forms
 
     :returns:
       Returns a CNF or DNF of `f`, respectively. If `f` contains quantifiers,
-      then the result is an equivalent prenex normal form whose matrix is in CND
+      then the result is an equivalent prenex normal form whose matrix is in CNF
       or DNF, respectively.
 
     .. rubric:: Some examples

@@ -44,7 +44,7 @@ Quantifier Elimination
   User Interface
   **************
 
-  .. autofunction:: qe
+  .. autofunction:: qe(f: RCF.types.Formula, assume: Iterable[RCF.atomic.AtomicFormula] = [], **options) -> Optional[RCF.types.Formula]
 
 .. discuss: autofunction qe gets its signature from
 .. VirtualSubstitution.__call__. However, it shows

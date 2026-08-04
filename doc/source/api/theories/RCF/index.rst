@@ -14,3 +14,4 @@ Real Closed Fields
    bnf.rst
    qe.rst
    redlog.rst
+   types.rst
