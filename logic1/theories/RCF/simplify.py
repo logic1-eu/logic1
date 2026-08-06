@@ -361,6 +361,9 @@ class InternalRepresentation(
         self._subst = _subst or _Substitution()
         assert self._options == self._knowl.options
 
+    def __str__(self) -> str:
+        return f'InternalRepresentation({self._knowl=!s}, {self._subst=!s})'
+
     def add(self, gand: type[And | Or], atoms: Iterable[AtomicFormula]) -> abc.simplify.RESTART:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.add`.
         """
@@ -394,9 +397,8 @@ class InternalRepresentation(
         """
 
         knowl = ref._knowl.reduce(self._subst.as_gb())
-        # print(f'extract: {ref._knowl=!s}\n'
-        #       f'         {self._knowl=!s}\n'
-        #       f'         {self._subst=!s}\n'
+        # print(f'extract: {ref=!s}\n'
+        #       f'         {self=!s}\n'
         #       f'         {knowl=!s}')
         L: list[AtomicFormula] = []
         for bknowl in self._knowl:
