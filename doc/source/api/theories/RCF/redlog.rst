@@ -8,4 +8,4 @@ Redlog Interface
 **********************
 
 .. automodule:: logic1.theories.RCF.redlog
-    :members: qe
+    :members: gqe, qe, qea, simplify
