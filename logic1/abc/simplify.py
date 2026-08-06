@@ -308,6 +308,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         """
         ref = ir
         ir = ir.next_()
+        # Do we want to apply ir.transform_atom(atom)? Compare _simpl_and_or.
         f = self.simpl_at(atom, context=None)
         if not Formula.is_atomic(f):
             return self._simpl_nnf(f, ir)
@@ -316,11 +317,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
             final_atoms = list(ir.extract(And, ref))
         except ir.Inconsistent:
             return _F()
-        if len(final_atoms) == 0:
-            return _T()
-        if len(final_atoms) == 1:
-            return final_atoms[0]
-        assert False, final_atoms
+        return And(*final_atoms)
 
     def _simpl_quantified(self, f: QuantifiedFormula[α, τ, χ, σ], ir: ρ) -> Formula[α, τ, χ, σ]:
         """Simplify the negation normal form `f`, which starts with either
