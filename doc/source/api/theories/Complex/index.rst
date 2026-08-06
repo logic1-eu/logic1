@@ -10,15 +10,17 @@ In this theory, terms are polynomial expressions built from rational numbers,
 the imaginary unit :math:`i`, complex variables, complex conjugation, and real
 and imaginary parts.
 
-To construct :class:`Terms <.Complex.term.Term>`, one can first obtain
+To construct :class:`Terms <.Complex.term.Term>`, one can obtain
 :class:`Variables <.Complex.term.Variable>` from the global variable set
-:data:`VV <.Complex.term.VV>`. These can then be combined with the usual
-arithmetic operations  (:meth:`+ <.Complex.term.Term.__add__>`,
+:data:`VV <.Complex.term.VV>`. These can be combined using
+arithmetic :meth:`+ <.Complex.term.Term.__add__>`,
 :meth:`- <.Complex.term.Term.__sub__>`, :meth:`* <.Complex.term.Term.__mul__>`,
 :meth:`/ <.Complex.term.Term.__truediv__>`, :meth:`** <.Complex.term.Term.__pow__>`,
-:meth:`~ <.Complex.term.Term.__invert__>`), the imaginary unit
+the imaginary unit
 :data:`I <.Complex.term.I>`, and the functions :func:`Re <.Complex.term.Re>`,
 :func:`Im <.Complex.term.Im>`, and :func:`Conj <.Complex.term.Conj>` to build larger terms.
+The symbol :meth:`~ <.Complex.term.Term.__invert__>` is an alias for
+:func:`Conj <.Complex.term.Conj>`.
 
 >>> from logic1.firstorder import *
 >>> from logic1.theories.Complex import *
