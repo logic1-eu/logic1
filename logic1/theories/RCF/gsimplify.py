@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 import logging
+from itertools import chain
 from math import prod
-from typing import cast, final, Iterable, Optional
+from typing import cast, final, Iterable, Optional, Sequence
 
 from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.abc.simplify import InternalRepresentation
@@ -116,10 +117,11 @@ class GlobalPremise:
     _have_gbasis: bool
     _options: Options
 
-    def assume(self, gbasis: Iterable[Term]) -> list[AtomicFormula]:
-        assumption = set().union(*self._atoms.values())
-        for atom in assumption:
-            assumption.add(atom.op(atom.lhs.reduce(gbasis), 0))
+    def assume(self, gbasis: Sequence[Term]) -> list[AtomicFormula]:
+        assumption = set(chain.from_iterable(self._atoms.values()))
+        base = assumption.copy()
+        assumption.update(atom.op(atom.lhs.reduce(gbasis), 0) for atom in base)
+        assumption.update(Eq(f, 0) for f in gbasis)
         return sorted(assumption)
 
     @property
@@ -275,13 +277,14 @@ class GSimplify:
             # with the equations of `global_premise`.
             clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne),
                                         radical=self._options.radical)
+            clause_assume = global_premise.assume(gbasis=clause_gbasis)
 
             # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain left
             # hand sides of the global premise. We might discover T or redundancy of \/ Eq.
             product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
             product = product.reduce(clause_gbasis)
             try:
-                test_formula = simplify(Eq(product, 0), assume=global_premise.assume(gbasis=clause_gbasis))
+                test_formula = simplify(Eq(product, 0), assume=clause_assume)
             except InternalRepresentation.Inconsistent:
                 # The general idea of theory simplification is the equivalence
                 #
@@ -322,9 +325,13 @@ class GSimplify:
             # This concludes the computation of `new_clause`; simplify it
             and_eq = new_clause[Ne]
             new_clause_formula = new_clause.to_formula()
-            new_clause_formula = simplify(new_clause_formula,
-                                          assume=global_premise.assume(gbasis=clause_gbasis),
-                                          explode_always=False)
+            try:
+                new_clause_formula = simplify(new_clause_formula, assume=clause_assume,
+                                                                  explode_always=False)
+            except InternalRepresentation.Inconsistent:
+                # with the same reasoning as above, we conclude that `clause` is
+                # redundant modulo `global_premise`.
+                continue
             assert isinstance(new_clause_formula, (AtomicFormula, Or, _T, _F))
             assert (not isinstance(new_clause_formula, Or) or
                     all(isinstance(arg, AtomicFormula) for arg in new_clause_formula.args))
@@ -333,6 +340,8 @@ class GSimplify:
             if isinstance(new_clause_formula, _F):
                 return [Clause()]
             new_clause = Clause(new_clause_formula)
+            # The simplification of `new_clause_formula` modulo `clause_gbasis` drops /\ Eq. We
+            # restore the original one.
             new_clause[Ne] = and_eq
 
             # 3. We next compute a `test_clause` of the form with the following idea:
