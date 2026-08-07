@@ -1012,13 +1012,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return SortKey(self)
 
-    def subs(self, d: Mapping[Variable, Term | int | mpq]) -> Term:
+    def subs(self, d: Mapping[Variable, Term | int | float | Fraction | mpq]) -> Term:
         """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import VV
         >>> x, y, z = VV.get('x', 'y', 'z')
-        >>> f = 2*y*x**2 + x + 1
-        >>> f.subs({x: y, y: 2*z})
+        >>> (x + y).subs({x: mpq(1,2)})
+        y + 1/2
+        >>> (2*y*x**2 + x + 1).subs({x: y, y: 2*z})
         4*y**2*z + y + 1
 
         .. seealso::
@@ -1027,13 +1028,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         sage_keywords: dict[str, MPolynomial[Rational] | int | mpq] = dict()
         for variable, substitute in d.items():
-            match substitute:
-                case Term():
-                    sage_keywords[str(variable.poly)] = substitute.poly
-                case int() | mpq():
-                    sage_keywords[str(variable.poly)] = substitute
-                case _:
-                    assert False, (self, d)
+            if not isinstance(substitute, Term):
+                substitute = Term(substitute)
+            sage_keywords[str(variable.poly)] = substitute.poly
         return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
     @lru_cache(maxsize=CACHE_SIZE)
