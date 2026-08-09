@@ -23,6 +23,7 @@ Terms and Variables
     larger :class:`Terms <.Complex.term.Term>`. The symbol
     :meth:`~ <.Complex.term.Term.__invert__>` is an alias for :func:`Conj <.Complex.term.Conj>`.
 
+    >>> from logic1.theories.Complex import *
     >>> z = VV['z']
     >>> Re(z + I)
     1/2 * z + 1/2 * ~z
@@ -71,6 +72,7 @@ Atomic Formulas
     constructed if both sides are real, otherwise a :class:`ValueError` is
     raised.
 
+    >>> from logic1.theories.Complex import *
     >>> z = VV['z']
     >>> z == 1
     z == 1

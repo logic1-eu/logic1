@@ -1,0 +1,3 @@
+>>> from logic1.interactive.Sets import *
+>>> And(a == b, z != y)
+And(a == b, z != y)
