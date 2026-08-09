@@ -71,6 +71,11 @@ class VariableSet(ABC, Generic[χ]):
         >>> assert isinstance(x, RCF.term.Variable)
         >>> assert isinstance(y, RCF.term.Variable)
 
+        Note that :meth:`.get` returns a tuple also for a single variable:
+
+        >>> from logic1.theories import RCF
+        >>> x, = RCF.VV.get('x')
+
         .. seealso::
           * :meth:`__getitem__` -- obtain variable by its name
           * :meth:`imp` -- import variables into global namespace

@@ -16,6 +16,12 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.
                                                     'logic1.theories.RCF.term.Term',
                                                     'logic1.theories.RCF.term.Variable',
                                                     int]):
+    """The common parent class of :class:`Eq <.RCF.atomic.Eq>`, :class:`Ne
+    <.RCF.atomic.Ne>`, :class:`Le <.RCF.atomic.Le>`, :class:`Ge
+    <.RCF.atomic.Ge>`, :class:`Lt <.RCF.atomic.Lt>`, :class:`Gt
+    <.RCF.atomic.Gt>`. Although technically not an abstract class, it is not
+    intended to be instantiated directly. Use one of its subclasses instead.
+    """
 
     @property
     def lhs(self) -> Term:
