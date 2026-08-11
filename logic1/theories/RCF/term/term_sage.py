@@ -1106,6 +1106,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             :meth:`Polynomial.pseudo_quo_rem()
             <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
         """
+        # self, other, quotient are of type UPolynomial
         self1 = self.poly.polynomial(self.polynomial_ring(x.poly))
         other1 = other.poly.polynomial(self.polynomial_ring(x.poly))
         quotient, remainder = self1.pseudo_quo_rem(other1)
