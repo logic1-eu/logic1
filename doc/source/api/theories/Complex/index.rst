@@ -81,3 +81,4 @@ T
    qe.rst
    ast.rst
    types.rst
+   interactive.rst

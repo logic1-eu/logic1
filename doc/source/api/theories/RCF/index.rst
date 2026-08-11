@@ -15,3 +15,4 @@ Real Closed Fields
    qe.rst
    redlog.rst
    types.rst
+   interactive.rst

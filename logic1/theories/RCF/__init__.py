@@ -54,7 +54,7 @@ for external input with decimal numbers.
     >>> x + (mpq(1, 10) + mpq(2, 10))
     x + 3/10
 
-The module :mod:`logic1.interactive.RCF` provides a convenient interface for
+The module :mod:`.logic1.interactive.RCF` provides a convenient interface for
 interactive use, e.g., pre-defining single letter variables.
 
 :ref:`Atoms <api-RCF-atomic>` are built from polynomials using equality,
@@ -74,8 +74,8 @@ And(b > 0,
     9*a**6 + 27*a**4*b**2 + 27*a**2*b**4 + 9*b**6 + 30*a**5 + 60*a**3*b**2 + 30*a*b**4
         + 36*a**4 + 36*a**2*b**2 + 14*a**3 - 2*a*b**2 - 5*a**2 - b**2 < 0)
 
-Numbers obtained from terms or formulas using :mod:`.RCF` operations are
-generally of type :class:`gmpy2.mpq`.
+Numbers obtained from terms or formulas using :mod:`.theories.RCF` operations
+are generally of type :class:`gmpy2.mpq`.
 
 >>> from logic1.interactive.RCF import *
 >>> t = 0.1 * x + 2

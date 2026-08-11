@@ -14,3 +14,4 @@ Sets
    bnf.rst
    qe.rst
    types.rst
+   interactive.rst
