@@ -169,6 +169,11 @@ endmodule;
 def _call_redlog(command: str) -> str:
     echo_string = _PRG.replace('"', r'\"') + '\n' + f'wrap({command});\n' + '\n' + 'quit;\n'
     cp = subprocess.run(f'echo "{echo_string}" | redcsl -w', shell=True, capture_output=True)
+    if cp.returncode == 127:
+        raise RuntimeError('redcsl not found. Install Reduce and make sure redcsl is in your PATH.')
+    if cp.returncode != 0:
+        raise RuntimeError(f'redcsl failed with exit code {cp.returncode}:\n'
+                           f'{cp.stderr.decode()}')
     return _unwrap(cp.stdout.decode())
 
 
