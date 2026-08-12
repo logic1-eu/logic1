@@ -30,7 +30,7 @@ class Clause:
     def __getitem__(self, key: type[AtomicFormula]) -> set[AtomicFormula]:
         return self._atoms[key]
 
-    def __init__(self, f: Optional[Or | AtomicFormula] = None) -> None:
+    def __init__(self, f: Optional[Or | AtomicFormula | _F] = None) -> None:
         self._atoms = {Eq: set(), Ne: set(), Gt: set(), Lt: set()}
         if isinstance(f, Or):
             args = f.args
@@ -242,17 +242,6 @@ class GSimplify:
             count -= 1
 
             global_premise.add(atom)
-
-            # h = atom.lhs.reduce(global_premise.gbasis)
-            # reduced_atom = atom.op(h, 0)
-            # if h.is_constant():
-            #     if reduced_atom:
-            #         continue
-            #     else:
-            #         return [Clause()]
-            # global_premise.add(atom)
-            # global_premise.add(reduced_atom)
-
             new_clauses.append(clause)
 
         # Pass 2: Simplify the other clauses modulo global premise.
@@ -266,12 +255,16 @@ class GSimplify:
             new_clause = Clause()
 
             # 1. Build the atoms of /\ Eq for the new clause /\ Eq -> \/ (Gt, Lt, Eq)
+            F = set()
+            for atom in clause[Ne]:
+                f = atom.lhs.reduce(global_premise.gbasis)
+                F.add(f)
+            G = Term.gbasis(F, radical=self._options.radical)
             H = set()
-            for atom in clause[Ne]:  # !*rlgsred=T
-                h = atom.lhs.reduce(global_premise.gbasis)
+            for g in G:
+                h = g.reduce(global_premise.gbasis)
                 H.add(h)
-            G = Term.gbasis(H, radical=self._options.radical)
-            new_clause[Ne] = {Ne(g, 0) for g in G}  # !*rlgssub=T
+            new_clause[Ne] = {Ne(h, 0) for h in H}
 
             # 2. For the simplification of \/ (Gt, Lt, Eq) we use a Gröbner basis of /\ Eq together
             # with the equations of `global_premise`.
@@ -279,8 +272,8 @@ class GSimplify:
                                         radical=self._options.radical)
             clause_assume = global_premise.assume(gbasis=clause_gbasis)
 
-            # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain left
-            # hand sides of the global premise. We might discover T or redundancy of \/ Eq.
+            # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain
+            # left hand sides of the global premise. We might discover T or redundancy of \/ Eq.
             product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
             product = product.reduce(clause_gbasis)
             try:
@@ -290,7 +283,7 @@ class GSimplify:
                 #
                 #     /\ Θ -> (φ <-> /\ Θ /\ φ).
                 #
-                # More generally, θ can be conjucntively added to any subformula
+                # More generally, θ can be conjunctively added to any subformula
                 # of φ. In our situation, we have
                 #
                 #     /\ `global_premise` -> ( /\ Eq -> \/ (Gt, Lt, Eq) <->
@@ -324,24 +317,24 @@ class GSimplify:
 
             # This concludes the computation of `new_clause`; simplify it
             and_eq = new_clause[Ne]
+            new_clause[Ne] = set()
             new_clause_formula = new_clause.to_formula()
             try:
+                # The following simplification drops \/ new_clause[Ne]
                 new_clause_formula = simplify(new_clause_formula, assume=clause_assume,
                                                                   explode_always=False)
             except InternalRepresentation.Inconsistent:
-                # with the same reasoning as above, we conclude that `clause` is
-                # redundant modulo `global_premise`.
+                # With the same reasoning as in the previous exception handling,
+                # we conclude that `clause` is redundant modulo
+                # `global_premise`.
                 continue
-            assert isinstance(new_clause_formula, (AtomicFormula, Or, _T, _F))
-            assert (not isinstance(new_clause_formula, Or) or
-                    all(isinstance(arg, AtomicFormula) for arg in new_clause_formula.args))
+            assert isinstance(new_clause_formula, (AtomicFormula, Or, _T, _F)) and new_clause_formula.depth() <= 1
             if isinstance(new_clause_formula, _T):
                 continue
-            if isinstance(new_clause_formula, _F):
-                return [Clause()]
+            # if isinstance(new_clause_formula, _F), then we must not return
+            # [Clause()], because `and_eq` would be dropped.
             new_clause = Clause(new_clause_formula)
-            # The simplification of `new_clause_formula` modulo `clause_gbasis` drops /\ Eq. We
-            # restore the original one.
+            # Restore \/ new_clause[Ne]
             new_clause[Ne] = and_eq
 
             # 3. We next compute a `test_clause` of the form with the following idea:
@@ -352,8 +345,8 @@ class GSimplify:
             # Start with `new_clause` of the form /\ Eq -> \/ (Gt, Lt, Eq)
             test_clause = new_clause.copy()
 
-            # Instead of /\ Eq use the Gröbner basis computed above, combining /\ Eq with the
-            # equations of `global_premise`
+            # Instead of /\ Eq use `clause_gbasis`, which combines /\ Eq with
+            # the equations of `global_premise`
             test_clause[Ne] = set()
             for f in clause_gbasis:
                 test_clause.add(Ne(f, 0))
