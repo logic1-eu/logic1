@@ -128,9 +128,8 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def final_simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """Compute a simplified equivalent of `f`, preserving the normal form of
-          `f`. This method is called at the end of the CNF and DNF computations
-          to simplify the result, but it should not change the normal form of
-          the result if it is already in normal form.
+        """ This method is called at the end of CNF and DNF computations
+          to simplify the result. It computes a simplified equivalent of ``f``
+          preserving the normal form of ``f`` just computed.
         """
         ...
