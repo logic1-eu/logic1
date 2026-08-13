@@ -27,6 +27,9 @@ extensions = [
     'sphinx.ext.intersphinx',
 ]
 
+import doctest
+doctest_default_flags = doctest.NORMALIZE_WHITESPACE
+
 # doctest_path = ['../logic1']
 
 autodoc_class_signature = 'separated'
