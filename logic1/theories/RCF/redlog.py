@@ -3,7 +3,7 @@ Binary distributions are available on `SourceForge
 <https://sourceforge.net/projects/reduce-algebra/>`_. The executable
 :file:`redcsl` must be in the system path. Test the following in your shell:
 
-.. code-block:: bash
+.. code-block::
 
     $ redcsl
     Reduce (CSL, rev 6864), 24-Aug-2024 ...
