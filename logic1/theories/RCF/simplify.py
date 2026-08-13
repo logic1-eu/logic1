@@ -1,7 +1,9 @@
-"""This module provides an implementation of *deep simplifcication* based on
-generating and propagating internal representations during recursion in Real
-Closed fields. This is essentially the *standard simplifier*, which has been
-proposed for Ordered Fields in [DolzmannSturm-1997]_.
+"""This module implements *deep simplification* for Real Closed Fields by
+generating and propagating internal representations during recursion. It extends
+the *standard simplifier* for Ordered Fields proposed in [DolzmannSturm-1997]_.
+In particular, the simplification strategies described under
+:attr:`Options.implicit_ranges`, :attr:`Options.lift`, and
+:attr:`Options.substitute` were not part of the original standard simplifier.
 """
 from __future__ import annotations
 
@@ -26,16 +28,172 @@ from logic1.support.tracing import trace  # noqa
 
 @dataclass(frozen=True)
 class Options(abc.simplify.Options):
-    """Options for :class:`.Simplify`. Implements the abstract class
+    """Options for :class:`.Simplify` and the functions :func:`.simplify` and
+    :func:`.is_valid` based on it. Implements the abstract class
     :class:`.abc.simplify.Options`.
     """
 
     explode_always: bool = True
+    r"""Simplification can split certain atomic formulas built from products
+    or square sums:
+
+    .. admonition:: Example
+
+        1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
+
+           :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`
+
+        2. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
+
+           :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`
+
+    With ``explode_always=False`` the splittings in "1." are applied only within
+    disjunctions and the ones in "2." are applied only within conjunctions. This
+    keeps the terms more complex but the boolean structure simpler.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c = VV.get('a', 'b', 'c')
+    >>> simplify(And(a * b == 0, c == 0))
+    And(c == 0, Or(b == 0, a == 0))
+    >>> simplify(And(a * b == 0, c == 0), explode_always=False)
+    And(c == 0, a*b == 0)
+    >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
+    Or(c == 0, b == 0, a == 0)
+    """
+
     implicit_ranges: bool = True
+    """By default, the simplifier uses explicit numerical bounds on variables,
+    algebraic knowledge like non-negativity of squares, and interval arithmetic
+    to derive bounds on complex terms. Turning this off via
+    ``implicit_ranges=False`` reduces the computation time at the price of less
+    simplification.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> phi = And(10 < x, x < 100, Or(z == 0, And(x*y**2 + x**2 > 0)))
+    >>> simplify(phi)
+    And(x - 100 < 0, x - 10 > 0)
+    >>> simplify(phi, implicit_ranges=False)
+    And(x - 100 < 0, x - 10 > 0, Or(z == 0, x*y**2 + x**2 > 0))
+    """
+
     lift: bool = True
+    """By default, the simplifier produces atoms with left hand sides that are
+    primitive polynomials over the integers. With ``lift=False``, monic
+    polynomials over the rationals are produced instead.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> x = VV['x']
+    >>> phi = 4 * x**2 == 1
+    >>> simplify(phi)
+    Or(2*x - 1 == 0, 2*x + 1 == 0)
+    >>> simplify(phi, lift=False)
+    Or(x - 1/2 == 0, x + 1/2 == 0)
+
+    The name of the option refers to the notion of "lifting" polynomials over
+    the rationals to polynomials over the integers.
+    """
+
     prefer_order: bool = True
+    r"""One can sometimes equivalently choose between ordering inequalities and
+    disequalities.
+
+    .. admonition:: Example
+
+        * :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
+          :math:`a > 0 \lor (b = 0 \land a \neq 0)`
+        * :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
+          :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
+
+    By default, the left hand sides in the Example are preferred. With
+    ``prefer_order=False`` the right hand sides are preferred.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b = VV.get('a', 'b')
+    >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
+    And(a >= 0, Or(b == 0, a > 0))
+    >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
+    And(a >= 0, Or(b == 0, a > 0))
+    >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+    And(a >= 0, Or(b == 0, a != 0))
+    >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+    And(a >= 0, Or(b == 0, a != 0))
+
+    The choice depends on the user's preference and the context. On the one
+    hand, ordering inequalities can be considered more natural than
+    disequalities in algebraic contexts. On the other hand ordering inequalities
+    can be more informative, e.g., when the user is interested in the sign of a
+    term. More generally, they have smaller satisfying sets.
+    """
+
     prefer_weak: bool = False
+    r"""One can sometimes equivalently choose between strict and weak inequalities.
+
+    .. admonition:: Example
+
+        * :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
+          :math:`a = 0 \lor (b = 0 \land a > 0)`
+        * :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
+          :math:`a \neq 0 \land (b = 0 \lor a > 0)`
+
+    By default, the right hand sides in the Example are preferred. With
+    ``prefer_weak=True`` the left hand sides are preferred.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b = VV.get('a', 'b')
+    >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
+    And(a != 0, Or(b == 0, a > 0))
+    >>> simplify(And(a != 0, Or(b == 0, a > 0)))
+    And(a != 0, Or(b == 0, a > 0))
+    >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+    And(a != 0, Or(b == 0, a >= 0))
+    >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+    And(a != 0, Or(b == 0, a >= 0))
+
+    The default has been chosen because strict inequalities are more informative
+    than weak ones, e.g., when the user is interested in the sign of a term.
+    More generally, they have smaller satisfying sets. It is noteworthy that
+    weak inequalities are preferable for the elimination of existential
+    quantifiers via virtual substitution.
+    """
+
     substitute: int = 2
+    r"""
+    .. admonition:: Example
+
+        Consider the formula :math:`\phi` given by :math:`d = 2 \land
+        4b - 3c = 0 \land a + b + c + d \geq 0`.
+
+        1. :math:`\phi` is equivalent to :math:`d = 2 \land 4b - 3c = 0 \land
+           a + b + c + 2 \geq 0`, substituting the value :math:`d = 2` wherever
+           adequate.
+        2. Going further, :math:`\phi` is also equivalent to :math:`d = 2 \land
+           4b - 3c = 0 \land 4a + 7c + 8 \geq 0` additionally substituting the
+           monomial :math:`b = \frac{3}{4} c` wherever adequate.
+
+    The default is ``substitute=2``, which means that both these simplifications
+    are applied. With ``substitute=1``, only values are substituted. With
+    ``substitute=0`` neither of these simplifications is applied.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    >>> phi = And(d == 2, 4*b - 3*c == 0, a + b + c + d >= 0)
+    >>> simplify(phi, substitute=0)
+    And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + d >= 0)
+    >>> simplify(phi, substitute=1)
+    And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + 2 >= 0)
+    >>> simplify(phi)
+    And(d - 2 == 0, 4*b - 3*c == 0, 4*a + 7*c + 8 >= 0)
+
+    Lower values of ``substitute`` reduce the computation time at the price of
+    less simplification.
+    """
 
 
 @dataclass
@@ -343,11 +501,12 @@ class _Knowledge:
 @dataclass
 class InternalRepresentation(
         abc.simplify.InternalRepresentation[AtomicFormula, Term, Variable, int]):
-    """Implements the abstract methods :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
-    :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and :meth:`next_()
-    <.abc.simplify.InternalRepresentation.next_>` of it super class
-    :class:`.abc.simplify.InternalRepresentation`. Required by
-    :class:`.Sets.simplify.Simplify` for instantiating the type variable
+    """Implements the abstract methods
+    :meth:`add() <.abc.simplify.InternalRepresentation.add>`,
+    :meth:`extract() <.abc.simplify.InternalRepresentation.extract>`, and
+    :meth:`next_() <.abc.simplify.InternalRepresentation.next_>`
+    of its super class :class:`.abc.simplify.InternalRepresentation`. Required
+    by :class:`.RCF.simplify.Simplify` for instantiating the type variable
     :data:`.abc.simplify.ρ` of :class:`.abc.simplify.Simplify`.
     """
     _options: Options
@@ -520,9 +679,9 @@ class Simplify(abc.simplify.Simplify[
     <.abc.simplify.Simplify.simpl_at>` of its super class
     :class:`.abc.simplify.Simplify`.
 
-    The simplifier should be called via :func:`.simplify`, as described below.
-    In addition, this class inherits :meth:`.abc.simplify.Simplify.is_valid`,
-    which should be called via :func:`.is_valid`, as described below.
+    The simplifier should be called via the function :func:`.simplify`. In
+    addition, this class inherits :meth:`.abc.simplify.Simplify.is_valid`, which
+    should be called via the function :func:`.is_valid`.
     """
 
     _options: Options = field(default_factory=Options)
@@ -706,136 +865,74 @@ class Simplify(abc.simplify.Simplify[
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Formula:
-    r"""Simplify `f` modulo `assume`.
+    """This is the primary simplification function for ``f`` modulo ``assume``.
+    Note that assumptions do not affect bound variables.
 
-    :param f:
-      The formula to be simplified
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b = VV.get('a', 'b')
+    >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
+    Ex(a, a - 5 > 0)
 
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The
-      simplification result is equivalent modulo those assumptions. Note
-      that assumptions do not affect bound variables.
-
-      >>> from logic1.firstorder import *
-      >>> from logic1.theories.RCF import *
-      >>> a, b = VV.get('a', 'b')
-      >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
-      Ex(a, a - 5 > 0)
-
-    :param explode_always:
-      Simplification can split certain atomic formulas built from products
-      or square sums:
-
-      .. admonition:: Example
-
-        1.
-          1. :math:`ab = 0` is equivalent to :math:`a = 0 \lor b = 0`
-          2. :math:`a^2 + b^2 \neq 0` is equivalent to :math:`a \neq 0 \lor b \neq 0`;
-
-        2.
-          1. :math:`ab \neq 0` is equivalent to :math:`a \neq 0 \land b \neq 0`
-          2. :math:`a^2 + b^2 = 0` is equivalent to :math:`a = 0 \land b = 0`.
-
-      If `explode_always` is :data:`False`, the splittings in "1." are only applied
-      within disjunctions and the ones in "2." are only applied within conjunctions.
-      This keeps terms more complex but the boolean structure simpler.
-
-      >>> from logic1.firstorder import *
-      >>> from logic1.theories.RCF import *
-      >>> a, b, c = VV.get('a', 'b', 'c')
-      >>> simplify(And(a * b == 0, c == 0))
-      And(c == 0, Or(b == 0, a == 0))
-      >>> simplify(And(a * b == 0, c == 0), explode_always=False)
-      And(c == 0, a*b == 0)
-      >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
-      Or(c == 0, b == 0, a == 0)
-
-    :param prefer_order:
-      One can sometimes equivalently choose between order inequalities and
-      (in)equations.
-
-      .. admonition:: Example
-
-        1. :math:`a > 0 \lor (b = 0 \land a < 0)` is equivalent to
-           :math:`a > 0 \lor (b = 0 \land a \neq 0)`
-        2. :math:`a \geq 0 \land (b = 0 \lor a > 0)` is equivalent to
-           :math:`a \geq 0 \land (b = 0 \lor a \neq 0)`
-
-      By default, the left hand sides in the Example are preferred. If
-      `prefer_order` is :data:`False`, then the right hand sides are preferred.
-
-      >>> from logic1.firstorder import *
-      >>> from logic1.theories.RCF import *
-      >>> a, b = VV.get('a', 'b')
-      >>> simplify(And(a >= 0, Or(b == 0, a > 0)))
-      And(a >= 0, Or(b == 0, a > 0))
-      >>> simplify(And(a >= 0, Or(b == 0, a != 0)))
-      And(a >= 0, Or(b == 0, a > 0))
-      >>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
-      And(a >= 0, Or(b == 0, a != 0))
-      >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
-      And(a >= 0, Or(b == 0, a != 0))
-
-    :param prefer_weak:
-      One can sometimes equivalently choose between strict and weak inequalities.
-
-      .. admonition:: Example
-
-        1. :math:`a = 0 \lor (b = 0 \land a \geq 0)` is equivalent to
-           :math:`a = 0 \lor (b = 0 \land a > 0)`
-        2. :math:`a \neq 0 \land (b = 0 \lor a \geq 0)` is equivalent to
-           :math:`a \neq 0 \land (b = 0 \lor a > 0)`
-
-      By default, the right hand sides in the Example are preferred. If
-      `prefer_weak` is :data:`True`, then the left hand sides are
-      preferred.
-
-      >>> from logic1.firstorder import *
-      >>> from logic1.theories.RCF import *
-      >>> a, b = VV.get('a', 'b')
-      >>> simplify(And(a != 0, Or(b == 0, a >= 0)))
-      And(a != 0, Or(b == 0, a > 0))
-      >>> simplify(And(a != 0, Or(b == 0, a > 0)))
-      And(a != 0, Or(b == 0, a > 0))
-      >>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
-      And(a != 0, Or(b == 0, a >= 0))
-      >>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
-      And(a != 0, Or(b == 0, a >= 0))
-
-    :param substitute:
-
-    .. admonition:: Example
-
-        Consider :math:`d = 2 \land 4b - 3c = 0 \land a + b + c + d >= 0`:
-
-        1. :math:`phi` is equivalent to :math:`d = 2 \land 4b - 3c == 0 \land
-           a + b + c + 2 >= 0`, substituting the value :math:`2` of :math:`d`
-           wherever adequate.
-        2. Going further, :math:`phi` is also equivalent to :math:`d = 2 \land
-           4b - 3c == 0 \land 4a + 7c + 8 >= 0` additionally substituting the
-           monomial :math:`3/4 c` for :math:`b`.
-
-        The default is `substitute=2`, which means that both these
-        simplifications are applied. With `substitute=1`, only values are
-        substituted. With `substitute=0` neither of these simplifications is
-        applied.
-
-      >>> from logic1.firstorder import *
-      >>> from logic1.theories.RCF import *
-      >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
-      >>> phi = And(d == 2, 4*b - 3*c == 0, a + b + c + d >= 0)
-      >>> simplify(phi, substitute=0)
-      And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + d >= 0)
-      >>> simplify(phi, substitute=1)
-      And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + 2 >= 0)
-      >>> simplify(phi)
-      And(d - 2 == 0, 4*b - 3*c == 0, 4*a + 7*c + 8 >= 0)
-
-    :returns:
-      A simplified equivalent of `f` modulo `assume`.
+    .. seealso::
+        * :class:`.Options` -- for the options that can be passed to this
+          function. With the documentation of the options you also find further
+          simplification examples.
+        * :class:`.Simplify` -- Its inherited method :meth:`.Simplify.simplify`
+          is wrapped by this function.
     """
     return Simplify(Options(**options)).simplify(f, assume)
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Optional[bool]:
+    """Simplification-based heuristic test for validity and unsatisfiability of
+    a formula.
+
+    .. admonition:: Mathematical definition
+
+        A formula is *valid* if it is true for all values of its free variables.
+        A formula is *unsatisfiable* if it is false for all values of its free
+        variables.
+
+    This function provides an efficient heuristic test whether ``f``
+    is valid or unsatisfiable modulo ``assume``:
+
+    * If the simplifier yields :data:`.T`, then ``f`` is valid and
+      :obj:`.True` is returned.
+
+    * If the simplifier yields :data:`.F`, then ``f`` is unsatisfiable and
+      :obj:`.False` is returned.
+
+    Otherwise, :obj:`None` is returned, which means "don't know". The
+    ``**options`` are passed to the simplifier.
+
+    .. rubric:: Some examples
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, c = VV.get('a', 'b', 'c')
+
+    Valid:
+
+    >>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])
+    True
+
+    Validity holds but cannot be detected via the simplifier:
+
+    >>> is_valid((a - c) * b**2 + c**2 >= 0, assume=[a > c])  # returns None
+
+    Neither valid nor unsatisfiable:
+
+    >>> is_valid(a > 0)  # returns None
+
+    Unsatisfiable:
+
+    >>> is_valid(3 * b**2 + c**2 < 0)
+    False
+
+    .. seealso::
+        * :class:`.Options` -- for the options recognized by this function.
+        * :class:`.Simplify` -- Its inherited method :meth:`.Simplify.is_valid`
+          is wrapped by this function.
+    """
     return Simplify(Options(**options)).is_valid(f, assume)
