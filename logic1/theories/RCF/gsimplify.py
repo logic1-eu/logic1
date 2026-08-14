@@ -336,37 +336,6 @@ class GSimplify:
             new_clause = Clause(new_clause_formula)
             # Restore \/ new_clause[Ne]
             new_clause[Ne] = and_eq
-
-            # 3. We next compute a `test_clause` of the form with the following idea:
-            # `test_clause` combines `new_clause` with redundant information from `global_premise`.
-            # If `test_clause` is eventually recoginized to be true, then `new_clause` is redundant
-            # modulo `global_premise` and can be dropped.
-
-            # Start with `new_clause` of the form /\ Eq -> \/ (Gt, Lt, Eq)
-            test_clause = new_clause.copy()
-
-            # Instead of /\ Eq use `clause_gbasis`, which combines /\ Eq with
-            # the equations of `global_premise`
-            test_clause[Ne] = set()
-            for f in clause_gbasis:
-                test_clause.add(Ne(f, 0))
-
-            # Add to \/ Eq the atom `product == 0`
-            test_clause.add(Eq(product, 0))
-
-            # Add to \/ (Gt, Lt, Eq) information from disequalities and inequalities in
-            # `global_premise` modulo `clause_gbasis`
-            for rel in (Ne, Ge, Gt, Le, Lt):
-                for f in global_premise.term_list_of(rel):
-                    h = f.reduce(clause_gbasis)
-                    test_clause.add(rel.complement()(h, 0))
-
-            # Finally test `test_clause`, where `assume` is not required
-            test_formula = simplify(test_clause.to_formula())
-            assert test_formula is not _F
-            if isinstance(test_formula, _T):
-                continue
-
             new_clauses.append(new_clause)
 
         return new_clauses
