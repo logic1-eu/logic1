@@ -57,17 +57,10 @@ class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
 
 
 class Clustering(Enum):
-    """Clustering strategies available.
-
-    Required by :class:`.RCF.qe.Options`.
+    """Admissible values of the option :attr:`.RCF.qe.Options.clustering`.
     """
     NONE = auto()
-    """No clustering at all
-    """
-
     FULL = auto()
-    """Full clustering
-    """
 
 
 class DegreeViolation(abc.qe.NodeProcessFailure):
@@ -75,25 +68,12 @@ class DegreeViolation(abc.qe.NodeProcessFailure):
 
 
 class Generic(Enum):
-    """Available degrees of genericity. For details on generic quantifier
-    elimination see
-
-    Required by :class:`.RCF.qe.Options`.
+    """Admissible values of the option :attr:`.RCF.qe.Options.generic`.
     """
+
     NONE = auto()
-    """Regular quantifier elimination, not making any assumptions.
-    """
-
     MONOMIAL = auto()
-    """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.assumptions`, where the left hand side of those
-    atomic formulas is a monomial (and the right hand side is zero).
-    """
-
     FULL = auto()
-    """Admit assumptions on parameters by adding atomic formulas to
-    :attr:`.abc.qe.QuantifierElimination.assumptions`.
-    """
 
 
 @dataclass

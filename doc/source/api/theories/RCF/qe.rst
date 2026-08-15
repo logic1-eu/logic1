@@ -6,45 +6,39 @@
 Quantifier Elimination
 **********************
 
-.. automodule:: logic1.theories.RCF.node
-
-  Assumptions
-  ***********
-
-  .. autoclass:: Assumptions
-    :exclude-members: __init__, __new__
-
-  Nodes
-  *****
-
-  .. autoclass:: Node
-    :exclude-members: __init__, __new__
-
-  Options
-  *******
-
-  .. autoclass:: Clustering
-    :members:
-
-  .. autoclass:: Generic
-    :members:
-
 .. automodule:: logic1.theories.RCF.qe
 
-  .. autoclass:: Options
-    :members: clustering, generic, traditional_guards
-    :exclude-members: __init__, __new__
-
-  Quantifier Elimination
-  **********************
-
-  .. autoclass:: VirtualSubstitution
-    :exclude-members: __init__, __new__
-
-  User Interface
-  **************
-
   .. autofunction:: qe(f: RCF.types.Formula, assume: Iterable[RCF.atomic.AtomicFormula] = [], **options) -> Optional[RCF.types.Formula]
+
+  .. autoclass:: Options
+    :members: clustering, elimination_order, generic, log_level, log_rate, traditional_guards, workers, xopt
+    :exclude-members: __init__, __new__
+    :member-order: alphabetical
+
+.. autoclass:: logic1.theories.RCF.node.Clustering
+  :members:
+  :undoc-members:
+
+.. autoclass:: logic1.theories.RCF.node.Generic
+  :members:
+  :undoc-members:
+
+Details
+*******
+
+.. attention::
+  The material below addresses implementers rather than users.
+
+.. autoclass:: logic1.theories.RCF.qe.VirtualSubstitution
+  :exclude-members: __init__, __new__
+
+.. autoclass:: logic1.theories.RCF.node.Node
+  :exclude-members: __init__, __new__
+
+.. autoclass:: logic1.theories.RCF.node.Assumptions
+  :exclude-members: __init__, __new__
+
+
 
 .. discuss: autofunction qe gets its signature from
 .. VirtualSubstitution.__call__. However, it shows

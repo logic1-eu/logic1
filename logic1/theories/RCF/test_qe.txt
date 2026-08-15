@@ -39,6 +39,16 @@ Or(a > 0, And(b <= 0, a == 0), And(a < 0, a*b + b <= 0))
 >>> qe(phi_6, clustering=Clustering.FULL)
 Or(a > 0, And(b <= 0, a == 0), And(a < 0, a**2*b + a*b >= 0))
 
+>>> phi_7 = Ex(x, a * x**2 + b * x + c == 0)
+>>> qe(phi_7, clustering=Clustering.NONE)
+Or(And(c == 0, b == 0, a == 0),
+   And(b < 0, a == 0), And(b > 0, a == 0),
+   And(a < 0, 4*a*c - b**2 == 0), And(a < 0, 4*a*c - b**2 < 0),
+   And(a > 0, 4*a*c - b**2 == 0), And(a > 0, 4*a*c - b**2 < 0))
+>>> qe(phi_7, clustering=Clustering.FULL)
+Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b**2 <= 0))
+
+
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
@@ -168,3 +178,18 @@ ValueError: invalid assumption on bound variables in x - 8 < 0
 
 >>> qe(Ex(y, And(a > 0, y > 9, b == 0)), assume={x < 8, a > 1})
 b == 0
+
+# Two instances of VirtualSubstitution
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> from logic1.theories.RCF.qe import VirtualSubstitution
+>>> another_qe = VirtualSubstitution()
+>>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+>>> qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
+4*a*c - b**2 + 4*c <= 0
+>>> another_qe(Ex(x, a * x + b == 0), generic=Generic.FULL)
+T
+>>> qe.assumptions
+[a + 1 != 0]
+>>> another_qe.assumptions
+[a != 0]

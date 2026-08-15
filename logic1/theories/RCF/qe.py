@@ -17,23 +17,72 @@ from logic1.theories.RCF.types import Formula
 
 @dataclass
 class Options(abc.qe.Options):
-    """The options specified here, as well as the options inherited from
-    :class:`.abc.qe.Options`, can be passed to the callable class
-    :class:`.VirtualSubstitution` as keyword arguments.
-
-    Required by :class:`.VirtualSubstitution` for instantiating the type
+    """Required by :class:`.VirtualSubstitution` for instantiating the type
     variable :data:`.abc.qe.ω` of :class:`.abc.qe.QuantifierElimination`.
+
+    The options specified here, as well as the options ``log_level``,
+    ``log_rate``, ``workers`` inherited from :class:`.abc.qe.Options`, can be
+    passed to :func:`.qe` as keyword arguments.
     """
 
     clustering: Clustering
-    """The clustering strategy used by :class:`.VirtualSubstitution`. See
-    [Kosta-2016]_ for details on clustering.
+    """The clustering strategy to be used by :func:`.qe`. The default is
+    :attr:`.Clustering.FULL`. For theoretical details on clustering see
+    [Kosta-2016]_.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, x = VV.get('a', 'b', 'x')
+
+    >>> phi_6 = Ex(x, And(a * x + b <= 0, x <= b))
+    >>> qe(phi_6, clustering=Clustering.NONE)
+    Or(a > 0, And(b <= 0, a == 0), And(a < 0, a*b + b <= 0))
+    >>> qe(phi_6, clustering=Clustering.FULL)
+    Or(a > 0, And(b <= 0, a == 0), And(a < 0, a**2*b + a*b >= 0))
+
+    >>> phi_7 = Ex(x, a * x**2 + b * x + c == 0)
+    >>> qe(phi_7, clustering=Clustering.NONE)
+    Or(And(c == 0, b == 0, a == 0),
+       And(b < 0, a == 0), And(b > 0, a == 0),
+       And(a < 0, 4*a*c - b**2 == 0), And(a < 0, 4*a*c - b**2 < 0),
+       And(a > 0, 4*a*c - b**2 == 0), And(a > 0, 4*a*c - b**2 < 0))
+    >>> qe(phi_7, clustering=Clustering.FULL)
+    Or(And(c == 0, b == 0, a == 0),
+       And(b != 0, a == 0),
+       And(a != 0, 4*a*c - b**2 <= 0))
+    """
+
+    elimination_order: int
+    """Strategy for determining the variable elimination order. This option
+    affects only Xopt nodes. With ``elimination_order=0``, variables in each
+    quantifier block are eliminated from the inside out, i.e., the last variable
+    is eliminated first. With ``elimination_order=1`` (default), dynamic
+    heuristics are used to select the next variable to eliminate.
     """
 
     generic: Generic
-    """The degree of genericity used by :class:`.VirtualSubstitution`. See
-    [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_ for details on generic
-    quantifier elimination.
+    r"""The degree of genericity used by the quantifier elimination. The
+    default is :attr:`.Generic.NONE`. The principal idea of generic quantifier
+    elimination is to assume certain disequalities on the parameters of the
+    input formula in order to avoid case distinctions during quantifier
+    elimination. Technically, these disequalities are added to
+    :attr:`qe.assumptions <.abc.qe.QuantifierElimination.assumptions>`, which is
+    initialized with the  ``assume`` argument of :func:`.qe`.
+    The following options are available:
+
+    :attr:`.Generic.NONE`
+      uses regular quantifier elimination without making any assumptions.
+
+    :attr:`.Generic.MONOMIAL`
+      admits assumptions of the form :math:`m \neq 0` where :math:`m` is a
+      monomial in the parameters of the input formula.
+
+    :attr:`.Generic.FULL`
+      admits assumptions of the form :math:`p \neq 0` where :math:`p` is a
+      polynomial in the parameters of the input formula.
+
+    For theoretical details on generic quantifier elimination see
+    [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_.
 
     >>> from logic1.firstorder import *
     >>> from logic1.theories.RCF import *
@@ -41,27 +90,28 @@ class Options(abc.qe.Options):
 
     >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
     ...    assume=[c > 0])
-    Or(And(b != 0, a^2 - 2 == 0),
-       And(a^2 - 2 != 0, 4*a^2*c - b^2 - 8*c <= 0))
+    Or(And(b != 0, a**2 - 2 == 0),
+       And(a**2 - 2 != 0, 4*a**2*c - b**2 - 8*c <= 0))
     >>> qe.assumptions
     [c > 0]
 
     >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
-    ...    assume=[c > 0], generic=GENERIC.FULL)
-    4*a^2*c - b^2 - 8*c <= 0
-    >>> qe.assumptions
-    [c > 0, a^2 - 2 != 0]
-
-    >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
-    ...    assume=[c > 0], generic=GENERIC.MONOMIAL)
-    Or(a^2 - 2 == 0, 4*a^2*c - b^2 - 8*c <= 0)
+    ...    assume=[c > 0], generic=Generic.MONOMIAL)
+    Or(a**2 - 2 == 0, 4*a**2*c - b**2 - 8*c <= 0)
     >>> qe.assumptions
     [c > 0, b != 0]
+
+    >>> qe(Ex(x, (a**2 - 2) * x**2 + b * x + c == 0),
+    ...    assume=[c > 0], generic=Generic.FULL)
+    4*a**2*c - b**2 - 8*c <= 0
+    >>> qe.assumptions
+    [c > 0, a**2 - 2 != 0]
     """
 
     traditional_guards: bool
-    """`traditional_guards=False` strictly follows the construction of guards
-    as described in [Kosta-2016]_.
+    """The default is ``traditional_guards=True``. Setting
+    ``traditional_guards=False`` strictly follows the construction of guards as
+    described in [Kosta-2016]_.
 
     >>> from logic1.firstorder import *
     >>> from logic1.theories.RCF import *
@@ -70,17 +120,26 @@ class Options(abc.qe.Options):
     >>> qe(Ex(x, a * x**2 + b * x + c == 0))
     Or(And(c == 0, b == 0, a == 0),
        And(b != 0, a == 0),
-       And(a != 0, 4*a*c - b^2 <= 0))
+       And(a != 0, 4*a*c - b**2 <= 0))
 
     >>> qe(Ex(x, a * x**2 + b * x + c == 0), traditional_guards=False)
     Or(And(c == 0, b == 0, a == 0),
        And(b != 0, Or(c == 0, a == 0)),
-       And(a != 0, 4*a*c - b^2 <= 0))
+       And(a != 0, 4*a*c - b**2 <= 0))
     """
 
     xopt: bool
+    """The default ``xopt=True`` admits Xopt for subproblems in which all terms
+    are weakly parametric linear.
 
-    elimination_order: int
+    .. seealso::
+
+      :func:`.qe`
+        for more information on Xopt and the notion of subproblems.
+
+      :meth:`.is_weakly_parametric_linear`
+        for the definition of weakly parametric linear terms.
+    """
 
     def __init__(self, /, clustering: Clustering = Clustering.FULL,
                  generic: Generic = Generic.NONE, traditional_guards: bool = True,
@@ -166,53 +225,63 @@ class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, froz
 
 
 qe = virtual_substitution = VirtualSubstitution()
-"""
-Real quantifier elimination by virtual substitution. The implementation
-essentially follows [Kosta-2016]_ up to degree two. It also offers generic
-quantifier elimination [DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_.
+r""" Real quantifier elimination. Returns a quantifier-free equivalent
+``f'`` of ``f`` modulo the assumptions provided by the attribute
+:attr:`qe.assumptions <.abc.qe.QuantifierElimination.assumptions>`.
 
-Technically, :func:`.qe` is an instance of the callable class
-:class:`.VirtualSubstitution`.
+.. math::
+  \mathbb{R} \models \bigwedge \mathtt{qe.assumptions}
+                     \longrightarrow (\mathtt{f} \longleftrightarrow \mathtt{f'}).
 
-:param f:
-  The input formula to which quantifier elimination will be applied.
+With regular quantifier elimination, :attr:`qe.assumptions
+<.abc.qe.QuantifierElimination.assumptions>` contains the assumptions passed as the
+``assume`` parameter, modulo simplification. In particular, we obtain
+:math:`\mathbb{R} \models \mathtt{f} \longleftrightarrow \mathtt{f'}` with the
+default ``assume=[]``. With generic quantifier elimination
+[DolzmannSturmWeispfenning-1998]_, [Sturm-1999]_, disequalities in the
+parameters may be added in the course of the elimination.
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The return value
-  is equivalent modulo those assumptions.
+Technically, :obj:`logic1.theories.RCF.qe.qe` is an instance of the callable
+class :class:`.VirtualSubstitution`. Its attributes are reset and reused with
+each call of :func:`.qe`. Additional, independent instances of quantifier
+elimination can be created and used as follows:
 
-:param workers:
-  Specifies the number of processes to be used in parallel:
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> from logic1.theories.RCF.qe import VirtualSubstitution
+>>> another_qe = VirtualSubstitution()
+>>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+>>> qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
+4*a*c - b**2 + 4*c <= 0
+>>> another_qe(Ex(x, a * x + b == 0), generic=Generic.FULL)
+T
+>>> qe.assumptions
+[a + 1 != 0]
+>>> another_qe.assumptions
+[a != 0]
 
-  * The default value `workers=0` uses a sequential implementation,
-    which avoids overhead when input problems are small. For all other
-    values, there are additional processes started.
+In general, our implementation essentially follows [Kosta-2016]_ up to degree
+two. For subproblems in which all terms are weakly parametric linear, we use a
+specialized approach, which we call *Xopt*, based on [Weispfenning-1997]_.
 
-  * A positive value `workers=n > 0` uses `n + 2` processes: the master
-    process, `n` worker processes, and a proxy processes that manages
-    shared data.
+.. seealso::
 
-    .. note::
-      `workers=1` uses the parallel implementation with only one
-      worker. Algorithmically this is similar to the sequential version
-      with `workers=0` but comes at the cost of 2 additional processes.
+  :class:`.Options`
+    for the options that can be passed to this function. The documentation of
+    the options also contains some more quantifier elimination examples.
 
-  * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-    many workers.  It follows that `workers=-2` exactly allocates all
-    of CPUs of the machine, and workers=-3 is an interesting choice,
-    which leaves one CPU free for smooth interaction with the machine.
+  :attr:`Options.generic`
+    explains generic quantifier elimination in more detail.
 
-:param `**options`:
-  Keyword arguments with keywords corresponding to attributes of
-  :class:`.Options`. Those are :attr:`.clustering`, :attr:`.generic`,
-  :attr:`.log_level`, :attr:`.log_rate`, :attr:`.traditional_guards`.
+  :attr:`Options.workers`
+    explains how to specify parallel computation of subproblems.
 
-:returns:
-  A quantifier-free equivalent of `f` modulo assumptions that are available in
-  :attr:`qe.assumptions <.abc.qe.QuantifierElimination.assumptions>` at the end of
-  the computation. With regular quantifier elimination, the assumptions are
-  those passed as the `assume` parameter, modulo simplification. With
-  *generic quantifier elimination*, inequations in the parameters can be
-  added in the course of the elimination. See :attr:`.Options.generic` for
-  examples.
+  :class:`logic1.theories.RCF.node.Node`
+    The subproblems referred to above correspond to instances of this class.
+
+  :meth:`.is_weakly_parametric_linear`
+    for the definition of "weakly parametric linear terms".
+
+  :class:`logic1.theories.RCF.qe.VirtualSubstitution`
+    :obj:`qe` is an instance of this callable class.
 """
