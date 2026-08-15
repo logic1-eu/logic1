@@ -17,6 +17,9 @@ version = '0.1'
 # General configuration
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
+import doctest
+doctest_default_flags = doctest.NORMALIZE_WHITESPACE
+
 exclude_patterns = ['**/atomlib.rst']
 
 extensions = [
@@ -26,9 +29,6 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
 ]
-
-import doctest
-doctest_default_flags = doctest.NORMALIZE_WHITESPACE
 
 # doctest_path = ['../logic1']
 
