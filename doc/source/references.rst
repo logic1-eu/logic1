@@ -11,9 +11,8 @@ References
   <https://doi.org/10.1007/978-1-4613-2821-6>`_
 
 .. [Burhenne-1990]
-  Klaus-Dieter Burhenne. Implementierung eines Algorithmus zur
-  Quantorenelimination für lineare reelle Probleme.
-  Diploma Thesis, University of Passau, Germany, 1990
+  K. Burhenne. Implementierung eines Algorithmus zur Quantorenelimination für
+  lineare reelle Probleme. Diploma Thesis, University of Passau, Germany, 1990
 
 .. [DolzmannSturm-1997]
   A. Dolzmann, T. Sturm. Simplification of Quantifier-Free Formulae over
@@ -28,8 +27,8 @@ References
 
 .. [FarossSturm-2026]
   N. Faross, T. Sturm. Pseudo-Complex Quantifier Elimination. To appear in
-  Proc. CASC 2026. Preprint at
-  `<https://doi.org/10.48550/arXiv.2604.26400>`_
+  Proc. CASC 2026. Preprint at `doi:10.48550/arXiv.2604.26400
+  <https://doi.org/10.48550/arXiv.2604.26400>`_
 
 .. [Kosta-2016]
   M. Kosta. New Concepts for Real Quantifier Elimination by Virtual
@@ -44,3 +43,8 @@ References
   T. Sturm. Thirty Years of Virtual Substitution: Foundations, Techniques,
   Applications. Proc. ISSAC 2018, pp.11–16, ACM Press, 2018.
   `doi:10.1145/3208976.3209030 <https://doi.org/10.1145/3208976.3209030>`_
+
+.. [Weispfenning-1997]
+  V. Weispfenning. Simulation and Optimization by Quantifier Elimination. J.
+  Symb. Comput. 24(2):189–208, 1997. `doi:10.1006/jsco.1997.0122
+  <https://doi.org/10.1006/jsco.1997.0122>`_
