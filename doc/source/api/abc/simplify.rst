@@ -42,7 +42,8 @@ Simplification
     :canonical: logic1.abc.simplify.σ
 
   Additionally, we introduce a type variable :data:`ρ` for internal
-  representations used by the simplifier.
+  representations and a type variable :data:`ω` for options used by the
+  simplifier.
 
   .. data:: ρ
     :value: TypeVar('ρ', bound='InternalRepresentation')
@@ -66,8 +67,7 @@ Simplification
     :members:
 
   .. autoclass:: InternalRepresentation
-    :members: add, extract, next_
-    :special-members:
+    :members:
     :exclude-members: __init__, __new__
 
 
@@ -79,3 +79,4 @@ Simplification
 
   .. autoclass:: Simplify
     :members:
+    :exclude-members: __init__, __new__

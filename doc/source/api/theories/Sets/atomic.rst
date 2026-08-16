@@ -11,6 +11,8 @@ Variables and Atoms
   .. autoclass:: VariableSet
     :exclude-members: __init__, __new__
 
+    .. autoproperty:: stack
+
     .. automethod:: __getitem__
 
     .. automethod:: fresh

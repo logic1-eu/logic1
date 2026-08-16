@@ -56,7 +56,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
 
     The principal idea is that a :class:`InternalRepresentation` should holds
     information that corresponds to a conjunction of atomic formulas. In the
-    course of recursive simplification in:class:`.abc.simplify.Simplify`,
+    course of recursive simplification in :class:`.abc.simplify.Simplify`,
     instances of this class are inherited from higher levels and are enriched
     with information from all atomic formulas on the toplevel of the subformula
     currently under consideration.
@@ -65,15 +65,15 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
     class Inconsistent(Exception):
         """Indicates that an instance of :class:`InternalRepresentation`
         contains inconsistent information. This exception is typically handled
-        in :class:`.abc.Simplify` and its derived classes, where appropriate
-        values are returned.
+        in :class:`.abc.simplify.Simplify` and its derived classes, where
+        appropriate values are returned.
         """
         pass
 
     @abstractmethod
     def add(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], atoms: Iterable[α]) -> RESTART:
         """Add information originating from `atoms`. If `gand` is
-        :class:`.And`, consider ``atoms``. If `gand` is :class:`.Or`, consider
+        :class:`.And`, consider `atoms`. If `gand` is :class:`.Or`, consider
         ``(Not(at) for at in atoms)``. Simplification among atoms is supposed
         to take place here.
         """
@@ -81,7 +81,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], ref: Self) -> Iterable[α]:
-        """Comapare `self`and `ref` to identify and extract information that
+        """Comapare `self` and `ref` to identify and extract information that
         must be represented on the toplevel of the subformula currently under
         consideration. If `gand` is :class:`.And`, the result represents a
         conjunction.  If `gand` is :class:`.Or`,  it represents a disjunction.
@@ -95,10 +95,14 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
         """
         ...
 
+    @abstractmethod
     def restart(self, ir: Self) -> Self:
-        assert False
+        ...
 
     def transform_atom(self, atom: α) -> α:
+        """Return an atomic formula that is equivalent to `atom` modulo the
+        information contained in `self`.
+        """
         return atom
 
 
@@ -119,7 +123,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
 
     .. seealso::
       Derived classes in various theories: :class:`.RCF.simplify.Simplify`,
-      :class:`.Sets.simplify.Simplify`
+      :class:`.Sets.simplify.Simplify`, :class:`.Complex.simplify.Simplify`
     """
 
     _options: ω

@@ -79,7 +79,7 @@ Variables, Terms, Atoms
 
   .. autoclass:: Term
     :members: as_latex, sort_key, vars
-    :special-members:
+    :exclude-members: __init__, __new__
 
 
   Variables
@@ -105,9 +105,9 @@ Variables, Terms, Atoms
   Generic Types
   *************
 
-  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`, and
-  :data:`.atomic.χ` with the same names and definitions as in module
-  :mod:`.formula`.
+  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`,
+  :data:`.atomic.χ`, and :data:`.atomic.σ` with the same names and definitions
+  as in module :mod:`.formula`.
 
   .. data:: α
     :value: TypeVar('α', bound='AtomicFormula')
