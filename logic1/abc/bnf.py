@@ -43,14 +43,14 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
     _pyeda_to_atoms: dict[expr.Literal, AtomicFormula] = field(default_factory=dict)
 
     def cnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """Compute a conjunctive normal form. If `f` contains quantifiers, then
-        the result is a prenex normal form whose matrix is in CNF.
+        """Compute a conjunctive normal form. If ``f`` contains quantifiers,
+        then the result is a prenex normal form whose matrix is in CNF.
         """
         return self.final_simplify(Not(self._dnf(Not(f))).to_nnf())
 
     def dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """Compute a disjunctive normal form. If `f` contains quantifiers, then
-        the result is a prenex normal form whose matrix is in DNF.
+        """Compute a disjunctive normal form. If ``f`` contains quantifiers,
+        then the result is a prenex normal form whose matrix is in DNF.
         """
         return self.final_simplify(self._dnf(f))
 
@@ -122,14 +122,14 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """Compute a simplified equivalent of `f`.
+        """Compute a simplified equivalent of ``f``.
         """
         ...
 
     @abstractmethod
     def final_simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """ This method is called at the end of CNF and DNF computations
-          to simplify the result. It computes a simplified equivalent of ``f``
-          preserving the normal form of ``f`` just computed.
+        """This method is called at the end of CNF and DNF computations
+        to simplify the result. It computes a simplified equivalent of ``f``
+        preserving the normal form of ``f`` just computed.
         """
         ...

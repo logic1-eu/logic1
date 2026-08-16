@@ -31,7 +31,8 @@ class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
 
 @dataclass
 class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Formula]):
-    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
+    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>`,
+    :meth:`memorize() <.abc.qe.Node.memorize>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination` for
     instantiating the type variable :data:`.abc.qe.ν` of
@@ -46,6 +47,8 @@ class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Fo
         return Node(variables=self.variables, formula=self.formula, options=self.options)
 
     def memorize(self) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.Node.memoize`.
+        """
         return self.formula
 
     def process(self, assumptions: Assumptions) -> list[Node]:
@@ -242,7 +245,9 @@ Technically, :func:`.qe` is an instance of the callable class
 
 :param `**options`:
   Keyword arguments with keywords corresponding to attributes of
-  :class:`.abc.qe.Options`. Those are :attr:`.log_level`, :attr:`.log_rate`.
+  :class:`.abc.qe.Options`. Those are
+  :attr:`log_level <.abc.qe.Options.log_level>`,
+  :attr:`log_rate <.abc.qe.Options.log_rate>`.
 
 :returns:
 

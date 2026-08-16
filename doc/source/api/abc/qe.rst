@@ -13,7 +13,8 @@ Quantifier Elimination
   corresponding sections of the various domains:
 
   * :ref:`Quantifier elimination in Real Closed Fields <api-RCF-qe>`
-  * :ref:`Quantifier elimination in the theory of Sets <api-Sets-qe>`
+  * :ref:`Quantifier elimination in Complex <api-Complex-qe>`
+  * :ref:`Quantifier elimination in Sets <api-Sets-qe>`
 
 .. automodule:: logic1.abc.qe
 
@@ -82,25 +83,21 @@ Quantifier Elimination
     ***********
 
     .. autoclass:: Assumptions
-      :members: atoms, append, extend, simplify
+      :members:
       :exclude-members: __init__, __new__
-
-      .. autoclass:: logic1.abc.qe.Assumptions.Inconsistent
-        :exclude-members: __init__, __new__
 
     Nodes
     *****
 
     .. autoclass:: Node
-      :members: variables, formula, copy, process
-      :undoc-members:
+      :members:
       :exclude-members: __init__, __new__
 
     Options
     *******
 
     .. autoclass:: Options
-      :members: log_level, log_rate, workers
+      :members:
       :exclude-members: __init__, __new__
 
     Quantifier Elimination
@@ -156,9 +153,7 @@ Quantifier Elimination
     **********
 
     .. autoclass:: NodeList
-      :members:
       :exclude-members: __init__, __new__
 
     .. autoclass:: WorkingNodeList
-      :members:
       :exclude-members: __init__, __new__

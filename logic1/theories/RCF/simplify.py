@@ -554,7 +554,6 @@ class InternalRepresentation(
     def extract(self, gand: type[And | Or], ref: Self) -> list[AtomicFormula]:
         """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.extract`.
         """
-
         knowl = ref._knowl.reduce(self._subst.as_gb())
         # print(f'extract: {ref=!s}\n'
         #       f'         {self=!s}\n'
@@ -635,7 +634,7 @@ class InternalRepresentation(
                     stack.append(bknowl)
 
     def restart(self, ir: Self) -> Self:
-        """Implements the abstract method :meth:`.abc.simplify.InternalRepresentation.restart`.
+        """Overrides the method :meth:`.abc.simplify.InternalRepresentation.restart`.
         """
         result = self.next_()
         for var, val in ir._subst:
@@ -651,8 +650,9 @@ class InternalRepresentation(
         return result
 
     def transform_atom(self, atom: AtomicFormula) -> AtomicFormula:
-        """Apply the substitution part of `self` to atom. The result is an atom
-        with monic left hand side and zero right hand side.
+        """Apply the substitution part of ``self`` to atom. The result is an atom
+        with monic left hand side and zero right hand side. Overrides the method
+        :meth:`.abc.simplify.InternalRepresentation.transform_atom`.
         """
         G = self._subst.as_gb()
         assert atom.rhs == 0

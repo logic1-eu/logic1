@@ -110,18 +110,22 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
 
     @abstractmethod
     def memorize(self) -> μ:
+        """Return a hashable object that identifies this node. This is used to
+        avoid processing the same node twice.
+        """
         ...
 
     @abstractmethod
     def process(self, assumptions: λ) -> Sequence[Self]:
-        """This `node` describes a formula ``Ex(node.variables,
+        """This ``node`` describes a formula ``Ex(node.variables,
         node.formula)``. Select a `variable` from ``node.variables`` and
-        compute a list `S` of successor nodes such that:
+        compute a list ``S`` of successor nodes such that:
 
-        1. `variable` is not in ``successor.variables`` for `successor` in `S`;
+        1. ``variable`` is not in ``successor.variables`` for ``successor`` in
+           ``S``;
 
-        2. `variable` does not occur in ``successor.formula`` for `successor`
-           in `S`;
+        2. ``variable`` does not occur in ``successor.formula`` for ``successor``
+           in ``S``;
 
         3. ``Or(*(Ex(successor.variables, successor.formula) for s in S))`` is
            logically equivalent to ``Ex(node.variables, node.formula)``.
@@ -131,6 +135,10 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
 
 @dataclass
 class NodeList(Collection[ν], Generic[ν, μ]):
+    """A list of nodes with a memory to avoid duplicates and statistics about
+    the number of nodes added and dropped.
+    """
+
     # Sequential only
 
     nodes: list[ν] = field(default_factory=list)
@@ -148,6 +156,10 @@ class NodeList(Collection[ν], Generic[ν, μ]):
         return len(self.nodes)
 
     def append(self, node: ν) -> bool:
+        """Append ``node`` to the list of nodes if it is not already in the
+        memory. Return ``True`` if ``node`` was appended, and ``False``
+        otherwise.
+        """
         memorize = node.memorize()
         is_new = memorize not in self.memory
         if is_new:
@@ -159,6 +171,9 @@ class NodeList(Collection[ν], Generic[ν, μ]):
         return is_new
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Append ``nodes`` to the list of nodes if they are not already in the
+        memory.
+        """
         for node in nodes:
             self.append(node)
 
@@ -188,6 +203,12 @@ class NodeList(Collection[ν], Generic[ν, μ]):
 
 @dataclass
 class WorkingNodeList(NodeList[ν, μ]):
+    """A subclass of :class:`.NodeList` that is used for the list of nodes that
+    are currently being processed during quantifier elimination. Additionally,
+    it keeps track of the current number of nodes with a given number of
+    variables.
+    """
+
     # Sequential only
 
     node_counter: Counter[int] = field(default_factory=Counter)
@@ -547,7 +568,7 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
 
     .. seealso::
 
-        * The argument `assume` of :meth:`.QuantifierElimination.__call__`.
+        * The argument ``assume`` of :meth:`.QuantifierElimination.__call__`.
         * Generic quantifier elimination in :mod:`.RCF.qe`.
 
     This is an upper bound for the type variable :data:`.λ`.
@@ -569,12 +590,12 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
         self.atoms = list(atoms)
 
     def append(self, new_atom: α) -> None:
-        """Add `new_atom` as another assumption and simplify.
+        """Add ``new_atom`` as another assumption and simplify.
         """
         self.extend([new_atom])
 
     def extend(self, new_atoms: Iterable[α]) -> None:
-        """Add `new_atoms` as further assumptions and simplify.
+        """Add ``new_atoms`` as further assumptions and simplify.
         """
         self.atoms.extend(new_atoms)
         # NF nörgelt
@@ -592,10 +613,10 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
 
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """`f` is a (possibly unary or trivial) conjunction of atoms. Simplifes
-        `f` in such a way that the result is again a (possibly unary or
-        trivial) conjunction of atoms. Raises :class:`.Inconsistent` if `f` is
-        simplified to :data:`.F`.
+        """``f`` is a (possibly unary or trivial) conjunction of atoms.
+        Simplifes ``f`` in such a way that the result is again a (possibly unary
+        or trivial) conjunction of atoms. Raises :class:`.Inconsistent` if ``f``
+        is simplified to :data:`.F`.
         """
         ...
 
@@ -801,7 +822,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
           generic type :data:`.ω`, which extends :class:`.Options`.
 
         :returns:
-          A quantifier-free equivalent of `f` modulo certain assumptions. A
+          A quantifier-free equivalent of ``f`` modulo certain assumptions. A
           simplified equivalent of all relevant assumptions are available as
           :attr:`.assumptions`.
 

@@ -13,7 +13,9 @@ Simplification
   corresponding sections of the various domains:
 
   * :ref:`Simplification in Real Closed Fields <api-RCF-simplify>`
-  * :ref:`Simplification in the InternalRepresentation of Sets <api-Sets-simplify>`
+  * :ref:`Simplification in Complex <api-Complex-simplify>`
+  * :ref:`Simplification in Sets <api-Sets-simplify>`
+
 
 .. automodule:: logic1.abc.simplify
 
