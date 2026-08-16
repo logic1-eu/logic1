@@ -357,7 +357,15 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False
 
     def as_redlog(self) -> str:
-        """Redlog representation as a string, which can be used elsewhere.
+        """Returns the Redlog representation of this formula.
+
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> f = All(x, Or(x < 1, x - 1 == 0, x > 1))
+        >>> f.as_redlog()
+        'all(x, ((x - 1 < 0) or (x - 1 = 0) or (x - 1 > 0)))'
+
+        .. seealso:: The :ref:`Redlog interface <api-RCF-redlog>` for Real Closed Fields
         """
         match self:
             case All():
@@ -937,7 +945,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, type(self)
 
     def subs(self, substitution: dict[χ, τ | σ]) -> Self:
-        """Substitution of terms for variables.
+        """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import *
         >>> a, b, x = VV.get('a', 'b', 'x')

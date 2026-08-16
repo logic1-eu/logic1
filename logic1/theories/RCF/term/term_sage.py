@@ -680,6 +680,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return Term(other - self.poly)
 
     def __str__(self):
+        """Return the mathematical string representation of this term.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> str(t)
+        'x^2 - 2*x*y + y^2 + 4*x - 4*y + 4'
+        """
         return str(self.poly)
 
     def __sub__(self, other: object) -> Term:

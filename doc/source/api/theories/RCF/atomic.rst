@@ -218,6 +218,8 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
 
     .. automethod:: __iter__
 
+    .. automethod:: __str__
+
     .. automethod:: as_constant
 
     .. automethod:: as_latex
@@ -307,9 +309,11 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
                   rhs
       :type: logic1.theories.RCF.term.Term
 
-      The left hand side term and the right hand side term of an atomic formula.
+      The left hand side and the right hand side term of this atomic formula.
 
     .. automethod:: __bool__
+
+    .. automethod:: __eq__
 
     .. automethod:: __le__
 
@@ -317,26 +321,20 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
 
     .. automethod:: as_latex
 
+    .. automethod:: as_redlog
+
     .. automethod:: bvars
 
-    .. method:: complement(cls) -> type[AtomicFormula]
-                converse(cls) -> type[AtomicFormula]
-                dual(cls) -> type[AtomicFormula]
+    .. method:: complement() -> type[AtomicFormula]
+                converse() -> type[AtomicFormula]
+                dual() -> type[AtomicFormula]
       :classmethod:
 
-      Complement relation, converse relation, and dual relation.
+      Return the complement relation, converse relation, dual relation of this
+      subclass of :class:`AtomicFormula <.RCF.atomic.AtomicFormula>`.
+
       :meth:`complement` implements the abstract method
       :meth:`.firstorder.atomic.AtomicFormula.complement`.
-
-      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-      |                    | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
-      +====================+=============+=============+=============+=============+=============+=============+
-      | :meth:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
-      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-      | :meth:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
-      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
-      | :meth:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
-      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
 
       .. admonition:: Mathematical definitions
 
@@ -373,7 +371,20 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
         :math:`\overline{\overline{\varrho}} = (\varrho^{-1})^{-1} = (\varrho^d)^d =
         \varrho`.
 
+      This yields the following table for RCF:
+
+      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+      |                    | :class:`Eq` | :class:`Ne` | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
+      +====================+=============+=============+=============+=============+=============+=============+
+      | :meth:`complement` | :class:`Ne` | :class:`Eq` | :class:`Gt` | :class:`Lt` | :class:`Ge` | :class:`Le` |
+      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+      | :meth:`converse`   | :class:`Eq` | :class:`Ne` | :class:`Ge` | :class:`Le` | :class:`Gt` | :class:`Lt` |
+      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+      | :meth:`dual`       | :class:`Ne` | :class:`Eq` | :class:`Lt` | :class:`Gt` | :class:`Le` | :class:`Ge` |
+      +--------------------+-------------+-------------+-------------+-------------+-------------+-------------+
+
       .. seealso::
+
         Inherited method :meth:`.firstorder.atomic.AtomicFormula.to_complement`
 
     .. automethod:: fvars
@@ -381,12 +392,6 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
     .. automethod:: simplify
 
     .. automethod:: strict_part
-
-      +---------------------+-------------+-------------+-------------+-------------+
-      |                     | :class:`Le` | :class:`Ge` | :class:`Lt` | :class:`Gt` |
-      +=====================+=============+=============+=============+=============+
-      | :meth:`strict_part` | :class:`Lt` | :class:`Gt` | :class:`Lt` | :class:`Gt` |
-      +---------------------+-------------+-------------+-------------+-------------+
 
     .. automethod:: subs
 
@@ -399,3 +404,9 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
              Ne
 
     Bases: :class:`.AtomicFormula`
+
+    .. seealso::
+
+      :meth:`Term.__eq__ <.RCF.term.Term.__eq__>`, :meth:`Term.__ge__ <.RCF.term.Term.__ge__>`, :meth:`Term.__gt__ <.RCF.term.Term.__gt__>`, :meth:`Term.__le__ <.RCF.term.Term.__le__>`, :meth:`Term.__lt__ <.RCF.term.Term.__lt__>`, :meth:`Term.__ne__ <.RCF.term.Term.__ne__>`
+        for constructing instances of these classes using the corresponding
+        infix operators ``==``, ``>=``, ``>``, ``<=``, ``<``, ``!=``.
