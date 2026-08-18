@@ -6,9 +6,9 @@
 Variables, Terms, Atoms
 ***********************
 
-There is an infinite set :data:`RCF.VV <.RCF.term.VV>` of all :mod:`.theories.RCF` variables, which is an instance of the class :class:`VariableSet <.RCF.term.VariableSet>`. The variables obtained from :data:`VV <.RCF.term.VV>` are instances of the class :class:`Variable <.RCF.term.Variable>`, which is a subclass of :class:`Term <.RCF.term.Term>`. Larger terms can be constructed from variables and numbers using ring arithmetic :meth:`+ <.RCF.term.Term.__add__>`, :meth:`* <.RCF.term.Term.__mul__>`, :meth:`- <.RCF.term.Term.__sub__>`, :meth:`** <.RCF.term.Term.__pow__>`, :meth:`/ <.RCF.term.Term.__truediv__>` implemented in :class:`Term <.RCF.term.Term>`.
+There is an infinite set :data:`RCF.VV <.RCF.term.VV>` of all :mod:`RCF <.theories.RCF>` variables, which is an instance of the class :class:`VariableSet <.RCF.term.VariableSet>`. The variables obtained from :data:`VV <.RCF.term.VV>` are instances of the class :class:`Variable <.RCF.term.Variable>`, which is a subclass of :class:`Term <.RCF.term.Term>`. Larger terms can be constructed from variables and numbers using ring arithmetic :meth:`+ <.RCF.term.Term.__add__>`, :meth:`* <.RCF.term.Term.__mul__>`, :meth:`- <.RCF.term.Term.__sub__>`, :meth:`** <.RCF.term.Term.__pow__>`, :meth:`/ <.RCF.term.Term.__truediv__>` implemented in :class:`Term <.RCF.term.Term>`.
 
-There is a class :class:`AtomicFormula <.RCF.atomic.AtomicFormula>` with subclasses :class:`Eq <.RCF.atomic.Eq>`, :class:`Ne <.RCF.atomic.Ne>`, :class:`Le <.RCF.atomic.Le>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Lt <.RCF.atomic.Lt>`, :class:`Gt <.RCF.atomic.Gt>`. Atoms are obtained as instances of these subclasses either using the class names as constructors, or using the corresponding operators :meth:`== <.RCF.term.Term.__eq__>`, :meth:`\!= <.RCF.term.Term.__ne__>`, :meth:`<= <.RCF.term.Term.__le__>`, :meth:`>= <.RCF.term.Term.__ge__>`, :meth:`< <.RCF.term.Term.__lt__>` :meth:`> <.RCF.term.Term.__gt__>` overloaded in the class :class:`Term <.RCF.term.Term>`.
+There is a class :class:`AtomicFormula <.RCF.atomic.AtomicFormula>` with subclasses :class:`Eq <.RCF.atomic.Eq>`, :class:`Ne <.RCF.atomic.Ne>`, :class:`Le <.RCF.atomic.Le>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Lt <.RCF.atomic.Lt>`, :class:`Gt <.RCF.atomic.Gt>`. Atoms are obtained as instances of these subclasses either using the class names as constructors, or using the corresponding operators :meth:`== <.RCF.term.Term.__eq__>`, :meth:`\!= <.RCF.term.Term.__ne__>`, :meth:`<= <.RCF.term.Term.__le__>`, :meth:`>= <.RCF.term.Term.__ge__>`, :meth:`< <.RCF.term.Term.__lt__>` :meth:`> <.RCF.term.Term.__gt__>` overloaded in the class :class:`Term <.RCF.term.Term>`. The following diagram, which has no rigorous formal semantics, illustrates this.
 
 Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
 
@@ -152,6 +152,7 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
         [arrowhead=empty, xlabel="subclass of             ", fontsize="10pt", fontname="sans-serif"];
       Ne, Le, Ge, Lt, Gt -> AtomicFormula [arrowhead=empty];
    }
+
 
 .. automodule:: logic1.theories.RCF.term
 

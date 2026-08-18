@@ -230,8 +230,8 @@ r""" Real quantifier elimination. Returns a quantifier-free equivalent
 :attr:`qe.assumptions <.abc.qe.QuantifierElimination.assumptions>`.
 
 .. math::
-  \mathbb{R} \models \bigwedge \mathtt{qe.assumptions}
-                     \longrightarrow (\mathtt{f} \longleftrightarrow \mathtt{f'}).
+  \textsf{RCF} \models \bigwedge \mathtt{qe.assumptions} \longrightarrow
+                       (\mathtt{f} \longleftrightarrow \mathtt{f'}).
 
 With regular quantifier elimination, :attr:`qe.assumptions
 <.abc.qe.QuantifierElimination.assumptions>` contains the assumptions passed as the

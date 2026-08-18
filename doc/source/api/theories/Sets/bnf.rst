@@ -1,6 +1,6 @@
 .. _api-Sets-bnf:
 
-*Sets*
+*Sets with Cardinality Constraints*
 
 ********************
 Boolean Normal Forms
@@ -8,25 +8,12 @@ Boolean Normal Forms
 
 .. automodule:: logic1.theories.Sets.bnf
 
-  .. autoclass:: BooleanNormalForm
-    :exclude-members: __init__, __new__
+  .. function:: cnf(f: Sets.types.Formula) -> Sets.types.Formula
+                dnf(f: Sets.types.Formula) -> Sets.types.Formula
 
-
-  User Interface
-  **************
-
-  .. function:: cnf(f: Formula) -> Formula
-                dnf(f: Formula) -> Formula
-
-    Compute a conjunctive or disjunctive normal form, respectively.
-
-    :param f:
-      The input formula
-
-    :returns:
-      Returns a CNF or DNF of `f`, respectively. If `f` contains quantifiers,
-      then the result is an equivalent prenex normal form whose matrix is in CND
-      or DNF, respectively.
+    Compute a conjunctive or disjunctive normal form of ``f``. If ``f`` contains
+    quantifiers, then the result is an equivalent prenex normal form whose
+    matrix is in CNF or DNF, respectively.
 
     .. rubric:: Some examples
 
@@ -51,3 +38,23 @@ Boolean Normal Forms
     And(Or(a == b, a != d), Or(a == d, b == d))
     >>> dnf(f)
     Or(And(a == b, a == d), And(b == d, a != b))
+
+    .. seealso::
+
+      :class:`.BooleanNormalForm`
+        Its inherited methods :meth:`.BooleanNormalForm.cnf` and
+        :meth:`.BooleanNormalForm.dnf` are wrapped by the functions
+        :func:`.cnf` and :func:`.dnf`, respectively.
+
+      :ref:`Simplification <api-Sets-simplify>`
+        for the simplifier that is used to simplify intermediate results
+        throughout the CNF and DNF computation.
+
+  Details
+  *******
+
+  .. attention::
+    The material below addresses implementers rather than users.
+
+  .. autoclass:: BooleanNormalForm
+    :exclude-members: __init__, __new__

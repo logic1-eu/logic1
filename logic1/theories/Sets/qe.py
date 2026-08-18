@@ -210,47 +210,26 @@ class QuantifierElimination(abc.qe.QuantifierElimination[Node, Formula,
 
 
 qe = quantifier_elimination = QuantifierElimination()
-"""
+r"""
 Quantifier elimination for the theory of sets with cardinanity constraints.
-Technically, :func:`.qe` is an instance of the callable class
-:class:`.QuantifierElimination`.
+Returns a quantifier-free equivalent ``f'`` of ``f`` modulo the assumptions
+passed in the `assume` parameter.
 
-:param f:
-  The input formula to which quantifier elimination will be applied.
+.. math::
+  \textsf{Sets} \models \bigwedge \mathtt{assume} \longrightarrow
+                        (\mathtt{f} \longleftrightarrow \mathtt{f'}).
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The return value
-  is equivalent modulo those assumptions.
+.. seealso::
 
-:param workers:
-  Specifies the number of processes to be used in parallel:
+  :class:`logic1.abc.qe.Options`
+    for the options that can be passed to this function.
 
-  * The default value `workers=0` uses a sequential implementation,
-    which avoids overhead when input problems are small. For all other
-    values, there are additional processes started.
+  :attr:`logic1.abc.qe.Options.workers`
+    explains how to specify parallel computation of subproblems.
 
-  * A positive value `workers=n > 0` uses `n + 2` processes: the master
-    process, `n` worker processes, and a proxy processes that manages
-    shared data.
+  :class:`logic1.theories.Sets.qe.Node`
+    The subproblems referred to above correspond to instances of this class.
 
-    .. note::
-      `workers=1` uses the parallel implementation with only one
-      worker. Algorithmically this is similar to the sequential version
-      with `workers=0` but comes at the cost of 2 additional processes.
-
-  * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-    many workers.  It follows that `workers=-2` exactly allocates all
-    of CPUs of the machine, and workers=-3 is an interesting choice,
-    which leaves one CPU free for smooth interaction with the machine.
-
-:param `**options`:
-  Keyword arguments with keywords corresponding to attributes of
-  :class:`.abc.qe.Options`. Those are
-  :attr:`log_level <.abc.qe.Options.log_level>`,
-  :attr:`log_rate <.abc.qe.Options.log_rate>`.
-
-:returns:
-
-  A quantifier-free equivalent of `f` modulo the assumptions that are passed as
-  the `assume` parameter.
+  :class:`logic1.theories.Sets.qe.QuantifierElimination`
+    :obj:`qe` is an instance of this callable class.
 """

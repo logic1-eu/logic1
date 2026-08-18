@@ -1,6 +1,6 @@
 .. _api-Sets-simplify:
 
-*Sets*
+*Sets with Cardinality Constraints*
 
 **************
 Simplification
@@ -8,43 +8,20 @@ Simplification
 
 .. automodule:: logic1.theories.Sets.simplify
 
-  Internal Representations
-  ************************
+  .. autofunction:: simplify(f: Sets.types.Formula, assume: Iterable[Sets.atomic.AtomicFormula] = []) -> Sets.types.Formula
 
-  .. autoclass:: InternalRepresentation
-    :exclude-members: __init__, __new__
 
-  Simplification and Validity
-  ***************************
+  .. autofunction:: is_valid(f: Sets.types.Formula, assume: Iterable[Sets.atomic.AtomicFormula] = []) -> Optional[bool]
+
+
+  Details
+  *******
+
+  .. attention::
+    The material below addresses implementers rather than users.
 
   .. autoclass:: Simplify
     :exclude-members: __init__, __new__
 
-  User Interface
-  **************
-
-  .. autofunction:: simplify
-
-    .. rubric:: An example
-
-    >>> from logic1.firstorder import *
-    >>> from logic1.theories.Sets import *
-    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
-    >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
-    And(a == c, a == d)
-
-  .. autofunction:: is_valid
-
-    .. rubric:: Some examples
-
-    >>> from logic1.firstorder import *
-    >>> from logic1.theories.Sets import *
-    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
-
-    >>> is_valid(a == d, assume=[a == b, b == c, c == d])
-    True
-
-    >>> is_valid(a == d, assume=[a == b, b != c, c == d])
-    False
-
-    >>> is_valid(a == d, assume=[a != b, b != c, c != d])  # Returns None
+  .. autoclass:: InternalRepresentation
+    :exclude-members: __init__, __new__

@@ -1,6 +1,6 @@
 .. _api-Sets-qe:
 
-*Sets*
+*Sets with Cardinality Constraints*
 
 **********************
 Quantifier Elimination
@@ -8,29 +8,7 @@ Quantifier Elimination
 
 .. automodule:: logic1.theories.Sets.qe
 
-  Assumptions
-  ***********
-
-  .. autoclass:: Assumptions
-    :exclude-members: __init__, __new__
-
-  Nodes
-  *****
-
-  .. autoclass:: Node
-    :exclude-members: __init__, __new__
-
-  Quantifier Elimination
-  **********************
-
-  .. autoclass:: QuantifierElimination
-    :exclude-members: __init__, __new__
-
-  User Interface
-  **************
-
   .. autofunction:: qe(f: Sets.types.Formula, assume: Iterable[Sets.atomic.AtomicFormula] = [], **options) -> Optional[Sets.types.Formula]
-
 
   .. rubric:: Some examples
 
@@ -67,3 +45,19 @@ Quantifier Elimination
   ...            Ex([w, x, y, z],
   ...              And(w != x, w != y, w != z, x != y, x != z, y != z))))
   Or(C_(2), C(4))
+
+
+Details
+*******
+
+.. attention::
+  The material below addresses implementers rather than users.
+
+.. autoclass:: QuantifierElimination
+  :exclude-members: __init__, __new__
+
+.. autoclass:: Node
+  :exclude-members: __init__, __new__
+
+.. autoclass:: Assumptions
+  :exclude-members: __init__, __new__

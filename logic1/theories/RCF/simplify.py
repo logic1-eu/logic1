@@ -49,7 +49,7 @@ class Options(abc.simplify.Options):
 
     With ``explode_always=False`` the splittings in "1." are applied only within
     disjunctions and the ones in "2." are applied only within conjunctions. This
-    keeps the terms more complex but the boolean structure simpler.
+    keeps the terms more complex but the Boolean structure simpler.
 
     >>> from logic1.firstorder import *
     >>> from logic1.theories.RCF import *
@@ -875,11 +875,14 @@ def simplify(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> For
     Ex(a, a - 5 > 0)
 
     .. seealso::
-        * :class:`.Options` -- for the options that can be passed to this
-          function. With the documentation of the options you also find further
-          simplification examples.
-        * :class:`.Simplify` -- Its inherited method :meth:`.Simplify.simplify`
-          is wrapped by this function.
+
+      :class:`.Options`
+        for the options that can be passed to this function. With the
+        documentation of the options you also find further simplification
+        examples.
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.simplify` is wrapped by this
+        function.
     """
     return Simplify(Options(**options)).simplify(f, assume)
 
@@ -923,7 +926,7 @@ def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Opt
 
     Neither valid nor unsatisfiable:
 
-    >>> is_valid(a > 0)  # returns None
+    >>> is_valid(a > 0)
 
     Unsatisfiable:
 
@@ -931,8 +934,11 @@ def is_valid(f: Formula, assume: Iterable[AtomicFormula] = [], **options) -> Opt
     False
 
     .. seealso::
-        * :class:`.Options` -- for the options recognized by this function.
-        * :class:`.Simplify` -- Its inherited method :meth:`.Simplify.is_valid`
-          is wrapped by this function.
+
+      :class:`.Options`
+        for the options recognized by this function.
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.is_valid` is wrapped by this
+        function.
     """
     return Simplify(Options(**options)).is_valid(f, assume)

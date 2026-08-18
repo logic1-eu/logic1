@@ -1,8 +1,8 @@
 .. _api-Sets:
 
-****
-Sets
-****
+*********************************
+Sets with Cardinality Constraints
+*********************************
 
 .. automodule:: logic1.theories.Sets
 

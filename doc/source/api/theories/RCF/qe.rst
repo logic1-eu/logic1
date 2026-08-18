@@ -23,6 +23,7 @@ Quantifier Elimination
   :members:
   :undoc-members:
 
+
 Details
 *******
 
@@ -37,10 +38,3 @@ Details
 
 .. autoclass:: logic1.theories.RCF.node.Assumptions
   :exclude-members: __init__, __new__
-
-
-
-.. discuss: autofunction qe gets its signature from
-.. VirtualSubstitution.__call__. However, it shows
-.. firstorder.atomic.AtomicFormula instead of RCF.atomic.AtomicFormula. This is
-.. also the origin of a Warning when building the documentation.

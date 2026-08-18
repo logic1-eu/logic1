@@ -1,6 +1,6 @@
 .. _api-Sets-types:
 
-*Sets*
+*Sets with Cardinality Constraints*
 
 *****
 Types

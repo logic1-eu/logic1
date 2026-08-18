@@ -184,8 +184,73 @@ class Simplify(abc.simplify.Simplify[
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+    """This is the primary simplification function for f modulo assume.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
+    And(a == c, a == d)
+
+    Assumptions do not affect bound variables.
+
+    >>> simplify(And(a == c, Ex(a, a == b)), assume=[a == b])
+    And(a == c, Ex(a, a == b))
+
+    .. seealso::
+
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.simplify` is wrapped by this
+        function.
+    """
     return Simplify().simplify(f, assume)
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = []) -> Optional[bool]:
+    """Simplification-based heuristic test for validity and unsatisfiability of
+    a formula.
+
+    .. admonition:: Mathematical definition
+
+        A formula is *valid* if it is true for all values of its free variables.
+        A formula is *unsatisfiable* if it is false for all values of its free
+        variables.
+
+    This function provides an efficient heuristic test whether ``f``
+    is valid or unsatisfiable modulo ``assume``:
+
+    * If the simplifier yields :data:`.T`, then ``f`` is valid and
+      :obj:`.True` is returned.
+
+    * If the simplifier yields :data:`.F`, then ``f`` is unsatisfiable and
+      :obj:`.False` is returned.
+
+    Otherwise, :obj:`None` is returned, which means "don't know".
+
+    .. rubric:: Some examples
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+
+    Valid:
+
+    >>> is_valid(a == d, assume=[a == b, b == c, c == d])
+    True
+
+    Unsatisfiable:
+
+    >>> is_valid(a == d, assume=[a == b, b != c, c == d])
+    False
+
+    Neither valid nor unsatisfiable:
+
+    >>> is_valid(a == d, assume=[a != b, b != c, c != d])
+
+    .. seealso::
+
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.is_valid` is wrapped by this
+        function.
+    """
     return Simplify().is_valid(f, assume)

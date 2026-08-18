@@ -63,12 +63,15 @@ Boolean Normal Forms
             Or(a != 0, G0002_c != 0, G0002_b == 0))))))))
 
     .. seealso::
-        * :class:`.BooleanNormalForm` -- Its inherited methods
-          :meth:`.BooleanNormalForm.cnf` and :meth:`.BooleanNormalForm.dnf` are
-          wrapped by the functions :func:`.cnf` and :func:`.dnf`, respectively.
-        * :ref:`Simplification <api-RCF-simplify>` -- for the simplifier that is
-          used to simplify intermediate results throughout the CNF and DNF
-          computation.
+
+      :class:`.BooleanNormalForm`
+        Its inherited methods :meth:`.BooleanNormalForm.cnf` and
+        :meth:`.BooleanNormalForm.dnf` are wrapped by the functions
+        :func:`.cnf` and :func:`.dnf`, respectively.
+
+      :ref:`Simplification <api-RCF-simplify>`
+        for the simplifier that is used to simplify intermediate results
+        throughout the CNF and DNF computation.
 
 
   Details
