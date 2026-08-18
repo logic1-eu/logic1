@@ -59,7 +59,7 @@ interactive use, e.g., pre-defining single letter variables.
 
 :ref:`Atoms <api-RCF-atomic>` are built from polynomials using equality,
 disequality, and order relations. :ref:`Formulas <api-firstorder-firstorder>`
-are built from atoms using boolean connectives and quantifiers. Real closed
+are built from atoms using Boolean connectives and quantifiers. Real closed
 fields are complete, decidable, and admit :ref:`quantifier elimination
 <api-RCF-qe>`.
 

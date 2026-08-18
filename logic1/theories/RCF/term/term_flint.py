@@ -773,7 +773,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __eq__(self, other: Term | Constant) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
         # it makes no sense to compare terms with general objects. We have
-        # Eq.__bool__, which supports some comparisons in boolean contexts.
+        # Eq.__bool__, which supports some comparisons in Boolean contexts.
         # Same for __ne__.
         lhs = self - other
         # Use _poly.leadling_coefficient() in order to support @lru_cache on

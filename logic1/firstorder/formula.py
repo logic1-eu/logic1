@@ -1098,7 +1098,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
 
         Replaces each atomic subformula of `self` with the :class:`Formula`
         `map_atoms(self)`. If `sort_levels` is :obj:`True`, all subformulas
-        built from commutative  boolean operators (:class:`.And`, :class:`.Or`,
+        built from commutative Boolean operators (:class:`.And`, :class:`.Or`,
         :class:`.Equivalent`) are sorted after the application of `map_atoms`.
 
         >>> from logic1.theories.RCF import *

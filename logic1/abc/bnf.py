@@ -1,6 +1,6 @@
 """This module :mod:`logic1.abc.bnf` provides a generic abstract implementation
-of boolean normal form computations using the famous Espresso algorithm in
-combination with boolean abstraction. Techincally, we use the python package
+of Boolean normal form computations using the famous Espresso algorithm in
+combination with Boolean abstraction. Technically, we use the python package
 `PyEDA <https://pyeda.readthedocs.io/en/latest/index.html>`_, which in turns
 wraps a `C extension
 <https://ptolemy.berkeley.edu/projects/embedded/pubs/downloads/espresso/_index.htm>`_

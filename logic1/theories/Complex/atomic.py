@@ -54,7 +54,7 @@ class AtomicFormula(
     def __bool__(self) -> bool:  # TODO: maybe dont allow inequalities?
         """Compare the sort keys of both sides of this atomic formula
         using the corresponding operator of this formula. This is used to
-        evaluate atomic formulas in boolean contexts. For evaluating constant
+        evaluate atomic formulas in Boolean contexts. For evaluating constant
         atomic formulas with respect to their usual semantics, use :meth:`.eval`
         instead.
 
