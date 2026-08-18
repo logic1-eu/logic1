@@ -4,8 +4,9 @@ quantifier elimination, which can used by various theories via subclassing.
 
 from __future__ import annotations
 
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from collections import Counter
+from collections.abc import Hashable, Sequence
 from dataclasses import dataclass, field
 import logging
 import multiprocessing as mp
@@ -15,13 +16,13 @@ import queue
 import os
 import threading
 import time
-from typing import (Any, Collection, Generic, Iterable, Iterator, Optional,
+from typing import (Any, cast, Collection, Generic, Iterable, Iterator, Optional,
                     Self, TypeVar)
 from typing import reveal_type  # noqa
 
 from logic1.support.excepthook import NoTraceException
 from logic1.firstorder import (All, And, AtomicFormula, _F, Formula, Not, Or,
-                               Prefix, Term, Variable)
+                               Prefix, _T, Term, Variable)
 from logic1.support.logging import DeltaTimeFormatter, Timer
 
 # Create logger
@@ -52,11 +53,6 @@ multiprocessing_logger.addHandler(multiprocessing_handler)
 χ = TypeVar('χ', bound=Variable)
 σ = TypeVar('σ')
 
-φ = TypeVar('φ', bound=Formula)
-"""A type variable denoting a formula with upper bound
-:class:`logic1.firstorder.formula.Formula`.
-"""
-
 ν = TypeVar('ν', bound='Node')
 """A type variable denoting a node with upper bound
 :class:`logic1.abc.qe.Node`.
@@ -68,6 +64,11 @@ abstract method :meth:`.QuantifierElimination.init_env`."""
 
 λ = TypeVar('λ', bound='Assumptions')
 """A type variable denoting a assumptions with upper bound :class:`.Assumptions`.
+"""
+
+μ = TypeVar('μ', bound='Hashable')
+"""A type variable denoting the information stored in the Memory attribute of
+:class:`.NodeList` and its subclasses.
 """
 
 ω = TypeVar('ω', bound='Options')
@@ -85,7 +86,7 @@ class NodeProcessFailure(Exception):
 
 
 @dataclass
-class Node(Generic[φ, χ, λ]):
+class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     """Holds a subproblem for existential quantifier elimination. Theories
     implementing the interface can put restrictions on the existing fields and
     add further fields.
@@ -97,7 +98,7 @@ class Node(Generic[φ, χ, λ]):
     """A list of variables.
     """
 
-    formula: φ
+    formula: Formula[α, τ, χ, σ]
     """A quantifier-free formula.
     """
 
@@ -108,15 +109,23 @@ class Node(Generic[φ, χ, λ]):
         ...
 
     @abstractmethod
-    def process(self, assumptions: λ) -> list[Self]:
-        """This `node` describes a formula ``Ex(node.variables,
+    def memorize(self) -> μ:
+        """Return a hashable object that identifies this node. This is used to
+        avoid processing the same node twice.
+        """
+        ...
+
+    @abstractmethod
+    def process(self, assumptions: λ) -> Sequence[Self]:
+        """This ``node`` describes a formula ``Ex(node.variables,
         node.formula)``. Select a `variable` from ``node.variables`` and
-        compute a list `S` of successor nodes such that:
+        compute a list ``S`` of successor nodes such that:
 
-        1. `variable` is not in ``successor.variables`` for `successor` in `S`;
+        1. ``variable`` is not in ``successor.variables`` for ``successor`` in
+           ``S``;
 
-        2. `variable` does not occur in ``successor.formula`` for `successor`
-           in `S`;
+        2. ``variable`` does not occur in ``successor.formula`` for ``successor``
+           in ``S``;
 
         3. ``Or(*(Ex(successor.variables, successor.formula) for s in S))`` is
            logically equivalent to ``Ex(node.variables, node.formula)``.
@@ -125,11 +134,15 @@ class Node(Generic[φ, χ, λ]):
 
 
 @dataclass
-class NodeList(Collection[ν], Generic[φ, ν]):
+class NodeList(Collection[ν], Generic[ν, μ]):
+    """A list of nodes with a memory to avoid duplicates and statistics about
+    the number of nodes added and dropped.
+    """
+
     # Sequential only
 
     nodes: list[ν] = field(default_factory=list)
-    memory: set[φ] = field(default_factory=set)
+    memory: set[μ] = field(default_factory=set)
     hits: int = 0
     candidates: int = 0
 
@@ -143,16 +156,24 @@ class NodeList(Collection[ν], Generic[φ, ν]):
         return len(self.nodes)
 
     def append(self, node: ν) -> bool:
-        is_new = node.formula not in self.memory
+        """Append ``node`` to the list of nodes if it is not already in the
+        memory. Return ``True`` if ``node`` was appended, and ``False``
+        otherwise.
+        """
+        memorize = node.memorize()
+        is_new = memorize not in self.memory
         if is_new:
             self.nodes.append(node)
-            self.memory.add(node.formula)
+            self.memory.add(memorize)
         else:
             self.hits += 1
         self.candidates += 1
         return is_new
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Append ``nodes`` to the list of nodes if they are not already in the
+        memory.
+        """
         for node in nodes:
             self.append(node)
 
@@ -181,7 +202,13 @@ class NodeList(Collection[ν], Generic[φ, ν]):
 
 
 @dataclass
-class WorkingNodeList(NodeList[φ, ν]):
+class WorkingNodeList(NodeList[ν, μ]):
+    """A subclass of :class:`.NodeList` that is used for the list of nodes that
+    are currently being processed during quantifier elimination. Additionally,
+    it keeps track of the current number of nodes with a given number of
+    variables.
+    """
+
     # Sequential only
 
     node_counter: Counter[int] = field(default_factory=Counter)
@@ -226,6 +253,8 @@ class WorkingNodeList(NodeList[φ, ν]):
     def extend(self, nodes: Iterable[ν]) -> None:
         for node in nodes:
             match node.formula:
+                case _T():
+                    raise FoundT()
                 case _F():
                     continue
                 case Or(args=args):
@@ -241,11 +270,11 @@ class WorkingNodeList(NodeList[φ, ν]):
 
 
 @dataclass
-class NodeListManager(Generic[φ, ν]):
+class NodeListManager(Generic[ν, μ]):
 
     nodes: list[ν] = field(default_factory=list)
     nodes_lock: threading.Lock = field(default_factory=threading.Lock)
-    memory: set[φ] = field(default_factory=set)
+    memory: set[μ] = field(default_factory=set)
     memory_lock: threading.Lock = field(default_factory=threading.Lock)
     hits: int = 0
     hits_candidates_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -255,7 +284,7 @@ class NodeListManager(Generic[φ, ν]):
         with self.nodes_lock:
             return self.nodes.copy()
 
-    def get_memory(self) -> set[φ]:
+    def get_memory(self) -> set[μ]:
         with self.memory_lock:
             return self.memory.copy()
 
@@ -271,9 +300,10 @@ class NodeListManager(Generic[φ, ν]):
 
     def append(self, node: ν) -> bool:
         with self.memory_lock:
-            is_new = node.formula not in self.memory
+            memorize = node.memorize()
+            is_new = memorize not in self.memory
             if is_new:
-                self.memory.add(node.formula)
+                self.memory.add(memorize)
         if is_new:
             with self.nodes_lock:
                 self.nodes.append(node)
@@ -292,7 +322,7 @@ class NodeListManager(Generic[φ, ν]):
             return (self.hits, self.candidates)
 
 
-class NodeListProxy(Collection[ν], Generic[φ, ν]):
+class NodeListProxy(Collection[ν], Generic[ν, μ]):
     # parallel
 
     def __init__(self, proxy: _NodeListProxy) -> None:
@@ -303,7 +333,7 @@ class NodeListProxy(Collection[ν], Generic[φ, ν]):
         return self._proxy.get_nodes()
 
     @property
-    def memory(self) -> set[φ]:
+    def memory(self) -> set[μ]:
         return self._proxy.get_memory()
 
     @property
@@ -357,35 +387,35 @@ class NodeListProxy(Collection[ν], Generic[φ, ν]):
         return f'{key}={num_nodes}, H={ratio:.0%}'
 
 
-class _NodeListProxy(mp.managers.BaseProxy, Generic[φ, ν]):
+class _NodeListProxy(mp.managers.BaseProxy, Generic[ν, μ]):
 
     def get_nodes(self) -> list[ν]:
-        return self._callmethod('get_nodes')  # type: ignore[func-returns-value]
+        return cast(list[ν], self._callmethod('get_nodes'))
 
-    def get_memory(self) -> set[φ]:
-        return self._callmethod('get_memory')  # type: ignore[func-returns-value]
+    def get_memory(self) -> set[μ]:
+        return cast(set[μ], self._callmethod('get_memory'))
 
     def get_candidates(self) -> int:
-        return self._callmethod('get_candidates')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('get_candidates'))
 
     def get_hits(self) -> int:
-        return self._callmethod('get_hits')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('get_hits'))
 
     def __len__(self) -> int:
-        return self._callmethod('__len__')  # type: ignore[func-returns-value]
+        return cast(int, self._callmethod('__len__'))
 
     def append(self, node: ν) -> bool:
-        return self._callmethod('append', (node,))  # type: ignore[func-returns-value]
+        return cast(bool, self._callmethod('append', (node,)))
 
     def extend(self, nodes: Iterable[ν]) -> None:
-        return self._callmethod('extend', (nodes,))  # type: ignore[func-returns-value]
+        return self._callmethod('extend', (nodes,))
 
     def statistics(self) -> tuple[Any, ...]:
-        return self._callmethod('statistics')  # type: ignore[func-returns-value]
+        return cast(tuple[Any, ...], self._callmethod('statistics'))
 
 
 @dataclass
-class WorkingNodeListManager(NodeListManager[φ, ν]):
+class WorkingNodeListManager(NodeListManager[ν, μ]):
 
     busy: int = 0
     busy_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -430,7 +460,7 @@ class WorkingNodeListManager(NodeListManager[φ, ν]):
             self.busy -= 1
 
 
-class WorkingNodeListProxy(NodeListProxy[φ, ν]):
+class WorkingNodeListProxy(NodeListProxy[ν, μ]):
 
     def __init__(self, proxy: _WorkingNodeListProxy) -> None:
         self._proxy: _WorkingNodeListProxy = proxy
@@ -443,6 +473,8 @@ class WorkingNodeListProxy(NodeListProxy[φ, ν]):
         new_nodes = []
         for node in nodes:
             match node.formula:
+                case _T():
+                    raise FoundT()
                 case _F():
                     continue
                 case Or(args=args):
@@ -492,28 +524,28 @@ class WorkingNodeListProxy(NodeListProxy[φ, ν]):
         self._proxy.task_done()
 
 
-class _WorkingNodeListProxy(_NodeListProxy[φ, ν]):
+class _WorkingNodeListProxy(_NodeListProxy[ν, μ]):
 
     def get_node_counter(self) -> Counter[int]:
-        return self._callmethod('get_node_counter')  # type: ignore[func-returns-value]
+        return cast(Counter[int], self._callmethod('get_node_counter'))
 
     def is_finished(self) -> bool:
-        return self._callmethod('is_finished')  # type: ignore[func-returns-value]
+        return cast(bool, self._callmethod('is_finished'))
 
     def pop(self) -> ν:
-        return self._callmethod('pop')  # type: ignore[func-returns-value]
+        return cast(ν, self._callmethod('pop'))
 
     def task_done(self) -> None:
-        return self._callmethod('task_done')  # type: ignore[func-returns-value]
+        return self._callmethod('task_done')
 
 
-class SyncManager(mp.managers.SyncManager, Generic[φ, ν]):
+class SyncManager(mp.managers.SyncManager, Generic[ν, μ]):
 
-    def NodeList(self) -> NodeListProxy[φ, ν]:
+    def NodeList(self) -> NodeListProxy[ν, μ]:
         proxy = self._NodeListProxy()  # type: ignore[attr-defined]
         return NodeListProxy(proxy)
 
-    def WorkingNodeList(self) -> WorkingNodeListProxy[φ, ν]:
+    def WorkingNodeList(self) -> WorkingNodeListProxy[ν, μ]:
         proxy = self._WorkingNodeListProxy()  # type: ignore[attr-defined]
         return WorkingNodeListProxy(proxy)
 
@@ -529,13 +561,14 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 
 
 @dataclass
-class Assumptions(Generic[α, τ, χ, σ]):
+class Assumptions(Generic[α, τ, χ, σ], ABC):
     """Holds the currently valid assumptions. This starts with user assumptions
     explicitly provided by the user. Certain variants of quantified elimination
     may add further assumptions in the course of the elimination.
 
     .. seealso::
-        * The argument `assume` of :meth:`.QuantifierElimination.__call__`.
+
+        * The argument ``assume`` of :meth:`.QuantifierElimination.__call__`.
         * Generic quantifier elimination in :mod:`.RCF.qe`.
 
     This is an upper bound for the type variable :data:`.λ`.
@@ -550,16 +583,19 @@ class Assumptions(Generic[α, τ, χ, σ]):
     """A list of atoms holding the current set of assumptions.
     """
 
+    def __hash__(self) -> int:
+        return hash(tuple(self.atoms))
+
     def __init__(self, atoms: Iterable[α]) -> None:
         self.atoms = list(atoms)
 
     def append(self, new_atom: α) -> None:
-        """Add `new_atom` as another assumption and simplify.
+        """Add ``new_atom`` as another assumption and simplify.
         """
         self.extend([new_atom])
 
     def extend(self, new_atoms: Iterable[α]) -> None:
-        """Add `new_atoms` as further assumptions and simplify.
+        """Add ``new_atoms`` as further assumptions and simplify.
         """
         self.atoms.extend(new_atoms)
         # NF nörgelt
@@ -577,10 +613,10 @@ class Assumptions(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """`f` is a (possibly unary or trivial) conjunction of atoms. Simplifes
-        `f` in such a way that the result is again a (possibly unary or
-        trivial) conjunction of atoms. Raises :class:`.Inconsistent` if `f` is
-        simplified to :data:`.F`.
+        """``f`` is a (possibly unary or trivial) conjunction of atoms.
+        Simplifes ``f`` in such a way that the result is again a (possibly unary
+        or trivial) conjunction of atoms. Raises :class:`.Inconsistent` if ``f``
+        is simplified to :data:`.F`.
         """
         ...
 
@@ -596,37 +632,41 @@ class Options:
     """
 
     log_level: int
-    """The `log_level` of the logger used by :class:`.QuantifierElimination`.
+    """The logging level of the logger used
     """
 
     log_rate: float
-    """The minimal timespan (in s) between to log outputs in certain loops.
+    """The minimal timespan (in s) between log outputs when reporting progress
     """
 
     workers: int
-    """The number of worker processes used. For more information see the
-    documentation of the parameter `workers` of :meth:`.__call__`.
+    """Controls the number of CPUs used for processing subproblems:
 
-    :param workers:
-      Specifies the number of processes to be used in parallel:
+    * With the default value ``workers=0``, the implementation runs
+      sequentially. For all other values, additional processes are started.
 
-      * The default value `workers=0` uses a sequential implementation,
-        which avoids overhead when input problems are small. For all other
-        values, there are additional processes started.
+    * A positive value ``workers=n`` uses ``n + 2`` CPUs: ``n`` for worker
+      processes that process subproblems, one for the master process, and
+      another one for a proxy process that manages shared data.
 
-      * A positive value `workers=n > 0` uses `n + 2` processes: the master
-        process, `n` worker processes, and a proxy processes that manages
-        shared data.
+    * A negative value ``workers=-n`` uses ``os.cpu_count() - n`` CPUs for
+      workers, plus two additional CPUs for the master and proxy processes. It
+      follows that ``workers=-2`` uses all available CPUs, while ``workers=-3``
+      leaves one CPU free.
 
-        .. note::
-          `workers=1` uses the parallel implementation with only one
-          worker. Algorithmically this is similar to the sequential version
-          with `workers=0` but comes at the cost of 2 additional processes.
+    .. attention::
 
-      * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-        many workers.  It follows that `workers=-2` exactly allocates all
-        of CPUs of the machine, and workers=-3 is an interesting choice,
-        which leaves one CPU free for smooth interaction with the machine.
+      * ``workers=1`` uses the parallel implementation with only one worker.
+        Algorithmically, this is similar to the sequential implementation with
+        ``workers=0``, but introduces overhead.
+
+      * ``workers=-1`` uses ``os.cpu_count() + 1`` CPUs, which is not a
+        natural choice.
+
+    .. seealso::
+
+      :class:`logic1.abc.qe.Node`
+        The subproblems referred to above correspond to instances of this class.
     """
 
     def __init__(self, log_level: int = logging.NOTSET, log_rate: float = 0.5,
@@ -645,7 +685,7 @@ class Options:
 
 
 @dataclass
-class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
+class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
     """A generic callable class that implements quantifier elimination.
     """
 
@@ -687,18 +727,18 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
     matrix into the :attr:`.working_nodes`.
     """
 
-    working_nodes: Optional[WorkingNodeList[Formula[α, τ, χ, σ], ν]] = None
+    working_nodes: Optional[WorkingNodeList[ν, μ]] = None
     """Subproblems left for the current block. Element nodes of
     :attr:`.working_nodes` have the same shape as element nodes of
     :attr:`.root_nodes`
     """
 
-    success_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    success_nodes: Optional[NodeList[ν, μ]] = None
     """Finished subproblems of the current block. For each `node` in
     `success_nodes` we have ``node.variables == []``.
     """
 
-    failure_nodes: Optional[NodeList[Formula[α, τ, χ, σ], ν]] = None
+    failure_nodes: Optional[NodeList[ν, μ]] = None
     """Failed subproblems of the current block, which can occur with incomplete
     quantifier elimination procedures. An element nodes of
     :attr:`.failure_nodes` have the same shape as an element node of
@@ -782,7 +822,7 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
           generic type :data:`.ω`, which extends :class:`.Options`.
 
         :returns:
-          A quantifier-free equivalent of `f` modulo certain assumptions. A
+          A quantifier-free equivalent of ``f`` modulo certain assumptions. A
           simplified equivalent of all relevant assumptions are available as
           :attr:`.assumptions`.
 
@@ -887,18 +927,18 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         self.root_nodes = self.create_root_nodes(vars_, matrix)
 
     def final_simplification(self):
-        logger.debug(f'entering {self.final_simplification.__name__}')
-        if logger.isEnabledFor(logging.DEBUG):
+        logger.info(f'entering {self.final_simplification.__name__}')
+        if logger.isEnabledFor(logging.INFO):
             num_atoms = sum(1 for _ in self.matrix.atoms())
-            logger.debug(f'found {num_atoms} atoms')
+            logger.info(f'found {num_atoms} atoms')
         logger.info('final simplification')
         timer = Timer()
         self.result = self.final_simplify(self.matrix, assume=self._assumptions.atoms)
         self.time_final_simplification = timer.get()
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(f'{self.time_final_simplification=:.3f}')
+        if logger.isEnabledFor(logging.INFO):
+            logger.info(f'{self.time_final_simplification=:.3f}')
             num_atoms = sum(1 for _ in self.result.atoms())
-            logger.debug(f'produced {num_atoms} atoms')
+            logger.info(f'produced {num_atoms} atoms')
 
     @abstractmethod
     def final_simplify(self, formula: Formula[α, τ, χ, σ], assume: Iterable[α] = []) \
@@ -945,12 +985,12 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
         assert self._assumptions is not None
         logger.debug('entering sync manager context')
         timer = Timer()
-        manager: SyncManager[Formula[α, τ, χ, σ], ν]
+        manager: SyncManager[ν, μ]
         with SyncManager() as manager:
             self.time_syncmanager_enter = timer.get()
             logger.debug(f'{self.time_syncmanager_enter=:.3f}')
             m_lock = manager.Lock()
-            working_nodes: WorkingNodeListProxy[Formula[α, τ, χ, σ], ν] = manager.WorkingNodeList()
+            working_nodes: WorkingNodeListProxy[ν, μ] = manager.WorkingNodeList()
             working_nodes.extend(self.root_nodes)
             self.root_nodes = None
             success_nodes: multiprocessing.Queue[Optional[list[ν]]] = multiprocessing.Queue()
@@ -1120,6 +1160,37 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
             return self.parallel_process_block()
         return self.sequential_process_block()
 
+    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ]):
+        """Quantifier elimination main loop.
+        """
+        logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
+        f = f.to_pnf()
+        bound_variables = set(f.bvars())
+        for atom in self.assumptions:
+            if not bound_variables.isdisjoint(atom.fvars()):
+                raise ValueError(f'invalid assumption on bound variables in {atom}')
+        self.matrix, self.blocks = f.matrix()
+        while self.blocks:
+            try:
+                self.pop_block()
+                self.process_block()
+            except FoundT:
+                logger.info('found T')
+                if self.working_nodes is None:
+                    logger.info(WorkingNodeList().final_statistics())
+                else:
+                    logger.info(self.working_nodes.final_statistics())
+                    self.working_nodes = None
+                self.success_nodes = NodeList(nodes=[self.create_true_node()])
+            else:
+                if self.failure_nodes:
+                    n = len(self.failure_nodes.nodes)
+                    raise NoTraceException(f'Failed - {n} failure nodes')
+            self.collect_success_nodes()
+        self.final_simplification()
+        logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
+        return self.result
+
     def sequential_process_block(self) -> None:
         assert self.options is not None
         assert self.root_nodes is not None
@@ -1215,30 +1286,3 @@ class QuantifierElimination(Generic[ν, λ, ι, ω, α, τ, χ, σ]):
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=:.{precision}f}')
                 print(f'{self.time_total=:.{precision}f}')
-
-    def quantifier_eliminiation(self, f: Formula[α, τ, χ, σ]):
-        """Quantifier elimination main loop.
-        """
-        logger.debug(f'entering {self.quantifier_eliminiation.__name__}')
-        f = f.to_pnf()
-        self.matrix, self.blocks = f.matrix()
-        while self.blocks:
-            try:
-                self.pop_block()
-                self.process_block()
-            except FoundT:
-                logger.info('found T')
-                if self.working_nodes is None:
-                    logger.info(WorkingNodeList().final_statistics())
-                else:
-                    logger.info(self.working_nodes.final_statistics())
-                    self.working_nodes = None
-                self.success_nodes = NodeList(nodes=[self.create_true_node()])
-            else:
-                if self.failure_nodes:
-                    n = len(self.failure_nodes.nodes)
-                    raise NoTraceException(f'Failed - {n} failure nodes')
-            self.collect_success_nodes()
-        self.final_simplification()
-        logger.debug(f'leaving {self.quantifier_eliminiation.__name__}')
-        return self.result

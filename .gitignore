@@ -24,3 +24,16 @@ dist
 
 # rattler-build
 output
+
+# Cython
+*.so
+*.c
+/logic1/**/*.html
+
+Leaks
+
+# VS Code
+.vscode
+
+# MyPy
+.mypy_cache

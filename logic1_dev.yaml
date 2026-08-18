@@ -8,27 +8,37 @@
 #
 # Further packages can be added interactively anytime later on.
 #
+# Can be deleted as follows:
+#   $ conda remove --name logic1_dev --all
+#
 # https://docs.conda.io/projects/conda/en/stable/user-guide/tasks/manage-environments.html
 #
 name: logic1_dev
 channels:
   - conda-forge
 dependencies:
-  - python=3.11
+  - python >=3.12
   - coverage
+  - cython
   - pytest-cython
+  - graphviz
+  - python-graphviz
   - jupyter
   - line_profiler
   - more-itertools
   - mypy
+  - networkx
   - pip
   - pyeda
   - pytest
   - pytest-xdist
+  - python-flint
   - rattler-build
   - sage
+  - setuptools
   - setuptools_scm
   - snakeviz
   - sphinx
   - sphinx-book-theme
+  - types-networkx
   - viztracer

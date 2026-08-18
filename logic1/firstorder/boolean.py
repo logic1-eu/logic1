@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from typing import final, Optional
 
-from .atomic import AtomicFormula, Term, Variable
-from .formula import α, τ, χ, σ, Formula
+from logic1.firstorder.term import Term, Variable
+from logic1.firstorder.atomic import AtomicFormula
+from logic1.firstorder.formula import α, τ, χ, σ, Formula
 
-from ..support.tracing import trace  # noqa
+from logic1.support.tracing import trace
 
 
 class BooleanFormula(Formula[α, τ, χ, σ]):

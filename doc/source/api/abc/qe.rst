@@ -13,7 +13,8 @@ Quantifier Elimination
   corresponding sections of the various domains:
 
   * :ref:`Quantifier elimination in Real Closed Fields <api-RCF-qe>`
-  * :ref:`Quantifier elimination in the theory of Sets <api-Sets-qe>`
+  * :ref:`Quantifier elimination in Complex <api-Complex-qe>`
+  * :ref:`Quantifier elimination in Sets <api-Sets-qe>`
 
 .. automodule:: logic1.abc.qe
 
@@ -42,13 +43,6 @@ Quantifier Elimination
 
     We introduce the following additional type variables.
 
-    .. data:: φ
-      :value: TypeVar('φ', bound=Formula)
-      :canonical: logic1.abc.qe.φ
-
-      A type variable denoting a formula with upper bound
-      :class:`logic1.firstorder.formula.Formula`.
-
     .. data:: ν
       :value: TypeVar('ν', bound='Node')
       :canonical: logic1.abc.qe.ν
@@ -70,6 +64,13 @@ Quantifier Elimination
       A type variable denoting a assumptions with upper bound
       :class:`.Assumptions`.
 
+    .. data:: μ
+      :value: TypeVar('μ', bound='Hashable')
+      :canonical: logic1.abc.qe.μ
+
+      A type variable denoting the information stored in the Memory attribute of
+      :class:`.NodeList` and its subclasses.
+
     .. data:: ω
       :value: TypeVar('ω', bound='Options')
       :canonical: logic1.abc.qe.ω
@@ -82,26 +83,22 @@ Quantifier Elimination
     ***********
 
     .. autoclass:: Assumptions
-      :members: atoms, append, extend, simplify
-      :special-members:
-
-      .. autoclass:: logic1.abc.qe.Assumptions.Inconsistent
-        :special-members:
+      :members:
+      :exclude-members: __init__, __new__
 
     Nodes
     *****
 
     .. autoclass:: Node
-      :members: variables, formula, copy, process
-      :undoc-members:
-      :special-members:
+      :members:
+      :exclude-members: __init__, __new__
 
     Options
     *******
 
     .. autoclass:: Options
-      :members: log_level, log_rate, workers
-      :special-members:
+      :members:
+      :exclude-members: __init__, __new__
 
     Quantifier Elimination
     **********************
@@ -151,3 +148,12 @@ Quantifier Elimination
       .. automethod:: final_simplify
       .. automethod:: init_env
       .. automethod:: init_env_arg
+
+    Node Lists
+    **********
+
+    .. autoclass:: NodeList
+      :exclude-members: __init__, __new__
+
+    .. autoclass:: WorkingNodeList
+      :exclude-members: __init__, __new__

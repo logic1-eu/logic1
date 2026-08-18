@@ -12,7 +12,7 @@ from logic1.support.tracing import trace  # noqa
 from logic1.theories.Sets.atomic import AtomicFormula, C, Eq, Ne, Variable
 from logic1.theories.Sets.bnf import dnf
 from logic1.theories.Sets.simplify import simplify
-from logic1.theories.Sets.typing import Formula
+from logic1.theories.Sets.types import Formula
 
 
 class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
@@ -30,8 +30,9 @@ class Assumptions(abc.qe.Assumptions[AtomicFormula, Variable, Variable, Never]):
 
 
 @dataclass
-class Node(abc.qe.Node[Formula, Variable, Assumptions]):
-    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>` and
+class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Formula]):
+    """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>`,
+    :meth:`memorize() <.abc.qe.Node.memorize>` and
     :meth:`process() <.abc.qe.Node.process>` of its super class
     :class:`.abc.qe.Node`. Required by :class:`.QuantifierElimination` for
     instantiating the type variable :data:`.abc.qe.ν` of
@@ -44,6 +45,11 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
         """
         return Node(variables=self.variables, formula=self.formula, options=self.options)
+
+    def memorize(self) -> Formula:
+        """Implements the abstract method :meth:`.abc.qe.Node.memoize`.
+        """
+        return self.formula
 
     def process(self, assumptions: Assumptions) -> list[Node]:
         """Implements the abstract method :meth:`.abc.qe.Node.process`.
@@ -128,8 +134,8 @@ class Node(abc.qe.Node[Formula, Variable, Assumptions]):
 
 
 @dataclass
-class QuantifierElimination(abc.qe.QuantifierElimination[
-        Node, Assumptions, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
+class QuantifierElimination(abc.qe.QuantifierElimination[Node, Formula,
+        Assumptions, None, abc.qe.Options, AtomicFormula, Variable, Variable, Never]):
     """
     Quantifier elimination for the theory of sets with cardinality constraints.
 
@@ -204,45 +210,26 @@ class QuantifierElimination(abc.qe.QuantifierElimination[
 
 
 qe = quantifier_elimination = QuantifierElimination()
-"""
+r"""
 Quantifier elimination for the theory of sets with cardinanity constraints.
-Technically, :func:`.qe` is an instance of the callable class
-:class:`.QuantifierElimination`.
+Returns a quantifier-free equivalent ``f'`` of ``f`` modulo the assumptions
+passed in the `assume` parameter.
 
-:param f:
-  The input formula to which quantifier elimination will be applied.
+.. math::
+  \textsf{Sets} \models \bigwedge \mathtt{assume} \longrightarrow
+                        (\mathtt{f} \longleftrightarrow \mathtt{f'}).
 
-:param assume:
-  A list of atomic formulas that are assumed to hold. The return value
-  is equivalent modulo those assumptions.
+.. seealso::
 
-:param workers:
-  Specifies the number of processes to be used in parallel:
+  :class:`logic1.abc.qe.Options`
+    for the options that can be passed to this function.
 
-  * The default value `workers=0` uses a sequential implementation,
-    which avoids overhead when input problems are small. For all other
-    values, there are additional processes started.
+  :attr:`logic1.abc.qe.Options.workers`
+    explains how to specify parallel computation of subproblems.
 
-  * A positive value `workers=n > 0` uses `n + 2` processes: the master
-    process, `n` worker processes, and a proxy processes that manages
-    shared data.
+  :class:`logic1.theories.Sets.qe.Node`
+    The subproblems referred to above correspond to instances of this class.
 
-    .. note::
-      `workers=1` uses the parallel implementation with only one
-      worker. Algorithmically this is similar to the sequential version
-      with `workers=0` but comes at the cost of 2 additional processes.
-
-  * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-    many workers.  It follows that `workers=-2` exactly allocates all
-    of CPUs of the machine, and workers=-3 is an interesting choice,
-    which leaves one CPU free for smooth interaction with the machine.
-
-:param `**options`:
-  Keyword arguments with keywords corresponding to attributes of
-  :class:`.abc.qe.Options`. Those are :attr:`.log_level`, :attr:`.log_rate`.
-
-:returns:
-
-  A quantifier-free equivalent of `f` modulo the assumptions that are passed as
-  the `assume` parameter.
+  :class:`logic1.theories.Sets.qe.QuantifierElimination`
+    :obj:`qe` is an instance of this callable class.
 """

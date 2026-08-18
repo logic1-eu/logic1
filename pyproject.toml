@@ -1,33 +1,48 @@
+# cspell:disable
+
 [project]
 name = "logic1"
 dynamic = ["version"] # See https://setuptools-scm.readthedocs.io/en/v8.1.0/usage/
 description = "Interpreted first-order logic in Python"
 authors = [
-  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Nicolas Faroß", email = "faross@chalmers.se"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
+license = "GPL-2.0-or-later"
+license-files = ["./LICENSE"]
 maintainers = [
-  {name = "Nicolas Faroß", email = "faross@math.uni-sb.de"},
+  {name = "Nicolas Faroß", email = "faross@chalmers.se"},
+  {name = "Lorenz Leutgeb", email = "lorenz@mpi-inf.mpg.de"},
   {name = "Thomas Sturm", email = "tsturm@me.com"}
 ]
 readme = "README.md"
 dependencies = [
+  "gmpy2",
   "more-itertools",
   "pyeda",
 ]
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering",
-  "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
-  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3",
   "Typing :: Typed"
 ]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8"]
+requires = ["setuptools>=64", "setuptools-scm>=8", "Cython>=3.1.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.local.cythonize.flags]
+annotate = true
+inplace = true
+
+[tool.setuptools]
+ext-modules = [
+  {name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"]}
+#  {name = "logic1.theories.RCF.substitution", sources = ["logic1/theories/RCF/substitution.pyx"]}
+]
 
 [tool.setuptools.packages.find]
 include = ["logic1*"]

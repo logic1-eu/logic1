@@ -59,7 +59,7 @@ which provides an interface to various theories via further subclassing.
 For some of its methods, :class:`AtomicFormula
 <.firstorder.atomic.AtomicFormula>` already provides implementations, which
 delegate theory-specific parts to an abstract class
-:class:`Term <.firstorder.atomic.Term>` for argument terms of atomic formulas.
+:class:`Term <.firstorder.term.Term>` for argument terms of atomic formulas.
 
 We give an example using the theory RCF of Real Closed Fields, which is
 implemented not in :mod:`.logic1.firstorder` but in
@@ -102,17 +102,16 @@ equivalent formulas that do not contain quantifiers anymore:
 Or(And(b == 0, a == 0), And(a != 0, a*b <= 0))
 """  # noqa
 
-from .formula import Formula  # noqa
 
-from .atomic import AtomicFormula, Term, Variable  # noqa
-
-from .boolean import BooleanFormula, Equivalent, Implies, And, Or, Not, _T, T, _F, F  # noqa
-
-from .quantified import QuantifiedFormula, Ex, All, Prefix  # noqa
+from logic1.firstorder.formula import Formula
+from logic1.firstorder.atomic import AtomicFormula
+from logic1.firstorder.term import Term, Variable, VariableSet
+from logic1.firstorder.boolean import BooleanFormula, Equivalent, Implies, And, Or, Not, _T, T, _F, F
+from logic1.firstorder.quantified import QuantifiedFormula, Ex, All, Prefix
 
 
 __all__ = [
     'Ex', 'All', 'Prefix',
 
-    'Equivalent', 'Implies', 'And', 'Or', 'Not', 'T', 'F',
+    'Equivalent', 'Implies', 'And', 'Or', 'Not', 'T', 'F'
 ]

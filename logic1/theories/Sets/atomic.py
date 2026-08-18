@@ -4,8 +4,8 @@ import logging
 import string
 from typing import Any, ClassVar, Final, Iterator, Never, Optional, Self, TypeAlias
 
-from ... import firstorder
-from ...firstorder import _F, _T
+from logic1 import firstorder
+from logic1.firstorder import _F, _T
 
 
 logging.basicConfig(
@@ -14,27 +14,27 @@ logging.basicConfig(
 
 
 oo = float('Inf')
-"""A symbolic name for the float `inf` as an :data:`.Index`
+"""A symbolic name for the ``float('inf')`` as an :data:`.Index`.
 """
 
 Index: TypeAlias = int | float
-"""An index, which is either a positive integer or the float `inf`, which is
-represented by :data:`oo`
+"""An index, which is either a positive integer or the ``float('inf')``, which
+is represented by :data:`oo`.
 """
 
 
-class VariableSet(firstorder.atomic.VariableSet['Variable']):
+class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Sets.
     Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
     assigned to :data:`.VV`.
 
     .. seealso::
-        Final methods inherited from parent class:
+        Final methods inherited from the parent class:
 
-        * :meth:`.firstorder.atomic.VariableSet.get`
+        * :meth:`.firstorder.term.VariableSet.get`
             -- obtain several variables simultaneously
-        * :meth:`.firstorder.atomic.VariableSet.imp`
+        * :meth:`.firstorder.term.VariableSet.imp`
             -- import variables into global namespace
     """
 
@@ -45,8 +45,12 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return self._stack
 
     def __getitem__(self, index: str) -> Variable:
-        """Implements abstract method
-        :meth:`.firstorder.atomic.VariableSet.__getitem__`.
+        """Return the variable with the name ``index``. Implements abstract
+        method :meth:`.firstorder.term.VariableSet.__getitem__`.
+
+        >>> from logic1.theories.Sets import VV
+        >>> VV['x']
+        x
         """
         match index:
             case str():
@@ -69,10 +73,11 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
         return f'{{{s}}}'
 
     def fresh(self, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence G0001, G0002,
-        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
-        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
+        """Return a fresh variable, by default from the sequence ``G0001``,
+        ``G0002``, ..., ``G9999``, ``G10000``, ... This naming convention is
+        inspired by Lisp's ``gensym()``. If the optional argument ``suffix``
+        is specified, the sequence ``G0001<suffix>``, ``G0002<suffix>``, ...
+        is used instead.
         """
         i = 1
         v_as_str = f'G{i:04d}{suffix}'
@@ -90,6 +95,8 @@ class VariableSet(firstorder.atomic.VariableSet['Variable']):
 
 
 VV = VariableSet()
+"""The unique instance of :class:`.VariableSet`. This is a singleton.
+"""
 
 
 class Variable(firstorder.Variable['Variable', Never, str]):
@@ -121,7 +128,7 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def as_latex(self) -> str:
         """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.atomic.Term.as_latex`.
+        :meth:`.firstorder.term.Term.as_latex`.
         """
         base = self.string.rstrip(string.digits)
         index = self.string[len(base):]
@@ -131,13 +138,13 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
-        abstract method :meth:`.firstorder.atomic.Variable.fresh`.
+        abstract method :meth:`.firstorder.term.Variable.fresh`.
         """
         return self.wrapped_variable_set.fresh(suffix=f'_{str(self)}')
 
     def sort_key(self) -> str:
         """A sort key suitable for ordering instances of this class. Implements
-        the abstract method :meth:`.firstorder.atomic.Term.sort_key`.
+        the abstract method :meth:`.firstorder.term.Term.sort_key`.
         """
         return self.string
 
@@ -154,7 +161,7 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields this variable. Implements the abstract
-        method :meth:`.firstorder.atomic.Term.vars`.
+        method :meth:`.firstorder.term.Term.vars`.
         """
         yield self
 
@@ -162,8 +169,8 @@ class Variable(firstorder.Variable['Variable', Never, str]):
 class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Variable', Never]):
 
     def __le__(self, other: Formula) -> bool:
-        """Returns `True` if this atomic formula should be sorted before or is
-        equal to other. Implements abstract method
+        """Returns :obj:`True` if this atomic formula should be sorted before or
+        is equal to other. Implements abstract method
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
         """
         L: Final = [C, C_, Eq, Ne]
@@ -232,7 +239,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are elements of
-        `quantified`. Implements the abstract method
+        ``quantified``. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.bvars`.
         """
         match self:
@@ -249,6 +256,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
         :meth:`.firstorder.atomic.AtomicFormula.complement`.
 
         .. seealso::
+
           Inherited method :meth:`.firstorder.atomic.AtomicFormula.to_complement`
         """
         D: Any = {C: C_, C_: C, Eq: Ne, Ne: Eq}
@@ -256,7 +264,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
 
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
         """Iterate over occurrences of variables that are *not* elements of
-        `quantified`. Implements the abstract method
+        ``quantified``. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.fvars`.
         """
         match self:
@@ -269,7 +277,8 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
 
     def simplify(self) -> Formula:
         """Fast basic simplification. The result is equivalent to self.
-        Implements the abstract method :meth:`.firstorder.atomic.AtomicFormula.simplify`.
+        Implements the abstract method
+        :meth:`.firstorder.atomic.AtomicFormula.simplify`.
         """
         match self:
             case Eq(lhs=lhs, rhs=rhs):
@@ -352,7 +361,7 @@ class Ne(AtomicFormula):
 class C(AtomicFormula):
     """Cardinality constraints. From a mathematical perspective, the instances
     are constant relation symbols with an index, which is either a positive
-    integer or the float `inf`, represented as ``oo``. ``C(n)`` holds iff there
+    integer or ``float('inf')``, represented as ``oo``. ``C(n)`` holds iff there
     are at least ``n`` different elements in the universe. This is not a
     statement about the index ``n`` but about a range of models where this
     constant relation holds.
@@ -430,4 +439,4 @@ class C_(AtomicFormula):
         return cls._instances[index]
 
 
-from .typing import Formula
+from logic1.theories.Sets.types import Formula

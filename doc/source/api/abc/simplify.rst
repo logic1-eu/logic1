@@ -13,7 +13,9 @@ Simplification
   corresponding sections of the various domains:
 
   * :ref:`Simplification in Real Closed Fields <api-RCF-simplify>`
-  * :ref:`Simplification in the InternalRepresentation of Sets <api-Sets-simplify>`
+  * :ref:`Simplification in Complex <api-Complex-simplify>`
+  * :ref:`Simplification in Sets <api-Sets-simplify>`
+
 
 .. automodule:: logic1.abc.simplify
 
@@ -42,7 +44,8 @@ Simplification
     :canonical: logic1.abc.simplify.σ
 
   Additionally, we introduce a type variable :data:`ρ` for internal
-  representations used by the simplifier.
+  representations and a type variable :data:`ω` for options used by the
+  simplifier.
 
   .. data:: ρ
     :value: TypeVar('ρ', bound='InternalRepresentation')
@@ -51,17 +54,31 @@ Simplification
     A type variable denoting a type of variables with upper bound
     :class:`logic1.abc.simplify.InternalRepresentation`.
 
+  .. data:: ω
+    :value: TypeVar('ω', bound='Options')
+    :canonical: logic1.abc.simplify.ω
+
+    A type variable denoting a options for :meth:`.Simplify.simplify` with upper
+    bound :class:`.Options`.
+
 
   Internal Representations
   ************************
 
+  .. autoclass:: RESTART
+    :members:
+
   .. autoclass:: InternalRepresentation
-    :members: add, extract, next_
-    :special-members:
+    :members:
+    :exclude-members: __init__, __new__
 
 
   Simplification and Validity
   ***************************
 
+  .. autoclass:: Options
+    :exclude-members: __init__, __new__
+
   .. autoclass:: Simplify
     :members:
+    :exclude-members: __init__, __new__

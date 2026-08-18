@@ -1,7 +1,7 @@
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 
->>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
+>>> a, b, c, d, w, x, y, z = VV.get('a', 'b', 'c', 'd', 'w', 'x', 'y', 'z')
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
 # doi:10.1006/jsco.1997.0123, Sect. 5.3
@@ -25,7 +25,7 @@ a == 0
 a != 0
 
 >>> simplify(And(a > b, Equivalent(a == 0, b > 0)))
-And(b <= 0, a != 0, a - b > 0)
+And(b <= 0, a - b > 0, a != 0)
 
 >>> simplify(Or(a > b, Equivalent(a == 0, b > 0)))
 Or(a - b > 0, And(Or(b <= 0, a == 0), Or(b > 0, a < 0)))
@@ -47,7 +47,7 @@ Or(b < 0, Ex(a, a - b > 0))
 >>> simplify(Ex(a, And(a > 5, b > 10)), assume=[a > 10, b > 20])
 Ex(a, a - 5 > 0)
 
-# Test explode_always
+# Test option explode_always
 >>> simplify(And(a * b == 0, c == 0))
 And(c == 0, Or(b == 0, a == 0))
 >>> simplify(And(a * b == 0, c == 0), explode_always=False)
@@ -55,29 +55,31 @@ And(c == 0, a*b == 0)
 >>> simplify(Or(a * b == 0, c == 0), explode_always=False)
 Or(c == 0, b == 0, a == 0)
 
-# Test prefer_weak
->>> assert simplify(And(a != 0, Or(b == 0, a >= 0)))\
-...     == simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak = False)
+# with Atoms
+>>> simplify(a * b == 0)
+Or(b == 0, a == 0)
+>>> simplify(a * b == 0, explode_always=False)
+a*b == 0
+>>> simplify(a**2 + b**2 == 0)
+And(b == 0, a == 0)
+>>> simplify(a**2 + b**2 == 0, explode_always=False)
+a**2 + b**2 == 0
 
->>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=False)  # default
-And(a != 0, Or(b == 0, a > 0))
->>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=False)  # default
-And(a != 0, Or(b == 0, a > 0))
->>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
-And(a != 0, Or(b == 0, a >= 0))
->>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
-And(a != 0, Or(b == 0, a >= 0))
+# Test option implicit_ranges
+>>> phi = And(10 < x, x < 100, Or(z == 0, And(x*y**2 + x**2 > 0)))
+>>> simplify(phi, implicit_ranges=True)  # default
+And(x - 100 < 0, x - 10 > 0)
+>>> simplify(phi, implicit_ranges=False)
+And(x - 100 < 0, x - 10 > 0, Or(z == 0, x*y**2 + x**2 > 0))
 
->>> simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=False)  # default
-Or(a == 0, And(b == 0, a > 0))
->>> simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=False)  # default
-Or(a == 0, And(b == 0, a > 0))
->>> simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=True)
-Or(a == 0, And(b == 0, a >= 0))
->>> simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=True)
-Or(a == 0, And(b == 0, a >= 0))
+# Test option lift
+>>> phi = 4 * x**2 == 1
+>>> simplify(phi)
+Or(2*x - 1 == 0, 2*x + 1 == 0)
+>>> simplify(phi, lift=False)
+Or(x - 1/2 == 0, x + 1/2 == 0)
 
-# Test prefer_order
+# Test option prefer_order
 >>> assert simplify(Or(a > 0, And(b == 0, a != 0)))\
 ...     == simplify(Or(a > 0, And(b == 0, a != 0)), prefer_order=True)
 
@@ -99,18 +101,51 @@ And(a >= 0, Or(b == 0, a != 0))
 >>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
 And(a >= 0, Or(b == 0, a != 0))
 
+# Test option prefer_weak
+>>> assert simplify(And(a != 0, Or(b == 0, a >= 0)))\
+...     == simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak = False)
+
+>>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=False)  # default
+And(a != 0, Or(b == 0, a > 0))
+>>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=False)  # default
+And(a != 0, Or(b == 0, a > 0))
+>>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+>>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+
+>>> simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=False)  # default
+Or(a == 0, And(b == 0, a > 0))
+>>> simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=False)  # default
+Or(a == 0, And(b == 0, a > 0))
+>>> simplify(Or(a == 0, And(b == 0, a >= 0)), prefer_weak=True)
+Or(a == 0, And(b == 0, a >= 0))
+>>> simplify(Or(a == 0, And(b == 0, a > 0)), prefer_weak=True)
+Or(a == 0, And(b == 0, a >= 0))
+
 # Do not prefer order over equality
 >>> simplify(And(a <= 0, Or(b != 0, a == 0)), prefer_order=True)
 And(a <= 0, Or(b != 0, a == 0))
 >>> simplify(And(a <= 0, Or(b != 0, a >= 0)), prefer_order=True)
 And(a <= 0, Or(b != 0, a == 0))
 
+# Test option substitute
+>>> phi = And(d == 2, 4*b - 3*c == 0, a + b + c + d >= 0)
+>>> simplify(phi, substitute=0)
+And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + d >= 0)
+>>> simplify(phi, substitute=1)
+And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + 2 >= 0)
+>>> simplify(phi, substitute=2)  # default
+And(d - 2 == 0, 4*b - 3*c == 0, 4*a + 7*c + 8 >= 0)
+
 # Test is_valid
 >>> is_valid(3 * b**2 + c**2 >= 0)
 True
 >>> is_valid(3 * b**2 + c**2 < 0)
 False
->>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])  # return None
+>>> is_valid(a * b**2 + c**2 >= 0, assume=[a > 0])
+True
+>>> is_valid(a * b**2 + c**2 >= 0)  # Returns None
 
 # Examples by NF during the development of simpl_and_or:
 >>> simplify(And(x + y == 0, Or(And(x == 0, y != 0), And(x != 0, y == 0))))
@@ -123,12 +158,95 @@ F
 >>> simplify(And(x**2 + y**2 + z > 0, z == 1))
 z - 1 == 0
 
+# This shows the relevance of the non-trivial _Knowledge.get(). Intersection
+# during InternalRepresentation.add() discovers a substitution:
+>>> simplify(And(x >= 0, y >= 0, x + y <= 0))
+And(y == 0, x == 0)
+
+
+--------------------------------------------------------------------------------
+# The following is a copy of the content of the docstrings of the attribute of
+# the dataclass RCF.simplify.Options. The problem is that these docstrings are
+# valid and adequate Sphinx documentation but they are not considered by doctest
+# or pytest:
+
+# explode_always: bool = True
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> a, b, c = VV.get('a', 'b', 'c')
+>>> simplify(And(a * b == 0, c == 0))
+And(c == 0, Or(b == 0, a == 0))
+>>> simplify(And(a * b == 0, c == 0), explode_always=False)
+And(c == 0, a*b == 0)
+>>> simplify(Or(a * b == 0, c == 0), explode_always=False)
+Or(c == 0, b == 0, a == 0)
+
+# implicit_ranges: bool = True
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> x, y, z = VV.get('x', 'y', 'z')
+>>> phi = And(10 < x, x < 100, Or(z == 0, And(x*y**2 + x**2 > 0)))
+>>> simplify(phi)
+And(x - 100 < 0, x - 10 > 0)
+>>> simplify(phi, implicit_ranges=False)
+And(x - 100 < 0, x - 10 > 0, Or(z == 0, x*y**2 + x**2 > 0))
+
+# lift: bool = True
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> x = VV['x']
+>>> phi = 4 * x**2 == 1
+>>> simplify(phi)
+Or(2*x - 1 == 0, 2*x + 1 == 0)
+>>> simplify(phi, lift=False)
+Or(x - 1/2 == 0, x + 1/2 == 0)
+
+# prefer_order: bool = True
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> a, b = VV.get('a', 'b')
+>>> simplify(And(a >= 0, Or(b == 0, a > 0)))
+And(a >= 0, Or(b == 0, a > 0))
+>>> simplify(And(a >= 0, Or(b == 0, a != 0)))
+And(a >= 0, Or(b == 0, a > 0))
+>>> simplify(And(a >= 0, Or(b == 0, a > 0)), prefer_order=False)
+And(a >= 0, Or(b == 0, a != 0))
+>>> simplify(And(a >= 0, Or(b == 0, a != 0)), prefer_order=False)
+And(a >= 0, Or(b == 0, a != 0))
+
+# prefer_weak: bool = False
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> a, b = VV.get('a', 'b')
+>>> simplify(And(a != 0, Or(b == 0, a >= 0)))
+And(a != 0, Or(b == 0, a > 0))
+>>> simplify(And(a != 0, Or(b == 0, a > 0)))
+And(a != 0, Or(b == 0, a > 0))
+>>> simplify(And(a != 0, Or(b == 0, a >= 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+>>> simplify(And(a != 0, Or(b == 0, a > 0)), prefer_weak=True)
+And(a != 0, Or(b == 0, a >= 0))
+
+# substitute: int = 2
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+>>> phi = And(d == 2, 4*b - 3*c == 0, a + b + c + d >= 0)
+>>> simplify(phi, substitute=0)
+And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + d >= 0)
+>>> simplify(phi, substitute=1)
+And(d - 2 == 0, 4*b - 3*c == 0, a + b + c + 2 >= 0)
+>>> simplify(phi)
+And(d - 2 == 0, 4*b - 3*c == 0, 4*a + 7*c + 8 >= 0)
+
+
+--------------------------------------------------------------------------------
 #  Regressions of problems during development
 
 >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
 
 >>> simplify(-5*(a-b)*(a+b) <= 0)
-a^2 - b^2 >= 0
+a**2 - b**2 >= 0
 
 >>> i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
 
@@ -158,3 +276,21 @@ x6 != 0)))
 ...          Or(And(x5 < 0, x4 + x5 + x6 == 0), And(x5 >= 0, x4 - x5 + x6 == 0)))
 >>> simplify(f2)
 And(x6 == 0, x5 == 0, x4 == 0)
+
+>>> x, a, b, c = VV.get('x', 'a', 'b', 'c')
+>>> phi = And(2*a > 0, a != 0, 4*a**2*c - a*b**2 == 0)
+>>> simplify(phi)
+And(a > 0, 4*a*c - b**2 == 0)
+
+# The following is an undesired (but mathematically sound) behavior of the
+# simplifier, extracting too much information from the InternalRepresentation.
+# At some point, this caused an assertion violation because the simplification
+# of an atom did not yield an atom:
+
+# expecting x == 0:
+simplify(x == 0, assume=[x == y + 2])
+And(y + 2 == 0, x == 0)
+
+# expecting And(x - y - 2 == 0, Or(w == 0, And(z == 0, , x == 0))):
+>>> simplify(And(x == y + 2, Or(w == 0, And(x == 0, z == 0))))
+And(x - y - 2 == 0, Or(w == 0, And(z == 0, y + 2 == 0, x == 0)))

@@ -12,11 +12,12 @@ class trace(object):
     """
 
     def __init__(self, stream=sys.stdout, indent_step=2, show_ret=True,
-                 pretty=False):
-        self.indent_step = indent_step
-        self.pretty = pretty
-        self.show_ret = show_ret
+                 str=False, pretty=False):
         self.stream = stream
+        self.indent_step = indent_step
+        self.show_ret = show_ret
+        self.str = str
+        self.pretty = pretty
         # The following is a class attribute since we want to share the
         # indentation level between different traced functions, in case they
         # call each other:
@@ -45,4 +46,8 @@ class trace(object):
         return wrapper
 
     def _format(self, obj) -> str:
-        return pprint.pformat(obj) if self.pretty else repr(obj)
+        if self.str:
+            return str(obj)
+        if self.pretty:
+            return pprint.pformat(obj)
+        return repr(obj)

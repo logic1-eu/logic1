@@ -5,7 +5,8 @@ from functools import lru_cache
 from gmpy2 import mpq
 from typing import Final, Iterator, Optional, Self
 
-from .atomic import CACHE_SIZE, Eq, SortKey, Term, Variable
+from logic1.theories.RCF.term import CACHE_SIZE, SortKey, Term, Variable
+from logic1.theories.RCF.atomic import Eq
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,12 @@ class _Substitution:
                 continue
             root = self.find2(node)
             yield key.term, _SubstValue(root.coefficient, root.node.variable)
+
+    def __str__(self) -> str:
+        return str(self.as_dict())
+
+    def as_dict(self) -> dict[Variable, Term]:
+        return {var: val.as_term() for var, val in self}
 
     def as_gb(self, ignore: Optional[Variable] = None) -> list[Term]:
         """Convert this :class:._Substitution` into a Gröbner basis that can be

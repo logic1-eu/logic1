@@ -8,24 +8,12 @@ Boolean Normal Forms
 
 .. automodule:: logic1.theories.RCF.bnf
 
-  .. autoclass:: BooleanNormalForm
-    :special-members:
+  .. function:: cnf(f: RCF.types.Formula) -> RCF.types.Formula
+                dnf(f: RCF.types.Formula) -> RCF.types.Formula
 
-  User Interface
-  **************
-
-  .. function:: cnf(f: Formula) -> Formula
-                dnf(f: Formula) -> Formula
-
-    Compute a conjunctive or disjunctive normal form, respectively.
-
-    :param f:
-      The input formula
-
-    :returns:
-      Returns a CNF or DNF of `f`, respectively. If `f` contains quantifiers,
-      then the result is an equivalent prenex normal form whose matrix is in CND
-      or DNF, respectively.
+    Compute a conjunctive or disjunctive normal form of ``f``. If ``f`` contains
+    quantifiers, then the result is an equivalent prenex normal form whose
+    matrix is in CNF or DNF, respectively.
 
     .. rubric:: Some examples
 
@@ -73,3 +61,24 @@ Boolean Normal Forms
             Or(b != 0, a == 0, G0003_a != 0),
             Or(a != 0, G0004_a == 0, G0002_c != 0),
             Or(a != 0, G0002_c != 0, G0002_b == 0))))))))
+
+    .. seealso::
+
+      :class:`.BooleanNormalForm`
+        Its inherited methods :meth:`.BooleanNormalForm.cnf` and
+        :meth:`.BooleanNormalForm.dnf` are wrapped by the functions
+        :func:`.cnf` and :func:`.dnf`, respectively.
+
+      :ref:`Simplification <api-RCF-simplify>`
+        for the simplifier that is used to simplify intermediate results
+        throughout the CNF and DNF computation.
+
+
+  Details
+  *******
+
+  .. attention::
+    The material below addresses implementers rather than users.
+
+  .. autoclass:: BooleanNormalForm
+    :exclude-members: __init__, __new__

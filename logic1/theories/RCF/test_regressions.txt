@@ -17,15 +17,41 @@ And(y - 40 == 0, x - 450 <= 0)
 ...            Or(And(400*q + 9*td - 20050 <= 0, q == 0),
 ...               And(400*q + 9*td - 20050 > 0, 9*td - 20050 == 0)))
 >>> simplify(evil)
-And(q >= 0, q - 40 <= 0, 2*p1 - 7 >= 0, 250*p1 + 2*q - 1457 == 0, n >= 0,
+And(q - 40 <= 0, q >= 0, 2*p1 - 7 >= 0, 250*p1 + 2*q - 1457 == 0, n >= 0,
 i2 == 0, Or(And(9*td - 20050 == 0, q > 0), And(9*td - 20050 <= 0, q == 0,
 250*p1 - 1457 == 0)))
 
-# Sage factorization over QQ does not always yield primitive factors:
->>> VV.imp('a', 'b')
->>> t = 2*a**2 + 4*a*b + 2*b**2 - 1
->>> sage_factorization = t.poly.factor()
->>> sage_factorization.unit(), list(sage_factorization)
-(1, [(2*a^2 + 4*a*b + 2*b^2 - 1, 1)])
->>> t.factor()
-(mpq(2,1), {a^2 + 2*a*b + b^2 - 1/2: 1})
+# There was a bug in atomic_sage.Term.factor(), where leading coefficients of
+# factors were divided out and multiplied to the unit without correctly
+# considering multiplicities
+>>> a, b, c = VV.get('a', 'b', 'c')
+>>> p = (4*a**8*b**2 - 12*a**6*b**4 - 4*a**6*b**2*c**2 + 12*a**4*b**6 +
+... 8*a**4*b**4*c**2 - 4*a**2*b**8 - 4*a**2*b**6*c**2 - 4*a**8 + 12*a**6*b**2 -
+... 12*a**4*b**4 + 4*a**2*b**6)
+>>> unit, factors = p.factor()
+>>> q = Term(unit)
+>>> for factor, exp in factors.items():
+...     q *= factor ** exp
+>>> p - q
+0
+
+# There was a assertion violation in WorkingNodeList.extend if a node contained
+# the formula T
+>>> x = VV['x']
+>>> phi = qe(Ex(x, T))
+>>> qe(phi)
+T
+
+# There was a bug in Node.memorize for nodes with the same formula but different
+# variables
+>>> a, b = VV.get('a', 'b')
+>>> phi = Ex([a, b], a != 0)
+>>> qe(phi)
+T
+
+# There was a problem that cnf/dnf could contain deeper nested subformulas
+# because explode_always was on by default also in final simplification.
+>>> d_re, d_im = VV.get('d_re', 'd_im')
+>>> bad = And(d_im**4 - 6*d_im**2*d_re**2 + d_re**4 - 1 == 0, Or(d_re - 1 != 0, d_im >= 0), Or(d_re == 0, d_im - d_re == 0, d_im == 0, d_im + d_re == 0), Or(2*d_re - 1 != 0, d_im == 0, 2*d_im - 1 == 0, 2*d_im + 1 == 0), Or(And(d_re - 1 != 0, d_im != 0), And(Or(d_re - 1 == 0, d_re + 1 == 0), Or(d_re - 1 == 0, d_im == 0))), Or(And(d_im != 0, d_im**2 - d_re**2 + d_re != 0), And(4*d_im**2*d_re**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0))), Or(And(d_im != 0, Or(d_re - 1 != 0, d_im > 0)), And(d_im**4 - 2*d_im**2*d_re**2 + d_re**4 - d_im**2 - 1 == 0, Or(d_im == 0, d_im**2 - d_re**2 + d_re == 0))), Or(And(d_im != 0, Or(d_re - 1 != 0, d_im > 0)), And(Or(d_re == 0, d_im == 0), Or(2*d_re - 1 == 0, 2*d_re + 1 == 0, d_im == 0))), Or(And(d_im**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0)), And(Or(d_re - 1 != 0, d_im > 0), Or(d_im**2 - d_re**2 + 1 != 0, And(d_re != 0, d_im != 0)))), Or(And(d_im**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0)), And(Or(d_im**2 - d_re**2 + 1 != 0, And(d_re != 0, d_im != 0)), Or(d_im**2 - d_re**2 + d_re != 0, And(2*d_re - 1 != 0, d_im != 0)))))
+>>> dnf(bad)
+Or(And(d_re - 1 == 0, d_im == 0), And(d_re == 0, d_im != 0, d_im**4 - 1 == 0), And(d_re == 0, d_im > 0, d_im**4 - 1 == 0), And(d_re + 1 == 0, d_im == 0))

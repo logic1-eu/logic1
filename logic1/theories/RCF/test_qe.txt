@@ -4,40 +4,50 @@
 >>> a, b, c, d, x, y, z = VV.get('a', 'b', 'c', 'd', 'x', 'y', 'z')
 
 >>> phi_1 = All(x, Ex((y, z), And(y >= 0, z >= 0, y - z == x)))
->>> qe(phi_1, clustering=CLUSTERING.NONE)
+>>> qe(phi_1, clustering=Clustering.NONE)
 T
->>> qe(phi_1, clustering=CLUSTERING.FULL)
+>>> qe(phi_1, clustering=Clustering.FULL)
 T
 
 >>> phi_2 = All(x, Ex((y, z), And(y >= 0, z >= 0, y - z == x, a * x + b == 0)))
->>> qe(phi_2, clustering=CLUSTERING.NONE)
+>>> qe(phi_2, clustering=Clustering.NONE)
 And(b == 0, a == 0)
->>> qe(phi_2, clustering=CLUSTERING.FULL)
+>>> qe(phi_2, clustering=Clustering.FULL)
 And(b == 0, a == 0)
 
 >>> phi_3 = All(x, Ex((y, z), And(y >= 0, z >= 0, y + z == x)))
->>> qe(phi_3, clustering=CLUSTERING.NONE)
+>>> qe(phi_3, clustering=Clustering.NONE)
 F
->>> qe(phi_3, clustering=CLUSTERING.FULL)
+>>> qe(phi_3, clustering=Clustering.FULL)
 F
 
 >>> phi_4 = Ex(x, a * x + b == 0)
->>> qe(phi_4, clustering=CLUSTERING.NONE)
+>>> qe(phi_4, clustering=Clustering.NONE)
 Or(b == 0, a != 0)
->>> qe(phi_4, clustering=CLUSTERING.FULL)
+>>> qe(phi_4, clustering=Clustering.FULL)
 Or(b == 0, a != 0)
 
 >>> phi_5 = Ex(x, a * x + b <= 0)
->>> qe(phi_5, clustering=CLUSTERING.NONE)
+>>> qe(phi_5, clustering=Clustering.NONE)
 Or(b <= 0, a != 0)
->>> qe(phi_5, clustering=CLUSTERING.FULL)
+>>> qe(phi_5, clustering=Clustering.FULL)
 Or(b <= 0, a != 0)
 
 >>> phi_6 = Ex(x, And(a * x + b <= 0, x <= b))
->>> qe(phi_6, clustering=CLUSTERING.NONE)
+>>> qe(phi_6, clustering=Clustering.NONE)
 Or(a > 0, And(b <= 0, a == 0), And(a < 0, a*b + b <= 0))
->>> qe(phi_6, clustering=CLUSTERING.FULL)
-Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
+>>> qe(phi_6, clustering=Clustering.FULL)
+Or(a > 0, And(b <= 0, a == 0), And(a < 0, a**2*b + a*b >= 0))
+
+>>> phi_7 = Ex(x, a * x**2 + b * x + c == 0)
+>>> qe(phi_7, clustering=Clustering.NONE)
+Or(And(c == 0, b == 0, a == 0),
+   And(b < 0, a == 0), And(b > 0, a == 0),
+   And(a < 0, 4*a*c - b**2 == 0), And(a < 0, 4*a*c - b**2 < 0),
+   And(a > 0, 4*a*c - b**2 == 0), And(a > 0, 4*a*c - b**2 < 0))
+>>> qe(phi_7, clustering=Clustering.FULL)
+Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b**2 <= 0))
+
 
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
@@ -55,7 +65,7 @@ Or(a > 0, And(b <= 0, a == 0), And(a < 0, a^2*b + a*b >= 0))
 >>> p9_0 = p9_1 & p9_2 & p9_3 & p9_4 & p9_5 & p9_6 & p9_7 & p9_8 & p9_9
 
 >>> p9 = All(x1, p9_0 >> ((x1 == x10) & (x2 == x11)))
->>> p9_cnone = qe(p9, clustering=CLUSTERING.NONE); p9_cnone
+>>> p9_cnone = qe(p9, clustering=Clustering.NONE); p9_cnone
 And(Or(x2 < 0, And(x3 + x10 - x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10
 + x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
@@ -72,7 +82,7 @@ And(Or(x7 < 0, x6 - x7 + x8 != 0), Or(x7 >= 0, x6 + x7 + x8 != 0)), And(Or(x6 <
 x6 != 0), Or(x5 >= 0, x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0),
 Or(x4 >= 0, x3 + x4 + x5 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0,
 x2 + x3 + x4 != 0))))
->>> p9_cfull = qe(p9, clustering=CLUSTERING.FULL); p9_cfull
+>>> p9_cfull = qe(p9, clustering=Clustering.FULL); p9_cfull
 And(Or(x2 < 0, And(x3 + x10 - x11 == 0, x2 - x11 == 0), And(Or(x10 < 0, x9 - x10
 + x11 != 0), Or(x10 >= 0, x9 + x10 + x11 != 0)), And(Or(x9 < 0, x8 - x9 + x10 !=
 0), Or(x9 >= 0, x8 + x9 + x10 != 0)), And(Or(x8 < 0, x7 - x8 + x9 != 0), Or(x8
@@ -95,9 +105,9 @@ True
 # Davenport-Heintz (Result is d == 1 or d == -1)
 >>> davenport_heintz = Ex(c, All((b, a),
 ...    Implies(Or(And(a == d, b == c), And(a == c, b == 1)), a**2 == b)))
->>> qe(davenport_heintz, clustering=CLUSTERING.NONE)
+>>> qe(davenport_heintz, clustering=Clustering.NONE)
 And(d != 0, Or(d - 1 == 0, d + 1 == 0))
->>> qe(davenport_heintz, clustering=CLUSTERING.FULL)
+>>> qe(davenport_heintz, clustering=Clustering.FULL)
 And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 
 # Kahan's Problem
@@ -105,22 +115,22 @@ And(d != 0, Or(d - 1 == 0, d + 1 == 0))
 ...    Implies(b**2 * (x - c)**2 + a**2 * y**2 - a**2 * b**2 == 0, x**2 + y**2 <= 1))
 
 Degree violations with traditional guards:
->>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE).atoms())
+>>> sum(1 for _ in qe(ellipse, clustering=Clustering.NONE).atoms())
 Traceback (most recent call last):
 ...
 logic1.support.excepthook.NoTraceException: Failed - 2 failure nodes
 
 Same with full clustering:
->>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL).atoms())
+>>> sum(1 for _ in qe(ellipse, clustering=Clustering.FULL).atoms())
 Traceback (most recent call last):
 ...
 logic1.support.excepthook.NoTraceException: Failed - 2 failure nodes
 
 No degree violations with when turning traditional guards off:
->>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.NONE, traditional_guards=False).atoms())
+>>> sum(1 for _ in qe(ellipse, clustering=Clustering.NONE, traditional_guards=False).atoms())
 83
->>> sum(1 for _ in qe(ellipse, clustering=CLUSTERING.FULL, traditional_guards=False).atoms())
-40
+>>> sum(1 for _ in qe(ellipse, clustering=Clustering.FULL, traditional_guards=False).atoms())
+43
 
 # 5 Generic quadratic polynomials
 >>> a1, a2, a3, a4, a5 = VV.get('a1', 'a2', 'a3', 'a4', 'a5')
@@ -131,20 +141,20 @@ No degree violations with when turning traditional guards off:
 ...                          a3 * x**2 + b3 * x + c3 < 0,
 ...                          a4 * x**2 + b4 * x + c4 < 0,
 ...                          a5 * x**2 + b5 * x + c5 < 0))
->>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.NONE).atoms())
+>>> sum(1 for _ in qe(five_generic, clustering=Clustering.NONE).atoms())
 563
->>> sum(1 for _ in qe(five_generic, clustering=CLUSTERING.FULL).atoms())
+>>> sum(1 for _ in qe(five_generic, clustering=Clustering.FULL).atoms())
 283
 
 # Motzkin's Polynomial
 >>> mp = All(x, Implies(And(x >= 0, y >= 0), 1 + x * y * (x + y - 3) >= 0))
->>> qe(mp, clustering=CLUSTERING.NONE)
-Or(y - 4 <= 0, y^2 - 4*y <= 0, y^2 - 3*y >= 0)
->>> qe(mp, clustering=CLUSTERING.FULL)
-Or(y <= 0, y - 3 >= 0, y - 1 == 0, y^2 - 4*y <= 0)
->>> qe(mp.all(), clustering=CLUSTERING.NONE)
+>>> qe(mp, clustering=Clustering.NONE)
+Or(y - 4 <= 0, y**2 - 4*y <= 0, y**2 - 3*y >= 0)
+>>> qe(mp, clustering=Clustering.FULL)
+Or(y - 3 >= 0, y - 1 == 0, y <= 0, y**2 - 4*y <= 0)
+>>> qe(mp.all(), clustering=Clustering.NONE)
 T
->>> qe(mp.all(), clustering=CLUSTERING.FULL)
+>>> qe(mp.all(), clustering=Clustering.FULL)
 T
 
 # Hongs's Example:
@@ -153,9 +163,33 @@ Traceback (most recent call last):
 ...
 logic1.support.excepthook.NoTraceException: Failed - 1 failure nodes
 >>> qe(Ex(y, And(x**2 + x*y + b > 0, x + a*y**2 + b <= 0)))
-Or(And(x > 0, Or(a*x^4 + 2*a*b*x^2 + a*b^2 + b*x^2 + x^3 < 0, And(a*x^4 +
-2*a*b*x^2 + a*b^2 + b*x^2 + x^3 == 0, Or(a*x^3 + a*b*x > 0, And(a <= 0, Or(a ==
-0, x^2 + b == 0)))))), And(a != 0, a*b + a*x <= 0, Or(x^2 + b > 0, a^2*x^4 +
-2*a^2*b*x^2 + a^2*b^2 + a*b*x^2 + a*x^3 < 0), Or(a*x < 0, a^2*x^4 + 2*a^2*b*x^2
-+ a^2*b^2 + a*b*x^2 + a*x^3 > 0)), And(Or(x < 0, And(x == 0, b > 0)), Or(a < 0,
+Or(And(x > 0, Or(a*x**4 + 2*a*b*x**2 + a*b**2 + b*x**2 + x**3 < 0, And(a*x**4 +
+2*a*b*x**2 + a*b**2 + b*x**2 + x**3 == 0, Or(a*x**3 + a*b*x > 0, And(a <= 0, Or(a ==
+0, x**2 + b == 0)))))), And(a != 0, a*b + a*x <= 0, Or(x**2 + b > 0, a**2*x**4 +
+2*a**2*b*x**2 + a**2*b**2 + a*b*x**2 + a*x**3 < 0), Or(a*x < 0, a**2*x**4 + 2*a**2*b*x**2
++ a**2*b**2 + a*b*x**2 + a*x**3 > 0)), And(Or(x < 0, And(x == 0, b > 0)), Or(a < 0,
 And(b + x <= 0, a == 0))))
+
+# Assumptions on bound variables:
+>>> qe(Ex(x, And(a > 0, x > 9, b == 0)), assume={x < 8, a > 1})
+Traceback (most recent call last):
+...
+ValueError: invalid assumption on bound variables in x - 8 < 0
+
+>>> qe(Ex(y, And(a > 0, y > 9, b == 0)), assume={x < 8, a > 1})
+b == 0
+
+# Two instances of VirtualSubstitution
+>>> from logic1.firstorder import *
+>>> from logic1.theories.RCF import *
+>>> from logic1.theories.RCF.qe import VirtualSubstitution
+>>> another_qe = VirtualSubstitution()
+>>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
+>>> qe(Ex(x, (a + 1) * x**2 + b * x + c == 0), generic=Generic.FULL)
+4*a*c - b**2 + 4*c <= 0
+>>> another_qe(Ex(x, a * x + b == 0), generic=Generic.FULL)
+T
+>>> qe.assumptions
+[a + 1 != 0]
+>>> another_qe.assumptions
+[a != 0]
