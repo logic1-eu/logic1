@@ -111,6 +111,12 @@ class _PolynomialRing:
 
     @staticmethod
     def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
+        number_of_variables = 1 if isinstance(names, str) else len(names)
+        if number_of_variables > 2**15:
+            # https://github.com/Singular/Singular/issues/1383
+            # https://github.com/sagemath/sage/issues/42712
+            raise OverflowError(f'cannot construct a polynomial ring with {number_of_variables} variables')
+
         return sage_PolynomialRing(QQ, names, order=order, implementation='singular')
 
     def pop(self) -> None:
