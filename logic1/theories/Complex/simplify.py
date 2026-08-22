@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from typing import Optional, Self, TypeVar
 
 from gmpy2 import mpz
-import networkx as nx
 
 from logic1 import abc
 from logic1.firstorder.boolean import _F, F, _T, T, And, Or
@@ -31,6 +30,8 @@ def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: di
     >>> [(min(u, v), max(u, v)) for u, v in sorted(cover)]
     [('b', 'c')]
     """
+    import networkx as nx
+
     nodes = set(nodes_costs.keys())
 
     min_costs: dict[α, float] = dict()
