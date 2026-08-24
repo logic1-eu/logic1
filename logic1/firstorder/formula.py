@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TypeVar
+from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TYPE_CHECKING, TypeVar
 from typing_extensions import TypeIs
 
-from IPython.lib import pretty
-
 from logic1.support.tracing import trace
+
+if TYPE_CHECKING:
+    from IPython.lib.pretty import RepresentationPrinter
 
 
 α = TypeVar('α', bound='AtomicFormula')
@@ -802,7 +803,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
             as_latex += '{}\\dots'
         return f'$\\displaystyle {as_latex}$'
 
-    def _repr_pretty_(self, p: pretty.RepresentationPrinter, cycle: bool) -> None:
+    def _repr_pretty_(self, p: RepresentationPrinter, cycle: bool) -> None:
         assert not cycle
         op = self.__class__.__name__
         with p.group(len(op) + 1, op + '(', ')'):

@@ -34,7 +34,7 @@ sys_excepthook = sys.excepthook
 sys.excepthook = excepthook
 
 
-# iPhyton:
+# IPython:
 
 def ipy_custom_exec(ipy: Any, exc_type: type[NoTraceException],
                     exc: NoTraceException, tb: TracebackType, tb_offset=None):
@@ -43,12 +43,17 @@ def ipy_custom_exec(ipy: Any, exc_type: type[NoTraceException],
 
 # To be executed at import:
 
-try:
-    import IPython
-except ImportError:
-    ipy = None
-else:
-    ipy = IPython.get_ipython()
-
-if ipy is not None:
-    ipy.set_custom_exc((NoTraceException,), ipy_custom_exec)
+# `import IPython` would initialize all of IPython unconditionally,
+# i.e., even in an ordinary Python process, thus is avoided.
+#
+# By contrast, `sys.modules.get('IPython')` returns the module only if it has
+# been loaded *before*, which commonly is the case when running in the context
+# of IPython or Jupyter.
+# 
+# Caveat: If IPython is loaded *after* Logic1, then the custom exception handler
+# will not be registered.
+ipy_module = sys.modules.get('IPython')
+if ipy_module is not None:
+    ipy = ipy_module.get_ipython()
+    if ipy is not None:
+        ipy.set_custom_exc((NoTraceException,), ipy_custom_exec)
