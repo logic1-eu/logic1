@@ -87,7 +87,7 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.
             lhs = Term(lhs)
         if not isinstance(rhs, Term):
             rhs = Term(rhs)
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         """Return whether this atomic formula precedes or equals ``other`` in

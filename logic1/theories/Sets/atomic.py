@@ -333,7 +333,7 @@ class Eq(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables; {arg} is {type(arg)}')
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
 
 class Ne(AtomicFormula):
@@ -355,7 +355,7 @@ class Ne(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables - {arg} is {type(arg)}')
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
 
 class C(AtomicFormula):
@@ -398,7 +398,7 @@ class C(AtomicFormula):
         :meth:`firstorder.formula.Formula.__init__`.
         """
         super().__init__()
-        self.args = (index,)
+        self._args = (index,)
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):
@@ -428,7 +428,7 @@ class C_(AtomicFormula):
         :meth:`firstorder.formula.Formula.__init__`.
         """
         super().__init__()
-        self.args = (index,)
+        self._args = (index,)
 
     def __new__(cls, index: Index):
         if not (isinstance(index, int) and index > 0 or index == oo):

@@ -69,6 +69,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         interactive use or use as a library.
     """
 
+    _args: tuple[Any, ...]
     _hash: Optional[int]
 
     @property
@@ -100,10 +101,6 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 -- variable of a quantifier :math:`\\exists` or :math:`\\forall`
         """
         return self._args
-
-    @args.setter
-    def args(self, args: tuple[Any, ...]) -> None:
-        self._args = args
 
     def __and__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`& <object.__and__>` operator to apply

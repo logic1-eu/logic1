@@ -103,7 +103,7 @@ class AtomicFormula(
         supposed to have instances itself.
         """
         super().__init__(self, lhs, rhs)
-        self.args = (
+        self._args = (
             lhs if isinstance(lhs, Term) else Term(lhs),
             rhs if isinstance(rhs, Term) else Term(rhs)
         )

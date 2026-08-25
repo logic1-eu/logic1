@@ -35,10 +35,6 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
         """
         return self.args[0]
 
-    @var.setter
-    def var(self, value: χ) -> None:
-        self.args = (value, *self.args[1:])
-
     @property
     def arg(self) -> Formula[α, τ, χ, σ]:
         """The subformula in the scope of the :class:`QuantifiedFormula`.
@@ -70,12 +66,12 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
         match vars_:
             case Variable():
                 assert not isinstance(vars_, Sequence)
-                self.args = (vars_, arg)
+                self._args = (vars_, arg)
             case (Variable(), *_):
                 f = arg
                 for v in reversed(vars_[1:]):
                     f = self.op(v, f)
-                self.args = (vars_[0], f)
+                self._args = (vars_[0], f)
             case _:
                 raise ValueError(f'{vars_!r} is not a Variable')
 

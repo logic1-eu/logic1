@@ -35,7 +35,7 @@ class Equivalent(BooleanFormula[α, τ, χ, σ]):
 
     def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
         super().__init__()
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
     @property
     def lhs(self) -> Formula[α, τ, χ, σ]:
@@ -77,7 +77,7 @@ class Implies(BooleanFormula[α, τ, χ, σ]):
 
     def __init__(self, lhs: Formula[α, τ, χ, σ], rhs: Formula[α, τ, χ, σ]) -> None:
         super().__init__()
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
     @property
     def lhs(self) -> Formula[α, τ, χ, σ]:
@@ -136,7 +136,7 @@ class And(BooleanFormula[α, τ, χ, σ]):
                 args_flat.extend(list(arg.args))
             else:
                 args_flat.append(arg)
-        self.args = tuple(args_flat)
+        self._args = tuple(args_flat)
 
     def __new__(cls, *args: Formula[α, τ, χ, σ]):
         if not args:
@@ -219,7 +219,7 @@ class Or(BooleanFormula[α, τ, χ, σ]):
                 args_flat.extend(list(arg.args))
             else:
                 args_flat.append(arg)
-        self.args = tuple(args_flat)
+        self._args = tuple(args_flat)
 
     def __new__(cls, *args: Formula[α, τ, χ, σ]):
         if not args:
@@ -290,7 +290,7 @@ class Not(BooleanFormula[α, τ, χ, σ]):
         Not(a == 0)
         """
         super().__init__()
-        self.args = (arg, )
+        self._args = (arg, )
 
     @property
     def arg(self) -> Formula[α, τ, χ, σ]:
@@ -340,7 +340,7 @@ class _T(BooleanFormula[α, τ, χ, σ]):
 
     def __init__(self) -> None:
         super().__init__()
-        self.args = ()
+        self._args = ()
 
     def __new__(cls):
         if cls._instance is None:
@@ -389,7 +389,7 @@ class _F(BooleanFormula[α, τ, χ, σ]):
 
     def __init__(self) -> None:
         super().__init__()
-        self.args = ()
+        self._args = ()
 
     def __new__(cls):
         if cls._instance is None:
