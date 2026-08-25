@@ -814,8 +814,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 p.pretty(arg)
 
     def simplify(self) -> Formula[α, τ, χ, σ]:
-        """Fast basic simplification. The result is equivalent to `self`. The
-        following first-order simplifications are applied:
+        """Fast basic simplification. The result is equivalent to the formula.
+        The following first-order simplifications are applied:
 
         1. Truth values:
 
@@ -889,34 +889,29 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                     return _T()
                 return involutive_not(arg_simplify)
             case And() | Or():
-                simplified_args: list[Formula] = []
+                simplified_args = set()
                 for arg in self.args:
                     arg_simplify = arg.simplify()
                     if arg_simplify is self.definite_element():
                         return self.definite_element()
                     if arg_simplify is self.neutral_element():
                         continue
-                    if arg_simplify in simplified_args:
-                        continue
                     if arg_simplify.op is self.op:
-                        simplified_args.extend(arg_simplify.args)
+                        simplified_args.update(arg_simplify.args)
                     else:
-                        simplified_args.append(arg_simplify)
-                return self.op(*simplified_args)
+                        simplified_args.add(arg_simplify)
+                return self.op(*sorted(simplified_args))
             case Implies():
-                if self.rhs is _T():
-                    return self.lhs
                 lhs_simplify = self.lhs.simplify()
                 if lhs_simplify is _F():
                     return _T()
                 rhs_simplify = self.rhs.simplify()
-                if rhs_simplify is _T():
-                    return _T()
                 if lhs_simplify is _T():
                     return rhs_simplify
+                if rhs_simplify is _T():
+                    return _T()
                 if rhs_simplify is _F():
                     return involutive_not(lhs_simplify)
-                assert {lhs_simplify, rhs_simplify}.isdisjoint({_T(), _F()})
                 if lhs_simplify == rhs_simplify:
                     return _T()
                 return Implies(lhs_simplify, rhs_simplify)
@@ -928,13 +923,12 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 if rhs_simplify is _T():
                     return lhs_simplify
                 if lhs_simplify is _F():
-                    if isinstance(rhs_simplify, Not):
-                        return rhs_simplify.arg
-                    return Not(rhs_simplify)
+                    if rhs_simplify is _F():
+                        return _T()
+                    return involutive_not(rhs_simplify)
                 if rhs_simplify is _F():
-                    if isinstance(lhs_simplify, Not):
-                        return lhs_simplify.arg
-                    return Not(lhs_simplify)
+                    assert lhs_simplify is not _F()
+                    return involutive_not(lhs_simplify)
                 if lhs_simplify == rhs_simplify:
                     return _T()
                 return Equivalent(lhs_simplify, rhs_simplify)
