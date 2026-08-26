@@ -50,7 +50,7 @@ def test_counterexamples():
 
     # every quadratic equation has a solution in C
     a, b, c, z = VV.get('a', 'b', 'c', 'z')
-    phi = All([a, b, c], Ex(z, a * z**2 + b * z + c == 0))
+    phi = All([a, b, c], Implies(a != 0, Ex(z, a * z**2 + b * z + c == 0)))
     # assert qe(phi) == T  # failure nodes
 
     # REMIS: Counterexample for Geometry Provers over C

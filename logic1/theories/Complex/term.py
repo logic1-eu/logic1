@@ -6,7 +6,8 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 import functools
-from typing import Callable, ClassVar, Final, Generic, Never, Self
+import re
+from typing import Callable, ClassVar, Final, Generic, Never, Optional, Self
 
 from gmpy2 import mpq
 
@@ -16,6 +17,7 @@ from logic1.theories.Complex.types import Number, RationalNumber, τ
 from logic1.theories.Complex import ast
 from logic1.theories.Complex.format import ReprFormatter, StrFormatter
 from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_normal_form
+
 
 
 @dataclass
@@ -35,6 +37,10 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
     """The set of currently used variable names.
     """
 
+    _IDENTIFIER_RE = re.compile(r"[A-Za-z][A-Za-z0-9_]*")
+    """Regular expression for valid variable names.
+    """
+
     @property
     def stack(self) -> list[set[str]]:
         """Return the current stack of variable names. Implements the abstract
@@ -48,14 +54,21 @@ class VariableSet(firstorder.term.VariableSet['Variable']):
         return [self._names]
 
     def __getitem__(self, index: str) -> Variable:
-        """Return the variable with the given name. Implements the abstract
+        """Return the variable with the given name. Raise a :class:`ValueError`
+        if the name is not a valid Python identifier. Implements the abstract
         method :meth:`.firstorder.term.VariableSet.__getitem__`.
 
         >>> VV['z']
         z
+        >>> VV['1z']
+        Traceback (most recent call last):
+        ...
+        ValueError: variable name '1z' is not a valid identifier
         """
         if not isinstance(index, str):
             raise ValueError(f'expecting string as index; {index} is {type(index)}')
+        if not self._IDENTIFIER_RE.fullmatch(index):
+            raise ValueError(f'variable name \'{index}\' is not a valid identifier')
         self._names.add(index)
         return Variable._from_ast(ast.Var(index))
 
@@ -208,6 +221,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     """The current normal form used for :attr:`_ast`.
     """
 
+    _hash: Optional[int] = None
+    """The cached hash value of this term with respect to conjugate normal form.
+    """
+
     @property
     def normal_ast(self) -> ast.AST:
         """The AST representation of this term in the global normal form.
@@ -289,7 +306,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def __hash__(self) -> int:
         """Return the hash value of this term.
         """
-        return hash(self.normal_ast)
+        if self._hash is None:
+            if self._current_normal_form == conjugate_normal_form:
+                self._hash = hash(self._ast)
+            else:
+                self._hash = hash(conjugate_normal_form(self._ast))
+        return self._hash
 
     def __invert__(self) -> Term:
         """Return the complex conjugate of this term.
@@ -367,7 +389,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
     def __pow__(self, other: int) -> Term:
         """Raise this term to a non-negative integer power. Raise
-        a :class:`ValueError` if the exponent is negative.
+        a :class:`TypeError` if the exponent is negative.
 
         >>> I ** 2
         -1
@@ -386,8 +408,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         return Term(other) + self
 
     def __repr__(self) -> str:
-        """Return a string representation of this term that is valid Python code
-        and allows for the reconstruction of the original term.
+        """Return a string representation of this term that is valid Python
+        code. Allows for the reconstruction of the original expression up to
+        definition of variables and conversion of number types.
 
         >>> z = VV['z']
         >>> repr(z ** 2 + I)
