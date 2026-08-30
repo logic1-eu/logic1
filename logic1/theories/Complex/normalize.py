@@ -413,10 +413,10 @@ class WeakNormalizer(IdentityASTVisitor):
             if isinstance(arg, Mul):
                 args.extend(arg.args)
                 continue
-            #if isinstance(arg, Neg):
-            #    negated = not negated
-            #    args.append(arg.arg)
-            #    continue
+            if isinstance(arg, Neg):
+                negated = not negated
+                args.append(arg.arg)
+                continue
             if arg.is_constant():
                 constant = Mul(constant, arg)
                 continue

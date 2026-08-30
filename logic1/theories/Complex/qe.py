@@ -332,8 +332,9 @@ def qe(formula: Formula, assume: Iterable[AtomicFormula] = [], use_redlog: bool 
     rcf_assume = assume_to_rcf(assume)
     rcf_formula = formula_to_rcf(formula).to_pnf()
     topmost_op = type(rcf_formula)
+    rcf_qe_formula: Optional[RCF.Formula] = None
     if use_redlog:
-        rcf_qe_formula: Optional[RCF.Formula] = RCF.redlog.qe(rcf_formula, assume=rcf_assume)
+        rcf_qe_formula = RCF.redlog.qe(rcf_formula, assume=rcf_assume, **options)
     else:
         rcf_qe_formula = RCF.qe(rcf_formula, assume=rcf_assume, **options)
     if rcf_qe_formula is None:
