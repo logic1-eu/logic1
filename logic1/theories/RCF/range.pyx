@@ -1,6 +1,6 @@
-# cython: profile=False
-# cython: linetrace=False
-# distutils: define_macros=CYTHON_TRACE_NOGIL=0
+# Remove `_` to use coverage
+# _cython: linetrace=True
+# _distutils: define_macros=CYTHON_TRACE_NOGIL=0 CYTHON_TRACE=1 CYTHON_USE_SYS_MONITORING=0
 # type: ignore
 
 from __future__ import annotations
@@ -224,6 +224,8 @@ class _Range:
         return ret
 
     def __imul__(self, other: _Range) -> _Range:
+        if self is other:
+            other = other.copy()
         if self.is_point():
             h = self.start
             self.iset(other)
@@ -246,7 +248,7 @@ class _Range:
             self.ineg()
         return self
 
-    @cython.cfunc
+    @cython.ccall
     def _imul_core(self, other: _Range) -> cython.void:
         s1 = self.start.sgn()
         s2 = self.end.sgn()
@@ -303,13 +305,12 @@ class _Range:
             #       0
             #       (    )
             #       (       )
-            lopen = ((self.lopen or other.lopen) and (self.lopen or other.ropen)
-                     and (self.ropen and other.lopen))
+            lopen = self.lopen and other.lopen
             start = EP_ZERO
             ropen = self.ropen or other.ropen
             end = self.end * other.end
         elif s1 == 0 and t1 > 0:
-            lopen = self.lopen or (other.lopen and other.ropen)
+            lopen = self.lopen
             start = EP_ZERO
             assert s2 > 0
             end = self.end * other.end
@@ -430,6 +431,7 @@ class _Range:
             True, EP_ZERO, -self.start, self.lopen, {-p for p in self.exc if p < EP_ZERO})
         return non_negative.union(abs_of_negative)
 
+    @cython.ccall
     def copy(self) -> _Range:
         return _Range(self.lopen, self.start, self.end, self.ropen, self.exc)
 
