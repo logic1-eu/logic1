@@ -10,19 +10,17 @@ Or(b == 0, a != 0)
 # Period 9
 >>> x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11 = VV.get(*(f'x{i}' for i in range(12)))
 
->>> p9_1 = (x2 >= 0) & (x3 == x2 - x1) | (x2 < 0) & (x3 == -x2 - x1)
->>> p9_2 = (x3 >= 0) & (x4 == x3 - x2) | (x3 < 0) & (x4 == -x3 - x2)
->>> p9_3 = (x4 >= 0) & (x5 == x4 - x3) | (x4 < 0) & (x5 == -x4 - x3)
->>> p9_4 = (x5 >= 0) & (x6 == x5 - x4) | (x5 < 0) & (x6 == -x5 - x4)
->>> p9_5 = (x6 >= 0) & (x7 == x6 - x5) | (x6 < 0) & (x7 == -x6 - x5)
->>> p9_6 = (x7 >= 0) & (x8 == x7 - x6) | (x7 < 0) & (x8 == -x7 - x6)
->>> p9_7 = (x8 >= 0) & (x9 == x8 - x7) | (x8 < 0) & (x9 == -x8 - x7)
->>> p9_8 = (x9 >= 0) &  (x10 == x9 - x8) | (x9 < 0) & (x10 == -x9 - x8)
->>> p9_9 = (x10 >= 0) & (x11 == x10 - x9) | (x10 < 0) & (x11 == -x10 - x9)
+>>> p9_0 = And(Or(And(x2 >= 0, x3 == x2 - x1), And(x2 < 0, x3 == -x2 - x1)),
+...            Or(And(x3 >= 0, x4 == x3 - x2), And(x3 < 0, x4 == -x3 - x2)),
+...            Or(And(x4 >= 0, x5 == x4 - x3), And(x4 < 0, x5 == -x4 - x3)),
+...            Or(And(x5 >= 0, x6 == x5 - x4), And(x5 < 0, x6 == -x5 - x4)),
+...            Or(And(x6 >= 0, x7 == x6 - x5), And(x6 < 0, x7 == -x6 - x5)),
+...            Or(And(x7 >= 0, x8 == x7 - x6), And(x7 < 0, x8 == -x7 - x6)),
+...            Or(And(x8 >= 0, x9 == x8 - x7), And(x8 < 0, x9 == -x8 - x7)),
+...            Or(And(x9 >= 0, x10 == x9 - x8), And(x9 < 0, x10 == -x9 - x8)),
+...            Or(And(x10 >= 0, x11 == x10 - x9), And(x10 < 0, x11 == -x10 - x9)))
 
->>> p9_0 = p9_1 & p9_2 & p9_3 & p9_4 & p9_5 & p9_6 & p9_7 & p9_8 & p9_9
-
->>> p9 = p9_0 >> ((x1 == x10) & (x2 == x11))
+>>> p9 = Implies(p9_0, And(x1 == x10, x2 == x11))
 
 >>> vl = sorted(set(p9.fvars()), key=Term.sort_key)
 
@@ -71,3 +69,7 @@ x1 + x2 + x3 != 0))), Or(x6 > 0, And(x2 - x6 == 0, x1 == 0), And(Or(x6 == 0, x5
 x4 + x5 + x6 != 0)), And(Or(x4 < 0, x3 - x4 + x5 != 0), Or(x4 >= 0, x3 + x4 + x5
 != 0)), And(Or(x3 < 0, x2 - x3 + x4 != 0), Or(x3 >= 0, x2 + x3 + x4 != 0)),
 And(Or(x2 < 0, x1 - x2 + x3 != 0), Or(x2 >= 0, x1 + x2 + x3 != 0))))
+
+# The real Period 9 example would take five to ten more seconds:
+# >>> qe(p9.all(), workers=4)
+# T
