@@ -48,7 +48,7 @@ quadratic equation:
 >>> VV.imp('a', 'b', 'c', 'x')          # declare variables
 >>> phi = Ex(x, a*x**2 + b*x + c == 0)  # formalization with existential quantifier
 >>> qe(phi)                             # quantifier elimination
-Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b^2 <= 0))
+Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b**2 <= 0))
 
 Consider the infinite real sequence defined by :math:`x_{i+2} = |x_{i+1}| -
 x_{i}`. Logic1 can check that this sequence has period 9 for all possible
