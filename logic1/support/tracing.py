@@ -36,11 +36,13 @@ class trace(object):
             call = f'{fn.__qualname__}({arg_str})'
             self.stream.write(f'{indent}--> {call}\n')
             trace.cur_indent += self.indent_step
-            ret = fn(*args, **kwargs)
-            trace.cur_indent -= self.indent_step
+            try:
+                ret = fn(*args, **kwargs)
+            finally:
+                trace.cur_indent -= self.indent_step
             if self.show_ret:
                 ret_str = self._format(ret)
-                result = f'{fn.__qualname__} == {ret_str}\n'
+                result = f'{fn.__qualname__} == {ret_str}'
                 self.stream.write(f'{indent}<-- {result}\n')
             return ret
         return wrapper
