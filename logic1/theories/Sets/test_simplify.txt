@@ -5,3 +5,16 @@
 
 >>> simplify(And(b != c, Or(y == z, And(a == b, b != c))))
 And(b != c, Or(a == b, y == z))
+
+# Regression tests:
+
+>>> simplify(C_(oo))
+C_(oo)
+>>> qe(C_(oo))
+C_(oo)
+>>> simplify(And(C(oo), C_(oo)))
+F
+>>> simplify(Or(C(oo), C_(oo)))
+T
+>>> is_valid(C_(oo))
+

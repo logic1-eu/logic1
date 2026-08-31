@@ -61,7 +61,7 @@ class InternalRepresentation(
     """
     _options: abc.simplify.Options
     _min_card: Index = 1
-    _max_card: Index = oo
+    _max_card: Optional[Index] = oo
     _equations: UnionFind = field(default_factory=UnionFind)
     _inequations: set[Ne] = field(default_factory=set)
 
@@ -76,12 +76,14 @@ class InternalRepresentation(
                 case C(index=n):
                     if n > self._min_card:
                         self._min_card = n
-                    if self._min_card > self._max_card:
+                    if InternalRepresentation._is_inconsistent(self._min_card, self._max_card):
                         raise InternalRepresentation.Inconsistent()
                 case C_(index=n):
-                    if n - 1 < self._max_card:
+                    if n is oo:
+                        self._max_card = None
+                    elif self._max_card is None or n - 1 < self._max_card:
                         self._max_card = n - 1
-                    if self._min_card > self._max_card:
+                    if InternalRepresentation._is_inconsistent(self._min_card, self._max_card):
                         raise InternalRepresentation.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
                     self._equations.union(lhs, rhs)
@@ -111,8 +113,13 @@ class InternalRepresentation(
         L: list[AtomicFormula] = []
         if self._min_card > ref._min_card:
             L.append(C(self._min_card))
-        if self._max_card < ref._max_card:
-            L.append(C_(self._max_card + 1))
+        if self._max_card is None:
+            assert ref._max_card in (None, oo)
+            if ref._max_card is oo:
+                L.append(C_(oo))
+        else:
+            if ref._max_card is None or self._max_card < ref._max_card:
+                L.append(C_(self._max_card + 1))
         for eq in self._equations.equations():
             if ref._equations.find(eq.lhs) != ref._equations.find(eq.rhs):
                 L.append(eq)
@@ -124,6 +131,24 @@ class InternalRepresentation(
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
+
+    @staticmethod
+    def _is_inconsistent(min_card: Index, max_card: Optional[Index]) -> bool:
+        """Returns :obj:`True` if the given ``min_card`` and ``max_card`` are
+        inconsistent, :obj:`False` otherwise.
+
+        >>> InternalRepresentation._is_inconsistent(5, 3)
+        True
+        >>> InternalRepresentation._is_inconsistent(3, 5)
+        False
+        >>> InternalRepresentation._is_inconsistent(oo, None)
+        True
+        >>> InternalRepresentation._is_inconsistent(3, None)
+        False
+        """
+        if max_card is None:
+            return min_card is oo
+        return min_card > max_card
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.next_`.
