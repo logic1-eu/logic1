@@ -4,8 +4,8 @@ the first-order theory of the real numbers with ring arithmetic, equality, and
 order. This can be naturally axiomatized as follows:
 
 1. the axioms of ordered fields,
-2. every polynomial of odd degree has a root,
-3. squares are non-negative.
+2. every positive element has a square root,
+3. every polynomial of odd degree has a root.
 
 :ref:`Variables <api-RCF-atomic>` are elements of an infinite set :data:`RCF.VV
 <.RCF.term.VV>`, indexed by their name as a string.
