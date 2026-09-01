@@ -25,10 +25,10 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 
 
 def _caches():
-    from logic1.theories.RCF.node import XoNode
+    from logic1.theories.RCF.node.xopt import Node
     from logic1.theories.RCF.simplify import Simplify
     from logic1.theories.RCF.substitution import _SubstValue
-    return [_SubstValue.as_term, Simplify._simpl_at, XoNode.subs_into_formula]
+    return [_SubstValue.as_term, Simplify._simpl_at, Node.subs_into_formula]
 
 def cache_clear():
     for cache in _caches():
@@ -1124,12 +1124,15 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> t = -x**2 + y**2
         >>> t.factor() == (mpq(-1,1), {x - y: 1, x + y: 1})
         True
+        >>> t = (2*x + y)**3
+        >>> t.factor() == (mpq(8,1), {x + 1/2*y: 3})
+        True
         """
         unit, factors = self._poly.factor()
         D = dict()
         for factor, exp in factors:
             lc = factor.leading_coefficient()
-            unit *= lc
+            unit *= lc ** exp
             factor /= lc
             D[Term.from_raw(factor)] = exp
         return fmpq_to_mpq(unit), D

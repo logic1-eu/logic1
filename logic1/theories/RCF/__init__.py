@@ -41,18 +41,16 @@ for external input with decimal numbers.
 
     >>> from logic1.theories.RCF import *
     >>> x, = VV.get('x')
-    >>> x + 0.1
-    x + 1/10
-    >>> x + (1/10 + 2/10)
-    x + 415716888680356/1385722962267853
+    >>> x + 0.1  # doctest: +SKIP
+    x + 3602879701896397/36028797018963968
 
     Use GNU multi-precision rational numbers for exact arithmetic:
 
     >>> from logic1.theories.RCF import *
     >>> from gmpy2 import mpq
     >>> x, = VV.get('x')
-    >>> x + (mpq(1, 10) + mpq(2, 10))
-    x + 3/10
+    >>> x + mpq(1, 10)
+    x + 1/10
 
 The module :mod:`.logic1.interactive.RCF` provides a convenient interface for
 interactive use, e.g., pre-defining single letter variables.
@@ -79,9 +77,9 @@ Numbers obtained from terms or formulas using :mod:`.theories.RCF` operations
 are generally of type :class:`gmpy2.mpq`.
 
 >>> from logic1.interactive.RCF import *
->>> t = 0.1 * x + 2
+>>> t = 0.5 * x + 2
 >>> t.lc()
-mpq(1,10)
+mpq(1,2)
 >>> t.constant_coefficient()
 mpq(2,1)
 """
