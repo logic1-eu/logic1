@@ -75,6 +75,23 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
             case _:
                 raise ValueError(f'{vars_!r} is not a Variable')
 
+    def __le__(self, other: Formula[α, τ, χ, σ]) -> bool:
+        """Compare two quantified formulas by their quantifier variable and
+        subformula. Use the :meth:`sort_key <.term.Variable.sort_key>` of the
+        variables.
+
+        >>> from logic1.theories.RCF import *
+        >>> x, y = VV.get('x', 'y')
+        >>> f1 = All(x, x**2 >= 0)
+        >>> f2 = All(y, y**2 >= 0)
+        >>> f2 <= f1
+        True
+        """
+        if isinstance(other, QuantifiedFormula) and self.op is other.op:
+            return self.var.sort_key() <= other.var.sort_key() and self.arg <= other.arg
+        else:
+            return super().__le__(other)
+
 
 @final
 class Ex(QuantifiedFormula[α, τ, χ, σ]):

@@ -114,7 +114,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return And(self, other)
 
     def __eq__(self, other: object) -> bool:
-        """A recursive test for equality of the `self` and `other`.
+        """A recursive test for equality of the ``self`` and ``other``.
 
         Note that this is not a logical operator for equality.
 
@@ -173,8 +173,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return Not(self)
 
     def __le__(self, other: Formula[α, τ, χ, σ]) -> bool:
-        """Returns :external:obj:`True` if `self` should be sorted before or is
-        equal to other.
+        """Returns :external:obj:`True` if ``self`` should be sorted before or
+        is equal to other.
 
         .. seealso::
           * :meth:`AtomicFormula.__le__() <.firstorder.atomic.AtomicFormula.__le__>`\
@@ -222,8 +222,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return Or(self, other)
 
     def __repr__(self) -> str:
-        """A Representation of the :class:`Formula` `self` that is suitable for
-        use as an input.
+        """A Representation of the :class:`Formula` ``self`` that is suitable
+        for use as an input.
         """
         r = self.op.__name__
         r += '('
@@ -287,7 +287,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
 
     def all(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
         """Universal closure. Universally quantifiy all variables occurring
-        free in `self`, except the ones in `ignore`.
+        free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
         >>> a, b, x = VV.get('a', 'b', 'x')
@@ -392,7 +392,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
     def atoms(self) -> Iterator[α]:
         """
         An iterator over all instances of :class:`AtomicFormula
-        <.firstorder.atomic.AtomicFormula>` occurring in `self`.
+        <.firstorder.atomic.AtomicFormula>` occurring in ``self``.
 
         Recall that the truth values :data:`T <.boolean.T>` and :data:`F
         <.boolean.F>` are not atoms:
@@ -437,7 +437,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, type(self)
 
     def bvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
-        """An iterator over all bound occurrences of variables in `self`. Each
+        """An iterator over all bound occurrences of variables in ``self``. Each
         variable is reported once for each term that it occurs in.
 
         >>> from logic1.theories.RCF import *
@@ -450,8 +450,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         to the occurrence in a term. Appearances of variables as a quantified
         variables without use in any term are not considered.
 
-        The parameter `quantified` specifies variable to be considered bound in
-        addition to those that are explicitly quantified in `self`.
+        The parameter ``quantified`` specifies variable to be considered bound in
+        addition to those that are explicitly quantified in ``self``.
 
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
@@ -546,7 +546,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
 
     def ex(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
         """Existential closure. Existentially quantifiy all variables occurring
-        free in `self`, except the ones in `ignore`.
+        free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
         >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
@@ -568,11 +568,11 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return f
 
     def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
-        """An iterator over all free occurrences of variables in `self`. Each
+        """An iterator over all free occurrences of variables in ``self``. Each
         variable is reported once for each term that it occurs in.
 
-        The parameter `quantified` specifies variable to be considered bound in
-        addition to those that are explicitly quantified in `self`.
+        The parameter ``quantified`` specifies variable to be considered bound
+        in addition to those that are explicitly quantified in ``self``.
 
         >>> from logic1.theories.RCF import *
         >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
@@ -692,7 +692,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         Prefix([(<class 'logic1.firstorder.quantified.All'>, [x, y]),
                 (<class 'logic1.firstorder.quantified.Ex'>, [z])])
 
-        If `self` is not prenex, then the leading quantifiers are considered
+        If ``self`` is not prenex, then the leading quantifiers are considered
         and the matrix will not be quantifier-free:
 
         >>> h = All(x, All(y, Implies(x != 0, Ex(z, x * z == y))))
@@ -741,7 +741,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return f
 
     def qvars(self) -> Iterator[χ]:
-        """An iterator over all quantified variables in `self`.
+        """An iterator over all quantified variables in ``self``.
 
         In the following example, ``z`` is a quantified variable but not a
         bound variable:
@@ -1064,10 +1064,10 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         If the minimal number of alternations in the result can be achieved
         with both :class:`.Ex` and :class:`.All` as the first quantifier in the
         result, then the former is preferred. This preference can be changed
-        with a keyword argument `prefer_universal=True`.
+        with a keyword argument ``prefer_universal=True``.
 
-        An keyword argument `is_nnf=True` indicates that `self` is already in
-        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
+        An keyword argument ``is_nnf=True`` indicates that ``self`` is already
+        in NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
         be useful in time-critical situations.
 
         >>> from logic1.theories.RCF import *
@@ -1086,12 +1086,12 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
     def traverse(self, *,
                  map_atoms: Callable[..., Formula[α, τ, χ, σ]] = lambda atom: atom,
                  sort_levels: bool = False) -> Formula[α, τ, χ, σ]:
-        """Apply `tr` to all atomic formulas.
+        """Apply ``map_atoms`` to all atomic formulas.
 
-        Replaces each atomic subformula of `self` with the :class:`Formula`
-        `map_atoms(self)`. If `sort_levels` is :obj:`True`, all subformulas
+        Replaces each atomic subformula of ``self`` with the :class:`Formula`
+        ``map_atoms(self)``. If ``sort_levels`` is :obj:`True`, all subformulas
         built from commutative Boolean operators (:class:`.And`, :class:`.Or`,
-        :class:`.Equivalent`) are sorted after the application of `map_atoms`.
+        :class:`.Equivalent`) are sorted after the application of ``map_atoms``.
 
         >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
@@ -1113,7 +1113,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                     argl.sort()
                 return self.op(*argl)
             case Not() | Implies() | _F() | _T():
-                args = (arg.traverse_atoms(map_atoms=map_atoms, sort_levels=sort_levels)
+                args = (arg.traverse(map_atoms=map_atoms, sort_levels=sort_levels)
                         for arg in self.args)
                 return self.op(*args)
             case AtomicFormula():
