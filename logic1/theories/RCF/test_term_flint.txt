@@ -999,4 +999,14 @@ class Term:
     >>> list((x + y - y).vars())
     [x]
 
+    ----------------------------------------------------------------------------
+    Regression tests:
+    ----------------------------------------------------------------------------
+    An iterator was traversed twice, and the second example falsely returned
+    ``x**2 - 1``:
+    >>> (x**2 - 1).reduce([x - 1])
+    0
+    >>> (x**2 - 1).reduce(g for g in [x - 1])
+    0
+
     """

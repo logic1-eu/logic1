@@ -1409,6 +1409,10 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         >>> f.reduce([y**2 - 1, x*y - 1])
         2*x + 1
         """
+        # Convert ``G`` to a tuple to prevent a one-shot iterator from being
+        # consumed by the first traversal. ``Iterable[Term]`` matches the
+        # corresponding method in ``term_sage``.
+        G = tuple(G)
         tcontext = self.term_context()
         for g in G:
             tcontext |= g.term_context()
@@ -1458,6 +1462,10 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def _reduce_sage(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G via Sage. Deprecated; use reduce() instead.
         """
+        # Convert ``G`` to a tuple to prevent a one-shot iterator from being
+        # consumed by the first traversal. ``Iterable[Term]`` matches the
+        # corresponding method in ``term_sage``.
+        G = tuple(G)
         tcontext = self.term_context()
         for g in G:
             tcontext |= g.term_context()
