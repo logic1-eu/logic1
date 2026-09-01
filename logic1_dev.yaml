@@ -18,6 +18,7 @@ channels:
   - conda-forge
 dependencies:
   - python >=3.12
+  - clang
   - coverage
   - cython
   - pytest-cython
