@@ -66,12 +66,13 @@ fields are complete, decidable, and admit :ref:`quantifier elimination
 >>> from logic1.interactive.RCF import *
 >>> a1 = -(1 - 3*r) * (a**2 + b**2) + 2*a*r
 >>> a2 = -(2 - 3*r) * (a**2 + b**2) + 4*a*r - 2*a - r
->>> collins_johnson = Ex(r, And(0 < r < 1, a >= 1/2, b > 0, a1 < 0, a2 > 0))
+>>> collins_johnson = Ex(r, And(0 < r, r < 1, a >= 1/2, b > 0, a1 < 0, a2 > 0))
 >>> qe(collins_johnson)
-And(b > 0,
-    2*a - 1 >= 0,
-    3*a**4 + 6*a**2*b**2 + 3*b**4 + 10*a**3 + 10*a*b**2 + 4*a**2 - 4*b**2 - 6*a + 1 > 0,
-    9*a**6 + 27*a**4*b**2 + 27*a**2*b**4 + 9*b**6 + 30*a**5 + 60*a**3*b**2 + 30*a*b**4
+ And(b > 0,
+     2*a - 1 >= 0,
+     3*a**4 + 6*a**2*b**2 + 3*b**4 + 7*a**3 + 7*a*b**2 + 3*a**2 - b**2 - a > 0,
+     3*a**4 + 6*a**2*b**2 + 3*b**4 + 10*a**3 + 10*a*b**2 + 4*a**2 - 4*b**2 - 6*a + 1 > 0,
+     9*a**6 + 27*a**4*b**2 + 27*a**2*b**4 + 9*b**6 + 30*a**5 + 60*a**3*b**2 + 30*a*b**4
         + 36*a**4 + 36*a**2*b**2 + 14*a**3 - 2*a*b**2 - 5*a**2 - b**2 < 0)
 
 Numbers obtained from terms or formulas using :mod:`.theories.RCF` operations
