@@ -94,9 +94,6 @@ class InternalRepresentation(
             for ne in self._inequations:
                 if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
-            for ne in self._inequations:
-                if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
-                    raise InternalRepresentation.Inconsistent()
         return abc.simplify.RESTART.OTHERS
 
     def extract(self, gand: type[And | Or], ref: InternalRepresentation) -> list[AtomicFormula]:
@@ -182,7 +179,7 @@ class Simplify(abc.simplify.Simplify[
 
     _options: abc.simplify.Options = field(default_factory=abc.simplify.Options)
 
-    def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
+    def create_initial_representation(self, assume: Iterable[AtomicFormula] = []) \
             -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.

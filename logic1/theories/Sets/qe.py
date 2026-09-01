@@ -44,7 +44,7 @@ class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Fo
     def copy(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
         """
-        return Node(variables=self.variables, formula=self.formula, options=self.options)
+        return Node(variables=list(self.variables), formula=self.formula, options=self.options)
 
     def memorize(self) -> Formula:
         """Implements the abstract method :meth:`.abc.qe.Node.memoize`.

@@ -18,3 +18,8 @@ F
 T
 >>> is_valid(C_(oo))
 
+# type variable was passed as default argument resulting in a exception
+
+>>> from logic1.theories.Sets.simplify import Simplify
+>>> _ = Simplify().create_initial_representation()
+>>>
