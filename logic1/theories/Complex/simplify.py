@@ -25,14 +25,28 @@ def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: di
     nodes that are not covered by any edge.
 
     >>> nodes_costs = {'a': 1, 'b': 2, 'c': 4}
-    >>> edge_weights = {('a', 'b'): 1, ('b', 'c'): 2}
+    >>> edge_weights = {('a', 'b'): 3, ('b', 'c'): 2}
     >>> cover = min_weight_partial_edge_cover(nodes_costs, edge_weights)
     >>> [(min(u, v), max(u, v)) for u, v in sorted(cover)]
     [('b', 'c')]
+
+    >>> nodes_costs = {0: 5, 1: 5, 2: 5}
+    >>> edge_weights = {(0, 1): 4, (0, 2): 4}
+    >>> cover = min_weight_partial_edge_cover(nodes_costs, edge_weights)
+    >>> [(min(u, v), max(u, v)) for u, v in sorted(cover)]
+    [(0, 1), (0, 2)]
     """
     import networkx as nx
 
     nodes = set(nodes_costs.keys())
+    edge_weights = dict(edge_weights)
+    for node in nodes:
+        for other in nodes:
+            weight = min(
+                edge_weights.get((node, other), float('inf')),
+                edge_weights.get((other, node), float('inf'))
+            )
+            edge_weights[(node, other)] = edge_weights[(other, node)] = weight
 
     min_costs: dict[α, float] = dict()
     min_others: dict[α, Optional[α]] = dict()
@@ -40,7 +54,7 @@ def min_weight_partial_edge_cover(nodes_costs: dict[α, float], edge_weights: di
         min_costs[node] = nodes_costs[node]
         min_others[node] = None
         for other in nodes:
-            weight = edge_weights.get((node, other), float('inf'))
+            weight = edge_weights[(node, other)]
             if weight < min_costs[node]:
                 min_costs[node] = weight
                 min_others[node] = other
