@@ -102,7 +102,7 @@ class EndPoint:
             finite_sign: cython.int = mpq_sgn(MPQ(self.finite_value))
             return EndPoint.__new__(EndPoint, None, finite_sign * other.infinite_sign)
         elif self.finite_value is None and other.finite_value is not None:
-            finite_sign: cython.int = mpq_sgn(MPQ(other.finite_value))
+            finite_sign = mpq_sgn(MPQ(other.finite_value))
             return EndPoint.__new__(EndPoint, None, finite_sign * self.infinite_sign)
         else:
             return EndPoint.__new__(EndPoint, None, self.infinite_sign * other.infinite_sign)
