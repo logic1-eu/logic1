@@ -1045,6 +1045,10 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                     try:
                         nodes = success_nodes.get(timeout=0.001)
                     except queue.Empty:
+                        # ``None`` means the process is still running; ``0`` means that it
+                        # terminated successfully and its sentinel may still be in the queue.
+                        if any(process.exitcode not in (None, 0) for process in processes):
+                            raise RuntimeError('A worker process exited unexpectedly')
                         continue
                     if nodes is not None:
                         self.success_nodes.extend(nodes)
