@@ -1,0 +1,11 @@
+There was VariableSet.__init__ for initialization, which broke the following
+test. Initialization of a singleton belongs into the __new__ method.
+
+>>> from logic1.theories.Sets.atomic import VariableSet, VV
+
+>>> old = VV['G0001']
+>>> VariableSet() is VV
+True
+>>> fresh = VV.fresh()
+>>> str(old), str(fresh), bool(old == fresh)
+('G0001', 'G0002', False)

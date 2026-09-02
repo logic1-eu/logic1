@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import string
-from typing import Any, ClassVar, Final, Iterator, Never, Optional, Self, TypeAlias
+from typing import (Any, ClassVar, Final, final, Iterator, Never, Optional,
+                    Self, TypeAlias)
 
 from logic1 import firstorder
 from logic1.firstorder import _F, _T
@@ -22,7 +23,7 @@ Index: TypeAlias = int | float
 is represented by :data:`oo`.
 """
 
-
+@final
 class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Sets.
     Variables are uniquely identified by their name, which is a
@@ -39,6 +40,8 @@ class VariableSet(firstorder.VariableSet['Variable']):
     """
 
     _instance: ClassVar[Optional[VariableSet]] = None
+    _stack: list[set[str]]
+    _used: set[str]
 
     @property
     def stack(self) -> list[set[str]]:
@@ -59,13 +62,13 @@ class VariableSet(firstorder.VariableSet['Variable']):
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
-    def __init__(self) -> None:
-        self._stack: list[set[str]] = []
-        self._used: set[str] = set()
-
-    def __new__(cls) -> VariableSet:
+    def __new__(cls) -> Self:
+        # Initialization of a singleton belongs into the __new__ method.
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            self = super().__new__(cls)
+            self._stack = []
+            self._used = set()
+            cls._instance = self
         return cls._instance
 
     def __repr__(self) -> str:
