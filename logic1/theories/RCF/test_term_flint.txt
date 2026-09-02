@@ -1019,4 +1019,11 @@ class Term:
     >>> y.degree(x)
     0
 
+    (x**2).derivative(x, -1) returned x**2 because range(-1) is empty. A negative
+    derivative count is invalid, and the Sage backend raises ValueError, too:
+    >>> (x**2).derivative(x, -1)
+    Traceback (most recent call last):
+    ...
+    ValueError: Derivative order must be non-negative
+
     """

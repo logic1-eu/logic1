@@ -1098,12 +1098,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return self._poly.degrees()[x_index]
 
     def derivative(self, x: Variable, n: int = 1) -> Term:
-        """The `n`-th derivative of this term, with respect to `x`.
+        """The ``n``-th derivative of this term, with respect to ``x``.
 
         >>> x, y, z = VV.get('x', 'y', 'z')
         >>> (x ** 2 * y + x * z ** 2 + y ** 2 * z).derivative(x)
         2*x*y + z**2
         """
+        if n < 0:
+            raise ValueError("Derivative order must be non-negative")
         poly = self._poly
         names = poly.context().names()
         x_name = str(x._poly)
