@@ -1144,11 +1144,10 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                     with m_lock:
                         found_t.value += 1
                     break
+                working_nodes.extend(node for node in nodes if node.variables)
+                nodes = [node for node in nodes if not node.variables]
                 if nodes:
-                    if nodes[0].variables:
-                        working_nodes.extend(nodes)
-                    else:
-                        success_nodes.put(nodes)
+                    success_nodes.put(nodes)
                 working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
@@ -1219,11 +1218,8 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
             except NodeProcessFailure:
                 self.failure_nodes.append(node)
                 continue
-            if nodes:
-                if nodes[0].variables:
-                    self.working_nodes.extend(nodes)
-                else:
-                    self.success_nodes.extend(nodes)
+            self.working_nodes.extend(node for node in nodes if node.variables)
+            self.success_nodes.extend(node for node in nodes if not node.variables)
         logger.info(self.working_nodes.final_statistics())
         logger.info(self.success_nodes.final_statistics('success'))
         logger.info(self.failure_nodes.final_statistics('failure'))
