@@ -1009,4 +1009,14 @@ class Term:
     >>> (x**2 - 1).reduce(g for g in [x - 1])
     0
 
+    Equal zero terms returned different degrees. The distinction was only
+    whether x remained in the polynomial context, which violates representation
+    independence:
+    >>> Term(0).degree(x)
+    -1
+    >>> (x - x).degree(x)
+    -1
+    >>> y.degree(x)
+    0
+
     """

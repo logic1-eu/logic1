@@ -1079,10 +1079,11 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return fmpq_to_mpq(content)
 
     def degree(self, x: Variable) -> int:
-        """Return the degree in `x` of this term. `x` is matched against
-        variables of `self` by name. The index of the variables in their
-        specific TermContext is not relevant. If no variable with the name of
-        `x` occurs in the context of `self`, return 0.
+        """Return the degree of the Term in ``x``.
+
+        The variable ``x`` is matched by name against the variables of the term,
+        rather than by index. If ``x`` is not in the context of the Term, return
+        ``-1`` if the term is zero, and ``0`` otherwise.
 
         >>> x, y = VV.get('x', 'y')
         >>> (2*y*x**2 + x + 1).degree(x)
@@ -1092,7 +1093,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         names = context.names()
         x_name = str(x._poly)
         if x_name not in names:
-            return 0
+            return -1 if self.is_zero() else 0
         x_index = context.variable_to_index(x_name)
         return self._poly.degrees()[x_index]
 
