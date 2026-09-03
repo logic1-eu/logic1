@@ -583,9 +583,6 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
     """A list of atoms holding the current set of assumptions.
     """
 
-    def __hash__(self) -> int:
-        return hash(tuple(self.atoms))
-
     def __init__(self, atoms: Iterable[α]) -> None:
         self.atoms = list(atoms)
 
