@@ -10,7 +10,7 @@ of the famous Berkeley Espresso library [BraytonEtAl-1984]_.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pyeda.boolalg import expr, minimization  # type: ignore
-from typing import ClassVar, Generic, TypeVar
+from typing import Callable, ClassVar, Generic, TypeVar
 
 from .. import firstorder
 from ..firstorder import (
@@ -29,14 +29,14 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
     """Boolean normal form computation.
     """
 
-    _logic1_to_pyeda: ClassVar[dict[type[Formula], expr]] = {
+    _logic1_to_pyeda: ClassVar[dict[type[Formula], Callable[..., expr.Expression]]] = {
         firstorder.Equivalent: expr.Equal,
         firstorder.Implies: expr.Implies,
         firstorder.And: expr.And,
         firstorder.Or: expr.Or,
         firstorder.Not: expr.Not,
-        firstorder._T: expr._Zero,
-        firstorder._F: expr._One}
+        firstorder._T: lambda: expr(True),
+        firstorder._F: lambda: expr(False)}
 
     _index: int = 0
     _atoms_to_pyeda: dict[AtomicFormula, expr.Literal] = field(default_factory=dict)
@@ -78,8 +78,13 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
         dnf = self._from_pyeda(dnf_as_pyeda)
         return dnf
 
-    def _to_pyeda(self, f: AtomicFormula[α, τ, χ, σ] | And[α, τ, χ, σ] | Or[α, τ, χ, σ]) -> expr:
+    def _to_pyeda(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ] |
+                           AtomicFormula[α, τ, χ, σ] | _T | _F) -> expr:
         match f:
+            case And(args=args) | Or(args=args):
+                name = self._logic1_to_pyeda[f.op]
+                xs = (self._to_pyeda(arg) for arg in args)
+                return name(*xs, simplify=False)
             case AtomicFormula():
                 if f in self._atoms_to_pyeda:
                     return self._atoms_to_pyeda[f]
@@ -91,10 +96,8 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
                 self._atoms_to_pyeda[f] = new_exprvar
                 self._pyeda_to_atoms[new_exprvar] = f
                 return new_exprvar
-            case And(args=args) | Or(args=args):
-                name = self._logic1_to_pyeda[f.op]
-                xs = (self._to_pyeda(arg) for arg in args)
-                return name(*xs, simplify=False)
+            case _F() | _T():
+                return self._logic1_to_pyeda[type(f)]()
             case _:
                 assert False
 
