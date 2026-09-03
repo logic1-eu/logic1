@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
+import re
 from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TYPE_CHECKING, TypeVar
 from typing_extensions import TypeIs
 
@@ -771,36 +772,48 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
             case _:
                 assert False, type(self)
 
+    _LATEX_TOKEN = re.compile(r'\\(?:[A-Za-z]+|.)|.', re.DOTALL)
+
     def _repr_latex_(self) -> str:
-        """A LaTeX representation for Jupyter notebooks. In general, the
+        r"""A LaTeX representation for Jupyter notebooks. In general, the
         underlying method :meth:`as_latex` should be used instead.
 
-        Due to a current limitation of Jupyter, the LaTeX representration is
-        cut off after at most 5000 characters.
+        To remain below MathJax’s default 5 KiB TeX input buffer, the
+        representation is truncated to approximately 5000 characters.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+
+        >>> f = All(x, Ex(y, x - y == 0))
+        >>> f._repr_latex_()
+        '$\\displaystyle \\forall x \\, \\exists y \\, (x - y = 0)$'
+
+        >>> g = And(*(x == 0 for _ in range(1000)))
+        >>> latex = g._repr_latex_()
+        >>> latex == '$\\displaystyle ' + 'x = 0 \\, \\wedge \\, ' * 263 + 'x ={}\\dots$'
+        True
 
         .. seealso:: :meth:`as_latex` -- LaTeX representation
         """
         limit = 5000
-        as_latex = self.as_latex()
-        if len(as_latex) > limit:
-            as_latex = as_latex[:limit]
-            opc = 0
-            for pos in range(limit):
-                match as_latex[pos]:
-                    case '{':
-                        opc += 1
-                    case '}':
-                        opc -= 1
-            assert opc >= 0
-            while opc > 0:
-                match as_latex[-1]:
-                    case '{':
-                        opc -= 1
-                    case '}':
-                        opc += 1
-                as_latex = as_latex[:-1]
-            as_latex += '{}\\dots'
-        return f'$\\displaystyle {as_latex}$'
+        latex = self.as_latex()
+        if len(latex) <= limit:
+            return f'$\\displaystyle {latex}$'
+        cut = 0
+        open_groups: list[int] = []
+        for match in Formula._LATEX_TOKEN.finditer(latex):
+            if match.end() > limit:
+                break
+            cut = match.end()
+            token = match.group()
+            if token == '{':
+                open_groups.append(match.start())
+            elif token == '}':
+                assert open_groups
+                open_groups.pop()
+        if open_groups:
+            cut = open_groups[0]
+        return f'$\\displaystyle {latex[:cut]}{{}}\\dots$'
 
     def _repr_pretty_(self, p: RepresentationPrinter, cycle: bool) -> None:
         assert not cycle
