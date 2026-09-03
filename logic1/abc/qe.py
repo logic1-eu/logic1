@@ -90,16 +90,21 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     """Holds a subproblem for existential quantifier elimination. Theories
     implementing the interface can put restrictions on the existing fields and
     add further fields.
+
+    We define a :class:`Formula` to be in positive negation normal form (PNNF)
+    if it is either of type :class:`_T` or :class:`_F`, or is exclusively built
+    from :class:`And`, :class:`Or`, and :class:`AtomicFormula`. Informally
+    speaking, it is either a truth value or an and-or-combination of atoms.
     """
 
-    # This is used in both the sequential and the parallel code.
+    # This class is used in both the sequential and the parallel code.
 
     variables: list[χ]
     """A list of variables.
     """
 
     formula: Formula[α, τ, χ, σ]
-    """A quantifier-free formula.
+    """A :class:`Formula` in PNNF.
     """
 
     @abstractmethod
@@ -251,6 +256,10 @@ class WorkingNodeList(NodeList[ν, μ]):
         return node
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Extend the node list with multiple nodes.
+
+        For each ``node`` in ``nodes`` we know that ``node.formula`` is in PNNF.
+        """
         for node in nodes:
             match node.formula:
                 case _T():
@@ -470,6 +479,10 @@ class WorkingNodeListProxy(NodeListProxy[ν, μ]):
         return self._proxy.get_node_counter()
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Extend the node list held by the proxy with multiple nodes.
+
+        For each ``node`` in ``nodes`` we know that ``node.formula`` is in PNNF.
+        """
         new_nodes = []
         for node in nodes:
             match node.formula:
@@ -882,11 +895,19 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
 
     @abstractmethod
     def create_root_nodes(self, variables: Iterable[χ], matrix: Formula[α, τ, χ, σ]) -> list[ν]:
-        """If `matrix` is not a disjunction, create a list containing one
-        instance `node` of :data:`.ν` with ``node.variables == variables``
-        and ``node.formula == matrix``. If `matrix` is a disjunction
-        ``Or(*args)``, create a list containing one such node for each `arg` in
-        `args`.
+        """Create root nodes for the given variables and matrix.
+
+        The ``variables`` originate from corresponding existential quantifiers.
+        The ``matrix`` formula is assumed to be in PNNF.
+
+        * If ``matrix`` is of one of the types :class:`And`,
+          :class:`AtomicFormula`, :class:`_T`, :class:`_F`, then create a list
+          containing a single ``node`` of type :data:`.ν` with ``node.variables
+          == variables`` and ``node.formula == matrix``.
+        * If ``matrix`` is of type :class:`Or`, then create a list containing
+          one such ``node`` for each ``arg`` in ``matrix.args``.
+
+        Note that for each resulting ``node``, ``node.formula`` will be in PNNF.
         """
         ...
 
