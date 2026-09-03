@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import total_ordering
-from typing import ClassVar, Final, Generic, Never, Optional, Self, TypeVar
+from typing import Callable, ClassVar, Final, Generic, Never, Optional, Self
 
 from gmpy2 import mpq
 
@@ -383,6 +383,28 @@ class AST(ABC):
         except ValueError:
             return False
 
+    def is_rational(self) -> bool:
+        """Return :obj:`True` if this AST node is build from rational numbers.
+
+        >>> Rat(1).is_rational()
+        True
+        >>> Neg(Rat(1)).is_rational()
+        True
+        >>> (1 + 2 * I).is_rational()
+        False
+        """
+        def func(ast, result):
+            if isinstance(ast, Rat):
+                return True
+            if isinstance(ast, (_I, Var)):
+                return False
+            if isinstance(ast, (Add, Mul)):
+                return all(result)
+            if isinstance(ast, (Pow, Neg, Conj, Re, Im)):
+                return result[0]
+            assert False, f"Unexpected AST node type: {type(ast)}"
+        return self.accept(TraversalASTVisitor(func))
+
     def is_variable(self) -> bool:
         """Return :obj:`True` if this AST node is a variable.
 
@@ -640,7 +662,7 @@ class MonoidalOperation(AST):
         return self._args
 
     @abstractmethod
-    def __init__(self, *args: AST) -> None:
+    def __init__(self, *args: Number | AST) -> None:
         """Initialize this monoidal operation with the given arguments.
         If any of the arguments is itself a monoidal operation of the same
         type, then the argument is flattened. This abstract class is not
@@ -648,13 +670,15 @@ class MonoidalOperation(AST):
         """
         args_flat = []
         for arg in args:
+            if not isinstance(arg, AST):
+                arg = AST.from_number(arg)
             if isinstance(arg, self.__class__):
                 args_flat.extend(list(arg.args))
             else:
                 args_flat.append(arg)
         self._args = tuple(args_flat)
 
-    def __new__(cls, *args: AST):
+    def __new__(cls, *args: Number | AST):
         """Create a new instance of this monoidal operation with the
         given arguments. If no arguments are given, return the identity
         element. If only one argument is given, return that argument.
@@ -668,7 +692,10 @@ class MonoidalOperation(AST):
         if not args:
             return cls.identity
         if len(args) == 1:
-            return args[0]
+            if isinstance(args[0], AST):
+                return args[0]
+            else:
+                return AST.from_number(args[0])
         return super().__new__(cls)
 
 
@@ -685,7 +712,7 @@ class Add(MonoidalOperation):  # TODO: overwrite args just for docstring?
     """The identity element of addition, which is the rational number :math:`0`.
     """
 
-    def __init__(self, *args: AST) -> None:
+    def __init__(self, *args: Number | AST) -> None:
         """Initialize this addition node with the given arguments. If any of
         the arguments is itself an addition node, then the argument is
         flattened. If zero or one argument is given, the identity element or the
@@ -722,7 +749,7 @@ class Mul(MonoidalOperation):
     """The identity element of multiplication, which is the rational number $1$.
     """
 
-    def __init__(self, *args: AST) -> None:
+    def __init__(self, *args: Number | AST) -> None:
         """Initialize this multiplication node with the given arguments. If any
         of the arguments is itself a multiplication node, then the argument is
         flattened. If zero or one argument is given, the identity element or the
@@ -771,7 +798,7 @@ class Pow(AST):
         """
         return (self.base, self.exponent)
 
-    def __init__(self, base: AST, exponent: int) -> None:
+    def __init__(self, base: Number | AST, exponent: int) -> None:
         """Initialize this power node with the given base and exponent.
         Raise a :class:`TypeError` if the exponent is negative.
 
@@ -785,6 +812,8 @@ class Pow(AST):
         """
         if not isinstance(exponent, int) or exponent < 0:
             raise TypeError('Exponent must be a non-negative integer')
+        if not isinstance(base, AST):
+            base = AST.from_number(base)
         self.base = base
         self.exponent = exponent
 
@@ -811,10 +840,12 @@ class UnaryOperation(AST):
         return (self.arg,)
 
     @abstractmethod
-    def __init__(self, arg: AST) -> None:
+    def __init__(self, arg: Number | AST) -> None:
         """Initialize this unary operation with the given argument. This
         abstract class is not supposed to have instances itself.
         """
+        if not isinstance(arg, AST):
+            arg = AST.from_number(arg)
         self.arg = arg
 
 
@@ -826,7 +857,7 @@ class Neg(UnaryOperation):
     Neg(Var('z'))
     """
 
-    def __init__(self, arg: AST) -> None:
+    def __init__(self, arg: Number | AST) -> None:
         """Initialize this negation node with the given argument.
 
         >>> z = Var('z')
@@ -850,7 +881,7 @@ class Conj(UnaryOperation):
     Conj(Var('z'))
     """
 
-    def __init__(self, arg: AST) -> None:
+    def __init__(self, arg: Number | AST) -> None:
         """Initialize this conjugation node with the given argument.
 
         >>> z = Var('z')
@@ -873,7 +904,7 @@ class Re(UnaryOperation):
     Re(Var('z'))
     """
 
-    def __init__(self, arg: AST) -> None:
+    def __init__(self, arg: Number | AST) -> None:
         """Initialize this real part node with the given argument.
 
         >>> z = Var('z')
@@ -897,7 +928,7 @@ class Im(UnaryOperation):
     Im(Var('z'))
     """
 
-    def __init__(self, arg: AST) -> None:
+    def __init__(self, arg: Number | AST) -> None:
         """Initialize this imaginary part node with the given argument.
 
         >>> z = Var('z')
@@ -1017,7 +1048,8 @@ class ASTVisitor(ABC, Generic[α]):
           :class:`.normalize.WeakNormalizer`,
           :class:`.normalize.Normalizer`,
           :class:`.normalize.ConjugateNormalizer`
-        * :class:`.format.ReprFormatter`,
+        * :class:`.format.BaseReprFormatter`,
+          :class:`.format.TermReprFormatter`,
           :class:`.format.StrFormatter`,
           :class:`.format.LatexFormatter`
         * :class:`.qe.RCF_Evaluator`
@@ -1189,6 +1221,76 @@ class IdentityASTVisitor(ASTVisitor[AST]):
         Im(Var('x'))
         """
         return Im(im.arg.accept(self))
+
+
+class TraversalASTVisitor(ASTVisitor[α], Generic[α]):
+    """Visitor that traverses the AST and calls a given function for each node.
+    The function is called with the current AST node and a list of results from
+    visiting the children of the node. Implements the abstract class
+    :class:`.ASTVisitor`.
+
+    >>> f = lambda _, results: 1 + sum(results)
+    >>> size_visitor = TraversalASTVisitor(f)
+    >>> ast = Var('x') + 2 * I
+    >>> ast.accept(size_visitor)
+    5
+    """
+
+    def __init__(self, func: Callable[[AST, list[α]], α]) -> None:
+        """Initialize the visitor with a function that is called for each AST
+        node during the traversal.
+        """
+        self.func = func
+
+    def visit_rat(self, num: Rat) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_rat`.
+        """
+        return self.func(num, [])
+
+    def visit_i(self, i: _I) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_i`.
+        """
+        return self.func(i, [])
+
+    def visit_var(self, var: Var) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_var`.
+        """
+        return self.func(var, [])
+
+    def visit_add(self, add: Add) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_add`.
+        """
+        return self.func(add, [arg.accept(self) for arg in add.args])
+
+    def visit_mul(self, mul: Mul) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_mul`.
+        """
+        return self.func(mul, [arg.accept(self) for arg in mul.args])
+
+    def visit_pow(self, pow: Pow) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_pow`.
+        """
+        return self.func(pow, [pow.base.accept(self)])
+
+    def visit_neg(self, neg: Neg) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_neg`.
+        """
+        return self.func(neg, [neg.arg.accept(self)])
+
+    def visit_conj(self, conj: Conj) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_conj`.
+        """
+        return self.func(conj, [conj.arg.accept(self)])
+
+    def visit_re(self, re: Re) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_re`.
+        """
+        return self.func(re, [re.arg.accept(self)])
+
+    def visit_im(self, im: Im) -> α:
+        """Implements the abstract method :meth:`.ASTVisitor.visit_im`.
+        """
+        return self.func(im, [im.arg.accept(self)])
 
 
 class VariableSubstitutor(IdentityASTVisitor):

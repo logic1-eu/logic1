@@ -13,7 +13,9 @@ from logic1 import firstorder
 from logic1.firstorder.boolean import And, _F, Or, _T
 
 from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.format import TermReprFormatter
 from logic1.theories.Complex.term import Im, Re, Term, Variable
+
 
 from gmpy2 import mpq
 
@@ -47,7 +49,7 @@ class AtomicFormula(
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> (z == 0).rhs
-        0
+        Term(0)
         """
         return self.args[1]
 
@@ -140,9 +142,17 @@ class AtomicFormula(
         >>> z = VV['z']
         >>> repr(z == 0)
         'z == 0'
+        >>> repr(z - z == 0)
+        'Eq(0, 0)'
         """
         symbols = {Eq: '==', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
-        return f'{repr(self.lhs)} {symbols[self.op]} {repr(self.rhs)}'
+        formatter = TermReprFormatter(True)
+        left = self.lhs.normal_ast.accept(formatter)
+        right = self.rhs.normal_ast.accept(formatter)
+        if self.lhs.normal_ast.is_rational() and self.rhs.normal_ast.is_rational():
+            return f'{self.op.__name__}({left}, {right})'
+        else:
+            return f'{left} {symbols[self.op]} {right}'
 
     def __str__(self) -> str:
         """Return a string representation of this atomic formula. Implements the
@@ -286,9 +296,9 @@ class AtomicFormula(
         >>> from logic1.theories.Complex import *
         >>> z = VV['z']
         >>> (z == 0).real_normal_form()
-        And(1/2 * z + 1/2 * ~z == 0, -1/2 * I * z + 1/2 * I * ~z == 0)
+        And(mpq(1,2) * z + mpq(1,2) * ~z == 0, -mpq(1,2) * I * z + mpq(1,2) * I * ~z == 0)
         >>> (z != 0).real_normal_form()
-        Or(1/2 * z + 1/2 * ~z != 0, -1/2 * I * z + 1/2 * I * ~z != 0)
+        Or(mpq(1,2) * z + mpq(1,2) * ~z != 0, -mpq(1,2) * I * z + mpq(1,2) * I * ~z != 0)
         """
         lhs = self.lhs - self.rhs
         if isinstance(self, Eq):
@@ -317,7 +327,7 @@ class AtomicFormula(
         >>> (Re(z) == 0).simplify()
         z + ~z == 0
         >>> (-Re(z) > z * ~z).simplify()
-        z * ~z + 1/2 * z + 1/2 * ~z < 0
+        z * ~z + mpq(1,2) * z + mpq(1,2) * ~z < 0
         """
         lhs = self.lhs - self.rhs
         try:
