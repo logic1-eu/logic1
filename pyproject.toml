@@ -47,4 +47,7 @@ ext-modules = [
 [tool.setuptools.packages.find]
 include = ["logic1*"]
 
+[tool.setuptools.package-data]
+logic1 = ["py.typed"]
+
 [tool.setuptools_scm]
