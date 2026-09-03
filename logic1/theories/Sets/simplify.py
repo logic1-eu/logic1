@@ -79,7 +79,7 @@ class InternalRepresentation(
                     if InternalRepresentation._is_inconsistent(self._min_card, self._max_card):
                         raise InternalRepresentation.Inconsistent()
                 case C_(index=n):
-                    if n is oo:
+                    if n == oo:
                         self._max_card = None
                     elif self._max_card is None or n - 1 < self._max_card:
                         self._max_card = n - 1
@@ -112,7 +112,7 @@ class InternalRepresentation(
             L.append(C(self._min_card))
         if self._max_card is None:
             assert ref._max_card in (None, oo)
-            if ref._max_card is oo:
+            if ref._max_card == oo:
                 L.append(C_(oo))
         else:
             if ref._max_card is None or self._max_card < ref._max_card:
@@ -144,7 +144,7 @@ class InternalRepresentation(
         False
         """
         if max_card is None:
-            return min_card is oo
+            return min_card == oo
         return min_card > max_card
 
     def next_(self, remove: Optional[Variable] = None) -> Self:

@@ -206,7 +206,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
         SPACING: Final = ' '
         match self:
             case C() | C_():
-                if self.index is oo:
+                if self.index == oo:
                     return f'{SYMBOL[self.op]}(oo)'
                 return f'{SYMBOL[self.op]}({self.index})'
             case Eq() | Ne():
@@ -404,7 +404,7 @@ class C(AtomicFormula):
         self._args = (index,)
 
     def __new__(cls, index: Index):
-        if not (isinstance(index, int) and index > 0 or index == oo):
+        if not (type(index) == int and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
                              f'{index} is {type(index)}')
         if index not in cls._instances:
@@ -434,7 +434,7 @@ class C_(AtomicFormula):
         self._args = (index,)
 
     def __new__(cls, index: Index):
-        if not (isinstance(index, int) and index > 0 or index == oo):
+        if not (type(index) == int and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
                              f'{index} is {type(index)}')
         if index not in cls._instances:
