@@ -487,8 +487,10 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         :class:`Ex <.quantified.Ex>`::
 
             Ex ———— And ———— All ———— Ex ———— Ex ———— x == y + 1
+
+        A quantifier-free formula has zero alternations.
         """
-        return self._count_alternations()[0]
+        return max(0, self._count_alternations()[0])
 
     def _count_alternations(self) -> tuple[int, set[type[All | Ex]]]:
         match self:

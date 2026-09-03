@@ -40,3 +40,16 @@ def test_regression_pnf_negated_atom():
     f = Not(Eq(x, y))
     assert f.to_nnf(to_positive=False) == f
     assert f.to_pnf(is_nnf=True) == f
+
+
+def test_regression_count_alternations_quantifier_free():
+    """Regression test for :meth:`.Formula.count_alternations`.
+
+    The private implementation uses ``-1`` as a sentinel for formulas without
+    quantifiers, but the public method must report zero alternations.
+    """
+    from logic1.theories.RCF import Eq, VV
+
+    x, y = VV.get('altx', 'alty')
+    assert T.count_alternations() == 0
+    assert Eq(x, y).count_alternations() == 0
