@@ -26,7 +26,7 @@ Terms and Variables
     >>> from logic1.theories.Complex import *
     >>> z = VV['z']
     >>> Re(z + I)
-    1/2 * z + 1/2 * ~z
+    mpq(1,2) * z + mpq(1,2) * ~z
 
   .. autodata:: VV
 
@@ -77,7 +77,7 @@ Atomic Formulas
     >>> z == 1
     z == 1
     >>> Re(z) >= 0
-    1/2 * z + 1/2 * ~z >= 0
+    mpq(1,2) * z + mpq(1,2) * ~z >= 0
     >>> z > 0
     Traceback (most recent call last):
     ...

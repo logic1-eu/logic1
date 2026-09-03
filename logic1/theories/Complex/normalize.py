@@ -472,6 +472,8 @@ class WeakNormalizer(IdentityASTVisitor):
         -1
         >>> print(WeakNormalizer().visit_pow((I - I)**0))
         1
+        >>> print(WeakNormalizer().visit_pow((x**2)**3))
+        x^6
         """
         if pow.exponent == 0:
             return Rat(1)
@@ -479,7 +481,9 @@ class WeakNormalizer(IdentityASTVisitor):
         if base.is_constant():
             a, b = Pow(base, pow.exponent).eval()
             return AST.from_real_imag(a, b)
-        elif pow.exponent == 1:
+        if isinstance(base, Pow):
+            return Pow(base.base, base.exponent * pow.exponent)
+        if pow.exponent == 1:
             return base
         else:
             return Pow(base, pow.exponent)

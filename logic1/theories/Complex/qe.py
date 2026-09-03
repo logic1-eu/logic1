@@ -201,7 +201,7 @@ def real_normal_form(formula: Formula) -> Formula:
     >>> z = VV['z']
     >>> phi = Ex(z, z * ~z == 0)
     >>> real_normal_form(phi)
-    Ex(z, And(z * ~z == 0, 0 == 0))
+    Ex(z, And(z * ~z == 0, Eq(0, 0)))
     """
     if isinstance(formula, AtomicFormula):
        return formula.real_normal_form()
@@ -251,9 +251,9 @@ def _variable_to_complex(var: RCF.Variable) -> Term:
 
     >>> z_re, z_im = RCF.VV.get('z_re', 'z_im')
     >>> _variable_to_complex(z_re)
-    1/2 * z + 1/2 * ~z
+    mpq(1,2) * z + mpq(1,2) * ~z
     >>> _variable_to_complex(z_im)
-    -1/2 * I * z + 1/2 * I * ~z
+    -mpq(1,2) * I * z + mpq(1,2) * I * ~z
     """
     name = str(var)  # TODO: implement .name
     if name.endswith('_re'):
@@ -291,7 +291,7 @@ def formula_to_complex(formula: RCF.Formula) -> Formula:
     >>> z_re, z_im = RCF.VV.get('z_re', 'z_im')
     >>> phi = And(z_im**2 + z_re**2 == 0, 2*z_im*z_re == 0)
     >>> formula_to_complex(phi)
-    And(z * ~z == 0, -1/2 * I * z**2 + 1/2 * I * (~z)**2 == 0)
+    And(z * ~z == 0, -mpq(1,2) * I * z**2 + mpq(1,2) * I * (~z)**2 == 0)
     """
     OPS: dict[type[RCF.AtomicFormula], type[AtomicFormula]] = {
         RCF.Eq: Eq, RCF.Ne: Ne, RCF.Ge: Ge, RCF.Gt: Gt, RCF.Le: Le, RCF.Lt: Lt}

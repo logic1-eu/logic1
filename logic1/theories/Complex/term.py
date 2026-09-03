@@ -15,7 +15,7 @@ from logic1 import firstorder
 
 from logic1.theories.Complex.types import Number, RationalNumber, τ
 from logic1.theories.Complex import ast
-from logic1.theories.Complex.format import ReprFormatter, StrFormatter
+from logic1.theories.Complex.format import StrFormatter, TermReprFormatter
 from logic1.theories.Complex.normalize import cartesian_normal_form, conjugate_normal_form
 
 
@@ -199,7 +199,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     >>> (z + I) ** 2
     z**2 + 2 * I * z - 1
     >>> Re(z)
-    1/2 * z + 1/2 * ~z
+    mpq(1,2) * z + mpq(1,2) * ~z
 
     .. seealso::
         :class:`Variable`, :data:`VV`, :func:`Re`, :func:`Im`, :func:`Conj`,
@@ -238,9 +238,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """Initialize a term from a number.
 
         >>> Term(2)
-        2
+        Term(2)
         >>> Term(1.5)
-        3/2
+        Term(mpq(3,2))
         >>> Term(1 + 2j)
         1 + 2 * I
         """
@@ -392,7 +392,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         a :class:`TypeError` if the exponent is negative.
 
         >>> I ** 2
-        -1
+        -Term(1)
         """
         return Term._from_ast(self.normal_ast ** other)
 
@@ -416,7 +416,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         >>> repr(z ** 2 + I)
         'z**2 + I'
         """
-        return self.normal_ast.accept(ReprFormatter())
+        return self.normal_ast.accept(TermReprFormatter())
 
     def __rmul__(self, other: Number | Term) -> Term:
         """Multiply a number by this term. All other cases are handled by
@@ -482,7 +482,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
         >>> z = VV['z']
         >>> z / 2
-        1/2 * z
+        mpq(1,2) * z
         >>> z / z
         Traceback (most recent call last):
         ...
@@ -564,7 +564,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         registered in the global variable set :data:`VV`.
 
         >>> Term._from_ast(ast.Var('z') + ast.Rat(mpq(1, 2)))
-        z + 1/2
+        z + mpq(1,2)
         """
         term = cls.__new__(cls)
         term._ast = cls._normalizer(ast)
@@ -584,10 +584,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """Return the imaginary part of this term.
 
         >>> (2 * I).imaginary_part()
-        2
+        Term(2)
         >>> z = VV['z']
         >>> (z + 2).imaginary_part()
-        -1/2 * I * z + 1/2 * I * ~z
+        -mpq(1,2) * I * z + mpq(1,2) * I * ~z
 
         .. seealso:: :func:`.Im`
         """
@@ -596,8 +596,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
 
-        >>> x = VV['x']
-        >>> (x + 2).is_constant()
+        >>> z = VV['z']
+        >>> (z + 2).is_constant()
         False
         >>> (2 * I).is_constant()
         True
@@ -616,14 +616,25 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """
         return self.real_part().is_zero()
 
+    def is_rational(self) -> bool:
+        """Return :obj:`True` if this term is a rational number.
+
+        >>> Term(1).is_rational()
+        True
+        >>> z = VV['z']
+        >>> z.is_rational()
+        False
+        """
+        return self.is_constant() and self.is_real()
+
     def is_real(self) -> bool:
         """Return :obj:`True` if this term is real, i.e., its imaginary
         part is zero.
 
-        >>> x = VV['x']
-        >>> (x + 2).is_real()
+        >>> z = VV['z']
+        >>> (z + 2).is_real()
         False
-        >>> (x + x.conjugate()).is_real()
+        >>> (z + z.conjugate()).is_real()
         True
         """
         return self.imaginary_part().is_zero()
@@ -631,10 +642,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def is_variable(self) -> bool:
         """Return :obj:`True` if this term is a variable.
 
-        >>> x = VV['x']
-        >>> (x + 2).is_variable()
+        >>> z = VV['z']
+        >>> (z + 2).is_variable()
         False
-        >>> x.is_variable()
+        >>> z.is_variable()
         True
         >>> I.is_variable()
         False
@@ -644,10 +655,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
     def is_zero(self) -> bool:
         """Return :obj:`True` if this term is zero.
 
-        >>> x = VV['x']
-        >>> (x + 2).is_zero()
+        >>> z = VV['z']
+        >>> (z + 2).is_zero()
         False
-        >>> (x - x).is_zero()
+        >>> (z - z).is_zero()
         True
         """
         return self.normal_ast.is_zero()
@@ -657,9 +668,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
         >>> z = VV['z']
         >>> (3 * z - 2).lc()
-        3
+        Term(3)
         >>> (-z * ~z).lc()
-        -1
+        -Term(1)
         """
         if self.is_constant():
             return self
@@ -678,10 +689,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
         """Return the real part of this term.
 
         >>> (2 * I).real_part()
-        0
+        Term(0)
         >>> z = VV['z']
         >>> z.real_part()
-        1/2 * z + 1/2 * ~z
+        mpq(1,2) * z + mpq(1,2) * ~z
 
         .. seealso:: :func:`.Re`
         """
@@ -738,7 +749,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
         >>> a, b = VV.get('a', 'b')
         >>> (a ** 2).subs({a: I})
-        -1
+        -Term(1)
         >>> (a + b).subs({a: 1, b: a})
         a + 1
         """
@@ -759,7 +770,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey]):
 
         >>> z = VV['z']
         >>> list((z**2 + 2 * z + 1)._summands())
-        [({z: 2}, 1), ({z: 1}, 2), ({}, 1)]
+        [({z: 2}, Term(1)), ({z: 1}, Term(2)), ({}, Term(1))]
         """
         constant = Term(0)
         products = self.normal_ast.args if isinstance(self.normal_ast, ast.Add) else [self.normal_ast]
@@ -851,35 +862,39 @@ I: Final[Term] = Term(1j)
 """The imaginary unit.
 
 >>> I**2
--1
+-Term(1)
 """
 
 
-def Re(term: Term) -> Term:
+def Re(term: Number | Term) -> Term:
     """Return the real part of a term.
 
     >>> Re(2 * I)
-    0
+    Term(0)
     >>> z = VV['z']
     >>> Re(z)
-    1/2 * z + 1/2 * ~z
+    mpq(1,2) * z + mpq(1,2) * ~z
     """
+    if not isinstance(term, Term):
+        term = Term(term)
     return term.real_part()
 
 
-def Im(term: Term) -> Term:
+def Im(term: Number | Term) -> Term:
     """Return the imaginary part of a term.
 
     >>> Im(2 * I)
-    2
+    Term(2)
     >>> z = VV['z']
     >>> Im(z)
-    -1/2 * I * z + 1/2 * I * ~z
+    -mpq(1,2) * I * z + mpq(1,2) * I * ~z
     """
+    if not isinstance(term, Term):
+        term = Term(term)
     return term.imaginary_part()
 
 
-def Conj(term: Term) -> Term:
+def Conj(term: Number | Term) -> Term:
     """Return the complex conjugate of a term.
 
     >>> z = VV['z']
@@ -888,6 +903,8 @@ def Conj(term: Term) -> Term:
     >>> Conj(2 * I)
     -2 * I
     """
+    if not isinstance(term, Term):
+        term = Term(term)
     return term.conjugate()
 
 
