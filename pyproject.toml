@@ -18,8 +18,10 @@ maintainers = [
 readme = "README.md"
 dependencies = [
   "gmpy2",
-  "more-itertools",
+  "networkx",
   "pyeda",
+  "sagemath",
+  "typing-extensions",
 ]
 requires-python = ">=3.12"
 classifiers = [
@@ -28,6 +30,11 @@ classifiers = [
   "Topic :: Scientific/Engineering",
   "Programming Language :: Python :: 3",
   "Typing :: Typed"
+]
+
+[project.optional-dependencies]
+flint = [
+  "python-flint",
 ]
 
 [build-system]
