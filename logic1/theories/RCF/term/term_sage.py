@@ -62,35 +62,76 @@ def init_env_arg() -> list[str]:
 
 
 class _PolynomialRing:
+    """A wrapper around a Sage Singular polynomial ring.
+    """
 
     sage_ring: MPolynomialRing
-    stack: list[MPolynomialRing]
+    """Underlying Sage polynomial ring. The variable names are sorted according
+    to the sort key :meth:`sort_key`
+    """
 
-    def __call__(self, obj):
+    stack: list[MPolynomialRing]
+    """Stack of Sage polynomial rings, used for push/pop operations.
+    """
+
+    def __call__(self, obj: object) -> MPolynomial[Rational]:
+        """Cast the given object to a Sage polynomial in the underlying
+        polynomial ring.
+        """
         return self.sage_ring(obj)
 
-    def __init__(self, term_order='deglex'):
-        self.sage_ring = self.MPolynomialRing_factory('unused_', order=term_order)
-        self.stack = []
+    def __init__(self, vars_: Iterable[str] = (), term_order: str = 'deglex') -> None:
+        """Construct a polynomial ring with the given variables and term order.
 
-    def __repr__(self):
+        >>> R = _PolynomialRing(['x', 'y'], term_order='lex')
+        >>> R
+        MPolynomialRing(['x', 'y'], order='lex')
+        """
+        self.sage_ring = self.MPolynomialRing_factory('unused_', order=TermOrder(term_order))
+        self.stack = []
+        self.add_vars(vars_)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the polynomial ring.
+
+        >>> R = _PolynomialRing()
+        >>> R
+        MPolynomialRing([], order='deglex')
+        """
+        names = [str(g) for g in self.get_vars()]
+        order = self.sage_ring.term_order().name()
+        return f'MPolynomialRing({names}, order=\'{order}\')'
+
+    def __str__(self) -> str:
+        """Return a string representation of the underlying Sage polynomial
+        ring.
+        """
         return str(self.sage_ring)
 
     def add_var(self, var: str) -> None:
+        """Add a single variable to the polynomial ring. The new variable is
+        sorted according to the sort key :meth:`sort_key`.
+
+        >>> R = _PolynomialRing()
+        >>> R.add_var('a'); R.add_var('c'); R.add_var('b')
+        >>> R
+        MPolynomialRing(['a', 'b', 'c'], order='deglex')
+        """
         new_vars = [str(g) for g in self.sage_ring.gens()]
         assert var not in new_vars
         new_vars.append(var)
-        new_vars.sort()
+        new_vars.sort(key=_PolynomialRing.sort_key)
         self.sage_ring = self.MPolynomialRing_factory(new_vars, order=self.sage_ring.term_order())
 
     def add_vars(self, vars_: Iterable[str]) -> None:
+        """Add variables to the polynomial ring. The new variables are sorted
+        according to the sort key :meth:`sort_key`.
 
-        def sort_key(s: str) -> tuple[str, int]:
-            base = s.rstrip('0123456789')
-            index = s[len(base):]
-            n = int(index) if index else -1
-            return base, n
-
+        >>> R = _PolynomialRing()
+        >>> R.add_vars(['a', 'c', 'b'])
+        >>> R
+        MPolynomialRing(['a', 'b', 'c'], order='deglex')
+        """
         new_vars = []
         for g in self.sage_ring.gens():
             new_vars.append(str(g))
@@ -100,16 +141,25 @@ class _PolynomialRing:
                 new_vars.append(v)
                 have_appended = True
         if have_appended:
-            new_vars.sort(key=sort_key)
+            new_vars.sort(key=_PolynomialRing.sort_key)
             self.sage_ring = self.MPolynomialRing_factory(
                 new_vars, order=self.sage_ring.term_order())
 
     def get_vars(self) -> tuple[MPolynomial[Integer], ...]:
+        """Return the variables of the polynomial ring.
+
+        >>> R = _PolynomialRing()
+        >>> R.add_vars(['a', 'b', 'c'])
+        >>> list(R.get_vars())
+        [a, b, c]
+        """
         gens = (g for g in self.sage_ring.gens() if str(g) != 'unused_')
         return tuple(gens)
 
     @staticmethod
     def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
+        """Construct a Sage Singular polynomial ring with the given variable names and term order.
+        """
         return sage_PolynomialRing(QQ, names, order=order, implementation='singular')
 
     def pop(self) -> None:
@@ -119,8 +169,26 @@ class _PolynomialRing:
         self.stack.append(self.sage_ring)
         self.sage_ring = self.MPolynomialRing_factory('unused_', order=self.sage_ring.term_order())
 
+    @staticmethod
+    def sort_key(s: str) -> tuple[str, int]:
+        """Sort key for variable names. The sort order is lexicographic, except
+        that variables with the same name are ordered by their numeric suffix.
+
+        >>> _PolynomialRing.sort_key('x')
+        ('x', -1)
+        >>> _PolynomialRing.sort_key('x1')
+        ('x', 1)
+        """
+        base = s.rstrip('0123456789')
+        index = s[len(base):]
+        n = int(index) if index else -1
+        return base, n
+
 
 polynomial_ring = _PolynomialRing()
+"""
+Global polynomial ring which is used in :class:`VariableSet`.
+"""
 
 
 class VariableSet(firstorder.VariableSet['Variable']):
@@ -162,7 +230,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
         match index:
             case str():
                 self.polynomial_ring.add_vars((index,))
-                return Variable(self.polynomial_ring(index))
+                return Variable._from_sage(self.polynomial_ring(index))
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
@@ -190,7 +258,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
             i += 1
             v = f'G{i:04d}{suffix}'
         self.polynomial_ring.add_var(v)
-        return Variable(self.polynomial_ring(v))
+        return Variable._from_sage(self.polynomial_ring(v))
 
     def pop(self) -> None:
         from . import cache_clear
@@ -772,7 +840,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         if not self.is_variable():
             raise ValueError(f'{self} is not a variable')
-        return Variable(self.poly)
+        return Variable._from_sage(self.poly)
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified
@@ -897,6 +965,13 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             D[Term(poly)] = multiplicity
         return unit, D
 
+    @classmethod
+    def _from_sage(cls, value: Rational | MPolynomial[Rational] | UPolynomial) -> Self:
+        term = cls.__new__(cls)
+        term._poly = cls.polynomial_ring(value)
+        term._hash = None
+        return term
+
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant from a mathematical
         perspective.
@@ -952,7 +1027,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
                     # variable yields the neutral element of DEFINITE.mul().
                     ge_result = DEFINITE.POSITIVE
                 else:
-                    ge_result = assume.get(Variable(g), DEFINITE.UNKNOWN)
+                    ge_result = assume.get(Variable._from_sage(g), DEFINITE.UNKNOWN)
                     if e % 2 == 0:
                         ge_result = DEFINITE.square(ge_result)
                 term_result = DEFINITE.mul(term_result, ge_result)
@@ -1177,6 +1252,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         sage_keywords: dict[str, MPolynomial[Rational] | int | mpq] = dict()
         for variable, substitute in d.items():
+            if not isinstance(variable, Variable):
+                variable = Variable._from_sage(variable)
             if not isinstance(substitute, Term):
                 substitute = Term(substitute)
             sage_keywords[str(variable.poly)] = substitute.poly
@@ -1225,7 +1302,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             result = dict()
             for i, exponent in enumerate(etuple):
                 if exponent:
-                    result[Variable(gens[i])] = int(exponent)
+                    result[Variable._from_sage(gens[i])] = int(exponent)
             yield result, mpq(coefficient)
 
     def vars(self) -> Iterator[Variable]:
@@ -1237,12 +1314,15 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.variables>`
         """
         for g in self.poly.variables():
-            yield Variable(g)
+            yield Variable._from_sage(g)
 
-# discuss: Variable inherits __init__, and we can create Variable(3), Variable(term.poly), etc.
+
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
     VV: ClassVar[VariableSet] = VV
+
+    def __init__(self, arg: object) -> None:
+        raise NotImplementedError("Use the global variable set VV to create variables.")
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
