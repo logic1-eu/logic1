@@ -53,3 +53,12 @@ def test_regression_count_alternations_quantifier_free():
     x, y = VV.get('altx', 'alty')
     assert T.count_alternations() == 0
     assert Eq(x, y).count_alternations() == 0
+
+
+def test_regression_subs_irrelevant_substitution():
+    """Irrelevant substitutions must not alpha-rename quantified variables."""
+    from logic1.theories.RCF import Eq, VV
+
+    x, y, z = VV.get('subsx', 'subsy', 'subsz')
+    f = Ex(x, Eq(x, y))
+    assert f.subs({z: x}) is f

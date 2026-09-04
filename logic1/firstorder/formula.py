@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 import functools
 import re
-from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TYPE_CHECKING, TypeVar
+from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TYPE_CHECKING, TypeVar, cast
 from typing_extensions import TypeIs
 
 from logic1.support.tracing import trace
@@ -961,47 +961,33 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         Ex(x, a - x == 0)
         >>> f.subs({a: x})
         Ex(G0001_x, -G0001_x + x == 0)
-        >>> g = Ex(x, _ & (b == 0))
+        >>> g = Ex(x, And(_, b == 0))
         >>> g.subs({b: x})
         Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
         """
         if Formula.is_quantified_formula(self):
-            # A copy of the mutable could be avoided by keeping track of
-            # the changes and undoing them at the end.
             substitution = substitution.copy()
-            # (1) Remove substitution for the quantified variable. In
-            # principle, this is covered by (2) below, but deleting here
-            # preserves the name.
-            if self.var in substitution:
-                del substitution[self.var]
-            # Collect all variables on the right hand sides of
-            # substitutions:
+            fvars = set(self.fvars())
+            for var in list(substitution):
+                if var not in fvars:
+                    del substitution[var]
+            if not substitution:
+                return cast(Self, self)
             substituted_vars: set[Variable] = set()
-            for term in substitution.values():
-                if self.is_term(term):
-                    substituted_vars.update(tuple(term.vars()))
-            # (2) Make sure the quantified variable is not a key and does
-            # not occur in a value of substitution:
-            if self.var in substituted_vars or self.var in substitution:
+            for value in substitution.values():
+                if self.is_term(value):
+                    substituted_vars.update(value.vars())
+            if self.var in substituted_vars:
                 var = self.var.fresh()
-                # We now know the following:
-                #   (i) var is not a key,
-                #  (ii) var does not occur in the values,
-                # (iii) self.var is not a key.
-                # We do *not* know whether self.var occurs in the values.
                 substitution[self.var] = var
-                # All free occurrences of self.var in self.arg will be
-                # renamed to var. In case of (iv) above, substitution will
-                # introduce new free occurrences of self.var, which do not
-                # clash with the new quantified variable var:
-                return self.op(var, self.arg.subs(substitution))  # type: ignore[return-value]
-            return self.op(self.var, self.arg.subs(substitution))  # type: ignore[return-value]
+            else:
+                var = self.var
+            return cast(Self, self.op(var, self.arg.subs(substitution)))
         elif Formula.is_boolean_formula(self):
-            return_value = self.op(*(arg.subs(substitution) for arg in self.args))
-            return return_value  # type: ignore[return-value]
+            return cast(Self, self.op(*(arg.subs(substitution) for arg in self.args)))
         else:
-            # Atomic formulas are caught by the implementation of the
-            # abstract method AtomicFormula.subs.
+            # Atomic formulas are caught by the implementation of the abstract
+            # method AtomicFormula.subs.
             assert False, type(self)
 
     def to_nnf(self, to_positive: bool = True, _not: bool = False) -> Formula[α, τ, χ, σ]:
