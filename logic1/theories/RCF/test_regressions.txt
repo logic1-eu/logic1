@@ -55,3 +55,15 @@ T
 >>> bad = And(d_im**4 - 6*d_im**2*d_re**2 + d_re**4 - 1 == 0, Or(d_re - 1 != 0, d_im >= 0), Or(d_re == 0, d_im - d_re == 0, d_im == 0, d_im + d_re == 0), Or(2*d_re - 1 != 0, d_im == 0, 2*d_im - 1 == 0, 2*d_im + 1 == 0), Or(And(d_re - 1 != 0, d_im != 0), And(Or(d_re - 1 == 0, d_re + 1 == 0), Or(d_re - 1 == 0, d_im == 0))), Or(And(d_im != 0, d_im**2 - d_re**2 + d_re != 0), And(4*d_im**2*d_re**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0))), Or(And(d_im != 0, Or(d_re - 1 != 0, d_im > 0)), And(d_im**4 - 2*d_im**2*d_re**2 + d_re**4 - d_im**2 - 1 == 0, Or(d_im == 0, d_im**2 - d_re**2 + d_re == 0))), Or(And(d_im != 0, Or(d_re - 1 != 0, d_im > 0)), And(Or(d_re == 0, d_im == 0), Or(2*d_re - 1 == 0, 2*d_re + 1 == 0, d_im == 0))), Or(And(d_im**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0)), And(Or(d_re - 1 != 0, d_im > 0), Or(d_im**2 - d_re**2 + 1 != 0, And(d_re != 0, d_im != 0)))), Or(And(d_im**2 - d_re**2 + 1 == 0, Or(d_re == 0, d_im == 0)), And(Or(d_im**2 - d_re**2 + 1 != 0, And(d_re != 0, d_im != 0)), Or(d_im**2 - d_re**2 + d_re != 0, And(2*d_re - 1 != 0, d_im != 0)))))
 >>> dnf(bad)
 Or(And(d_re - 1 == 0, d_im == 0), And(d_re == 0, d_im != 0, d_im**4 - 1 == 0), And(d_re == 0, d_im > 0, d_im**4 - 1 == 0), And(d_re + 1 == 0, d_im == 0))
+
+# Sage represents constant factorizations using scalar units and factors, while
+# Term.factor() expects polynomial units and factors.
+>>> from gmpy2 import mpq
+>>> Term(2).factor()
+(mpq(2,1), {})
+>>> Term(-2).factor()
+(mpq(-2,1), {})
+>>> Term(mpq(3, 4)).factor()
+(mpq(3,4), {})
+>>> Term(0).factor()
+(mpq(0,1), {})

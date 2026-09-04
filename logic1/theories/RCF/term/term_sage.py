@@ -953,6 +953,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             :external:meth:`MPolynomial_libsingular.factor()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.factor>`
         """
+        if self.is_constant():
+            return self.constant_coefficient(), {}
         F = self.poly.factor()
         assert F.unit().is_constant()
         unit = mpq(F.unit().constant_coefficient())
