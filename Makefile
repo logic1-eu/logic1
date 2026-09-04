@@ -12,20 +12,17 @@ CYTHON_SOS     := $(addsuffix $(EXT_SUFFIX), $(CYTHON_BASES))
 
 GOALS := $(if $(MAKECMDGOALS), $(MAKECMDGOALS), $(.DEFAULT_GOAL))
 
-POLYLIB_TARGETS := mypy-run pytest-run
+POLYLIB_TARGETS := mypy-run
 
 ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   POLYLIB := $(shell PYTHONPATH=. python -c 'from logic1.theories.RCF.term import POLYLIB; print(POLYLIB)')
   $(info Determined POLYLIB == $(BOLD)"$(POLYLIB)"$(RESET) via Python import)
 
   ifeq ($(POLYLIB), FLINT)
-    ign_other_backend := --ignore=logic1/theories/RCF/term/term_sage.py
     exclude_re := logic1/theories/RCF/term/term_sage\.py
 
   else ifeq ($(POLYLIB), SAGE)
-    ign_other_backend := --ignore=logic1/theories/RCF/term/term_flint.py \
-                         --ignore=logic1/theories/RCF/test_term_flint.txt
-    exclude_re := logic1/theories/RCF/term/term_flint\.py|logic1/theories/RCF/test_term_flint\.txt
+    exclude_re := logic1/theories/RCF/term/term_flint\.py
 
   else
     $(error Could not determine valid POLYLIB)
@@ -42,7 +39,8 @@ ign_slow         := --ignore=logic1/theories/RCF/test_simplify_motor.txt \
                     --ignore=logic1/theories/RCF/test_qe.txt
 ign_redlog_motor := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 
-ignores := $(ign_other_backend) $(ign_redlog_motor)
+ignores := $(ign_redlog_motor)
+PYTEST := pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules
 
 reduce := $(shell echo "quit;" | redcsl -w &>/dev/null; echo $$?)
 
@@ -53,14 +51,15 @@ else
   ignores += $(ign_redlog)
 endif
 
-.PHONY: cython cython-clean cython-html \
-        pytest pytest-run pytest-fast pytest-seq pytest-full pytest-full-seq \
-        test-doc mypy mypy-run mypy_noinc test test-all doc pygount \
-        coverage coverage_html clean veryclean conda-build
+.PHONY: cython cython-clean cython-veryclean \
+        pytest mypy mypy-run \
+        test test-all test-doc \
+        doc pygount coverage coverage_html \
+        clean veryclean conda-build
 
 test: cython
 	$(MAKE) mypy-run
-	$(MAKE) pytest-run
+	$(PYTEST) $(ignores)
 
 test-all: test test-doc
 
@@ -73,10 +72,7 @@ mypy-run:
 	mypy --exclude '$(exclude_re)' logic1
 
 pytest: cython
-	$(MAKE) pytest-run
-
-pytest-run:
-	pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules $(ignores)
+	$(PYTEST) $(ignores)
 
 test-doc:
 	cd doc && make test
@@ -105,8 +101,11 @@ coverage_html: coverage
 	coverage html
 	open htmlcov/index.html
 
-veryclean:
-	/bin/rm -r htmlcov .coverage
+clean:
+	/bin/rm -rf build dist logic1.egg-info
+
+veryclean: clean cython-veryclean
+	/bin/rm -rf htmlcov .coverage
 
 conda-build:
 	LOGIC1_GIT_REPO="file:$$(pwd)" \
