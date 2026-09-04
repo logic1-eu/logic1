@@ -15,13 +15,14 @@ class NoTraceException(Exception):
 
 
 def handler(exc: NoTraceException, tb: Optional[TracebackType]):
-    print(f'{exc.args[0]}', file=sys.stderr, flush=True)
+    print(f'{exc.args}', file=sys.stderr, flush=True)
     # sys.stderr.write(f{err_type.__name__}: {err}\n")
 
 
 # Python shell
 
-def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[TracebackType]):
+def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[TracebackType],
+               sys_excepthook: Any = sys.excepthook):
     if isinstance(exc, NoTraceException):
         handler(exc, tb)
     else:
@@ -30,7 +31,6 @@ def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[T
 
 # To be executed at import:
 
-sys_excepthook = sys.excepthook
 sys.excepthook = excepthook
 
 
@@ -49,7 +49,7 @@ def ipy_custom_exec(ipy: Any, exc_type: type[NoTraceException],
 # By contrast, `sys.modules.get('IPython')` returns the module only if it has
 # been loaded *before*, which commonly is the case when running in the context
 # of IPython or Jupyter.
-# 
+#
 # Caveat: If IPython is loaded *after* Logic1, then the custom exception handler
 # will not be registered.
 ipy_module = sys.modules.get('IPython')
