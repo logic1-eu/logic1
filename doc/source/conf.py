@@ -1,5 +1,26 @@
 # mypy: ignore_errors
 
+import html
+import os
+import subprocess
+import setuptools_scm
+
+def subprocess_output(*args: str) -> str | None:
+    """Return text output from a subprocess, or ``None``."""
+    try:
+        return subprocess.run(
+            args,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+git_commit = subprocess_output('git', 'rev-parse', '--short=10', 'HEAD')
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
@@ -9,10 +30,11 @@
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Logic1'
+repository_url = 'https://github.com/logic1-eu/logic1'
 copyright = '2023-%Y, N. Faroß and T. Sturm'
 author = '<a href="https://www.chalmers.se/en/persons/faross/">N. Faroß</a>, <a href="https://science.thomas-sturm.de/">T. Sturm</a>'
-release = '0.1'
-version = '0.1'
+version = setuptools_scm.get_version(root='../..', relative_to=__file__)
+release = version
 
 # General configuration
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
@@ -41,7 +63,11 @@ autodoc_default_options = {
 
 autodoc_type_aliases = {}
 
-# _extra_footer = ''
+extra_footer = (
+    None if version is None else 
+        f'Corresponds to version <code>{html.escape(version)}</code>.' if git_commit is None else
+            f'Corresponds to version <a href="{repository_url}/tree/{git_commit}"><code>{html.escape(version)}</code></a>.'
+)
 
 intersphinx_mapping = {
     'gmpy2': ('https://gmpy2.readthedocs.io/en/latest/', None),
@@ -93,9 +119,10 @@ html_theme = 'sphinx_book_theme'
 
 html_theme_options = {
     'collapse_navbar': False,
+    'extra_footer': extra_footer,
     'home_page_in_toc': True,
     'max_navbar_depth': 12,
-    'repository_url': 'https://github.com/logic1-eu/logic1',
+    'repository_url': repository_url,
     'show_navbar_depth': 12,  # default is 1
     'show_toc_level': 1,  # default is 1
     'use_repository_button': True
