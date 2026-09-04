@@ -1026,4 +1026,11 @@ class Term:
     ...
     ValueError: Derivative order must be non-negative
 
+    A zeroth derivative returned zero when the variable was absent from the
+    polynomial context:
+    >>> Term(5).derivative(x, 0)
+    5
+    >>> (x - x + 5).derivative(x, 0)
+    5
+
     """

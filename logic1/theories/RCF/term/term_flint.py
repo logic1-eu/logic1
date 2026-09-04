@@ -1105,6 +1105,8 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         if n < 0:
             raise ValueError("Derivative order must be non-negative")
+        if n == 0:
+            return self
         poly = self._poly
         names = poly.context().names()
         x_name = str(x._poly)
