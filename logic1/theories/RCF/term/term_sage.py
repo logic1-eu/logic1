@@ -25,6 +25,7 @@ from sage.rings.polynomial.term_order import TermOrder
 from sage.rings.rational import Rational
 
 from logic1 import firstorder
+from logic1.theories.RCF.types import Number, _NUMBER_TYPES
 from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
 
 from logic1.support.tracing import trace  # noqa
@@ -564,7 +565,8 @@ class SortKey(Generic[τ]):
         return self.term._poly != other.term._poly
 
 
-class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
+
+class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
 
     polynomial_ring: ClassVar[_PolynomialRing] = polynomial_ring
 
@@ -593,14 +595,12 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             self._poly = self.polynomial_ring(self._poly)
         return self._poly
 
-    def __add__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly + other.poly)
-        if isinstance(other, (mpq, float)):
-            return Term(self.poly + Rational(other))
-        return Term(self.poly + other)
+    def __add__(self, other: Number | Term) -> Term:
+        if not isinstance(other, Term):
+            other = Term(other)
+        return Term._from_sage(self.poly + other.poly)
 
-    def __eq__(self, other: Term | int) -> Eq:  # type: ignore[override]
+    def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
         # it makes no sense to compare terms with general objects. We have
         # Eq.__bool__, which supports some comparisons in Boolean contexts.
@@ -611,13 +611,13 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             lhs = -lhs
         return Eq(lhs, 0)
 
-    def __ge__(self, other: Term | int) -> Ge | Le:
+    def __ge__(self, other: Number | Term) -> Ge | Le:
         lhs = self - other
         if lhs.lc() < 0:
             return Le(-lhs, 0)
         return Ge(lhs, 0)
 
-    def __gt__(self, other: Term | int) -> Gt | Lt:
+    def __gt__(self, other: Number | Term) -> Gt | Lt:
         lhs = self - other
         if lhs.lc() < 0:
             return Lt(-lhs, 0)
@@ -636,25 +636,18 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         self._poly = state["_poly"]
         self._hash = None
 
-    def __init__(self, arg: float | int | Fraction | mpq |
-                       Integer | Rational | MPolynomial[Rational] | UPolynomial) -> None:
-        """Construct a :class:`Term` from :class:`.float`, :class:`.int`,
-        :class:`Fraction <fractions.Fraction>`, or :class:`mpq <gmpy2.mpq>`.
-        Arguments of the following types are private and should not be used outside of this module:
-        :class:`Integer <.sage.rings.integer.Integer>`,
-        :class:`Rational <.sage.rings.rational.Rational>`,
-        :class:`MPolynomial[Rational] <.sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular>`,
-        :class:`UPolynomial <.sage.rings.polynomial.polynomial_element.Polynomial_generic_dense>`.
+    def __init__(self, arg: Number) -> None:
+        """Construct a :class:`Term` from a number.
 
         >>> from logic1.theories.RCF import Term
-        >>> Term(0.1 + 0.2)
-        415716888680356/1385722962267853
-        >>> Term(42)
-        42
-        >>> Term(Fraction(1, 42))
-        1/42
-        >>> Term(mpq(1, 42))
-        1/42
+        >>> Term(2)
+        2
+        >>> Term(0.5)
+        1/2
+        >>> Term(Fraction(1, 2))
+        1/2
+        >>> Term(mpq(1, 2))
+        1/2
 
         .. attention::
             Python division of integers yields a float, which can cause
@@ -671,12 +664,9 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             3/10
 
         """
-        if isinstance(arg, MPolynomial):
-            self._poly = arg
-        elif isinstance(arg, (float | Fraction, int, Integer, mpq, Rational, UPolynomial)):
-            self._poly = self.polynomial_ring(arg)
-        else:
-            raise ValueError(f'expected polynomial, integer, or rational; {arg} is {type(arg)}')
+        if not isinstance(arg, _NUMBER_TYPES):
+            raise ValueError(f'expected a number type; {arg} is {type(arg)}')
+        self._poly = self.polynomial_ring(arg)
         self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
@@ -691,7 +681,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
          (mpq(4,1), y), (mpq(4,1), 1)]
         """
         for coefficient, power_product in self.poly:
-            yield mpq(coefficient), Term(power_product)
+            yield mpq(coefficient), Term._from_sage(power_product)
 
     def __le__(self, other: Term | int | mpq) -> Ge | Le:
         lhs = self - other
@@ -705,46 +695,42 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             return Gt(-lhs, 0)
         return Lt(lhs, 0)
 
-    def __mul__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly * other.poly)
-        if isinstance(other, (mpq, float)):
-            return Term(self.poly * Rational(other))
-        return Term(self.poly * other)
+    def __mul__(self, other: Number | Term) -> Term:
+        if not isinstance(other, Term):
+            other = Term(other)
+        return Term._from_sage(self.poly * other.poly)
 
-    def __ne__(  # type: ignore[override]
-            self, other: Term | int | mpq) -> Ne:
+    def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
         lhs = self - other
         if lhs.lc() < 0:
             lhs = -lhs
-        return Ne(lhs, Term(0))
+        return Ne(lhs, 0)
 
     def __neg__(self) -> Term:
-        return Term(-self.poly)
+        return Term._from_sage(-self.poly)
 
-    def __pow__(self, other: object) -> Term:
-        return Term(self.poly ** other)
+    def __pow__(self, n: int) -> Term:
+        if n < 0:
+            raise ValueError(f'negative exponent {n} not supported')
+        return Term._from_sage(self.poly ** n)
 
-    def __radd__(self, other: object) -> Term:
-        assert not isinstance(object, Term)
-        if isinstance(other, (mpq, float)):
-            return Term(Rational(other) + self.poly)
-        return Term(other + self.poly)
+    def __radd__(self, other: Number | Term) -> Term:
+        assert not isinstance(other, Term)
+        other = Term(other)
+        return Term._from_sage(other.poly + self.poly)
 
     def __repr__(self) -> str:
         return repr(self.poly).replace('^', '**')
 
-    def __rmul__(self, other: object) -> Term:
-        assert not isinstance(object, Term)
-        if isinstance(other, (mpq, float)):
-            return Term(Rational(other) * self.poly)
-        return Term(other * self.poly)
+    def __rmul__(self, other: Number | Term) -> Term:
+        assert not isinstance(other, Term)
+        other = Term(other)
+        return Term._from_sage(other.poly * self.poly)
 
-    def __rsub__(self, other: object) -> Term:
-        assert not isinstance(object, Term)
-        if isinstance(other, (mpq, float)):
-            return Term(Rational(other) - self.poly)
-        return Term(other - self.poly)
+    def __rsub__(self, other: Number | Term) -> Term:
+        assert not isinstance(other, Term)
+        other = Term(other)
+        return Term._from_sage(other.poly - self.poly)
 
     def __str__(self):
         """Return the mathematical string representation of this term.
@@ -757,21 +743,17 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return str(self.poly)
 
-    def __sub__(self, other: object) -> Term:
-        if isinstance(other, Term):
-            return Term(self.poly - other.poly)
-        if isinstance(other, (mpq, float)):
-            return Term(self.poly - Rational(other))
-        return Term(self.poly - other)
+    def __sub__(self, other: Number | Term) -> Term:
+        if not isinstance(other, Term):
+            other = Term(other)
+        return Term._from_sage(self.poly - other.poly)
 
-    def __truediv__(self, other: object) -> Term:
-        if isinstance(other, (mpq, float)):
-            return Term(self.poly / Rational(other))
-        if isinstance(other, Term):
-            return Term(self.poly / other.poly)
+    def __truediv__(self, other: Number | Term) -> Term:
+        if not isinstance(other, Term):
+            other = Term(other)
         # x*y / x would yield y as a Sage rational function and raise an
         # exception.
-        return Term(self.poly / other)
+        return Term._from_sage(self.poly / other.poly)
 
     def __xor__(self, other: object) -> Term:
         raise NotImplementedError(
@@ -859,7 +841,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.coefficient>`
         """
         d_poly = {key.poly: value for key, value in degrees.items()}
-        return Term(self.poly.coefficient(d_poly))
+        return Term._from_sage(self.poly.coefficient(d_poly))
 
     @lru_cache(maxsize=CACHE_SIZE)
     def constant_coefficient(self) -> mpq:
@@ -924,7 +906,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             :external:meth:`MPolynomial.derivative()
             <sage.rings.polynomial.multi_polynomial.MPolynomial.derivative>`
         """
-        return Term(self.poly.derivative(self.polynomial_ring(x.poly), n))
+        return Term._from_sage(self.poly.derivative(self.polynomial_ring(x.poly), n))
 
     @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
@@ -964,11 +946,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             lc = poly.lc()
             poly /= lc
             unit *= mpq(lc) ** multiplicity
-            D[Term(poly)] = multiplicity
+            D[Term._from_sage(poly)] = multiplicity
         return unit, D
 
     @classmethod
-    def _from_sage(cls, value: Rational | MPolynomial[Rational] | UPolynomial) -> Self:
+    def _from_sage(cls, value: Integer | Rational | MPolynomial[Rational] | UPolynomial) -> Self:
+        """Construct a :class:`Term` from a Sage object. Its argument types are
+        private and should not be used outside of this module.
+        """
         term = cls.__new__(cls)
         term._poly = cls.polynomial_ring(value)
         term._hash = None
@@ -1154,13 +1139,13 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             :external:meth:`MPolynomial_libsingular.monomials()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomials>`
         """
-        return [Term(monomial) for monomial in self.poly.monomials()]
+        return [Term._from_sage(monomial) for monomial in self.poly.monomials()]
 
     @lru_cache(maxsize=CACHE_SIZE)
     def normalize(self) -> Term:
         """Divide this term by its leading coefficient, so that the result is monic.
         """
-        return Term(self.poly / self.poly.lc())
+        return Term._from_sage(self.poly / self.poly.lc())
 
     @lru_cache(maxsize=CACHE_SIZE)
     def primitive_part(self, positive: bool = False) -> Term:
@@ -1194,7 +1179,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         self1 = self.poly.polynomial(self.polynomial_ring(x.poly))
         other1 = other.poly.polynomial(self.polynomial_ring(x.poly))
         quotient, remainder = self1.pseudo_quo_rem(other1)
-        return Term(quotient), Term(remainder)
+        return Term._from_sage(quotient), Term._from_sage(remainder)
 
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
         """Quotient and remainder of this term and `other`.
@@ -1214,7 +1199,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
         """
         quo, rem = self.poly.quo_rem(other.poly)
-        return Term(quo), Term(rem)
+        return Term._from_sage(quo), Term._from_sage(rem)
 
     def reduce(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G. The output is a polynomial ``r`` such that
@@ -1230,7 +1215,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.reduce>`
         """
         poly = self.polynomial_ring(self.poly).reduce([g.poly for g in G])
-        return Term(poly)
+        return Term._from_sage(poly)
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
@@ -1238,7 +1223,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return SortKey(self)
 
-    def subs(self, d: Mapping[Variable, Term | int | mpq | Fraction | float]) -> Term:
+    def subs(self, d: Mapping[Variable, Number | Term]) -> Term:
         """Simultaneous substitution of terms for variables.
 
         >>> from logic1.theories.RCF import VV
@@ -1259,7 +1244,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             if not isinstance(substitute, Term):
                 substitute = Term(substitute)
             sage_keywords[str(variable.poly)] = substitute.poly
-        return Term(self.polynomial_ring(self.poly).subs(**sage_keywords))
+        return Term._from_sage(self.polynomial_ring(self.poly).subs(**sage_keywords))
 
     @lru_cache(maxsize=CACHE_SIZE)
     def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:

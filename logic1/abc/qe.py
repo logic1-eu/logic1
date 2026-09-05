@@ -91,9 +91,10 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     implementing the interface can put restrictions on the existing fields and
     add further fields.
 
-    We define a :class:`Formula` to be in positive negation normal form (PNNF)
-    if it is either of type :class:`_T` or :class:`_F`, or is exclusively built
-    from :class:`And`, :class:`Or`, and :class:`AtomicFormula`. Informally
+    We define a :class:`.Formula` to be in positive negation normal form (PNNF)
+    if it is either of type :class:`._T` or :class:`._F`, or is exclusively
+    built from :class:`.And`, :class:`.Or`, and
+    :class:`AtomicFormula <.firstorder.atomic.AtomicFormula>`. Informally
     speaking, it is either a truth value or an and-or-combination of atoms.
     """
 
@@ -104,7 +105,7 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     """
 
     formula: Formula[α, τ, χ, σ]
-    """A :class:`Formula` in PNNF.
+    """A :class:`.Formula` in PNNF.
     """
 
     @abstractmethod
@@ -900,11 +901,12 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
         The ``variables`` originate from corresponding existential quantifiers.
         The ``matrix`` formula is assumed to be in PNNF.
 
-        * If ``matrix`` is of one of the types :class:`And`,
-          :class:`AtomicFormula`, :class:`_T`, :class:`_F`, then create a list
-          containing a single ``node`` of type :data:`.ν` with ``node.variables
-          == variables`` and ``node.formula == matrix``.
-        * If ``matrix`` is of type :class:`Or`, then create a list containing
+        * If ``matrix`` is of one of the types :class:`.And`,
+          :class:`AtomicFormula <.firstorder.atomic.AtomicFormula>`,
+          :class:`._T`, :class:`._F`, then create a list containing a single
+          ``node`` of type :data:`.ν` with ``node.variables == variables`` and
+          ``node.formula == matrix``.
+        * If ``matrix`` is of type :class:`.Or`, then create a list containing
           one such ``node`` for each ``arg`` in ``matrix.args``.
 
         Note that for each resulting ``node``, ``node.formula`` will be in PNNF.

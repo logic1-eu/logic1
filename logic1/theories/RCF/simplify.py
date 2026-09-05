@@ -20,7 +20,7 @@ from logic1.firstorder import And, _F, Not, Or, _T
 from logic1.theories.RCF.term import CACHE_SIZE, DEFINITE, Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne
 from logic1.theories.RCF.substitution import _SubstValue, _Substitution  # type: ignore
-from logic1.theories.RCF.types import Formula
+from logic1.theories.RCF.types import Formula, Number
 
 from logic1.theories.RCF.range import EndPoint, EP_INF, EP_ZERO, _Range, RANGE_R  # type: ignore
 from logic1.support.tracing import trace  # noqa
@@ -672,7 +672,7 @@ class InternalRepresentation(
 
 @dataclass(frozen=True)
 class Simplify(abc.simplify.Simplify[
-        AtomicFormula, Term, Variable, int, InternalRepresentation, Options]):
+        AtomicFormula, Term, Variable, Number, InternalRepresentation, Options]):
     """Deep simplification following [DolzmannSturm-1997]_. Implements the
     abstract methods :meth:`create_initial_representation
     <.abc.simplify.Simplify.create_initial_representation>` and :meth:`simpl_at

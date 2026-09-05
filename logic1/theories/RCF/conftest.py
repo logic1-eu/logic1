@@ -17,6 +17,7 @@ elif POLYLIB == 'FLINT':
     required_polylib = 'SAGE'
     inactive_paths = {
         rcf_dir / 'term' / 'term_sage.py',
+        rcf_dir / 'test_term_sage.py',
     }
 else:
     raise ValueError(f'unknown polynomial backend {POLYLIB!r}')

@@ -16,12 +16,19 @@ Terms and Variables
   .. note::
     The global variable set :data:`VV <.Complex.term.VV>` is used to obtain
     :class:`Variables <.Complex.term.Variable>`. These can then be recursively
-    combined with :data:`.Number` types using arithmetic :meth:`+ <.Complex.term.Term.__add__>`,
-    :meth:`- <.Complex.term.Term.__sub__>`, :meth:`* <.Complex.term.Term.__mul__>`,
-    :meth:`/ <.Complex.term.Term.__truediv__>`, :meth:`** <.Complex.term.Term.__pow__>`, the imaginary unit :data:`I <.Complex.term.I>`, and the functions :func:`Re <.Complex.term.Re>`,
-    :func:`Im <.Complex.term.Im>`, and :func:`Conj <.Complex.term.Conj>` to build
-    larger :class:`Terms <.Complex.term.Term>`. The symbol
-    :meth:`~ <.Complex.term.Term.__invert__>` is an alias for :func:`Conj <.Complex.term.Conj>`.
+    combined with :data:`Number <.Complex.types.Number>` types using arithmetic
+    :meth:`+ <.Complex.term.Term.__add__>`,
+    :meth:`- <.Complex.term.Term.__sub__>`,
+    :meth:`* <.Complex.term.Term.__mul__>`,
+    :meth:`/ <.Complex.term.Term.__truediv__>`,
+    :meth:`** <.Complex.term.Term.__pow__>`,
+    the imaginary unit :data:`I <.Complex.term.I>`, and the functions
+    :func:`Re <.Complex.term.Re>`,
+    :func:`Im <.Complex.term.Im>`, and
+    :func:`Conj <.Complex.term.Conj>`
+    to build larger :class:`Terms <.Complex.term.Term>`. The symbol
+    :meth:`~ <.Complex.term.Term.__invert__>` is an alias for
+    :func:`Conj <.Complex.term.Conj>`.
 
     >>> from logic1.theories.Complex import *
     >>> z = VV['z']

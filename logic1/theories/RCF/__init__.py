@@ -30,10 +30,11 @@ representation and deglex monomial ordering.
 >>> (2 * x - 3 * y) ** 3
 8*x**3 - 36*x**2*y + 54*x*y**2 - 27*y**3
 
-Admissible number types are :class:`.int`, :class:`gmpy2.mpq`, and
-:class:`.float`. Fractions are entered as GNU multi-precision rational numbers
-:class:`gmpy2.mpq`, while :class:`.float` provides a convenient interface
-for external input with decimal numbers.
+Admissible :data:`Number <.RCF.types.Number>` types are :class:`.int`,
+:class:`fractions.Fraction`, :class:`gmpy2.mpq`, and :class:`.float`. Fractions
+are entered either as build-in :class:`fractions.Fraction` or as GNU
+multi-precision rational numbers :class:`gmpy2.mpq`, while :class:`.float`
+provides a convenient interface for external input with decimal numbers.
 
 .. attention::
     Python division of integers yields a float, which can cause precision
@@ -84,6 +85,7 @@ mpq(1,2)
 mpq(2,1)
 """
 
+from logic1.theories.RCF.types import Formula
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
 from logic1.theories.RCF.term import (POLYLIB, cache_clear, cache_info, init_env, init_env_arg,
                                       Term, Variable, VV)
@@ -92,7 +94,6 @@ from logic1.theories.RCF.parser import l1
 from logic1.theories.RCF.qe import Clustering, Generic, qe
 from logic1.theories.RCF import redlog
 from logic1.theories.RCF.simplify import is_valid, simplify
-from logic1.theories.RCF.types import Formula
 from logic1.theories.RCF import node
 
 __all__ = [

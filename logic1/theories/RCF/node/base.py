@@ -11,7 +11,7 @@ from logic1.firstorder import And, Or
 from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Le
 from logic1.theories.RCF.simplify import simplify
-from logic1.theories.RCF.types import Formula
+from logic1.theories.RCF.types import Formula, Number
 
 if TYPE_CHECKING:
     from logic1.theories.RCF.qe import Options
@@ -41,7 +41,7 @@ class Statistics:
     gauss_or: int = 0
 
 
-class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, int]):
+class Assumptions(abc.qe.Assumptions[AtomicFormula, Term, Variable, Number]):
     """Implements the abstract method :meth:`simplify()
     <.abc.qe.Assumptions.simplify>` of its super class
     :class:`.abc.qe.Assumptions`. Required by :class:`.Node` and
@@ -78,7 +78,7 @@ class Generic(Enum):
 
 @dataclass
 class Node(abc.qe.Node[
-        AtomicFormula, Term, Variable, int, Assumptions,
+        AtomicFormula, Term, Variable, Number, Assumptions,
         tuple[tuple[Variable, ...], Formula, frozenset[Term]]]):
     """Implements the abstract methods :meth:`copy() <.abc.qe.Node.copy>`,
     :meth:`memorize() <.abc.qe.Node.memorize>` and
