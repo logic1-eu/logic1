@@ -578,7 +578,8 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 class Assumptions(Generic[α, τ, χ, σ], ABC):
     """Holds the currently valid assumptions. This starts with user assumptions
     explicitly provided by the user. Certain variants of quantified elimination
-    may add further assumptions in the course of the elimination.
+    may add further assumptions in the course of the elimination. The assumptions
+    are simplified on initialization and after adding further assumptions.
 
     .. seealso::
 
@@ -598,7 +599,8 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
     """
 
     def __init__(self, atoms: Iterable[α]) -> None:
-        self.atoms = list(atoms)
+        self.atoms = []
+        self.extend(atoms)
 
     def append(self, new_atom: α) -> None:
         """Add ``new_atom`` as another assumption and simplify.
@@ -606,7 +608,8 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
         self.extend([new_atom])
 
     def extend(self, new_atoms: Iterable[α]) -> None:
-        """Add ``new_atoms`` as further assumptions and simplify.
+        """Add ``new_atoms`` as further assumptions and simplify. Raise
+        :class:`.Inconsistent` if the resulting assumptions are inconsistent.
         """
         self.atoms.extend(new_atoms)
         # NF nörgelt
@@ -625,9 +628,9 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """``f`` is a (possibly unary or trivial) conjunction of atoms.
-        Simplifes ``f`` in such a way that the result is again a (possibly unary
-        or trivial) conjunction of atoms. Raises :class:`.Inconsistent` if ``f``
-        is simplified to :data:`.F`.
+        Simplify ``f`` in such a way that the result is again a (possibly unary
+        or trivial) conjunction of atoms. The result may be :data:`.F`, which
+        :meth:`.extend` interprets as inconsistent assumptions.
         """
         ...
 
@@ -834,7 +837,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
 
         :returns:
           A quantifier-free equivalent of ``f`` modulo certain assumptions. A
-          simplified equivalent of all relevant assumptions are available as
+          simplified equivalent of all relevant assumptions is available as
           :attr:`.assumptions`.
 
           * Regularly, the assumptions are exactly those passed as the `assume`

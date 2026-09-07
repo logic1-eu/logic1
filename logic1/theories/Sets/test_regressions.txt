@@ -9,3 +9,19 @@ True
 >>> fresh = VV.fresh()
 >>> str(old), str(fresh), bool(old == fresh)
 ('G0001', 'G0002', False)
+
+Initial QE assumptions were not simplified until further assumptions were added.
+
+>>> from logic1 import T
+>>> from logic1.theories.Sets import Eq, Ne, qe
+>>> from logic1.theories.Sets.qe import Assumptions
+>>> x, y = VV.get('x', 'y')
+>>> qe(T, assume=[Eq(x, x), Eq(x, y), Eq(x, y)])
+T
+>>> qe.assumptions
+[x == y]
+>>> try:
+...     qe(T, assume=[Eq(x, y), Ne(x, y)])
+... except Assumptions.Inconsistent:
+...     print('inconsistent assumptions')
+inconsistent assumptions
