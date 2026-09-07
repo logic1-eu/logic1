@@ -133,8 +133,8 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
         2. ``variable`` does not occur in ``successor.formula`` for ``successor``
            in ``S``;
 
-        3. ``Or(*(Ex(successor.variables, successor.formula) for s in S))`` is
-           logically equivalent to ``Ex(node.variables, node.formula)``.
+        3. ``Or(*(Ex(successor.variables, successor.formula) for successor in S))``
+           is logically equivalent to ``Ex(node.variables, node.formula)``.
         """
         ...
 
