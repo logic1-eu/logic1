@@ -55,7 +55,7 @@ procedures, e.g., over the real numbers.
 ## Examples
 
 Consider the real numbers with arithmetic, equations, and inequality. From a
-formal perpective, this is the theory of real closed fields (RCF). Logic1 allows
+formal perspective, this is the theory of real closed fields (RCF). Logic1 allows
 to formalize the question for the existence of solutions of a parametric
 quadratic equation:
 

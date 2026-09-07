@@ -60,7 +60,7 @@ class Equivalent(BooleanFormula[α, τ, χ, σ]):
 
 @final
 class Implies(BooleanFormula[α, τ, χ, σ]):
-    """A class whose instances are equivalences in the sense that their
+    """A class whose instances are implications in the sense that their
     toplevel operator represents the Boolean operator :math:`\\longrightarrow`.
 
     >>> from logic1.theories.RCF import *

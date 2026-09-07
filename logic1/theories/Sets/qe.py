@@ -211,7 +211,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination[Node, Formula,
 
 qe = quantifier_elimination = QuantifierElimination()
 r"""
-Quantifier elimination for the theory of sets with cardinanity constraints.
+Quantifier elimination for the theory of sets with cardinality constraints.
 Returns a quantifier-free equivalent ``f'`` of ``f`` modulo the assumptions
 passed in the `assume` parameter.
 

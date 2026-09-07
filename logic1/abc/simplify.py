@@ -1,5 +1,5 @@
 """This module :mod:`logic1.abc.simplify` provides a generic abstract
-implementation of *deep simplifcication* based on generating and propagating
+implementation of *deep simplification* based on generating and propagating
 internal representations during recursion. This is essentially the *standard
 simplifier*, which has been proposed for Ordered Fields in
 [DolzmannSturm-1997]_.
@@ -81,7 +81,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
 
     @abstractmethod
     def extract(self, gand: type[And[α, τ, χ, σ] | Or[α, τ, χ, σ]], ref: Self) -> Iterable[α]:
-        """Comapare ``self`` and ``ref`` to identify and extract information that
+        """Compare ``self`` and ``ref`` to identify and extract information that
         must be represented on the toplevel of the subformula currently under
         consideration. If ``gand`` is :class:`.And`, the result represents a
         conjunction.  If ``gand`` is :class:`.Or`,  it represents a disjunction.
@@ -97,7 +97,7 @@ class InternalRepresentation(Generic[α, τ, χ, σ]):
 
     def restart(self, ir: Self) -> Self:
         """Return a new internal representation for the current level during
-        simplifiation after :data:`RESTART.ALL` has been returned by
+        simplification after :data:`RESTART.ALL` has been returned by
         :meth:`.InternalRepresentation.add`. In this case, ``ir`` is the
         internal representation of the current level, and ``self`` is the
         internal representation of the previous level.
@@ -146,7 +146,7 @@ class Simplify(Generic[α, τ, χ, σ, ρ, ω]):
         ...
 
     def is_valid(self, f: Formula[α, τ, χ, σ], assume: Iterable[α] = []) -> Optional[bool]:
-        """Simplification-based heuristic test for vailidity of a formula.
+        """Simplification-based heuristic test for validity of a formula.
 
         .. admonition:: Mathematical definition
 

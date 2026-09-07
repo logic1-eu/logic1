@@ -1,5 +1,5 @@
 r"""We provide subclasses of :class:`Formula <.formula.Formula>` that implement
-quanitfied formulas in the sense that their toplevel operator is a one of the
+quantified formulas in the sense that their toplevel operator is one of the
 quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
@@ -15,8 +15,8 @@ from logic1.support.tracing import trace
 
 
 class QuantifiedFormula(Formula[α, τ, χ, σ]):
-    r"""A class whose instances are quanitfied formulas in the sense that their
-    toplevel operator is a one of the quantifiers :math:`\exists` or
+    r"""A class whose instances are quantified formulas in the sense that their
+    toplevel operator is one of the quantifiers :math:`\exists` or
     :math:`\forall`. Note that members of :class:`QuantifiedFormula` may have
     subformulas with other logical operators deeper in the expression tree.
     """
@@ -98,7 +98,7 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
 
 @final
 class Ex(QuantifiedFormula[α, τ, χ, σ]):
-    r"""A class whose instances are existentially quanitfied formulas in the
+    r"""A class whose instances are existentially quantified formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\exists`. Besides variables, the quantifier accepts sequences of
     variables as a shorthand.
@@ -132,7 +132,7 @@ class Ex(QuantifiedFormula[α, τ, χ, σ]):
 
 @final
 class All(QuantifiedFormula[α, τ, χ, σ]):
-    r"""A class whose instances are universally quanitfied formulas in the
+    r"""A class whose instances are universally quantified formulas in the
     sense that their toplevel operator represents the quantifier symbol
     :math:`\forall`. Besides variables, the quantifier accepts sequences of
     variables as a shorthand.
@@ -175,7 +175,7 @@ class Prefix(deque[tuple[type[All | Ex], list[χ]]]):
     All [x0, epsilon]  Ex [delta]  All [x]
 
     .. seealso::
-        * :external:class:`collections.deque` -- for mehods inherited from double-ended queues
+        * :external:class:`collections.deque` -- for methods inherited from double-ended queues
         * :meth:`matrix <.Formula.matrix>` -- the matrix of a prenex formula
         * :meth:`quantify <.Formula.quantify>` -- add quantifier prefix
     """

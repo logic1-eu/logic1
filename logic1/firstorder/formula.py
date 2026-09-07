@@ -47,7 +47,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
 
        b. Negation :math:`\lnot`
 
-       c. Conjunction :math:`\land` and discjunction :math:`\lor`
+       c. Conjunction :math:`\land` and disjunction :math:`\lor`
 
        d. Implication :math:`\longrightarrow`
 
@@ -57,16 +57,16 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
        a variable.
 
     As an abstract base class, :class:`Formula` cannot be instantiated.
-    Nevertheless, it implements a number of methods on first-order formualas.
+    Nevertheless, it implements a number of methods on first-order formulas.
     The methods implemented here  are typically syntactic in the sense that
     they do not need to know the semantics of the underlying theories.
 
     .. note::
 
         :class:`Formula` depends on three type variables :data:`.α`,
-        :data:`.τ`, :data:`.χ` for the types ocurring atomic formula, terms,
-        and variables, respectively. They appear in type annotations used
-        by static type checkers but are not relevant for the either
+        :data:`.τ`, :data:`.χ` for the types of atomic formulas, terms, and
+        variables, respectively. They appear in type annotations used
+        by static type checkers but are not relevant for either
         interactive use or use as a library.
     """
 
@@ -87,11 +87,11 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         .. seealso::
             * :attr:`Equivalent.lhs <.boolean.Equivalent.lhs>` \
                 -- left hand side of a logical :math:`\\longleftrightarrow`
-            * :attr:`Equivalent.rhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Equivalent.rhs <.boolean.Equivalent.rhs>` \
                 -- right hand side of a logical :math:`\\longleftrightarrow`
-            * :attr:`Implies.lhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Implies.lhs <.boolean.Implies.lhs>` \
                 -- left hand side of a logical :math:`\\longrightarrow`
-            * :attr:`Implies.rhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Implies.rhs <.boolean.Implies.rhs>` \
                 -- right hand side of a logical :math:`\\longrightarrow`
             * :attr:`Not.arg <.boolean.Not.arg>` \
                 -- argument formula of a logical :math:`\\neg`
@@ -287,7 +287,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, repr(self)
 
     def all(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
-        """Universal closure. Universally quantifiy all variables occurring
+        """Universal closure. Universally quantify all variables occurring
         free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
@@ -548,7 +548,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, type(self)
 
     def ex(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
-        """Existential closure. Existentially quantifiy all variables occurring
+        """Existential closure. Existentially quantify all variables occurring
         free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
@@ -1000,8 +1000,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         admitted are :class:`.And`, :class:`.Or`, :class:`.Ex`, and
         :class:`.All`.
 
-        If the input is quanitfier-free, :meth:`to_nnf` will not introduce any
-        quanitfiers.
+        If the input is quantifier-free, :meth:`to_nnf` will not introduce any
+        quantifiers.
 
         If `to_positive` is `True`, :class:`.Not` is eliminated via replacing
         relation symbols with their complements. The result is then even a
