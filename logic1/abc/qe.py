@@ -1262,7 +1262,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 case False:
                     read_as = '  # read as Ex'
                 case True:
-                    read_as = '  # read as Not All'
+                    read_as = '  # read as Not Ex'
                 case _:
                     assert False, self.negated
             return f'{self.negated},{read_as}'
@@ -1281,11 +1281,11 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 f'    blocks        = {self.blocks},\n'
                 f'    matrix        = {self.matrix},\n'
                 f'    negated       = {negated_as_str()}\n'
-                f'    root_nodes    = {self.root_nodes}\n'
+                f'    root_nodes    = {self.root_nodes},\n'
                 f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
                 f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
                 f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
-                f'    result        = {self.result}'
+                f'    result        = {self.result},\n'
                 f')')
 
     # discuss: We probably do not want to print
