@@ -777,11 +777,17 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
     process after all workers have terminated.
     """
 
-    time_import_success_nodes: Optional[float] = None
-    """The time spent for importing all :attr:`.success_nodes` from the
-    :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
-    process after all workers have terminated.
-    """
+    # The following is a relic of an earlier design that did not use a
+    # multiprocessing.Queue to import success nodes. Similar information could
+    # now be recorded by maintaining a set of active sentinels and starting a
+    # timer when that set becomes empty. The variable would then be renamed to
+    # time_drain_success_nodes.
+    #
+    # time_import_success_nodes: Optional[float] = None
+    # """The time spent for importing all :attr:`.success_nodes` from the
+    # :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
+    # process after all workers have terminated.
+    # """
 
     time_import_working_nodes: Optional[float] = None
     """The time spent for importing all :attr:`.working_nodes` from the
@@ -1293,7 +1299,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 print(f'{self.time_start_all_workers=}')
                 print(f'{self.time_multiprocessing=}')
                 print(f'{self.time_import_working_nodes=}')
-                print(f'{self.time_import_success_nodes=}')
+                # print(f'{self.time_import_success_nodes=}')
                 print(f'{self.time_import_failure_nodes=}')
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=}')
