@@ -27,6 +27,10 @@ from ..support.tracing import trace  # noqa
 @dataclass
 class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
     """Boolean normal form computation.
+
+    Instances maintain mutable abstraction state during a conversion. They are
+    safe for use in separate processes, but an individual instance must not be
+    used concurrently by multiple threads.
     """
 
     _logic1_to_pyeda: ClassVar[dict[type[Formula], Callable[..., expr.Expression]]] = {
@@ -46,13 +50,21 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
         """Compute a conjunctive normal form. If ``f`` contains quantifiers,
         then the result is a prenex normal form whose matrix is in CNF.
         """
-        return self.final_simplify(Not(self._dnf(Not(f))).to_nnf())
+        self._reset()
+        try:
+            return self.final_simplify(Not(self._dnf(Not(f))).to_nnf())
+        finally:
+            self._reset()
 
     def dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Compute a disjunctive normal form. If ``f`` contains quantifiers,
         then the result is a prenex normal form whose matrix is in DNF.
         """
-        return self.final_simplify(self._dnf(f))
+        self._reset()
+        try:
+            return self.final_simplify(self._dnf(f))
+        finally:
+            self._reset()
 
     def _dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         f = self.simplify(f.to_pnf())
@@ -77,6 +89,11 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
             dnf_as_pyeda, = minimization.espresso_exprs(dnf_as_pyeda)
         dnf = self._from_pyeda(dnf_as_pyeda)
         return dnf
+
+    def _reset(self) -> None:
+        self._index = 0
+        self._atoms_to_pyeda.clear()
+        self._pyeda_to_atoms.clear()
 
     def _to_pyeda(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ] |
                            AtomicFormula[α, τ, χ, σ] | _T | _F) -> expr:

@@ -44,3 +44,19 @@ And(Or(a == b, a != d), Or(a == b, b != d))
 
 >>> cnf(((a != d) | (b == d)) & ((a == d) | (b == d)))
 And(Or(a == b, a != d), Or(a == d, b == d))
+
+The Boolean abstraction is shared by both entry points but reset after each
+conversion:
+
+>>> xs = VV.get('x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7')
+>>> for left, right in zip(xs[::2], xs[1::2]):
+...     _ = dnf(And(left == d, right == d))
+>>> converter = dnf.__self__
+>>> converter is cnf.__self__
+True
+>>> converter._index
+0
+>>> converter._atoms_to_pyeda
+{}
+>>> converter._pyeda_to_atoms
+{}
