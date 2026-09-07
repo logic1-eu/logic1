@@ -12,7 +12,7 @@ from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula
 from logic1.theories.RCF.node import Assumptions, Clustering, Generic, Node
 from logic1.theories.RCF.simplify import simplify
-from logic1.theories.RCF.types import Formula
+from logic1.theories.RCF.types import Formula, Number
 
 
 @dataclass
@@ -155,7 +155,7 @@ class Options(abc.qe.Options):
 
 @dataclass
 class VirtualSubstitution(abc.qe.QuantifierElimination[Node, tuple[Formula, frozenset[Term]],
-      Assumptions, list[str], Options, AtomicFormula, Term, Variable, int]):
+      Assumptions, list[str], Options, AtomicFormula, Term, Variable, Number]):
     """Real quantifier elimination by virtual substitution.
 
     Implements the abstract methods

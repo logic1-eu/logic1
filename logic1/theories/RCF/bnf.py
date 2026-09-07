@@ -7,10 +7,10 @@ from logic1 import abc
 from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula
 from logic1.theories.RCF.simplify import simplify as _simplify
-from logic1.theories.RCF.types import Formula
+from logic1.theories.RCF.types import Formula, Number
 
 
-class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, int]):
+class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, Number]):
     """Implements the abstract methods :meth:`simplify
     <.abc.bnf.BooleanNormalForm.simplify>` and :meth:`final_simplify
     <.abc.bnf.BooleanNormalForm.final_simplify>` of its super class

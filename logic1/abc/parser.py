@@ -21,7 +21,7 @@ class L1Parser(Generic[α, τ, χ, σ]):
             # print(ast.dump(a, indent=4))
             assert isinstance(a, ast.Expression)
             return self._process(a.body)
-        except (NameError, ParserError, SyntaxError, TypeError) as exc:
+        except Exception as exc:
             raise NoTraceException(*exc.args)
 
     def _process(self, a: ast.expr) -> Formula[α, τ, χ, σ]:
@@ -64,6 +64,8 @@ class L1Parser(Generic[α, τ, χ, σ]):
                         return And(self._process(left), self._process(right))
                     case ast.RShift():
                         return Implies(self._process(left), self._process(right))
+                    case ast.LShift():
+                        return Implies(self._process(right), self._process(left))
                     case _:
                         raise ParserError(f'unknown operator {ast.dump(op)} in {ast.unparse(a)}')
             case ast.UnaryOp(op=op, operand=operand):

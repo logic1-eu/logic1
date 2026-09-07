@@ -10,15 +10,11 @@ from flint import Ordering, fmpq, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
 
 from logic1 import firstorder
+from logic1.theories.RCF.types import Number, _NUMBER_TYPES
 
 POLYLIB: Final[str] = "FLINT"
 
 TERM_ORDER: Final[Ordering] = Ordering.deglex
-
-
-type Constant = float | fmpq | Fraction| int | mpq
-
-_CONSTANT_TYPES: Final[tuple[type, ...]] = (float, fmpq, Fraction, int, mpq)
 
 
 CACHE_SIZE: Final[Optional[int]] = 2**16
@@ -37,7 +33,7 @@ def cache_info():
     return {cache.__wrapped__: cache.cache_info() for cache in _caches()}
 
 
-def as_fmpq(arg: Constant) -> fmpq:
+def as_fmpq(arg: Number) -> fmpq:
     if isinstance(arg, float):
         return mpq_to_fmpq(mpq(arg))
     elif isinstance(arg, fmpq):
@@ -49,8 +45,8 @@ def as_fmpq(arg: Constant) -> fmpq:
     elif isinstance(arg, mpq):
         return mpq_to_fmpq(arg)
     else:
-        constant_types = ', '.join(c.__name__ for c in _CONSTANT_TYPES)
-        raise ValueError(f'expected one of {constant_types}; {arg} is {type(arg)}')
+        number_types = ', '.join(c.__name__ for c in _NUMBER_TYPES)
+        raise ValueError(f'expected one of {number_types}; {arg} is {type(arg)}')
 
 def fmpq_to_mpq(r: fmpq) -> mpq:
     return mpq(int(r.numerator), int(r.denominator))
@@ -757,11 +753,11 @@ class SortKey[τ: Term]:
         return 0
 
 
-class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
+class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
 
     _poly: fmpq_mpoly
 
-    def __add__(self, other: Term | Constant) -> Term:
+    def __add__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
             tcontext = self.term_context() | other.term_context()
             sum = tcontext.coerce_poly(self._poly) + tcontext.coerce_poly(other._poly)
@@ -769,7 +765,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         else:
             return self + Term(other)
 
-    def __eq__(self, other: Term | Constant) -> Eq:  # type: ignore[override]
+    def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
         # it makes no sense to compare terms with general objects. We have
         # Eq.__bool__, which supports some comparisons in Boolean contexts.
@@ -781,7 +777,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             lhs = -lhs
         return Eq(lhs, 0)
 
-    def __ge__(self, other: Term | Constant) -> Ge | Le:
+    def __ge__(self, other: Number | Term) -> Ge | Le:
         lhs = self - other
         if lhs.lc() < 0:
             return Le(-lhs, 0)
@@ -795,7 +791,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         d = {"poly_as_dict": poly_as_dict, "names": names}
         return d
 
-    def __gt__(self, other: Term | Constant) -> Gt | Lt:
+    def __gt__(self, other: Number | Term) -> Gt | Lt:
         lhs = self - other
         if lhs.lc() < 0:
             return Lt(-lhs, 0)
@@ -807,7 +803,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         # hash(self._summands_as_hashable()) was too slow.
         return hash(repr(self._poly))
 
-    def __init__(self, arg: Constant) -> None:
+    def __init__(self, arg: Number) -> None:
         """
         >>> Term(0.5)
         1/2
@@ -840,7 +836,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
             monomial = Term.from_raw(poly_factory(exp_vec=exp_vec))
             yield fmpq_to_mpq(coeff), monomial
 
-    def __le__(self, other: Term | Constant) -> Ge | Le:
+    def __le__(self, other: Number | Term) -> Ge | Le:
         lhs = self - other
         if lhs.lc() < 0:
             return Ge(-lhs, 0)
@@ -850,14 +846,14 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __len__(self) -> int:
         return len(self._poly)
 
-    def __lt__(self, other: Term | Constant) -> Gt | Lt:
+    def __lt__(self, other: Number | Term) -> Gt | Lt:
         lhs = self - other
         if lhs.lc() < 0:
             return Gt(-lhs, 0)
         else:
             return Lt(lhs, 0)
 
-    def __mul__(self, other: Term | Constant) -> Term:
+    def __mul__(self, other: Number | Term) -> Term:
         """
         >>> x, y = VV.get('x', 'y')
         >>> (x - y) * (x + y)
@@ -870,7 +866,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         else:
             return self * Term(other)
 
-    def __ne__(self, other: Term | Constant) -> Ne:  # type: ignore[override]
+    def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
         lhs = self - other
         if lhs.lc() < 0:
             lhs = -lhs
@@ -880,20 +876,22 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         return Term.from_raw(-self._poly)
 
     def __pow__(self, exp: int) -> Term:
+        if exp < 0:
+            raise ValueError(f'Negative exponent {exp} not supported')
         return Term.from_raw(self._poly ** exp)
 
-    def __radd__(self, other: Constant) -> Term:
+    def __radd__(self, other: Number) -> Term:
         assert not isinstance(other, Term)
         return Term(other) + self
 
     def __repr__(self) -> str:
         return self._as_string(mul='*', pow='**')
 
-    def __rmul__(self, other: Constant) -> Term:
+    def __rmul__(self, other: Number) -> Term:
         assert not isinstance(other, Term)
         return Term(other) * self
 
-    def __rsub__(self, other: Constant) -> Term:
+    def __rsub__(self, other: Number) -> Term:
         assert not isinstance(other, Term)
         return Term(other) - self
 
@@ -905,7 +903,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
     def __str__(self) -> str:
         return self._as_string(mul='*', pow='^')
 
-    def __sub__(self, other: Term | Constant) -> Term:
+    def __sub__(self, other: Number | Term) -> Term:
         if isinstance(other, Term):
             tcontext = self.term_context() | other.term_context()
             difference = tcontext.coerce_poly(self._poly) - tcontext.coerce_poly(other._poly)
@@ -913,7 +911,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         else:
             return self - Term(other)
 
-    def __truediv__(self, other: Term | Constant) -> Term:
+    def __truediv__(self, other: Number | Term) -> Term:
         """True division. `self` must be divisible by `other`. Otherwise, flint
         will raise an error.
         """
@@ -1483,7 +1481,7 @@ class Term(firstorder.Term['Term', 'Variable', int, SortKey['Term']]):
         """
         return SortKey(self)
 
-    def subs(self, mapping: Mapping[Variable, Term | Constant]) -> Term:
+    def subs(self, mapping: Mapping[Variable, Number | Term]) -> Term:
         """Simultaneous substitution of terms or constants for variables.
 
         >>> x, y, z = VV.get('x', 'y', 'z')

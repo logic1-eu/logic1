@@ -4,6 +4,7 @@ quantifiers :math:`\exists` or :math:`\forall`.
 """
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections import deque
 from typing import final, Sequence
 
@@ -19,6 +20,7 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
     :math:`\forall`. Note that members of :class:`QuantifiedFormula` may have
     subformulas with other logical operators deeper in the expression tree.
     """
+
     @property
     def var(self) -> χ:
         """The variable of the quantifier.
@@ -51,6 +53,7 @@ class QuantifiedFormula(Formula[α, τ, χ, σ]):
         """
         return self.args[1]
 
+    @abstractmethod
     def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ, σ]) -> None:
         """Construct a quantified formula.
 
@@ -108,6 +111,17 @@ class Ex(QuantifiedFormula[α, τ, χ, σ]):
     >>> Ex([x, y], And(x > 0, y > 0, z == x - y))
     Ex(x, Ex(y, And(x > 0, y > 0, x - y - z == 0)))
     """
+
+    def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ, σ]) -> None:
+        """Construct an existentially quantified formula.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> Ex(x, x**2 == y)
+        Ex(x, x**2 - y == 0)
+        """
+        super().__init__(vars_, arg)
+
     @classmethod
     def dual(cls) -> type[All[α, τ, χ, σ]]:
         r"""A class method yielding the class :class:`All`, which implements
@@ -130,6 +144,17 @@ class All(QuantifiedFormula[α, τ, χ, σ]):
     >>> All([x, y], (x + y)**2 >= 0)
     All(x, All(y, x**2 + 2*x*y + y**2 >= 0))
     """
+
+    def __init__(self, vars_: χ | Sequence[χ], arg: Formula[α, τ, χ, σ]) -> None:
+        """Construct a universally quantified formula.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> All(x, x**2 >= 0)
+        All(x, x**2 >= 0)
+        """
+        super().__init__(vars_, arg)
+
     @classmethod
     def dual(cls) -> type[Ex[α, τ, χ, σ]]:
         """A class method yielding the dual class :class:`Ex` of class:`All`.
