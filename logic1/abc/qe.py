@@ -29,24 +29,35 @@ from logic1.support.logging import DeltaTimeFormatter, Timer
 delta_time_formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s - %(levelname)-5s - %(delta)s: %(message)s')
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(delta_time_formatter)
+handler_name = f"{__name__}/stream_handler"
+stream_handler = logging.getHandlerByName(handler_name)
+if stream_handler is None:
+    stream_handler = logging.StreamHandler()
+    stream_handler.set_name(handler_name)
+    stream_handler.setFormatter(delta_time_formatter)
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
-logger.addHandler(stream_handler)
-logger.addFilter(lambda record: record.msg.strip() != '')
+if stream_handler not in logger.handlers:
+    logger.addHandler(stream_handler)
+    logger.addFilter(lambda record: record.msg.strip() != '')
 logger.setLevel(logging.WARNING)
 
 # Create multiprocessing logger
 multiprocessing_formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s - %(delta)s: %(message)s')
 
-multiprocessing_handler = logging.StreamHandler()
-multiprocessing_handler.setFormatter(multiprocessing_formatter)
+handler_name = f"{__name__}/multiprocessing_handler"
+multiprocessing_handler = logging.getHandlerByName(handler_name)
+if multiprocessing_handler is None:
+    multiprocessing_handler = logging.StreamHandler()
+    multiprocessing_handler.set_name(handler_name)
+    multiprocessing_handler.setFormatter(multiprocessing_formatter)
+
 multiprocessing_logger = logging.getLogger('multiprocessing')
 multiprocessing_logger.propagate = False
-multiprocessing_logger.addHandler(multiprocessing_handler)
+if multiprocessing_handler not in multiprocessing_logger.handlers:
+    multiprocessing_logger.addHandler(multiprocessing_handler)
 
 α = TypeVar('α', bound=AtomicFormula)
 τ = TypeVar('τ', bound='Term')
