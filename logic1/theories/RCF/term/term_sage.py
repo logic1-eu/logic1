@@ -1256,8 +1256,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         >>> (2 * x + a).subs_linear_solution(x, 5 * x + b)
         a - 2/5*b
 
-        It is asserted that both polynomials are weakly parametric linear in
-        ``x``, but no exception is raised if this is not the case.
+        Both ``self`` and ``minimal_polynomial`` must be weakly parametric
+        linear in ``x``.
         """
         # self = a * x + b
         a = self.monomial_coefficient(x)
