@@ -288,6 +288,8 @@ class _PRD:
                 raise NotImplementedError(f'{self=}, {atom=}')
 
     def _translate(self) -> str:
+        """Return a string representation for debugging purposes.
+        """
         x = self.variable
         deg_f = self.term.degree(x)
         a = self.term.coefficient({x: 2})
@@ -356,13 +358,17 @@ class _TestPoint:
             return guard
 
     def _translate(self) -> str:
-        assert self.prd is not None
+        """Return a string representation for debugging purposes.
+        """
         match self.nsp:
             case _Nsp.NONE:
+                assert self.prd is not None
                 return self.prd._translate()
             case _Nsp.PLUS_EPSILON:
+                assert self.prd is not None
                 return self.prd._translate() + ' + epsilon'
             case _Nsp.MINUS_EPSILON:
+                assert self.prd is not None
                 return self.prd._translate() + ' - epsilon'
             case _Nsp.PLUS_INFINITY:
                 return '+inf'
@@ -380,6 +386,8 @@ class _EliminationSet:
     method: str
 
     def _translate(self, assumptions: Assumptions):
+        """Return a string representation for debugging purposes.
+        """
         return (self.method,
                 self.variable,
                 [(tp.guard(assumptions), tp._translate()) for tp in self.test_points])
