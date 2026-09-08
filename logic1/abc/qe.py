@@ -1314,7 +1314,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 print(f'{self.time_import_failure_nodes=}')
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=}')
-                print(f'{self.time_total=:.{precision}}')
+                print(f'{self.time_total=:.{precision}f}')
             case _:
                 print(f'{self.options.workers=}')
                 print(f'{self.time_syncmanager_enter=:.{precision}f}')
