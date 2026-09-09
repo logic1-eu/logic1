@@ -8,21 +8,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: 3.12
       - name: Initialize Conda
         run: |
-          source $CONDA/etc/profile.d/conda.sh
+          source "$CONDA/etc/profile.d/conda.sh"
           conda config --add channels "conda-forge"
-          conda create -y -n logic1 sage
-          conda activate logic1
+          conda create -y -n logic1 python=3.12 pip sage
       - name: Install dependencies using pip
-        run: pip install .
+        run: '"$CONDA/bin/conda" run --no-capture-output -n logic1 python -m pip install .'
       - name: Install pypa/build
-        run: pip install build
+        run: '"$CONDA/bin/conda" run --no-capture-output -n logic1 python -m pip install build'
       - name: Build a binary wheel and a source tarball
-        run: python -m build
+        run: '"$CONDA/bin/conda" run --no-capture-output -n logic1 python -m build'
       - name: Store the distribution packages
         uses: actions/upload-artifact@v4
         with:
@@ -40,7 +36,7 @@ jobs:
     permissions:
       id-token: write
     steps:
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: python-package-distributions
           path: dist
