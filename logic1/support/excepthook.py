@@ -4,24 +4,25 @@ from types import TracebackType
 
 
 class NoTraceException(Exception):
-    """An exception that prints an error message and exists without a
-    traceback. This can be used in situation that do not require inspection of
+    """An exception that prints an error message and exits without a
+    traceback. This can be used in situations that do not require inspection of
     the code. Examples are incorrect user input or failure of quantifier
-    elimination procedures due to their mathematical incompletess. Both are
-    considerd normal situations during interactive use. This exception
+    elimination procedures due to their mathematical incompleteness. Both are
+    considered normal situations during interactive use. This exception
     typically comes with a short but informative error message for the user.
     """
     pass
 
 
 def handler(exc: NoTraceException, tb: Optional[TracebackType]):
-    print(f'{exc.args[0]}', file=sys.stderr, flush=True)
+    print(f'{exc.args}', file=sys.stderr, flush=True)
     # sys.stderr.write(f{err_type.__name__}: {err}\n")
 
 
 # Python shell
 
-def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[TracebackType]):
+def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[TracebackType],
+               sys_excepthook: Any = sys.excepthook):
     if isinstance(exc, NoTraceException):
         handler(exc, tb)
     else:
@@ -30,11 +31,10 @@ def excepthook(exc_type: type[BaseException], exc: BaseException, tb: Optional[T
 
 # To be executed at import:
 
-sys_excepthook = sys.excepthook
 sys.excepthook = excepthook
 
 
-# iPhyton:
+# IPython:
 
 def ipy_custom_exec(ipy: Any, exc_type: type[NoTraceException],
                     exc: NoTraceException, tb: TracebackType, tb_offset=None):
@@ -43,12 +43,17 @@ def ipy_custom_exec(ipy: Any, exc_type: type[NoTraceException],
 
 # To be executed at import:
 
-try:
-    import IPython
-except ImportError:
-    ipy = None
-else:
-    ipy = IPython.get_ipython()
-
-if ipy is not None:
-    ipy.set_custom_exc((NoTraceException,), ipy_custom_exec)
+# `import IPython` would initialize all of IPython unconditionally,
+# i.e., even in an ordinary Python process, thus is avoided.
+#
+# By contrast, `sys.modules.get('IPython')` returns the module only if it has
+# been loaded *before*, which commonly is the case when running in the context
+# of IPython or Jupyter.
+#
+# Caveat: If IPython is loaded *after* Logic1, then the custom exception handler
+# will not be registered.
+ipy_module = sys.modules.get('IPython')
+if ipy_module is not None:
+    ipy = ipy_module.get_ipython()
+    if ipy is not None:
+        ipy.set_custom_exc((NoTraceException,), ipy_custom_exec)

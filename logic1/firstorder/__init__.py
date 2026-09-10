@@ -14,7 +14,7 @@ methods on first-order formulas recursively built using first-order operators:
 
    b. Negation :math:`\lnot`
 
-   c. Conjunction :math:`\land` and discjunction :math:`\lor`
+   c. Conjunction :math:`\land` and disjunction :math:`\lor`
 
    d. Implication :math:`\longrightarrow`
 

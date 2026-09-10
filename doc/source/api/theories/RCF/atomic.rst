@@ -193,29 +193,29 @@ Some examples can be found on the :ref:`landing page <api-RCF>` of this section.
     :exclude-members: __init__, __new__
 
     .. method:: +, *, -, **, /
-                __add__(other: object) -> Term
-                __mul__(other: object) -> Term
+                __add__(other: logic1.theories.RCF.types.Number | Term) -> Term
+                __mul__(other: logic1.theories.RCF.types.Number | Term) -> Term
                 __neg__() -> Term
-                __pow__(other: object) -> Term
-                __radd__(other: object) -> Term
-                __rmul__(other: object) -> Term
-                __rsub__(other: object) -> Term
-                __sub__(other: object) -> Term
-                __truediv__(other: object) -> Term
+                __pow__(other: int) -> Term
+                __radd__(other: logic1.theories.RCF.types.Number | Term) -> Term
+                __rmul__(other: logic1.theories.RCF.types.Number | Term) -> Term
+                __rsub__(other: logic1.theories.RCF.types.Number | Term) -> Term
+                __sub__(other: logic1.theories.RCF.types.Number | Term) -> Term
+                __truediv__(other: logic1.theories.RCF.types.Number | Term) -> Term
 
       Arithmetic operations on Terms are available as these overloaded operators.
 
     .. method:: ==, >=, >, <=, <, !=
-                __eq__(other: Term | int) -> logic1.theories.RCF.atomic.Eq
-                __ge__(other: Term | int) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
-                __gt__(other: Term | int) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
-                __le__(other: Term | int) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
-                __lt__(other: Term | int) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
-                __ne__(other: Term | int) -> logic1.theories.RCF.atomic.Ne
+                __eq__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Eq
+                __ge__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
+                __gt__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
+                __le__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Ge | logic1.theories.RCF.atomic.Le
+                __lt__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Gt | logic1.theories.RCF.atomic.Lt
+                __ne__(other: logic1.theories.RCF.types.Number | Term) -> logic1.theories.RCF.atomic.Ne
 
       Construction of instances of :class:`Eq <.RCF.atomic.Eq>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Gt <.RCF.atomic.Gt>`, :class:`Le <.RCF.atomic.Le>`, :class:`Lt <.RCF.atomic.Lt>`, :class:`Ne <.RCF.atomic.Ne>` is available via these overloaded operators.
 
-    .. automethod:: __init__(self, arg: float | int | fractions.Fraction | gmpy2.mpq | sage.rings.integer.Integer | sage.rings.rational.Rational | MPolynomial[sage.rings.rational.Rational] | UPolynomial) -> None
+    .. automethod:: __init__(self, logic1.theories.RCF.types.Number) -> None
 
     .. automethod:: __iter__
 

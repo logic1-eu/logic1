@@ -294,3 +294,32 @@ And(y + 2 == 0, x == 0)
 # expecting And(x - y - 2 == 0, Or(w == 0, And(z == 0, , x == 0))):
 >>> simplify(And(x == y + 2, Or(w == 0, And(x == 0, z == 0))))
 And(x - y - 2 == 0, Or(w == 0, And(z == 0, y + 2 == 0, x == 0)))
+
+
+Regression tests:
+
+>>> phi = And(x >= 0, x < 1, y > 0, y < 1, x*y > 0)
+>>> simplify(phi)
+And(y - 1 < 0, y > 0, x - 1 < 0, x >= 0, x*y > 0)
+
+>>> from logic1.theories.RCF.range import _Range, EndPoint
+>>> from gmpy2 import mpq
+
+>>> q = _Range(lopen=False, start=EndPoint(mpq(0)), end=EndPoint(mpq(1)), ropen=True)
+>>> r = _Range(lopen=True, start=EndPoint(mpq(0)), end=EndPoint(mpq(1)), ropen=True)
+>>> print(q * r)
+[0, 1)
+
+>>> r = _Range(lopen=True, start=EndPoint(mpq(0)), end=EndPoint(mpq(1)), ropen=False)
+>>> print(r * r)
+(0, 1]
+
+>>> q = _Range(lopen=False, start=EndPoint(mpq(0)), end=EndPoint(mpq(1)), ropen=True)
+>>> r = _Range(lopen=True, start=EndPoint(mpq(1)), end=EndPoint(mpq(2)), ropen=True)
+>>> print(q * r)
+[0, 2)
+
+>>> q = _Range(lopen=False, start=EndPoint(mpq(-2)), end=EndPoint(mpq(-1)), ropen=False)
+>>> q *= q
+>>> print(q)
+[1, 4]

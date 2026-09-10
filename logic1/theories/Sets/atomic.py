@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import string
-from typing import Any, ClassVar, Final, Iterator, Never, Optional, Self, TypeAlias
+from typing import (Any, ClassVar, Final, final, Iterator, Never, Optional,
+                    Self, TypeAlias)
 
 from logic1 import firstorder
 from logic1.firstorder import _F, _T
@@ -22,7 +23,7 @@ Index: TypeAlias = int | float
 is represented by :data:`oo`.
 """
 
-
+@final
 class VariableSet(firstorder.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Sets.
     Variables are uniquely identified by their name, which is a
@@ -39,6 +40,8 @@ class VariableSet(firstorder.VariableSet['Variable']):
     """
 
     _instance: ClassVar[Optional[VariableSet]] = None
+    _stack: list[set[str]]
+    _used: set[str]
 
     @property
     def stack(self) -> list[set[str]]:
@@ -59,13 +62,13 @@ class VariableSet(firstorder.VariableSet['Variable']):
             case _:
                 raise ValueError(f'expecting string as index; {index} is {type(index)}')
 
-    def __init__(self) -> None:
-        self._stack: list[set[str]] = []
-        self._used: set[str] = set()
-
-    def __new__(cls) -> VariableSet:
+    def __new__(cls) -> Self:
+        # Initialization of a singleton belongs into the __new__ method.
         if cls._instance is None:
-            cls._instance = super().__new__(cls)
+            self = super().__new__(cls)
+            self._stack = []
+            self._used = set()
+            cls._instance = self
         return cls._instance
 
     def __repr__(self) -> str:
@@ -203,7 +206,7 @@ class AtomicFormula(firstorder.AtomicFormula['AtomicFormula', 'Variable', 'Varia
         SPACING: Final = ' '
         match self:
             case C() | C_():
-                if self.index is oo:
+                if self.index == oo:
                     return f'{SYMBOL[self.op]}(oo)'
                 return f'{SYMBOL[self.op]}({self.index})'
             case Eq() | Ne():
@@ -333,7 +336,7 @@ class Eq(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables; {arg} is {type(arg)}')
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
 
 class Ne(AtomicFormula):
@@ -355,7 +358,7 @@ class Ne(AtomicFormula):
             if not isinstance(arg, Variable):
                 raise ValueError(
                     f'arguments must be variables - {arg} is {type(arg)}')
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
 
 class C(AtomicFormula):
@@ -398,10 +401,10 @@ class C(AtomicFormula):
         :meth:`firstorder.formula.Formula.__init__`.
         """
         super().__init__()
-        self.args = (index,)
+        self._args = (index,)
 
     def __new__(cls, index: Index):
-        if not (isinstance(index, int) and index > 0 or index == oo):
+        if not (type(index) == int and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
                              f'{index} is {type(index)}')
         if index not in cls._instances:
@@ -428,10 +431,10 @@ class C_(AtomicFormula):
         :meth:`firstorder.formula.Formula.__init__`.
         """
         super().__init__()
-        self.args = (index,)
+        self._args = (index,)
 
     def __new__(cls, index: Index):
-        if not (isinstance(index, int) and index > 0 or index == oo):
+        if not (type(index) == int and index > 0 or index == oo):
             raise ValueError(f'argument must be positive int or oo; '
                              f'{index} is {type(index)}')
         if index not in cls._instances:

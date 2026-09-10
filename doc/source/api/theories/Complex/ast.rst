@@ -80,6 +80,10 @@ ASTs and Visitors
     :members:
     :special-members:
 
+  .. autoclass:: TraversalASTVisitor
+    :members:
+    :special-members:
+
   .. autoclass:: VariableSubstitutor
     :members:
     :special-members:
@@ -90,7 +94,11 @@ Printing
 
 .. automodule:: logic1.theories.Complex.format
 
-  .. autoclass:: ReprFormatter
+  .. autoclass:: BaseReprFormatter
+    :members:
+    :special-members:
+
+  .. autoclass:: TermReprFormatter
     :members:
     :special-members:
 

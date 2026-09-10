@@ -1,2 +1,3 @@
 [run]
+core = ctrace
 plugins = Cython.Coverage

@@ -4,7 +4,6 @@ from collections import deque
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import auto, Enum
-from functools import lru_cache
 from typing import Iterable, Iterator, Optional, Self
 
 from gmpy2 import mpq
@@ -16,7 +15,7 @@ from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ne, Ge, Le
 from logic1.theories.RCF.simplify import simplify
 from logic1.theories.RCF.types import Formula
 from logic1.theories.RCF.node import base
-from logic1.theories.RCF.node.base import Assumptions, CACHE_SIZE, FoundF, Statistics
+from logic1.theories.RCF.node.base import Assumptions, FoundF, Statistics
 
 
 class _BoundType(Enum):
@@ -303,12 +302,16 @@ class Node(base.Node):
             return (0, 0)
 
     @staticmethod
-    @lru_cache(maxsize=CACHE_SIZE)
     def subs_into_formula(formula: Formula, x: Variable, testpoint: Term | _Infinity,
                           assumptions: Assumptions) -> Formula:
         """Substitute ``testpoint`` for ``x`` in ``formula``, and apply
         simplification modulo ``assumptions``
         """
+
+        # This method is a candidate for an lru cache. However, Assumptions are
+        # not hashable, because they are mutable. This can be resolved by
+        # either thoroughly revising abc.qe.Assumptions or playing technical
+        # tricks here.
 
         def subs_infinity_at(atom: AtomicFormula, x: Variable, inf: _Infinity) -> Formula:
             c = atom.lhs.monomial_coefficient(x)
