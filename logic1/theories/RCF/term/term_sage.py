@@ -161,11 +161,12 @@ class _PolynomialRing:
     def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
         """Construct a Sage Singular polynomial ring with the given variable names and term order.
         """
-        number_of_variables = 1 if isinstance(names, str) else len(names)
-        if number_of_variables > 2**15:
-            # https://github.com/Singular/Singular/issues/1383
-            # https://github.com/sagemath/sage/issues/42712
-            raise OverflowError(f'cannot construct a polynomial ring with {number_of_variables} variables')
+        if not isinstance(names, str):
+            names = tuple(names)
+            if len(names) > 2**15:
+                # https://github.com/Singular/Singular/issues/1383
+                # https://github.com/sagemath/sage/issues/42712
+                raise OverflowError(f'cannot construct a polynomial ring with {len(names)} variables')
         return sage_PolynomialRing(QQ, names, order=order, implementation='singular')
 
     def pop(self) -> None:
