@@ -31,7 +31,7 @@ git_commit = subprocess_output('git', 'rev-parse', '--short=10', 'HEAD')
 
 project = 'Logic1'
 repository_url = 'https://github.com/logic1-eu/logic1'
-copyright = '2023-%Y, N. Faroß and T. Sturm'
+copyright = '2023–%Y, N. Faroß and T. Sturm'
 author = '<a href="https://www.chalmers.se/en/persons/faross/">N. Faroß</a>, <a href="https://science.thomas-sturm.de/">T. Sturm</a>'
 version = setuptools_scm.get_version(root='../..', relative_to=__file__)
 release = version
@@ -64,7 +64,7 @@ autodoc_default_options = {
 autodoc_type_aliases = {}
 
 extra_footer = (
-    None if version is None else 
+    None if version is None else
         f'Corresponds to version <code>{html.escape(version)}</code>.' if git_commit is None else
             f'Corresponds to version <a href="{repository_url}/tree/{git_commit}"><code>{html.escape(version)}</code></a>.'
 )
@@ -120,6 +120,11 @@ html_theme = 'sphinx_book_theme'
 html_theme_options = {
     'collapse_navbar': False,
     'extra_footer': extra_footer,
+    'footer_content_items': [
+        'extra-footer',
+        'last-updated',
+        'copyright',
+    ],
     'home_page_in_toc': True,
     'max_navbar_depth': 12,
     'repository_url': repository_url,
