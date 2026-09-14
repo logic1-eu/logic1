@@ -39,7 +39,7 @@ be changed to *cartesian normal form* using the function
 
 >>> z = VV['z']
 >>> z * Re(z)
-1/2 * z**2 + 1/2 * z * ~z
+mpq(1,2) * z**2 + mpq(1,2) * z * ~z
 >>> old_normal_form = Term.set_normal_form(cartesian_normal_form)
 >>> z * Re(z)
 Re(z)**2 + I * Re(z) * Im(z)
@@ -57,7 +57,7 @@ to the case where both sides are real terms.
 >>> z == 0
 z == 0
 >>> Re(z) < 0
-1/2 * z + 1/2 * ~z < 0
+mpq(1,2) * z + mpq(1,2) * ~z < 0
 >>> z >= 0
 Traceback (most recent call last):
 ...

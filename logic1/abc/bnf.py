@@ -10,7 +10,7 @@ of the famous Berkeley Espresso library [BraytonEtAl-1984]_.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pyeda.boolalg import expr, minimization  # type: ignore
-from typing import ClassVar, Generic, TypeVar
+from typing import Callable, ClassVar, Generic, TypeVar
 
 from .. import firstorder
 from ..firstorder import (
@@ -27,16 +27,20 @@ from ..support.tracing import trace  # noqa
 @dataclass
 class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
     """Boolean normal form computation.
+
+    Instances maintain mutable abstraction state during a conversion. They are
+    safe for use in separate processes, but an individual instance must not be
+    used concurrently by multiple threads.
     """
 
-    _logic1_to_pyeda: ClassVar[dict[type[Formula], expr]] = {
+    _logic1_to_pyeda: ClassVar[dict[type[Formula], Callable[..., expr.Expression]]] = {
         firstorder.Equivalent: expr.Equal,
         firstorder.Implies: expr.Implies,
         firstorder.And: expr.And,
         firstorder.Or: expr.Or,
         firstorder.Not: expr.Not,
-        firstorder._T: expr._Zero,
-        firstorder._F: expr._One}
+        firstorder._T: lambda: expr(True),
+        firstorder._F: lambda: expr(False)}
 
     _index: int = 0
     _atoms_to_pyeda: dict[AtomicFormula, expr.Literal] = field(default_factory=dict)
@@ -46,13 +50,21 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
         """Compute a conjunctive normal form. If ``f`` contains quantifiers,
         then the result is a prenex normal form whose matrix is in CNF.
         """
-        return self.final_simplify(Not(self._dnf(Not(f))).to_nnf())
+        self._reset()
+        try:
+            return self.final_simplify(Not(self._dnf(Not(f))).to_nnf())
+        finally:
+            self._reset()
 
     def dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Compute a disjunctive normal form. If ``f`` contains quantifiers,
         then the result is a prenex normal form whose matrix is in DNF.
         """
-        return self.final_simplify(self._dnf(f))
+        self._reset()
+        try:
+            return self.final_simplify(self._dnf(f))
+        finally:
+            self._reset()
 
     def _dnf(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         f = self.simplify(f.to_pnf())
@@ -78,8 +90,18 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
         dnf = self._from_pyeda(dnf_as_pyeda)
         return dnf
 
-    def _to_pyeda(self, f: AtomicFormula[α, τ, χ, σ] | And[α, τ, χ, σ] | Or[α, τ, χ, σ]) -> expr:
+    def _reset(self) -> None:
+        self._index = 0
+        self._atoms_to_pyeda.clear()
+        self._pyeda_to_atoms.clear()
+
+    def _to_pyeda(self, f: And[α, τ, χ, σ] | Or[α, τ, χ, σ] |
+                           AtomicFormula[α, τ, χ, σ] | _T | _F) -> expr:
         match f:
+            case And(args=args) | Or(args=args):
+                name = self._logic1_to_pyeda[f.op]
+                xs = (self._to_pyeda(arg) for arg in args)
+                return name(*xs, simplify=False)
             case AtomicFormula():
                 if f in self._atoms_to_pyeda:
                     return self._atoms_to_pyeda[f]
@@ -91,10 +113,8 @@ class BooleanNormalForm(ABC, Generic[α, τ, χ, σ]):
                 self._atoms_to_pyeda[f] = new_exprvar
                 self._pyeda_to_atoms[new_exprvar] = f
                 return new_exprvar
-            case And(args=args) | Or(args=args):
-                name = self._logic1_to_pyeda[f.op]
-                xs = (self._to_pyeda(arg) for arg in args)
-                return name(*xs, simplify=False)
+            case _F() | _T():
+                return self._logic1_to_pyeda[type(f)]()
             case _:
                 assert False
 

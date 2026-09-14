@@ -134,7 +134,6 @@ Quantifier Elimination
       .. autoattribute:: time_start_all_workers
       .. autoattribute:: time_multiprocessing
       .. autoattribute:: time_import_failure_nodes
-      .. autoattribute:: time_import_success_nodes
       .. autoattribute:: time_import_working_nodes
       .. autoattribute:: time_syncmanager_exit
       .. autoattribute:: time_final_simplification

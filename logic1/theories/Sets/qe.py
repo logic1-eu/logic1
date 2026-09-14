@@ -44,7 +44,7 @@ class Node(abc.qe.Node[AtomicFormula, Variable, Variable, Never, Assumptions, Fo
     def copy(self) -> Node:
         """Implements the abstract method :meth:`.abc.qe.Node.copy`.
         """
-        return Node(variables=self.variables, formula=self.formula, options=self.options)
+        return Node(variables=list(self.variables), formula=self.formula, options=self.options)
 
     def memorize(self) -> Formula:
         """Implements the abstract method :meth:`.abc.qe.Node.memoize`.
@@ -211,7 +211,7 @@ class QuantifierElimination(abc.qe.QuantifierElimination[Node, Formula,
 
 qe = quantifier_elimination = QuantifierElimination()
 r"""
-Quantifier elimination for the theory of sets with cardinanity constraints.
+Quantifier elimination for the theory of sets with cardinality constraints.
 Returns a quantifier-free equivalent ``f'`` of ``f`` modulo the assumptions
 passed in the `assume` parameter.
 

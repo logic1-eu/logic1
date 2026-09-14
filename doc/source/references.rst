@@ -23,7 +23,7 @@ References
   A. Dolzmann, T. Sturm, V. Weispfenning. A New Approach for Automatic Theorem
   Proving in Real Geometry. J. Autom. Reasoning 21(3):357–380, 1998.
   `doi:10.1023/A:1006031329384
-  <https://doi.org/doi:10.1023/A:1006031329384>`_
+  <https://doi.org/10.1023/A:1006031329384>`_
 
 .. [FarossSturm-2026]
   N. Faross, T. Sturm. Pseudo-Complex Quantifier Elimination. To appear in

@@ -5,3 +5,21 @@
 
 >>> simplify(And(b != c, Or(y == z, And(a == b, b != c))))
 And(b != c, Or(a == b, y == z))
+
+# Regression tests:
+
+>>> simplify(C_(oo))
+C_(oo)
+>>> qe(C_(oo))
+C_(oo)
+>>> simplify(And(C(oo), C_(oo)))
+F
+>>> simplify(Or(C(oo), C_(oo)))
+T
+>>> is_valid(C_(oo))
+
+# type variable was passed as default argument resulting in a exception
+
+>>> from logic1.theories.Sets.simplify import Simplify
+>>> _ = Simplify().create_initial_representation()
+>>>

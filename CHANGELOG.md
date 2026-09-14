@@ -5,6 +5,147 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-09-14
+
+### Added
+
+- Add `py.typed` marker and adapt `pyproject.toml` accordingly.
+
+- Use `setuptools_scm` more systematically for versioning in code and documentation.
+
+### Fixed
+
+#### module `logic1`
+
+- Runtime and documentation version metadata was stale and malformed in `__init__.py`.
+
+#### module `abc`
+
+- Parallel QE could wait forever after an unexpected worker exception.
+
+- `qe` more systematically recognizes and handles contradictory `Assumptions` now.
+
+- `qe.QuantifierElimination` classified an entire successor
+   batch using only its first node.
+
+- Reloading the `qe` module duplicated global logging handlers.
+
+- The working node classes of `qe` explicitly require positive NNF now.
+
+- In `qe.QuantifierElimination`, fix formatting and details in `nodes_as_str` and `timings`.
+
+- The mutable `qe.Assumptions` is not hashable anymore.
+
+- Normal form computation in `bnf` could fail on formulas containing `T` or `F`.
+
+- `bnf` had a leak not resetting renaming tables for abstracting atoms.
+
+- `parser` now implements `<<` as converse implications and catches more exceptions.
+
+#### module `firstorder`
+
+- `Formula.simplify` could deliver wrong results with `T` in `Implies`. It was non-idempotent for `Equivalent(F, F)`, could reintroduce duplicates while flattening, and never sorted although this was documented.
+
+- `Formula.traverse` crashed on `Not` and `Implies`.
+
+- `Formula.count_alternations` falsely returned `-1` alternations for quantifier-free formulas.
+
+- `Formula._repr_latex_` could cut through a LaTeX control word.
+
+- `Formula.subs` could unnecessarily rename variables.
+
+- An assertion in `Formula.to_pnf` rejected non-positive NNF with `is_nnf=True`.
+
+- Instances of `Formula` are not mutable anymore.
+
+- In `QuantifiedFormula.__le__`, sorting crashed for both `Complex` and `Sets`.
+
+- Prevent instantiation of `QuantifiedFormula`.
+
+#### module `Complex`
+
+- `Term.set_normal_form` mutated hashes of existing terms.
+
+- `normalize.WeakNormalizer` had issues with normal form computation for signed factors and nested exponentiation.
+
+- `Term.__repr__` and `AtomicFormula.__repr__` both had issues with constants.
+
+- `simplify.min_weight_partial_edge_cover` did not consider multi-edges.
+
+- `qe.qe` silently discarded options when calling `redlog.qe`.
+
+- `VariableSet.__getitem__` was too liberal. We admit only Python identifiers as variables now.
+
+#### module `RCF`
+
+- Flaws in `range._Range._imul_core` affected the correctness of `simplify`.
+
+- `term_sage.Term.factor` crashed on nonzero constants.
+
+- `term_sage._PolynomialRing` had issues sorting variables.
+
+- `term_sage._PolynomialRing.MPolynomialRing_factory` could cause an overflow in Singular when allocating too many variables.
+
+- `term_sage.Variable.__init__` could be called directly, instead of using `VV`.
+
+- `term_sage` had inconsistencies about admissible number types.
+
+- `term_flint.Term.degree` could yield degree 0 instead of -1 for the zero polynomial.
+
+- `term_flint.Term.derivative` accepted negative derivative orders. Furthermore, it could return 0 instead of the input for derivative order 0.
+
+- `term_flint.Term.factor` did not reconstruct repeated non-monic factors.
+
+- `term_flint.Term.reduce` consumed generators twice.
+
+- `term_flint._caches` contained a non-existent class.
+
+- `vs._TestPoint._translate` had misplaced assertions.
+
+#### module `Sets`
+
+- `simplify.InternalRepresentation` erased the finite-cardinality constraint `C_(oo)`. Furthermore, its `extract` method had duplicate code lines.
+
+- `atomic` and `simplify` incorrectly assumed `float('inf')` to be a singleton.
+
+- `C.__new__` and `C_.__new__` admitted Boolean values as arguments.
+
+- The singleton `atomic.VariableSet` is implemented more robustly now.
+
+- `qe.Node.copy` did not copy its mutable variable list.
+
+#### module `support`
+
+- Reloading `support.excepthook` made ordinary exception handling recurse forever.
+
+- An empty `NoTraceException` caused a secondary `IndexError`.
+
+- `logging.DeltaTimeFormatter` corrupted exact whole-second durations.
+
+- The indentation in the `trace` decorator was flawed.
+
+#### Development/Build
+
+- Revise and simplify `Makefile`.
+
+- Add `pytest` support for ignoring inactive `RCF` term backend.
+
+- In `pyproject.toml`, declare runtime dependencies `Sage`, `NetworkX`, `typing-extensions`, add optional backend `python-flint`, and remove `more-itertools`.
+
+- Add dependency `clang` to `logic1_dev.yaml`.
+
+#### Documentation
+
+- Fix numerous user-facing documentation typos and broken references.
+
+- Fix various issues in doctests.
+
+### Removed
+
+- Remove file `cython.yaml`.
+
+- Comment unused variable `qe.QuantifierElimination.time_import_success_nodes`.
+
 ## [0.3.0] - 2026-08-18
 
 ### Added
@@ -98,7 +239,6 @@ cached hashes of Terms from being sent to processes with a different hash seed i
 
 - Exception `RCF.qe.Failed`
 
-
 ## [0.2.0] - 2025-02-11
 
 ### Added
@@ -146,7 +286,6 @@ cached hashes of Terms from being sent to processes with a different hash seed i
 - The definiteness tests in `simpl_at` have been reimplemented, replacing class `TSQ(Enum)` with class `DEFINITE(Enum)`.
 
 - Refactor module `simplify`, moving class `_Subsitution` to its own module. A slightly more efficient Cython variant exists but is not used at present.
-
 
 ## [0.1.0] - 2024-10-29
 

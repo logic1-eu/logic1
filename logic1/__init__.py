@@ -1,10 +1,6 @@
-__version__ = 0.1
+from importlib.metadata import version as _version
 
-___author___ = 'Nicolas Faroß, Thomas Sturm'
-___contact___ = 'https://logic1.eu/'
-___copyright__ = 'Copyright 2023, N. Faroß, T. Sturm, Germany'
-___license__ = 'GPL-2.0-or-later'
-___status__ = 'Prototype'
+__version__ = _version("logic1")
 
 from . import firstorder
 

@@ -6,16 +6,14 @@ from gmpy2 import mpq
 
 import logic1
 from logic1.firstorder import _T, _F
+from logic1.theories.RCF.types import Formula, Number
 from logic1.support.excepthook import NoTraceException
-
-if TYPE_CHECKING:
-    from logic1.theories.RCF.types import Formula
 
 
 class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.AtomicFormula',
                                                     'logic1.theories.RCF.term.Term',
                                                     'logic1.theories.RCF.term.Variable',
-                                                    int]):
+                                                    'logic1.theories.RCF.types.Number']):
     """Base class for atomic formulas over real closed fields. The class is the
     common parent of :class:`Eq <.RCF.atomic.Eq>`, :class:`Ne <.RCF.atomic.Ne>`,
     :class:`Le <.RCF.atomic.Le>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Lt
@@ -79,7 +77,7 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.
     def __hash__(self) -> int:
         return super().__hash__()
 
-    def __init__(self, lhs: Term | int, rhs: Term | int):
+    def __init__(self, lhs: Number | Term | int, rhs: Number | Term) -> None:
         super().__init__()
         if not isinstance(self, (Eq, Ne, Ge, Gt, Le, Lt)):
             raise NoTraceException('Instantiate one of Eq, Ne, Ge, Gt, Le, Lt instead')
@@ -87,7 +85,7 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.
             lhs = Term(lhs)
         if not isinstance(rhs, Term):
             rhs = Term(rhs)
-        self.args = (lhs, rhs)
+        self._args = (lhs, rhs)
 
     def __le__(self, other: Formula) -> bool:
         """Return whether this atomic formula precedes or equals ``other`` in
@@ -316,7 +314,7 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.atomic.
         D: Any = {Le: Lt, Lt: Lt, Ge: Gt, Gt: Gt}
         return D[cls]
 
-    def subs(self, sigma: Mapping[Variable, Term | int | mpq]) -> Self:
+    def subs(self, sigma: Mapping[Variable, Number | Term]) -> Self:
         """Return the atomic formula obtained from this atomic formula by
         simultaneous term substitution.
 
@@ -386,6 +384,5 @@ class Gt(AtomicFormula):
 
 class Lt(AtomicFormula):
     pass
-
 
 from logic1.theories.RCF.term import Term, Variable

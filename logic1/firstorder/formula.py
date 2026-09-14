@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import functools
-from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TypeVar
+import re
+from typing import Any, Callable, Final, Generic, Iterable, Iterator, Optional, Self, TYPE_CHECKING, TypeVar, cast
 from typing_extensions import TypeIs
 
-from IPython.lib import pretty
-
 from logic1.support.tracing import trace
+
+if TYPE_CHECKING:
+    from IPython.lib.pretty import RepresentationPrinter
 
 
 α = TypeVar('α', bound='AtomicFormula')
@@ -45,7 +47,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
 
        b. Negation :math:`\lnot`
 
-       c. Conjunction :math:`\land` and discjunction :math:`\lor`
+       c. Conjunction :math:`\land` and disjunction :math:`\lor`
 
        d. Implication :math:`\longrightarrow`
 
@@ -55,19 +57,20 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
        a variable.
 
     As an abstract base class, :class:`Formula` cannot be instantiated.
-    Nevertheless, it implements a number of methods on first-order formualas.
+    Nevertheless, it implements a number of methods on first-order formulas.
     The methods implemented here  are typically syntactic in the sense that
     they do not need to know the semantics of the underlying theories.
 
     .. note::
 
         :class:`Formula` depends on three type variables :data:`.α`,
-        :data:`.τ`, :data:`.χ` for the types ocurring atomic formula, terms,
-        and variables, respectively. They appear in type annotations used
-        by static type checkers but are not relevant for the either
+        :data:`.τ`, :data:`.χ` for the types of atomic formulas, terms, and
+        variables, respectively. They appear in type annotations used
+        by static type checkers but are not relevant for either
         interactive use or use as a library.
     """
 
+    _args: tuple[Any, ...]
     _hash: Optional[int]
 
     @property
@@ -84,11 +87,11 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         .. seealso::
             * :attr:`Equivalent.lhs <.boolean.Equivalent.lhs>` \
                 -- left hand side of a logical :math:`\\longleftrightarrow`
-            * :attr:`Equivalent.rhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Equivalent.rhs <.boolean.Equivalent.rhs>` \
                 -- right hand side of a logical :math:`\\longleftrightarrow`
-            * :attr:`Implies.lhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Implies.lhs <.boolean.Implies.lhs>` \
                 -- left hand side of a logical :math:`\\longrightarrow`
-            * :attr:`Implies.rhs <.boolean.Equivalent.lhs>` \
+            * :attr:`Implies.rhs <.boolean.Implies.rhs>` \
                 -- right hand side of a logical :math:`\\longrightarrow`
             * :attr:`Not.arg <.boolean.Not.arg>` \
                 -- argument formula of a logical :math:`\\neg`
@@ -99,10 +102,6 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 -- variable of a quantifier :math:`\\exists` or :math:`\\forall`
         """
         return self._args
-
-    @args.setter
-    def args(self, args: tuple[Any, ...]) -> None:
-        self._args = args
 
     def __and__(self, other: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
         """Override the :obj:`& <object.__and__>` operator to apply
@@ -116,7 +115,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return And(self, other)
 
     def __eq__(self, other: object) -> bool:
-        """A recursive test for equality of the `self` and `other`.
+        """A recursive test for equality of the ``self`` and ``other``.
 
         Note that this is not a logical operator for equality.
 
@@ -175,8 +174,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return Not(self)
 
     def __le__(self, other: Formula[α, τ, χ, σ]) -> bool:
-        """Returns :external:obj:`True` if `self` should be sorted before or is
-        equal to other.
+        """Returns :external:obj:`True` if ``self`` should be sorted before or
+        is equal to other.
 
         .. seealso::
           * :meth:`AtomicFormula.__le__() <.firstorder.atomic.AtomicFormula.__le__>`\
@@ -224,8 +223,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return Or(self, other)
 
     def __repr__(self) -> str:
-        """A Representation of the :class:`Formula` `self` that is suitable for
-        use as an input.
+        """A Representation of the :class:`Formula` ``self`` that is suitable
+        for use as an input.
         """
         r = self.op.__name__
         r += '('
@@ -288,8 +287,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, repr(self)
 
     def all(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
-        """Universal closure. Universally quantifiy all variables occurring
-        free in `self`, except the ones in `ignore`.
+        """Universal closure. Universally quantify all variables occurring
+        free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
         >>> a, b, x = VV.get('a', 'b', 'x')
@@ -394,7 +393,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
     def atoms(self) -> Iterator[α]:
         """
         An iterator over all instances of :class:`AtomicFormula
-        <.firstorder.atomic.AtomicFormula>` occurring in `self`.
+        <.firstorder.atomic.AtomicFormula>` occurring in ``self``.
 
         Recall that the truth values :data:`T <.boolean.T>` and :data:`F
         <.boolean.F>` are not atoms:
@@ -439,7 +438,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, type(self)
 
     def bvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
-        """An iterator over all bound occurrences of variables in `self`. Each
+        """An iterator over all bound occurrences of variables in ``self``. Each
         variable is reported once for each term that it occurs in.
 
         >>> from logic1.theories.RCF import *
@@ -452,8 +451,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         to the occurrence in a term. Appearances of variables as a quantified
         variables without use in any term are not considered.
 
-        The parameter `quantified` specifies variable to be considered bound in
-        addition to those that are explicitly quantified in `self`.
+        The parameter ``quantified`` specifies variable to be considered bound in
+        addition to those that are explicitly quantified in ``self``.
 
         .. seealso::
             * :meth:`fvars` -- all occurring free variables
@@ -489,8 +488,10 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         :class:`Ex <.quantified.Ex>`::
 
             Ex ———— And ———— All ———— Ex ———— Ex ———— x == y + 1
+
+        A quantifier-free formula has zero alternations.
         """
-        return self._count_alternations()[0]
+        return max(0, self._count_alternations()[0])
 
     def _count_alternations(self) -> tuple[int, set[type[All | Ex]]]:
         match self:
@@ -547,8 +548,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 assert False, type(self)
 
     def ex(self, ignore: Iterable[χ] = set()) -> Formula[α, τ, χ, σ]:
-        """Existential closure. Existentially quantifiy all variables occurring
-        free in `self`, except the ones in `ignore`.
+        """Existential closure. Existentially quantify all variables occurring
+        free in ``self``, except the ones in ``ignore``.
 
         >>> from logic1.theories.RCF import *
         >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
@@ -570,11 +571,11 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return f
 
     def fvars(self, quantified: frozenset[χ] = frozenset()) -> Iterator[χ]:
-        """An iterator over all free occurrences of variables in `self`. Each
+        """An iterator over all free occurrences of variables in ``self``. Each
         variable is reported once for each term that it occurs in.
 
-        The parameter `quantified` specifies variable to be considered bound in
-        addition to those that are explicitly quantified in `self`.
+        The parameter ``quantified`` specifies variable to be considered bound
+        in addition to those that are explicitly quantified in ``self``.
 
         >>> from logic1.theories.RCF import *
         >>> a, x, y, z = VV.get('a', 'x', 'y', 'z')
@@ -694,7 +695,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         Prefix([(<class 'logic1.firstorder.quantified.All'>, [x, y]),
                 (<class 'logic1.firstorder.quantified.Ex'>, [z])])
 
-        If `self` is not prenex, then the leading quantifiers are considered
+        If ``self`` is not prenex, then the leading quantifiers are considered
         and the matrix will not be quantifier-free:
 
         >>> h = All(x, All(y, Implies(x != 0, Ex(z, x * z == y))))
@@ -743,7 +744,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         return f
 
     def qvars(self) -> Iterator[χ]:
-        """An iterator over all quantified variables in `self`.
+        """An iterator over all quantified variables in ``self``.
 
         In the following example, ``z`` is a quantified variable but not a
         bound variable:
@@ -771,38 +772,50 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
             case _:
                 assert False, type(self)
 
+    _LATEX_TOKEN = re.compile(r'\\(?:[A-Za-z]+|.)|.', re.DOTALL)
+
     def _repr_latex_(self) -> str:
-        """A LaTeX representation for Jupyter notebooks. In general, the
+        r"""A LaTeX representation for Jupyter notebooks. In general, the
         underlying method :meth:`as_latex` should be used instead.
 
-        Due to a current limitation of Jupyter, the LaTeX representration is
-        cut off after at most 5000 characters.
+        To remain below MathJax’s default 5 KiB TeX input buffer, the
+        representation is truncated to approximately 5000 characters.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+
+        >>> f = All(x, Ex(y, x - y == 0))
+        >>> f._repr_latex_()
+        '$\\displaystyle \\forall x \\, \\exists y \\, (x - y = 0)$'
+
+        >>> g = And(*(x == 0 for _ in range(1000)))
+        >>> latex = g._repr_latex_()
+        >>> latex == '$\\displaystyle ' + 'x = 0 \\, \\wedge \\, ' * 263 + 'x ={}\\dots$'
+        True
 
         .. seealso:: :meth:`as_latex` -- LaTeX representation
         """
         limit = 5000
-        as_latex = self.as_latex()
-        if len(as_latex) > limit:
-            as_latex = as_latex[:limit]
-            opc = 0
-            for pos in range(limit):
-                match as_latex[pos]:
-                    case '{':
-                        opc += 1
-                    case '}':
-                        opc -= 1
-            assert opc >= 0
-            while opc > 0:
-                match as_latex[-1]:
-                    case '{':
-                        opc -= 1
-                    case '}':
-                        opc += 1
-                as_latex = as_latex[:-1]
-            as_latex += '{}\\dots'
-        return f'$\\displaystyle {as_latex}$'
+        latex = self.as_latex()
+        if len(latex) <= limit:
+            return f'$\\displaystyle {latex}$'
+        cut = 0
+        open_groups: list[int] = []
+        for match in Formula._LATEX_TOKEN.finditer(latex):
+            if match.end() > limit:
+                break
+            cut = match.end()
+            token = match.group()
+            if token == '{':
+                open_groups.append(match.start())
+            elif token == '}':
+                assert open_groups
+                open_groups.pop()
+        if open_groups:
+            cut = open_groups[0]
+        return f'$\\displaystyle {latex[:cut]}{{}}\\dots$'
 
-    def _repr_pretty_(self, p: pretty.RepresentationPrinter, cycle: bool) -> None:
+    def _repr_pretty_(self, p: RepresentationPrinter, cycle: bool) -> None:
         assert not cycle
         op = self.__class__.__name__
         with p.group(len(op) + 1, op + '(', ')'):
@@ -813,8 +826,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 p.pretty(arg)
 
     def simplify(self) -> Formula[α, τ, χ, σ]:
-        """Fast basic simplification. The result is equivalent to `self`. The
-        following first-order simplifications are applied:
+        """Fast basic simplification. The result is equivalent to the formula.
+        The following first-order simplifications are applied:
 
         1. Truth values:
 
@@ -888,34 +901,29 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                     return _T()
                 return involutive_not(arg_simplify)
             case And() | Or():
-                simplified_args: list[Formula] = []
+                simplified_args = set()
                 for arg in self.args:
                     arg_simplify = arg.simplify()
                     if arg_simplify is self.definite_element():
                         return self.definite_element()
                     if arg_simplify is self.neutral_element():
                         continue
-                    if arg_simplify in simplified_args:
-                        continue
                     if arg_simplify.op is self.op:
-                        simplified_args.extend(arg_simplify.args)
+                        simplified_args.update(arg_simplify.args)
                     else:
-                        simplified_args.append(arg_simplify)
-                return self.op(*simplified_args)
+                        simplified_args.add(arg_simplify)
+                return self.op(*sorted(simplified_args))
             case Implies():
-                if self.rhs is _T():
-                    return self.lhs
                 lhs_simplify = self.lhs.simplify()
                 if lhs_simplify is _F():
                     return _T()
                 rhs_simplify = self.rhs.simplify()
-                if rhs_simplify is _T():
-                    return _T()
                 if lhs_simplify is _T():
                     return rhs_simplify
+                if rhs_simplify is _T():
+                    return _T()
                 if rhs_simplify is _F():
                     return involutive_not(lhs_simplify)
-                assert {lhs_simplify, rhs_simplify}.isdisjoint({_T(), _F()})
                 if lhs_simplify == rhs_simplify:
                     return _T()
                 return Implies(lhs_simplify, rhs_simplify)
@@ -927,13 +935,12 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                 if rhs_simplify is _T():
                     return lhs_simplify
                 if lhs_simplify is _F():
-                    if isinstance(rhs_simplify, Not):
-                        return rhs_simplify.arg
-                    return Not(rhs_simplify)
+                    if rhs_simplify is _F():
+                        return _T()
+                    return involutive_not(rhs_simplify)
                 if rhs_simplify is _F():
-                    if isinstance(lhs_simplify, Not):
-                        return lhs_simplify.arg
-                    return Not(lhs_simplify)
+                    assert lhs_simplify is not _F()
+                    return involutive_not(lhs_simplify)
                 if lhs_simplify == rhs_simplify:
                     return _T()
                 return Equivalent(lhs_simplify, rhs_simplify)
@@ -954,47 +961,33 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         Ex(x, a - x == 0)
         >>> f.subs({a: x})
         Ex(G0001_x, -G0001_x + x == 0)
-        >>> g = Ex(x, _ & (b == 0))
+        >>> g = Ex(x, And(_, b == 0))
         >>> g.subs({b: x})
         Ex(G0002_x, And(Ex(G0001_x, -G0001_x + G0002_x == 0), x == 0))
         """
         if Formula.is_quantified_formula(self):
-            # A copy of the mutable could be avoided by keeping track of
-            # the changes and undoing them at the end.
             substitution = substitution.copy()
-            # (1) Remove substitution for the quantified variable. In
-            # principle, this is covered by (2) below, but deleting here
-            # preserves the name.
-            if self.var in substitution:
-                del substitution[self.var]
-            # Collect all variables on the right hand sides of
-            # substitutions:
+            fvars = set(self.fvars())
+            for var in list(substitution):
+                if var not in fvars:
+                    del substitution[var]
+            if not substitution:
+                return cast(Self, self)
             substituted_vars: set[Variable] = set()
-            for term in substitution.values():
-                if self.is_term(term):
-                    substituted_vars.update(tuple(term.vars()))
-            # (2) Make sure the quantified variable is not a key and does
-            # not occur in a value of substitution:
-            if self.var in substituted_vars or self.var in substitution:
+            for value in substitution.values():
+                if self.is_term(value):
+                    substituted_vars.update(value.vars())
+            if self.var in substituted_vars:
                 var = self.var.fresh()
-                # We now know the following:
-                #   (i) var is not a key,
-                #  (ii) var does not occur in the values,
-                # (iii) self.var is not a key.
-                # We do *not* know whether self.var occurs in the values.
                 substitution[self.var] = var
-                # All free occurrences of self.var in self.arg will be
-                # renamed to var. In case of (iv) above, substitution will
-                # introduce new free occurrences of self.var, which do not
-                # clash with the new quantified variable var:
-                return self.op(var, self.arg.subs(substitution))  # type: ignore[return-value]
-            return self.op(self.var, self.arg.subs(substitution))  # type: ignore[return-value]
+            else:
+                var = self.var
+            return cast(Self, self.op(var, self.arg.subs(substitution)))
         elif Formula.is_boolean_formula(self):
-            return_value = self.op(*(arg.subs(substitution) for arg in self.args))
-            return return_value  # type: ignore[return-value]
+            return cast(Self, self.op(*(arg.subs(substitution) for arg in self.args)))
         else:
-            # Atomic formulas are caught by the implementation of the
-            # abstract method AtomicFormula.subs.
+            # Atomic formulas are caught by the implementation of the abstract
+            # method AtomicFormula.subs.
             assert False, type(self)
 
     def to_nnf(self, to_positive: bool = True, _not: bool = False) -> Formula[α, τ, χ, σ]:
@@ -1007,8 +1000,8 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         admitted are :class:`.And`, :class:`.Or`, :class:`.Ex`, and
         :class:`.All`.
 
-        If the input is quanitfier-free, :meth:`to_nnf` will not introduce any
-        quanitfiers.
+        If the input is quantifier-free, :meth:`to_nnf` will not introduce any
+        quantifiers.
 
         If `to_positive` is `True`, :class:`.Not` is eliminated via replacing
         relation symbols with their complements. The result is then even a
@@ -1072,10 +1065,10 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
         If the minimal number of alternations in the result can be achieved
         with both :class:`.Ex` and :class:`.All` as the first quantifier in the
         result, then the former is preferred. This preference can be changed
-        with a keyword argument `prefer_universal=True`.
+        with a keyword argument ``prefer_universal=True``.
 
-        An keyword argument `is_nnf=True` indicates that `self` is already in
-        NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
+        An keyword argument ``is_nnf=True`` indicates that ``self`` is already
+        in NNF. :meth:`to_pnf` then skips the initial NNF computation, which can
         be useful in time-critical situations.
 
         >>> from logic1.theories.RCF import *
@@ -1094,12 +1087,12 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
     def traverse(self, *,
                  map_atoms: Callable[..., Formula[α, τ, χ, σ]] = lambda atom: atom,
                  sort_levels: bool = False) -> Formula[α, τ, χ, σ]:
-        """Apply `tr` to all atomic formulas.
+        """Apply ``map_atoms`` to all atomic formulas.
 
-        Replaces each atomic subformula of `self` with the :class:`Formula`
-        `map_atoms(self)`. If `sort_levels` is :obj:`True`, all subformulas
+        Replaces each atomic subformula of ``self`` with the :class:`Formula`
+        ``map_atoms(self)``. If ``sort_levels`` is :obj:`True`, all subformulas
         built from commutative Boolean operators (:class:`.And`, :class:`.Or`,
-        :class:`.Equivalent`) are sorted after the application of `map_atoms`.
+        :class:`.Equivalent`) are sorted after the application of ``map_atoms``.
 
         >>> from logic1.theories.RCF import *
         >>> x, y, z = VV.get('x', 'y', 'z')
@@ -1121,7 +1114,7 @@ class Formula(ABC, Generic[α, τ, χ, σ]):
                     argl.sort()
                 return self.op(*argl)
             case Not() | Implies() | _F() | _T():
-                args = (arg.traverse_atoms(map_atoms=map_atoms, sort_levels=sort_levels)
+                args = (arg.traverse(map_atoms=map_atoms, sort_levels=sort_levels)
                         for arg in self.args)
                 return self.op(*args)
             case AtomicFormula():

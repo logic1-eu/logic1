@@ -14,7 +14,7 @@ alternations in the prenex block [Burhenne-1990]_.
 from typing import Generic
 
 from . import (
-    All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Or,
+    All, And, AtomicFormula, BooleanFormula, Ex, _F, Formula, Not, Or,
     QuantifiedFormula, _T)
 from .formula import α, τ, χ, σ
 
@@ -57,7 +57,7 @@ class PrenexNormalForm(Generic[α, τ, χ, σ]):
         # All and Ex are not annotated in the return type, because they are not
         # used as quantifiers but as dictionary keys.
         match f:
-            case AtomicFormula() | _F() | _T():
+            case AtomicFormula() | Not() | _F() | _T():
                 return {Ex: f, All: f}
             case And() | Or():
                 L1 = []
