@@ -695,25 +695,25 @@ class Term:
     Test is_definite:
     ----------------------------------------------------------------------------
     >>> print(Term(0).is_definite())
-    DEFINITE.ZERO
+    Definite.ZERO
 
     >>> f = x**2 + y**2
     >>> print(f.is_definite())
-    DEFINITE.POSITIVE_SEMI
+    Definite.POSITIVE_SEMI
 
     >>> g = -x**2 - y**2 - 1
     >>> print(g.is_definite())
-    DEFINITE.NEGATIVE
+    Definite.NEGATIVE
 
     >>> h = (x - y) ** 2
     >>> print(h.is_definite())
-    DEFINITE.UNKNOWN
+    Definite.UNKNOWN
 
-    >>> print(h.is_definite(assume={x: DEFINITE.POSITIVE, y: DEFINITE.NEGATIVE}))
-    DEFINITE.POSITIVE
+    >>> print(h.is_definite(assume={x: Definite.POSITIVE, y: Definite.NEGATIVE}))
+    Definite.POSITIVE
 
-    >>> print(h.is_definite(assume={x: DEFINITE.NEGATIVE_SEMI, y: DEFINITE.POSITIVE_SEMI}))
-    DEFINITE.POSITIVE_SEMI
+    >>> print(h.is_definite(assume={x: Definite.NEGATIVE_SEMI, y: Definite.POSITIVE_SEMI}))
+    Definite.POSITIVE_SEMI
 
     ----------------------------------------------------------------------------
     Test is_monomial:

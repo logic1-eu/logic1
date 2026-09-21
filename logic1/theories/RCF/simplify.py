@@ -17,7 +17,7 @@ from gmpy2 import mpq, sign
 
 from logic1 import abc
 from logic1.firstorder import And, _F, Not, Or, _T
-from logic1.theories.RCF.term import CACHE_SIZE, DEFINITE, Term, Variable
+from logic1.theories.RCF.term import CACHE_SIZE, Definite, Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Le, Gt, Lt, Ne
 from logic1.theories.RCF.substitution import _SubstValue, _Substitution  # type: ignore
 from logic1.theories.RCF.types import Formula, Number
@@ -766,7 +766,7 @@ class Simplify(abc.simplify.Simplify[
                 fac_junctor = And
             definite = lhs.is_definite()
             # Definiteness tests on original left hand side
-            if definite in (DEFINITE.NEGATIVE, DEFINITE.POSITIVE):
+            if definite in (Definite.NEGATIVE, Definite.POSITIVE):
                 return definite_junctor.definite_element()
             _, factors = lhs.factor()
             square_free_lhs = Term(1)
@@ -776,12 +776,12 @@ class Simplify(abc.simplify.Simplify[
                 square_free_lhs *= factor
             # Definiteness tests on square-free part:
             square_free_definite = square_free_lhs.is_definite()
-            if square_free_definite in (DEFINITE.NEGATIVE, DEFINITE.POSITIVE):
+            if square_free_definite in (Definite.NEGATIVE, Definite.POSITIVE):
                 return definite_junctor.definite_element()
             if explode_always or context == definite_junctor:
-                if square_free_definite in (DEFINITE.NEGATIVE_SEMI, DEFINITE.POSITIVE_SEMI):
+                if square_free_definite in (Definite.NEGATIVE_SEMI, Definite.POSITIVE_SEMI):
                     return split_definite(square_free_lhs)
-                if definite in (DEFINITE.NEGATIVE_SEMI, DEFINITE.POSITIVE_SEMI):
+                if definite in (Definite.NEGATIVE_SEMI, Definite.POSITIVE_SEMI):
                     return split_definite(lhs)
             if explode_always or context == fac_junctor:
                 args = (rel(factor, 0) for factor in factors)
@@ -792,13 +792,13 @@ class Simplify(abc.simplify.Simplify[
 
             def definiteness_test(f: Term) -> Optional[Formula]:
                 definite = f.is_definite()
-                if definite in (DEFINITE.POSITIVE, DEFINITE.POSITIVE_SEMI):
+                if definite in (Definite.POSITIVE, Definite.POSITIVE_SEMI):
                     return _T()
-                if definite is DEFINITE.NEGATIVE:
+                if definite is Definite.NEGATIVE:
                     return _F()
-                if definite is DEFINITE.NEGATIVE_SEMI:
+                if definite is Definite.NEGATIVE_SEMI:
                     return _simpl_at_eq_ne(Eq, f)
-                if definite is DEFINITE.UNKNOWN:
+                if definite is Definite.UNKNOWN:
                     return None
                 assert False
 
@@ -813,7 +813,7 @@ class Simplify(abc.simplify.Simplify[
             even_factor = Term(1)
             odd_factor = Term(1)
             for factor, multiplicity in factors.items():
-                if factor.is_definite() is DEFINITE.POSITIVE:
+                if factor.is_definite() is Definite.POSITIVE:
                     continue
                 if multiplicity % 2 == 0:
                     even_factors.append(factor)
@@ -822,11 +822,11 @@ class Simplify(abc.simplify.Simplify[
                     odd_factor *= factor
             remaining_squarefree_part = odd_factor * even_factor
             # Definiteness tests on factorization
-            if (sgn * odd_factor).is_definite() in (DEFINITE.POSITIVE, DEFINITE.POSITIVE_SEMI):
+            if (sgn * odd_factor).is_definite() in (Definite.POSITIVE, Definite.POSITIVE_SEMI):
                 return _T()
-            if (sgn * odd_factor).is_definite() is DEFINITE.NEGATIVE:
+            if (sgn * odd_factor).is_definite() is Definite.NEGATIVE:
                 return _simpl_at_eq_ne(Eq, even_factor)
-            if (sgn * odd_factor).is_definite() is DEFINITE.NEGATIVE_SEMI:
+            if (sgn * odd_factor).is_definite() is Definite.NEGATIVE_SEMI:
                 return _simpl_at_eq_ne(Eq, sgn * remaining_squarefree_part)
             hit = definiteness_test(sgn * remaining_squarefree_part)
             # Definiteness tests on signed remaining squarefree part:
