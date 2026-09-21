@@ -52,19 +52,18 @@ else
 endif
 
 .PHONY: cython cython-clean cython-veryclean \
-		egg \
         pytest mypy mypy-run \
         test test-all test-doc \
         doc pygount coverage coverage_html \
         clean veryclean conda-build
 
-test: egg cython
+test: cython
 	$(MAKE) mypy-run
 	$(PYTEST) $(ignores)
 
 test-all: test test-doc
 
-mypy: egg cython
+mypy: cython
 	$(MAKE) mypy-run
 
 mypy-run:
@@ -72,17 +71,13 @@ mypy-run:
 	mypy --explicit-package-bases stubs
 	mypy --exclude '$(exclude_re)' logic1
 
-pytest: egg cython
+pytest: cython
 	$(PYTEST) $(ignores)
 
 test-doc:
 	cd doc && make test
 
 cython: $(CYTHON_SOS)
-
-egg:
-	python cython-setup.py egg_info
-
 
 logic1/theories/RCF/%$(EXT_SUFFIX): logic1/theories/RCF/%.pyx cython-setup.py
 	python cython-setup.py build_ext --inplace
@@ -93,13 +88,13 @@ cython-clean:
 cython-veryclean: cython-clean
 	/bin/rm -f $(addsuffix .cpython-*-darwin.so, $(CYTHON_BASES))
 
-doc: egg cython
+doc: cython
 	cd doc && make clean html
 
 pygount:
 	pygount -f summary logic1
 
-coverage: egg cython
+coverage: cython
 	coverage run -m pytest --doctest-modules $(ignores)
 
 coverage_html: coverage
@@ -110,7 +105,7 @@ clean:
 	/bin/rm -rf build dist
 
 veryclean: clean cython-veryclean
-	/bin/rm -rf htmlcov .coverage logic1.egg-info doc/build
+	/bin/rm -rf htmlcov .coverage doc/build
 
 conda-build:
 	LOGIC1_GIT_REPO="file:$$(pwd)" \
