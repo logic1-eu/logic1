@@ -118,5 +118,11 @@ conda-build:
 	LOGIC1_VERSION="$$(python -m setuptools_scm)" \
 	rattler-build build --recipe conda
 
-# Upload release notes:
+# Upload release notes w/o creating a new release
 # gh release edit v0.2.0 --notes-file releases/v0.2.0.md
+
+# Create new release
+# gh release create v0.3.1 --title "0.3.1"--notes-file releases/v0.3.1.md
+
+# Get the SHA-256 checksum of the release tarball
+# curl -Ls https://github.com/logic1-eu/logic1/archive/refs/tags/v0.3.1.tar.gz | shasum -a 256

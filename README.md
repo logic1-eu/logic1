@@ -59,7 +59,7 @@ formal perspective, this is the theory of real closed fields (RCF). Logic1 allow
 to formalize the question for the existence of solutions of a parametric
 quadratic equation:
 
-``` python
+```pycon
 >>> from logic1 import *                # import Logic1
 >>> from logic1.theories.RCF import *   # import RCF
 >>> VV.imp('a', 'b', 'c', 'x')          # declare variables
@@ -74,7 +74,7 @@ Logic1 can check that this sequence has period 9 for all possible choices of
 $x_1$, $x_2$. The final output T is a constant logical operator representing
 "True":
 
-``` python
+```pycon
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
 >>> VV.imp(*(f'x{i}' for i in range(1, 12)))
