@@ -63,7 +63,6 @@ quadratic equation:
 >>> from logic1 import *                # import Logic1
 >>> from logic1.theories.RCF import *   # import RCF
 >>> VV.imp('a', 'b', 'c', 'x')          # declare variables
->>> xx = VV.get('xx')
 >>> phi = Ex(x, a*x**2 + b*x + c == 0)  # formalization with existential quantifier
 >>> qe(phi)                             # quantifier elimination
 Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b**2 <= 0))
