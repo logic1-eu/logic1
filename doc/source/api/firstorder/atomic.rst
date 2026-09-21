@@ -6,52 +6,25 @@
 Variables, Terms, Atoms
 ***********************
 
-.. automodule:: logic1.firstorder.atomic
-
-  Generic Types
-  *************
-
-  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`, and
-  :data:`.atomic.χ` with the same names and definitions as in module
-  :mod:`.formula`.
-
-  .. data:: α
-    :value: TypeVar('α', bound='AtomicFormula')
-    :canonical: logic1.firstorder.atomic.α
-
-    A type variable denoting a type of atomic formulas with upper bound
-    :class:`logic1.firstorder.atomic.AtomicFormula`.
-
-  .. data:: τ
-    :value: TypeVar('τ', bound='Term')
-    :canonical: logic1.firstorder.atomic.τ
-
-    A type variable denoting a type of terms with upper bound
-    :class:`logic1.firstorder.atomic.Term`.
-
-  .. data:: χ
-    :value: TypeVar('χ', bound='Variable')
-    :canonical: logic1.firstorder.atomic.χ
-
-    A type variable denoting a type of variables with upper bound
-    :class:`logic1.firstorder.atomic.Variable`.
-
-  .. data:: σ
-    :value: TypeVar('σ')
-    :canonical: logic1.firstorder.atomic.σ
-
-    A type variable denoting a type that is admissible in addition to terms as a
-    dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
-    :data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
-    any variables. A typical example is setting :data:`σ` to :class:`int` in the
-    theory of real closed fields.
-
+.. automodule:: logic1.firstorder.term
 
   Set of Variables
   ********************
 
   .. autoclass:: VariableSet
     :special-members:
+    :exclude-members: __init__, __new__
+
+    .. property:: stack
+      :abstractmethod:
+
+      The class internally keeps track of variables already used. This is
+      relevant when creating unused variables via :meth:`Variable.fresh`. The
+      :attr:`stack` can hold such internal states.
+
+      .. seealso::
+        * :meth:`.push` -- push information to :attr:`.stack` and reset
+        * :meth:`.pop` -- restore information from :attr:`.stack`
 
     .. automethod:: __getitem__
 
@@ -73,11 +46,10 @@ Variables, Terms, Atoms
         :attr:`.stack`, :meth:`.push`, and :meth:`pop` are reserved for special
         situations.
 
-        They allow to obtain variables from :meth:`fresh()
-        <.firstorder.atomic.VariableSet.fresh>` within asychronous doctests in a
-        reproducable way. In the following example,
+        They allow to obtain variables from :meth:`Variable.fresh` within asychronous
+        doctests in a reproducable way. In the following example,
         :meth:`.Formula.to_pnf` indirectly uses
-        :meth:`.RCF.atomic.VariableSet.fresh`:
+        :meth:`Variable.fresh`:
 
         >>> from logic1.firstorder import *
         >>> from logic1.theories.RCF import *
@@ -107,7 +79,7 @@ Variables, Terms, Atoms
 
   .. autoclass:: Term
     :members: as_latex, sort_key, vars
-    :special-members:
+    :exclude-members: __init__, __new__
 
 
   Variables
@@ -117,6 +89,9 @@ Variables, Terms, Atoms
     :members:
     :undoc-members:
 
+
+.. automodule:: logic1.firstorder.atomic
+
   Atomic Formulas
   ***************
 
@@ -125,3 +100,48 @@ Variables, Terms, Atoms
     :undoc-members:
     :exclude-members: atoms
     :special-members: __le__, __str__
+
+
+  Generic Types
+  *************
+
+  We use type variables :data:`.atomic.α`, :data:`.atomic.τ`,
+  :data:`.atomic.χ`, and :data:`.atomic.σ` with the same names and definitions
+  as in module :mod:`.formula`.
+
+  .. data:: α
+    :value: TypeVar('α', bound='AtomicFormula')
+    :canonical: logic1.firstorder.term.α
+
+    A type variable denoting a type of atomic formulas with upper bound
+    :class:`logic1.firstorder.atomic.AtomicFormula`.
+
+  .. data:: τ
+    :value: TypeVar('τ', bound='Term')
+    :canonical: logic1.firstorder.term.τ
+
+    A type variable denoting a type of terms with upper bound
+    :class:`logic1.firstorder.term.Term`.
+
+  .. data:: χ
+    :value: TypeVar('χ', bound='Variable')
+    :canonical: logic1.firstorder.term.χ
+
+    A type variable denoting a type of variables with upper bound
+    :class:`logic1.firstorder.term.Variable`.
+
+  .. data:: σ
+    :value: TypeVar('σ')
+    :canonical: logic1.firstorder.term.σ
+
+    A type variable denoting a type that is admissible in addition to terms as a
+    dictionary entry in :meth:`.AtomicFormula.subs`. Instances of type
+    :data:`.σ` that are passed to :meth:`.AtomicFormula.subs` must not contain
+    any variables. A typical example is setting :data:`σ` to :class:`int` in the
+    theory of real closed fields.
+
+  .. data:: κ
+    :value: TypeVar('κ')
+    :canonical: logic1.firstorder.term.κ
+
+    A type variable denoting a sort key.

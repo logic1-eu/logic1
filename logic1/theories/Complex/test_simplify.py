@@ -28,7 +28,3 @@ def test_eval():
     x = VV['x']
     with pytest.raises(ValueError):
         ((1 - x) ** 2).eval()
-
-
-def test_normalize():
-    ...  # TODO

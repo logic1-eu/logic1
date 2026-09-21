@@ -18,9 +18,12 @@ channels:
   - conda-forge
 dependencies:
   - python >=3.12
+  - clang
   - coverage
   - cython
   - pytest-cython
+  - graphviz
+  - python-graphviz
   - jupyter
   - line_profiler
   - more-itertools

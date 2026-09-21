@@ -1,7 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Special+Elite&display=swap');
 
 .bd-sidebar-primary {
-    overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .navbar-brand .logo__title {
@@ -12,6 +13,17 @@
   font-optical-sizing:auto;
   color: var(--pst-color-muted);
   margin-right: auto;
+}
+
+.navbar-brand:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.bd-sidebar-secondary a:focus,
+.bd-sidebar-secondary a:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
 }
 
 /* anything related to the dark theme */

@@ -61,7 +61,7 @@ class InternalRepresentation(
     """
     _options: abc.simplify.Options
     _min_card: Index = 1
-    _max_card: Index = oo
+    _max_card: Optional[Index] = oo
     _equations: UnionFind = field(default_factory=UnionFind)
     _inequations: set[Ne] = field(default_factory=set)
 
@@ -76,12 +76,14 @@ class InternalRepresentation(
                 case C(index=n):
                     if n > self._min_card:
                         self._min_card = n
-                    if self._min_card > self._max_card:
+                    if InternalRepresentation._is_inconsistent(self._min_card, self._max_card):
                         raise InternalRepresentation.Inconsistent()
                 case C_(index=n):
-                    if n - 1 < self._max_card:
+                    if n == oo:
+                        self._max_card = None
+                    elif self._max_card is None or n - 1 < self._max_card:
                         self._max_card = n - 1
-                    if self._min_card > self._max_card:
+                    if InternalRepresentation._is_inconsistent(self._min_card, self._max_card):
                         raise InternalRepresentation.Inconsistent()
                 case Eq(lhs=lhs, rhs=rhs):
                     self._equations.union(lhs, rhs)
@@ -89,9 +91,6 @@ class InternalRepresentation(
                     self._inequations.add(atom)
                 case _:
                     assert False
-            for ne in self._inequations:
-                if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
-                    raise InternalRepresentation.Inconsistent()
             for ne in self._inequations:
                 if self._equations.find(ne.lhs) == self._equations.find(ne.rhs):
                     raise InternalRepresentation.Inconsistent()
@@ -111,8 +110,13 @@ class InternalRepresentation(
         L: list[AtomicFormula] = []
         if self._min_card > ref._min_card:
             L.append(C(self._min_card))
-        if self._max_card < ref._max_card:
-            L.append(C_(self._max_card + 1))
+        if self._max_card is None:
+            assert ref._max_card in (None, oo)
+            if ref._max_card == oo:
+                L.append(C_(oo))
+        else:
+            if ref._max_card is None or self._max_card < ref._max_card:
+                L.append(C_(self._max_card + 1))
         for eq in self._equations.equations():
             if ref._equations.find(eq.lhs) != ref._equations.find(eq.rhs):
                 L.append(eq)
@@ -124,6 +128,24 @@ class InternalRepresentation(
         if gand is Or:
             L = [atom.to_complement() for atom in L]
         return L
+
+    @staticmethod
+    def _is_inconsistent(min_card: Index, max_card: Optional[Index]) -> bool:
+        """Returns :obj:`True` if the given ``min_card`` and ``max_card`` are
+        inconsistent, :obj:`False` otherwise.
+
+        >>> InternalRepresentation._is_inconsistent(5, 3)
+        True
+        >>> InternalRepresentation._is_inconsistent(3, 5)
+        False
+        >>> InternalRepresentation._is_inconsistent(oo, None)
+        True
+        >>> InternalRepresentation._is_inconsistent(3, None)
+        False
+        """
+        if max_card is None:
+            return min_card == oo
+        return min_card > max_card
 
     def next_(self, remove: Optional[Variable] = None) -> Self:
         """Implements the abstract method :meth:`.abc.simplify.next_`.
@@ -157,7 +179,7 @@ class Simplify(abc.simplify.Simplify[
 
     _options: abc.simplify.Options = field(default_factory=abc.simplify.Options)
 
-    def create_initial_representation(self, assume=Iterable[AtomicFormula]) \
+    def create_initial_representation(self, assume: Iterable[AtomicFormula] = []) \
             -> InternalRepresentation:
         """Implements the abstract method
         :meth:`.abc.simplify.Simplify.create_initial_representation`.
@@ -184,8 +206,73 @@ class Simplify(abc.simplify.Simplify[
 
 
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
+    """This is the primary simplification function for f modulo assume.
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    >>> simplify(And(a == b, b == c, c == d,  d == c), assume=[a == b])
+    And(a == c, a == d)
+
+    Assumptions do not affect bound variables.
+
+    >>> simplify(And(a == c, Ex(a, a == b)), assume=[a == b])
+    And(a == c, Ex(a, a == b))
+
+    .. seealso::
+
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.simplify` is wrapped by this
+        function.
+    """
     return Simplify().simplify(f, assume)
 
 
 def is_valid(f: Formula, assume: Iterable[AtomicFormula] = []) -> Optional[bool]:
+    """Simplification-based heuristic test for validity and unsatisfiability of
+    a formula.
+
+    .. admonition:: Mathematical definition
+
+        A formula is *valid* if it is true for all values of its free variables.
+        A formula is *unsatisfiable* if it is false for all values of its free
+        variables.
+
+    This function provides an efficient heuristic test whether ``f``
+    is valid or unsatisfiable modulo ``assume``:
+
+    * If the simplifier yields :data:`.T`, then ``f`` is valid and
+      :obj:`.True` is returned.
+
+    * If the simplifier yields :data:`.F`, then ``f`` is unsatisfiable and
+      :obj:`.False` is returned.
+
+    Otherwise, :obj:`None` is returned, which means "don't know".
+
+    .. rubric:: Some examples
+
+    >>> from logic1.firstorder import *
+    >>> from logic1.theories.Sets import *
+    >>> a, b, c, d = VV.get('a', 'b', 'c', 'd')
+
+    Valid:
+
+    >>> is_valid(a == d, assume=[a == b, b == c, c == d])
+    True
+
+    Unsatisfiable:
+
+    >>> is_valid(a == d, assume=[a == b, b != c, c == d])
+    False
+
+    Neither valid nor unsatisfiable:
+
+    >>> is_valid(a == d, assume=[a != b, b != c, c != d])
+
+    .. seealso::
+
+      :class:`.Simplify`
+        Its inherited method :meth:`.Simplify.is_valid` is wrapped by this
+        function.
+    """
     return Simplify().is_valid(f, assume)

@@ -1,5 +1,7 @@
 from string import ascii_lowercase
 
+from gmpy2 import mpq
+
 from logic1.firstorder import *
 from logic1.theories.RCF import *
 
