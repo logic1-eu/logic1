@@ -306,6 +306,12 @@ class GlobalPremise:
             rels = (rels,)
         return [atom.lhs for rel in rels for atom in self[rel]]
 
+    def update(self, assume: Iterable[AtomicFormula]) -> None:
+        """Update the global premise with a set of atomic formulas ``assume``.
+        """
+        for atom in assume:
+            self.add(atom)
+
 
 @dataclass
 class GSimplify:
@@ -385,44 +391,37 @@ class GSimplify:
     def gsimplify_clauses(self, clauses: list[Clause], assume: Iterable[AtomicFormula]) -> list[Clause]:
         """Gröbner-simplify a list of clauses modulo ``assume``.
         """
+        count = len(clauses)
+        logging.info(f'{count} input clauses')
 
         if Clause() in clauses:
             logging.info(f'found empty clause')
             return [Clause()]
 
-        count = len(clauses)
-
-        strong_global_premise = GlobalPremise(assume, self._options)
-        weak_global_premise = GlobalPremise(assume, self._options)
-
-        # Step 1: Split the clauses into atoms and proper clauses
-        logging.info(f'splitting clauses ({count} input clauses left)')
-        proper_clauses = []
+        # Step 1: Split the clauses into equational clauses, atoms, and proper clauses
+        logging.info(f'splitting clauses')
+        equational_clauses = []
         atoms = []
+        regular_clauses = []
         for clause in clauses:
             if clause.is_equational():
-                proper_clauses.append(clause)
-                atom = clause.as_atom()
-                strong_global_premise.add(atom)
+                equational_clauses.append(clause)
             elif clause.is_atomic():
                 logging.debug(f'{count} input clauses left')
                 atom = clause.as_atom()
                 atoms.append(atom)
-                weak_global_premise.add(atom)
-                strong_global_premise.add(atom)
             else:
-                proper_clauses.append(clause)
+                regular_clauses.append(clause)
+
+        logging.info(f'{len(equational_clauses)} equational clauses, '
+                     f'{len(atoms)} atoms, '
+                     f'{len(regular_clauses)} regular clauses')
 
         new_clauses: list[Clause] = []
 
         # Step 2: Simplify the atoms, if present
-        if len(atoms) == 1:
-            logging.info(f'processing single atom as proper clause ({count} input clauses left)')
-            proper_clauses.append(Clause(atoms[0]))
-            weak_global_premise.remove(atoms[0])
-
-        elif len(atoms) > 1:
-            logging.info(f'processing multiple atoms ({count} input clauses left)')
+        if len(atoms) > 1:
+            logging.info(f'processing multiple atoms recursively')
             count -= len(atoms)
             atoms_as_clauses_neg = [Clause(Or(*(atom.to_complement() for atom in atoms)))]
             atoms_as_clauses_neg = self.gsimplify_clauses(atoms_as_clauses_neg, assume=assume)
@@ -431,18 +430,28 @@ class GSimplify:
             assert len(atoms_as_clauses_neg) == 1
             for atom_neg in atoms_as_clauses_neg[0]:
                 atom = atom_neg.to_complement()
-                # if isinstance(atom, Ne):
-                #     _, factors = atom.lhs.factor()
-                #     new_clauses.extend(Clause(Ne(factor, 0)) for factor in factors)
-                # else:
-                #     new_clauses.append(Clause(atom))
                 new_clauses.append(Clause(atom))
 
-        # Step 3: Simplify the proper clauses
-        logging.info(f'processing proper clauses ({count} input clauses left)')
-        for clause in proper_clauses:
+        strong_global_premise = GlobalPremise(assume, self._options)
+        weak_global_premise = GlobalPremise(assume, self._options)
+
+        for clause in equational_clauses:
+            strong_global_premise.add(clause.as_atom())
+            regular_clauses.append(clause)
+
+        strong_global_premise.update(atoms)
+
+        if len(atoms) == 1:
+            logging.info(f'moving single atom to regular clauses')
+            regular_clauses.append(Clause(atoms[0]))
+        else:
+            weak_global_premise.update(atoms)
+
+        # Step 3: Simplify the regular clauses
+        logging.info(f'processing {len(regular_clauses)} regular clauses')
+        for clause in regular_clauses:
+            logging.debug(f'{count} clauses left!')
             count -= 1
-            logging.debug(f'{count} input clauses left!')
 
             if clause.is_atomic():
                 global_premise = weak_global_premise
@@ -451,7 +460,7 @@ class GSimplify:
 
             new_clause = Clause()
 
-            # 1. Build the atoms of /\ Eq for the new clause /\ Eq -> \/ (Gt, Lt, Eq)
+            # 3.1. Build the atoms of /\ Eq for the new clause /\ Eq -> \/ (Gt, Lt, Eq)
             if len(clause[Ne]) > 0:
                 F = set()
                 for atom in clause[Ne]:
@@ -464,18 +473,13 @@ class GSimplify:
                     H.add(h)
                 new_clause[Ne] = {Ne(h, 0) for h in H}
 
-            logging.debug(f't0')
-
-
-            # 2. For the simplification of \/ (Gt, Lt, Eq) we use a Gröbner basis of /\ Eq together
+            # 3.2. For the simplification of \/ (Gt, Lt, Eq) we use a Gröbner basis of /\ Eq together
             # with the equations of `global_premise`.
             clause_gbasis = Term.gbasis(global_premise.gbasis + clause.term_list_of(Ne),
                                         radical=self._options.radical)
             clause_assume = global_premise.assume(gbasis=clause_gbasis)
 
-            logging.debug(f't1')
-
-            # 2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain
+            # 3.2.1. Simplify \/ Eq by considering the product of its left hand sides plus certain
             # left hand sides of the global premise. We might discover T or redundancy of \/ Eq.
             product = clause.product_of(Eq) * global_premise.product_of((Ne, Gt, Lt))
             product = product.reduce(clause_gbasis)
@@ -512,13 +516,11 @@ class GSimplify:
             else:
                 rhs_rels = [Gt, Lt, Eq]
 
-            # 2.2. Simplify \/ (Gt, Lt) or \/ (Gt, Lt, Eq), depending on the previous if
+            # 3.2.2. Simplify \/ (Gt, Lt) or \/ (Gt, Lt, Eq), depending on the previous if
             for rel in rhs_rels:
                 for atom in clause[rel]:
                     h = atom.lhs.reduce(clause_gbasis)
                     new_clause[rel].add(rel(h, 0))  # !*rlgsred=T
-
-            logging.debug(f't2')
 
             # This concludes the computation of `new_clause`; simplify it
             and_eq = new_clause[Ne]
@@ -536,15 +538,13 @@ class GSimplify:
             assert isinstance(new_clause_formula, (AtomicFormula, Or, _T, _F)) and new_clause_formula.depth() <= 1
             if isinstance(new_clause_formula, _T):
                 continue
-            # if isinstance(new_clause_formula, _F), then we must not return
+            # If isinstance(new_clause_formula, _F), then we must not return
             # [Clause()], because `and_eq` would be dropped.
             new_clause = Clause(new_clause_formula)
             # Restore \/ new_clause[Ne]
             new_clause[Ne] = and_eq
             new_clauses.append(new_clause)
 
-
-        logging.debug(f't3')
         return new_clauses
 
 def gsimplify(f: Formula, assume: Iterable[AtomicFormula] =[], **options) -> Formula:
