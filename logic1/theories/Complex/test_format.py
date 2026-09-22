@@ -1,46 +1,25 @@
-from logic1.firstorder import *
-from logic1.theories.Complex import *
+from logic1.theories.Complex import Term, VV
+from logic1.theories.Complex.ast import Rat
+
+from gmpy2 import mpq
 
 
-def test_repr():
-    w, x, y, z = VV.get('w', 'x', 'y', 'z')
 
-    term1 = Re(Im((x + y) * (z**2 - I / 2)))
-    # assert repr(term1) == 'Im((z**2 + -1/2 * I) * (x + y))'
+def test_regression_repr_numbers():
+    z = VV['z']
+    t = z + mpq(1, 3)
+    u = eval(repr(t), {'z': z, 'mpq': mpq})
+    assert t.sort_key() == u.sort_key()
 
-    term2 = -((x + 1j * y) * (z + w / I - 0.5)**3)
-    # assert repr(term2) == '-((x + I * y) * (z + w * (-I) - 1/2)**3)'
+    t = Term(mpq(1, 3))
+    u = eval(repr(t), {'mpq': mpq, 'Term': Term})
+    assert isinstance(u, Term)
+    assert t.sort_key() == u.sort_key()
 
-    term3 = -(x + (y + z)) / I**3 * Re(Im(z * w - I)) + -1 * (-z**2)**0
-    # assert repr(term3) == '-(x + y + z) * I * Re(Im(z * w - I)) + -1 * (-z**2)**0'
+    s = Rat(mpq(1, 3))
+    v = eval(repr(s), {'mpq': mpq, 'Rat': Rat})
+    assert isinstance(v, Rat)
+    assert s.sort_key() == v.sort_key()
 
-    formula1 = (x + I * y) * (z - w) == Re(Im(x**3 + y**2))
-    # assert repr(formula1) == '(x + I * y) * (z - w) == Re(Im(x**3 + y**2))'
-
-    formula2 = -(x * y + z) != I * w + Re(x**2)
-    # assert repr(formula2) == '-(x * y + z) != I * w + Re(x**2)'
-
-    formula3 = Re(x + I * y) >= Im(z**3 - w)
-    # assert repr(formula3) == 'Re(x + I * y) >= Im(z**3 - w)'
-
-    formula4 = Im((x + y)**2) <= Re(z * (I + w))
-    # assert repr(formula4) == 'Im((x + y)**2) <= Re(z) * (I + w)'
-
-    formula5 = Re(x * I) + Im(y + z) > -Re(w**2)
-    # assert repr(formula5) == 'Re(x * I) + Im(y + z) > -w**2'
-
-    formula6 = -Im(x + I * y) < Im(-1 * w - I**2)
-    # assert repr(formula6) == '-(x + I * y) < x * Im(-1 * w) - I**2'
-
-    # ((z**2 - I / 2)).normalize()
-    # (Im(z) * Re(z**2)).normalize()
-
-
-def test_str():
-    x, y, z = VV.get('x', 'y', 'z')
-    assert str(x**3) == 'x^3'
-    # assert str(I**3) == '-i'
-
-
-def test_latex():
-    ...  # TODO
+    q = mpq(1, 3) * z
+    assert repr(q) == "mpq(1,3) * z"

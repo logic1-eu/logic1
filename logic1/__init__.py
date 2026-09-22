@@ -1,10 +1,13 @@
-__version__ = 0.1
+from importlib.metadata import version as _version
 
-___author___ = 'Nicolas Faroß, Thomas Sturm'
-___contact___ = 'https://logic1.eu/'
-___copyright__ = 'Copyright 2023, N. Faroß, T. Sturm, Germany'
-___license__ = 'GPL-2.0-or-later'
-___status__ = 'Prototype'
+try:
+    __version__ = _version("logic1")
+except Exception:
+    from setuptools_scm import get_version as _get_version
+    try:
+        __version__ = _get_version()
+    except Exception:
+        __version__ = "unknown"
 
 from . import firstorder
 

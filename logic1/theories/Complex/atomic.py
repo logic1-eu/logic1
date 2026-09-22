@@ -1,5 +1,9 @@
+"""Atomic formulas in the theory :mod:`Complex <logic1.theories.Complex>`.
+"""
+
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Iterator, Mapping
 from typing import Self
 
@@ -9,35 +13,76 @@ from logic1 import firstorder
 from logic1.firstorder.boolean import And, _F, Or, _T
 
 from logic1.theories.Complex.types import Formula, Number
+from logic1.theories.Complex.format import TermReprFormatter
 from logic1.theories.Complex.term import Im, Re, Term, Variable
+
 
 from gmpy2 import mpq
 
 
 class AtomicFormula(
         firstorder.AtomicFormula['AtomicFormula', Term, Variable, Number]):
+    """Abstract base class for atomic formulas in the theory of complex
+    numbers. Implements the abstract class
+    :class:`.firstorder.atomic.AtomicFormula`.
+
+    .. seealso::
+        :class:`.Eq`, :class:`.Ne`, :class:`.Ge`, :class:`.Gt`,
+        :class:`.Le`, :class:`.Lt`
+    """
 
     @property
     def lhs(self) -> Term:
-        """The left hand side term of an atomic formula.
+        """The left-hand side term of this atomic formula.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0).lhs
+        z
         """
         return self.args[0]
 
     @property
     def rhs(self) -> Term:
-        """The right hand side term of an atomic formula.
+        """The right-hand side term of this atomic formula.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0).rhs
+        Term(0)
         """
         return self.args[1]
 
-    def __bool__(self) -> bool:  # TODO: discuss
-        """Compares the sort keys of the two sides of the atomic formula
-        using the operator of the formula.
+    def __bool__(self) -> bool:  # TODO: maybe dont allow inequalities?
+        """Compare the sort keys of both sides of this atomic formula
+        using the corresponding operator of this formula. This is used to
+        evaluate atomic formulas in Boolean contexts. For evaluating constant
+        atomic formulas with respect to their usual semantics, use :meth:`.eval`
+        instead.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> bool(z == 0)
+        False
+        >>> bool(z != 0)
+        True
+        >>> bool(z * ~z >= 1)  # not the usual semantics!
+        True
         """
         ops = {Eq: operator.eq, Ne: operator.ne, Le: operator.le,
                Lt: operator.lt, Ge: operator.ge, Gt: operator.gt}
         return ops[self.op](self.lhs.sort_key(), self.rhs.sort_key())
 
     def __eq__(self, other: object) -> bool:
+        """Return :obj:`True` if two formulas have the same relation and sides.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0) == (z == 0)
+        True
+        >>> (z == 0) == (z != 0)
+        False
+        """
         if not isinstance(other, AtomicFormula):
             return False
         if self.op != other.op:
@@ -49,19 +94,31 @@ class AtomicFormula(
         return True
 
     def __hash__(self) -> int:
+        """Return the hash value of this atomic formula. We need to explicitly
+        implement this method because we override :meth:`__eq__`.
+        """
         return super().__hash__()
 
+    @abstractmethod
     def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize an atomic formula. This abstract base class is not
+        supposed to have instances itself.
+        """
         super().__init__(self, lhs, rhs)
-        self.args = (
+        self._args = (
             lhs if isinstance(lhs, Term) else Term(lhs),
             rhs if isinstance(rhs, Term) else Term(rhs)
         )
 
     def __le__(self, other: Formula) -> bool:
-        """Returns `True` if this atomic formula should be sorted before or is
-        equal to other. Implements abstract method
+        """Compare this atomic formula with another formula.
+        Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.__le__`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0) <= (z != 0)
+        True
         """
         if not isinstance(other, AtomicFormula):
             return True
@@ -77,19 +134,46 @@ class AtomicFormula(
         return ORDER.index(self.op) <= ORDER.index(other.op)
 
     def __repr__(self) -> str:
-        symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
-        return f'{repr(self.lhs)} {symbols[self.op]} {repr(self.rhs)}'
+        """Return a string representation of this atomic formula that is
+        valid Python code and can be evaluated to reconstruct the original
+        atomic formula.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> repr(z == 0)
+        'z == 0'
+        >>> repr(z - z == 0)
+        'Eq(0, 0)'
+        """
+        symbols = {Eq: '==', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
+        formatter = TermReprFormatter(True)
+        left = self.lhs.normal_ast.accept(formatter)
+        right = self.rhs.normal_ast.accept(formatter)
+        if self.lhs.normal_ast.is_rational() and self.rhs.normal_ast.is_rational():
+            return f'{self.op.__name__}({left}, {right})'
+        else:
+            return f'{left} {symbols[self.op]} {right}'
 
     def __str__(self) -> str:
-        """String representation of this atomic formula. Implements the
+        """Return a string representation of this atomic formula. Implements the
         abstract method :meth:`.firstorder.atomic.AtomicFormula.__str__`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> str(z == 0)
+        'z = 0'
         """
         symbols = {Eq: '=', Ne: '!=', Le: '<=', Lt: '<', Ge: '>=', Gt: '>'}
         return f'{str(self.lhs)} {symbols[self.op]} {str(self.rhs)}'
 
     def as_latex(self) -> str:
-        """Latex representation as a string. Implements the abstract method
-        :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+        """Return a LaTeX representation of this atomic formula. Implements the
+        abstract method :meth:`.firstorder.atomic.AtomicFormula.as_latex`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z * ~z >= 0).as_latex()
+        'z \\\\overline{z} \\\\geq 0'
         """
         symbols = {
             Eq: '=', Ne: '\\neq', Le: '\\leq', Lt: '<', Ge: '\\geq', Gt: '>'
@@ -97,7 +181,7 @@ class AtomicFormula(
         return f'{self.lhs.as_latex()} {symbols[self.op]} {self.rhs.as_latex()}'
 
     def bvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
-        """Iterate over occurrences of variables that are elements of
+        """Return an iterator over occurrences of variables that are elements of
         `quantified`. Yield each such variable once for each term that it
         occurs in. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.bvars`.
@@ -111,25 +195,35 @@ class AtomicFormula(
 
     @classmethod
     def complement(cls) -> type[AtomicFormula]:
-        """Complement relation. Implements the abstract method
+        """Return the complement relation. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.complement`.
 
         .. seealso::
             Inherited method
             :meth:`.firstorder.atomic.AtomicFormula.to_complement`
+
+        >>> Eq.complement()
+        <class 'logic1.theories.Complex.atomic.Ne'>
+        >>> Lt.complement()
+        <class 'logic1.theories.Complex.atomic.Ge'>
         """
         return {Eq: Ne, Ne: Eq, Le: Gt, Lt: Ge, Ge: Lt, Gt: Le}[cls]
 
     @classmethod
     def converse(cls) -> type[AtomicFormula]:
-        """Converse relation.
+        """Return the converse relation.
+
+        >>> Le.converse()
+        <class 'logic1.theories.Complex.atomic.Ge'>
+        >>> Lt.converse()
+        <class 'logic1.theories.Complex.atomic.Gt'>
         """
         return {Eq: Eq, Ne: Ne, Le: Ge, Lt: Gt, Ge: Le, Gt: Lt}[cls]
 
     def eval(self) -> bool:
-        """Evaluates an atomic formula where both sides are constants.
-        Returns `True` if the formula is true, `False` if the formula is false,
-        and raises `ValueError` if the formula contains variables.
+        """Evaluate an atomic formula where both sides are constants.
+        Return :obj:`True` if the formula equivalent to :obj:`.T`.
+        Raises :class:`ValueError` if the formula contains variables.
 
         >>> from logic1.theories.Complex import *
         >>> (2 * I == 0).eval()
@@ -159,9 +253,9 @@ class AtomicFormula(
         assert False, type(self)
 
     def fvars(self, quantified: frozenset[Variable] = frozenset()) -> Iterator[Variable]:
-        """Iterate over occurrences of variables that are *not* elements of
-        `quantified`. Yield each such variable once for each term that it
-        occurs in. Implements the abstract method
+        """Return an iterator over occurrences of variables that are *not*
+        elements of :code:`quantified`. Yield each such variable once for each
+        term that it occurs in. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.fvars`.
         """
         for v in self.lhs.vars():
@@ -172,16 +266,39 @@ class AtomicFormula(
                 yield v
 
     def is_imaginary(self) -> bool:
-        """Returns `True` if both sides of this atomic formula are imaginary.
+        """Return :obj:`True` if both sides of this atomic formula are
+        imaginary.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (Re(z) == 0).is_imaginary()
+        False
+        >>> (I * Re(z) == 0).is_imaginary()
+        True
         """
         return self.lhs.is_imaginary() and self.rhs.is_imaginary()
 
     def is_real(self) -> bool:
-        """Returns `True` if both sides of this atomic formula are real."""
+        """Return :obj:`True` if both sides of this atomic formula are real.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0).is_real()
+        False
+        >>> (z * ~z == 0).is_real()
+        True
+        """
         return self.lhs.is_real() and self.rhs.is_real()
 
     def real_normal_form(self) -> Formula:
-        """Returns an equivalent formula in real normal form.
+        """Return an equivalent formula in real normal form.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z == 0).real_normal_form()
+        And(mpq(1,2) * z + mpq(1,2) * ~z == 0, -mpq(1,2) * I * z + mpq(1,2) * I * ~z == 0)
+        >>> (z != 0).real_normal_form()
+        Or(mpq(1,2) * z + mpq(1,2) * ~z != 0, -mpq(1,2) * I * z + mpq(1,2) * I * ~z != 0)
         """
         lhs = self.lhs - self.rhs
         if isinstance(self, Eq):
@@ -199,15 +316,24 @@ class AtomicFormula(
         assert False, type(self)
 
     def simplify(self) -> AtomicFormula | _T | _F:
-        """Fast basic simplification. The result is equivalent to self.
+        """Return an equivalent simplified version of this atomic formula.
         Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.simplify`.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> (z * ~z == Re(z)**2 + Im(z)**2).simplify()
+        T
+        >>> (Re(z) == 0).simplify()
+        z + ~z == 0
+        >>> (-Re(z) > z * ~z).simplify()
+        z * ~z + mpq(1,2) * z + mpq(1,2) * ~z < 0
         """
+        lhs = self.lhs - self.rhs
         try:
-            return firstorder._T() if self.eval() else firstorder._F()
+            return firstorder._T() if self.op(lhs, 0).eval() else firstorder._F()
         except ValueError:
             pass
-        lhs = self.lhs - self.rhs
         a, b = lhs.lc().eval()
         if isinstance(self, (Eq, Ne)):
             if (a, b) != (mpq(0), mpq(0)):
@@ -228,41 +354,187 @@ class AtomicFormula(
         assert False, type(self)
 
     def subs(self, sigma: Mapping[Variable, Number | Term]) -> Self:
-        """Formal simultaneous term substitution into the two argument terms of
-        the atomic formula. Implements the abstract method
+        """Formal simultaneous term substitution into both sides of the atomic
+        formula. Implements the abstract method
         :meth:`.firstorder.atomic.AtomicFormula.subs`.
+
+        >>> from logic1.theories.Complex import *
+        >>> a, b = VV.get('a', 'b')
+        >>> (a + b == 0).subs({a: 1, b: a})
+        a + 1 == 0
         """
         return self.op(self.lhs.subs(sigma), self.rhs.subs(sigma))
 
 
-
 class Eq(AtomicFormula):
-    pass
+    """Equality relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z == 0
+    z == 0
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the equality relation.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Eq(z, 0)
+        z == 0
+        """
+        super().__init__(lhs, rhs)
 
 
 class Ne(AtomicFormula):
-    pass
+    """Inequality relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z != 0
+    z != 0
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the inequality relation.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Ne(z, 0)
+        z != 0
+        """
+        super().__init__(lhs, rhs)
 
 
 class RealAtomicFormula(AtomicFormula):
+    """An abstract base class for atomic formulas where both sides are real.
+    Raise a :class:`ValueError` when trying to create an instance where
+    either side is not real.
 
+    .. seealso::
+        :class:`.Ge`, :class:`.Le`, :class:`.Gt`, :class:`.Lt`
+    """
+
+    @abstractmethod
     def __init__(self, lhs: Number | Term, rhs: Number | Term):
+        """Initialize the real atomic formula. Raise a :class:`ValueError`
+        if either side is not real. This abstract base class is not supposed to
+        have instances itself.
+        """
         super().__init__(lhs, rhs)
         if not self.is_real():
             raise ValueError(f'Cannot create atomic formula {self} because it is not real')
 
 
 class Ge(RealAtomicFormula):
-    pass
+    """Greater than or equal relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z * ~z >= 0
+    z * ~z >= 0
+    >>> z >= 0
+    Traceback (most recent call last):
+    ...
+    ValueError: Cannot create atomic formula z >= 0 because it is not real
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the greater than or equal relation. Raise a
+        :class:`ValueError` if either side is not real.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Ge(z * ~z, 0)
+        z * ~z >= 0
+        >>> Ge(z, 0)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cannot create atomic formula z >= 0 because it is not real
+        """
+        super().__init__(lhs, rhs)
 
 
 class Le(RealAtomicFormula):
-    pass
+    """Less than or equal relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z * ~z <= 0
+    z * ~z <= 0
+    >>> z <= 0
+    Traceback (most recent call last):
+    ...
+    ValueError: Cannot create atomic formula z <= 0 because it is not real
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the less than or equal relation.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Le(z * ~z, 0)
+        z * ~z <= 0
+        >>> Le(z, 0)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cannot create atomic formula z <= 0 because it is not real
+        """
+        super().__init__(lhs, rhs)
 
 
 class Gt(RealAtomicFormula):
-    pass
+    """Greater than relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z * ~z > 0
+    z * ~z > 0
+    >>> z > 0
+    Traceback (most recent call last):
+    ...
+    ValueError: Cannot create atomic formula z > 0 because it is not real
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the greater than relation.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Gt(z * ~z, 0)
+        z * ~z > 0
+        >>> Gt(z, 0)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cannot create atomic formula z > 0 because it is not real
+        """
+        super().__init__(lhs, rhs)
 
 
 class Lt(RealAtomicFormula):
-    pass
+    """Less than relation in the theory of complex numbers.
+
+    >>> from logic1.theories.Complex import *
+    >>> z = VV['z']
+    >>> z * ~z < 0
+    z * ~z < 0
+    >>> z < 0
+    Traceback (most recent call last):
+    ...
+    ValueError: Cannot create atomic formula z < 0 because it is not real
+    """
+
+    def __init__(self, lhs: Number | Term, rhs: Number | Term) -> None:
+        """Initialize the less than relation. Raise a :class:`ValueError`
+        if either side is not real.
+
+        >>> from logic1.theories.Complex import *
+        >>> z = VV['z']
+        >>> Lt(z * ~z, 0)
+        z * ~z < 0
+        >>> Lt(z, 0)
+        Traceback (most recent call last):
+        ...
+        ValueError: Cannot create atomic formula z < 0 because it is not real
+        """
+        super().__init__(lhs, rhs)

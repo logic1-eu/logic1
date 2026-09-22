@@ -246,11 +246,11 @@ class VariableSet:
     ...
     ValueError: illegal _drop at bottom of stack
 
-    Test get, which is inherited from logic1.firstorder.atomic.VariableSet:
+    Test get, which is inherited from logic1.firstorder.term.VariableSet:
     >>> VV.get('d', 'e')
     (d, e)
 
-    The method imp also inherited from logic1.firstorder.atomic.VariableSet
+    The method imp also inherited from logic1.firstorder.term.VariableSet
     cannot be tested because we are not interactive here.
 
     >>> VV.stack == [{'b', 'c', 'G0001', 'G0002', 'e', 'd', 'a'}]
@@ -998,5 +998,39 @@ class Term:
     Variable absent after cancellation:
     >>> list((x + y - y).vars())
     [x]
+
+    ----------------------------------------------------------------------------
+    Regression tests:
+    ----------------------------------------------------------------------------
+    An iterator was traversed twice, and the second example falsely returned
+    ``x**2 - 1``:
+    >>> (x**2 - 1).reduce([x - 1])
+    0
+    >>> (x**2 - 1).reduce(g for g in [x - 1])
+    0
+
+    Equal zero terms returned different degrees. The distinction was only
+    whether x remained in the polynomial context, which violates representation
+    independence:
+    >>> Term(0).degree(x)
+    -1
+    >>> (x - x).degree(x)
+    -1
+    >>> y.degree(x)
+    0
+
+    (x**2).derivative(x, -1) returned x**2 because range(-1) is empty. A negative
+    derivative count is invalid, and the Sage backend raises ValueError, too:
+    >>> (x**2).derivative(x, -1)
+    Traceback (most recent call last):
+    ...
+    ValueError: Derivative order must be non-negative
+
+    A zeroth derivative returned zero when the variable was absent from the
+    polynomial context:
+    >>> Term(5).derivative(x, 0)
+    5
+    >>> (x - x + 5).derivative(x, 0)
+    5
 
     """

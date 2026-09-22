@@ -1,4 +1,3 @@
-import datetime
 import logging
 import time
 import sys
@@ -26,12 +25,13 @@ class DeltaTimeFormatter(logging.Formatter):
     else:
         _start_time = logging._startTime / 1e9  # type: ignore
 
-    _time_since_start_time = time.time() - _start_time
+    _time_since_start_time: float = time.time() - _start_time
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = record.relativeCreated / 1000 - self._time_since_start_time
-        delta = datetime.timedelta(seconds=timestamp)
-        record.delta = str(delta)[:-3]
+        minutes, seconds = divmod(timestamp, 60)
+        hours, minutes = divmod(minutes, 60)
+        record.delta = f"{int(hours):01}:{int(minutes):02}:{seconds:06.3f}"
         return super().format(record)
 
     def get_reference_time(self) -> float:

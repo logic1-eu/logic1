@@ -1,18 +1,23 @@
+"""Boolean normal forms are computed by applying the normal form algorithms
+provided by `PyEDA <https://pyeda.readthedocs.io/>`_ to Boolean abstractions of
+the formulas. The results are then converted back to formulas.
+"""
 from logic1 import abc
 
 from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula
 from logic1.theories.RCF.simplify import simplify as _simplify
-from logic1.theories.RCF.types import Formula
+from logic1.theories.RCF.types import Formula, Number
 
 
-class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, int]):
-    """Implements the abstract method :meth:`simplify
-    <.abc.bnf.BooleanNormalForm.simplify>` of its super class
-    :class:`.abc.bnf.BooleanNormalForm`. In addition, this class inherits
-    :meth:`cnf <.abc.bnf.BooleanNormalForm.cnf>` and :meth:`dnf
-    <.abc.bnf.BooleanNormalForm.dnf>`, which should be called via
-    :func:`.cnf` and :func:`.dnf` as described below, respectively.
+class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, Number]):
+    """Implements the abstract methods :meth:`simplify
+    <.abc.bnf.BooleanNormalForm.simplify>` and :meth:`final_simplify
+    <.abc.bnf.BooleanNormalForm.final_simplify>` of its super class
+    :class:`.abc.bnf.BooleanNormalForm`. Inherits the methods :meth:`cnf
+    <.abc.bnf.BooleanNormalForm.cnf>` and :meth:`dnf
+    <.abc.bnf.BooleanNormalForm.dnf>`, which should be called via the functions
+    :func:`.cnf` and :func:`.dnf`, respectively.
     """
 
     def simplify(self, f: Formula) -> Formula:
@@ -26,10 +31,15 @@ class BooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable,
         return _simplify(f, explode_always=False)
 
 
-cnf = BooleanNormalForm().cnf
+_bnf = BooleanNormalForm()
+"""One instance of the BooleanNormalForm class used for both CNF and DNF
+computations.
+"""
+
+cnf = _bnf.cnf
 """User interface for the computation of a conjunctive normal form.
 """
 
-dnf = BooleanNormalForm().dnf
+dnf = _bnf.dnf
 """User interface for the computation of a disjunctive normal form.
 """

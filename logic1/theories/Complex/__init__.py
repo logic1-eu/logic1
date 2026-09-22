@@ -1,3 +1,6 @@
+"""A first-order theory of complex numbers following [FarossSturm-2026]_.
+"""
+
 # order to avoid circular imports:
 # types, ast, format, normalize, term, atomic, qe, simplify
 

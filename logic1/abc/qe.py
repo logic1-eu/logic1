@@ -29,24 +29,35 @@ from logic1.support.logging import DeltaTimeFormatter, Timer
 delta_time_formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s - %(levelname)-5s - %(delta)s: %(message)s')
 
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(delta_time_formatter)
+handler_name = f"{__name__}/stream_handler"
+stream_handler = logging.getHandlerByName(handler_name)
+if stream_handler is None:
+    stream_handler = logging.StreamHandler()
+    stream_handler.set_name(handler_name)
+    stream_handler.setFormatter(delta_time_formatter)
 
 logger = logging.getLogger(__name__)
 logger.propagate = False
-logger.addHandler(stream_handler)
-logger.addFilter(lambda record: record.msg.strip() != '')
+if stream_handler not in logger.handlers:
+    logger.addHandler(stream_handler)
+    logger.addFilter(lambda record: record.msg.strip() != '')
 logger.setLevel(logging.WARNING)
 
 # Create multiprocessing logger
 multiprocessing_formatter = DeltaTimeFormatter(
     f'%(asctime)s - %(name)s/%(process)-6d - %(levelname)-5s - %(delta)s: %(message)s')
 
-multiprocessing_handler = logging.StreamHandler()
-multiprocessing_handler.setFormatter(multiprocessing_formatter)
+handler_name = f"{__name__}/multiprocessing_handler"
+multiprocessing_handler = logging.getHandlerByName(handler_name)
+if multiprocessing_handler is None:
+    multiprocessing_handler = logging.StreamHandler()
+    multiprocessing_handler.set_name(handler_name)
+    multiprocessing_handler.setFormatter(multiprocessing_formatter)
+
 multiprocessing_logger = logging.getLogger('multiprocessing')
 multiprocessing_logger.propagate = False
-multiprocessing_logger.addHandler(multiprocessing_handler)
+if multiprocessing_handler not in multiprocessing_logger.handlers:
+    multiprocessing_logger.addHandler(multiprocessing_handler)
 
 α = TypeVar('α', bound=AtomicFormula)
 τ = TypeVar('τ', bound='Term')
@@ -90,16 +101,22 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
     """Holds a subproblem for existential quantifier elimination. Theories
     implementing the interface can put restrictions on the existing fields and
     add further fields.
+
+    We define a :class:`.Formula` to be in positive negation normal form (PNNF)
+    if it is either of type :class:`._T` or :class:`._F`, or is exclusively
+    built from :class:`.And`, :class:`.Or`, and
+    :class:`AtomicFormula <.firstorder.atomic.AtomicFormula>`. Informally
+    speaking, it is either a truth value or an and-or-combination of atoms.
     """
 
-    # This is used in both the sequential and the parallel code.
+    # This class is used in both the sequential and the parallel code.
 
     variables: list[χ]
     """A list of variables.
     """
 
     formula: Formula[α, τ, χ, σ]
-    """A quantifier-free formula.
+    """A :class:`.Formula` in PNNF.
     """
 
     @abstractmethod
@@ -110,27 +127,35 @@ class Node(Generic[α, τ, χ, σ, λ, μ], ABC):
 
     @abstractmethod
     def memorize(self) -> μ:
+        """Return a hashable object that identifies this node. This is used to
+        avoid processing the same node twice.
+        """
         ...
 
     @abstractmethod
     def process(self, assumptions: λ) -> Sequence[Self]:
-        """This `node` describes a formula ``Ex(node.variables,
+        """This ``node`` describes a formula ``Ex(node.variables,
         node.formula)``. Select a `variable` from ``node.variables`` and
-        compute a list `S` of successor nodes such that:
+        compute a list ``S`` of successor nodes such that:
 
-        1. `variable` is not in ``successor.variables`` for `successor` in `S`;
+        1. ``variable`` is not in ``successor.variables`` for ``successor`` in
+           ``S``;
 
-        2. `variable` does not occur in ``successor.formula`` for `successor`
-           in `S`;
+        2. ``variable`` does not occur in ``successor.formula`` for ``successor``
+           in ``S``;
 
-        3. ``Or(*(Ex(successor.variables, successor.formula) for s in S))`` is
-           logically equivalent to ``Ex(node.variables, node.formula)``.
+        3. ``Or(*(Ex(successor.variables, successor.formula) for successor in S))``
+           is logically equivalent to ``Ex(node.variables, node.formula)``.
         """
         ...
 
 
 @dataclass
 class NodeList(Collection[ν], Generic[ν, μ]):
+    """A list of nodes with a memory to avoid duplicates and statistics about
+    the number of nodes added and dropped.
+    """
+
     # Sequential only
 
     nodes: list[ν] = field(default_factory=list)
@@ -148,6 +173,10 @@ class NodeList(Collection[ν], Generic[ν, μ]):
         return len(self.nodes)
 
     def append(self, node: ν) -> bool:
+        """Append ``node`` to the list of nodes if it is not already in the
+        memory. Return ``True`` if ``node`` was appended, and ``False``
+        otherwise.
+        """
         memorize = node.memorize()
         is_new = memorize not in self.memory
         if is_new:
@@ -159,6 +188,9 @@ class NodeList(Collection[ν], Generic[ν, μ]):
         return is_new
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Append ``nodes`` to the list of nodes if they are not already in the
+        memory.
+        """
         for node in nodes:
             self.append(node)
 
@@ -188,6 +220,12 @@ class NodeList(Collection[ν], Generic[ν, μ]):
 
 @dataclass
 class WorkingNodeList(NodeList[ν, μ]):
+    """A subclass of :class:`.NodeList` that is used for the list of nodes that
+    are currently being processed during quantifier elimination. Additionally,
+    it keeps track of the current number of nodes with a given number of
+    variables.
+    """
+
     # Sequential only
 
     node_counter: Counter[int] = field(default_factory=Counter)
@@ -230,6 +268,10 @@ class WorkingNodeList(NodeList[ν, μ]):
         return node
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Extend the node list with multiple nodes.
+
+        For each ``node`` in ``nodes`` we know that ``node.formula`` is in PNNF.
+        """
         for node in nodes:
             match node.formula:
                 case _T():
@@ -449,6 +491,10 @@ class WorkingNodeListProxy(NodeListProxy[ν, μ]):
         return self._proxy.get_node_counter()
 
     def extend(self, nodes: Iterable[ν]) -> None:
+        """Extend the node list held by the proxy with multiple nodes.
+
+        For each ``node`` in ``nodes`` we know that ``node.formula`` is in PNNF.
+        """
         new_nodes = []
         for node in nodes:
             match node.formula:
@@ -543,10 +589,12 @@ SyncManager.register('_WorkingNodeListProxy', WorkingNodeListManager, _WorkingNo
 class Assumptions(Generic[α, τ, χ, σ], ABC):
     """Holds the currently valid assumptions. This starts with user assumptions
     explicitly provided by the user. Certain variants of quantified elimination
-    may add further assumptions in the course of the elimination.
+    may add further assumptions in the course of the elimination. The assumptions
+    are simplified on initialization and after adding further assumptions.
 
     .. seealso::
-        * The argument `assume` of :meth:`.QuantifierElimination.__call__`.
+
+        * The argument ``assume`` of :meth:`.QuantifierElimination.__call__`.
         * Generic quantifier elimination in :mod:`.RCF.qe`.
 
     This is an upper bound for the type variable :data:`.λ`.
@@ -561,19 +609,18 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
     """A list of atoms holding the current set of assumptions.
     """
 
-    def __hash__(self) -> int:
-        return hash(tuple(self.atoms))
-
     def __init__(self, atoms: Iterable[α]) -> None:
-        self.atoms = list(atoms)
+        self.atoms = []
+        self.extend(atoms)
 
     def append(self, new_atom: α) -> None:
-        """Add `new_atom` as another assumption and simplify.
+        """Add ``new_atom`` as another assumption and simplify.
         """
         self.extend([new_atom])
 
     def extend(self, new_atoms: Iterable[α]) -> None:
-        """Add `new_atoms` as further assumptions and simplify.
+        """Add ``new_atoms`` as further assumptions and simplify. Raise
+        :class:`.Inconsistent` if the resulting assumptions are inconsistent.
         """
         self.atoms.extend(new_atoms)
         # NF nörgelt
@@ -591,10 +638,10 @@ class Assumptions(Generic[α, τ, χ, σ], ABC):
 
     @abstractmethod
     def simplify(self, f: Formula[α, τ, χ, σ]) -> Formula[α, τ, χ, σ]:
-        """`f` is a (possibly unary or trivial) conjunction of atoms. Simplifes
-        `f` in such a way that the result is again a (possibly unary or
-        trivial) conjunction of atoms. Raises :class:`.Inconsistent` if `f` is
-        simplified to :data:`.F`.
+        """``f`` is a (possibly unary or trivial) conjunction of atoms.
+        Simplify ``f`` in such a way that the result is again a (possibly unary
+        or trivial) conjunction of atoms. The result may be :data:`.F`, which
+        :meth:`.extend` interprets as inconsistent assumptions.
         """
         ...
 
@@ -610,37 +657,41 @@ class Options:
     """
 
     log_level: int
-    """The `log_level` of the logger used by :class:`.QuantifierElimination`.
+    """The logging level of the logger used
     """
 
     log_rate: float
-    """The minimal timespan (in s) between to log outputs in certain loops.
+    """The minimal timespan (in s) between log outputs when reporting progress
     """
 
     workers: int
-    """The number of worker processes used. For more information see the
-    documentation of the parameter `workers` of :meth:`.__call__`.
+    """Controls the number of CPUs used for processing subproblems:
 
-    :param workers:
-      Specifies the number of processes to be used in parallel:
+    * With the default value ``workers=0``, the implementation runs
+      sequentially. For all other values, additional processes are started.
 
-      * The default value `workers=0` uses a sequential implementation,
-        which avoids overhead when input problems are small. For all other
-        values, there are additional processes started.
+    * A positive value ``workers=n`` uses ``n + 2`` CPUs: ``n`` for worker
+      processes that process subproblems, one for the master process, and
+      another one for a proxy process that manages shared data.
 
-      * A positive value `workers=n > 0` uses `n + 2` processes: the master
-        process, `n` worker processes, and a proxy processes that manages
-        shared data.
+    * A negative value ``workers=-n`` uses ``os.cpu_count() - n`` CPUs for
+      workers, plus two additional CPUs for the master and proxy processes. It
+      follows that ``workers=-2`` uses all available CPUs, while ``workers=-3``
+      leaves one CPU free.
 
-        .. note::
-          `workers=1` uses the parallel implementation with only one
-          worker. Algorithmically this is similar to the sequential version
-          with `workers=0` but comes at the cost of 2 additional processes.
+    .. attention::
 
-      * A negative value `workers=-n < 0` specifies ``os.num_cpu() - n``
-        many workers.  It follows that `workers=-2` exactly allocates all
-        of CPUs of the machine, and workers=-3 is an interesting choice,
-        which leaves one CPU free for smooth interaction with the machine.
+      * ``workers=1`` uses the parallel implementation with only one worker.
+        Algorithmically, this is similar to the sequential implementation with
+        ``workers=0``, but introduces overhead.
+
+      * ``workers=-1`` uses ``os.cpu_count() + 1`` CPUs, which is not a
+        natural choice.
+
+    .. seealso::
+
+      :class:`logic1.abc.qe.Node`
+        The subproblems referred to above correspond to instances of this class.
     """
 
     def __init__(self, log_level: int = logging.NOTSET, log_rate: float = 0.5,
@@ -737,11 +788,17 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
     process after all workers have terminated.
     """
 
-    time_import_success_nodes: Optional[float] = None
-    """The time spent for importing all :attr:`.success_nodes` from the
-    :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
-    process after all workers have terminated.
-    """
+    # The following is a relic of an earlier design that did not use a
+    # multiprocessing.Queue to import success nodes. Similar information could
+    # now be recorded by maintaining a set of active sentinels and starting a
+    # timer when that set becomes empty. The variable would then be renamed to
+    # time_drain_success_nodes.
+    #
+    # time_import_success_nodes: Optional[float] = None
+    # """The time spent for importing all :attr:`.success_nodes` from the
+    # :class:`SyncManager <multiprocessing.managers.SyncManager>` into the master
+    # process after all workers have terminated.
+    # """
 
     time_import_working_nodes: Optional[float] = None
     """The time spent for importing all :attr:`.working_nodes` from the
@@ -796,8 +853,8 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
           generic type :data:`.ω`, which extends :class:`.Options`.
 
         :returns:
-          A quantifier-free equivalent of `f` modulo certain assumptions. A
-          simplified equivalent of all relevant assumptions are available as
+          A quantifier-free equivalent of ``f`` modulo certain assumptions. A
+          simplified equivalent of all relevant assumptions is available as
           :attr:`.assumptions`.
 
           * Regularly, the assumptions are exactly those passed as the `assume`
@@ -859,11 +916,20 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
 
     @abstractmethod
     def create_root_nodes(self, variables: Iterable[χ], matrix: Formula[α, τ, χ, σ]) -> list[ν]:
-        """If `matrix` is not a disjunction, create a list containing one
-        instance `node` of :data:`.ν` with ``node.variables == variables``
-        and ``node.formula == matrix``. If `matrix` is a disjunction
-        ``Or(*args)``, create a list containing one such node for each `arg` in
-        `args`.
+        """Create root nodes for the given variables and matrix.
+
+        The ``variables`` originate from corresponding existential quantifiers.
+        The ``matrix`` formula is assumed to be in PNNF.
+
+        * If ``matrix`` is of one of the types :class:`.And`,
+          :class:`AtomicFormula <.firstorder.atomic.AtomicFormula>`,
+          :class:`._T`, :class:`._F`, then create a list containing a single
+          ``node`` of type :data:`.ν` with ``node.variables == variables`` and
+          ``node.formula == matrix``.
+        * If ``matrix`` is of type :class:`.Or`, then create a list containing
+          one such ``node`` for each ``arg`` in ``matrix.args``.
+
+        Note that for each resulting ``node``, ``node.formula`` will be in PNNF.
         """
         ...
 
@@ -1019,6 +1085,10 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                     try:
                         nodes = success_nodes.get(timeout=0.001)
                     except queue.Empty:
+                        # ``None`` means the process is still running; ``0`` means that it
+                        # terminated successfully and its sentinel may still be in the queue.
+                        if any(process.exitcode not in (None, 0) for process in processes):
+                            raise RuntimeError('A worker process exited unexpectedly')
                         continue
                     if nodes is not None:
                         self.success_nodes.extend(nodes)
@@ -1114,11 +1184,10 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                     with m_lock:
                         found_t.value += 1
                     break
+                working_nodes.extend(node for node in nodes if node.variables)
+                nodes = [node for node in nodes if not node.variables]
                 if nodes:
-                    if nodes[0].variables:
-                        working_nodes.extend(nodes)
-                    else:
-                        success_nodes.put(nodes)
+                    success_nodes.put(nodes)
                 working_nodes.task_done()
         except KeyboardInterrupt:
             multiprocessing_logger.debug(f'worker process {i} caught KeyboardInterrupt')
@@ -1189,11 +1258,8 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
             except NodeProcessFailure:
                 self.failure_nodes.append(node)
                 continue
-            if nodes:
-                if nodes[0].variables:
-                    self.working_nodes.extend(nodes)
-                else:
-                    self.success_nodes.extend(nodes)
+            self.working_nodes.extend(node for node in nodes if node.variables)
+            self.success_nodes.extend(node for node in nodes if not node.variables)
         logger.info(self.working_nodes.final_statistics())
         logger.info(self.success_nodes.final_statistics('success'))
         logger.info(self.failure_nodes.final_statistics('failure'))
@@ -1207,7 +1273,7 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 case False:
                     read_as = '  # read as Ex'
                 case True:
-                    read_as = '  # read as Not All'
+                    read_as = '  # read as Not Ex'
                 case _:
                     assert False, self.negated
             return f'{self.negated},{read_as}'
@@ -1226,11 +1292,11 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 f'    blocks        = {self.blocks},\n'
                 f'    matrix        = {self.matrix},\n'
                 f'    negated       = {negated_as_str()}\n'
-                f'    root_nodes    = {self.root_nodes}\n'
+                f'    root_nodes    = {self.root_nodes},\n'
                 f'    working_nodes = {nodes_as_str(self.working_nodes)},\n'
                 f'    success_nodes = {nodes_as_str(self.success_nodes)},\n'
                 f'    failure_nodes = {nodes_as_str(self.failure_nodes)},\n'
-                f'    result        = {self.result}'
+                f'    result        = {self.result},\n'
                 f')')
 
     # discuss: We probably do not want to print
@@ -1244,11 +1310,11 @@ class QuantifierElimination(Generic[ν, μ, λ, ι, ω, α, τ, χ, σ], ABC):
                 print(f'{self.time_start_all_workers=}')
                 print(f'{self.time_multiprocessing=}')
                 print(f'{self.time_import_working_nodes=}')
-                print(f'{self.time_import_success_nodes=}')
+                # print(f'{self.time_import_success_nodes=}')
                 print(f'{self.time_import_failure_nodes=}')
                 print(f'{self.time_final_simplification=:.{precision}f}')
                 print(f'{self.time_syncmanager_exit=}')
-                print(f'{self.time_total=:.{precision}}')
+                print(f'{self.time_total=:.{precision}f}')
             case _:
                 print(f'{self.options.workers=}')
                 print(f'{self.time_syncmanager_enter=:.{precision}f}')

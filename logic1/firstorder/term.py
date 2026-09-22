@@ -24,11 +24,11 @@ class VariableSet(ABC, Generic[χ]):
     """The infinite set of all variables of a theory. Variables are uniquely
     identified by their name, which is a :external:class:`str`. Subclasses
     within theories are singletons, and their unique instance is assigned to a
-    module variable :data:`VV` there.
+    module variable :code:`VV` there.
 
     .. seealso::
       Derived classes in various theories and their unique instances:
-      :class:`.RCF.atomic.VariableSet`, :data:`.RCF.atomic.VV` for Real Closed
+      :class:`.RCF.term.VariableSet`, :data:`.RCF.term.VV` for Real Closed
       Fields and :class:`.Sets.atomic.VariableSet`, :data:`.Sets.atomic.VV`
       for Sets.
     """
@@ -70,6 +70,11 @@ class VariableSet(ABC, Generic[χ]):
         >>> x, y = RCF.VV.get('x', 'y')
         >>> assert isinstance(x, RCF.term.Variable)
         >>> assert isinstance(y, RCF.term.Variable)
+
+        Note that :meth:`.get` returns a tuple also for a single variable:
+
+        >>> from logic1.theories import RCF
+        >>> x, = RCF.VV.get('x')
 
         .. seealso::
           * :meth:`__getitem__` -- obtain variable by its name
@@ -139,7 +144,7 @@ class Term(ABC, Generic[τ, χ, σ, κ]):
     cannot be used in the static method :meth:`.sort_key`.
 
     .. seealso::
-      Derived classes in various theories: :class:`.RCF.atomic.Term` for Real
+      Derived classes in various theories: :class:`.RCF.term.Term` for Real
       Closed Fields.
 
     .. note::
@@ -164,8 +169,9 @@ class Term(ABC, Generic[τ, χ, σ, κ]):
         .. note::
           We reserve Python's rich comparisons :external:obj:`__lt__
           <operator.__lt__>`, :external:obj:`__le__ <operator.__le__>` etc. as
-          constructors for instances of subclasses of :class:`.AtomicFormula`.
-          For example, :obj:`.RCF.atomic.Term.__lt__` constructs an inequality
+          constructors for instances of subclasses of
+          :class:`.firstorder.atomic.AtomicFormula`.
+          For example, :meth:`.RCF.term.Term.__lt__` constructs an inequality.
 
           >>> from logic1.theories.RCF import *
           >>> a, b = VV.get('a', 'b')
@@ -208,7 +214,7 @@ class Variable(Term[χ, χ, σ, κ]):
     to be implemented for the various theories.
 
     .. seealso::
-      Derived classes in various theories: :class:`.RCF.atomic.Variable` for
+      Derived classes in various theories: :class:`.RCF.term.Variable` for
       Real Closed Fields and :class:`.Sets.atomic.Variable` for Sets.
     """
 

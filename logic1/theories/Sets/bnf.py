@@ -25,10 +25,15 @@ class BooleanNormalForm(
         return _simplify(f)
 
 
-cnf = BooleanNormalForm().cnf
+_bnf = BooleanNormalForm()
+"""One instance of the BooleanNormalForm class used for both CNF and DNF
+computations.
+"""
+
+cnf = _bnf.cnf
 """User interface for the computation of a conjunctive normal form.
 """
 
-dnf = BooleanNormalForm().dnf
+dnf = _bnf.dnf
 """User interface for the computation of a disjunctive normal form.
 """

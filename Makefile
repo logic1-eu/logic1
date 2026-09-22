@@ -12,20 +12,17 @@ CYTHON_SOS     := $(addsuffix $(EXT_SUFFIX), $(CYTHON_BASES))
 
 GOALS := $(if $(MAKECMDGOALS), $(MAKECMDGOALS), $(.DEFAULT_GOAL))
 
-POLYLIB_TARGETS := mypy-run pytest-run
+POLYLIB_TARGETS := mypy-run
 
 ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   POLYLIB := $(shell PYTHONPATH=. python -c 'from logic1.theories.RCF.term import POLYLIB; print(POLYLIB)')
   $(info Determined POLYLIB == $(BOLD)"$(POLYLIB)"$(RESET) via Python import)
 
   ifeq ($(POLYLIB), FLINT)
-    ign_other_backend := --ignore=logic1/theories/RCF/term/term_sage.py
     exclude_re := logic1/theories/RCF/term/term_sage\.py
 
   else ifeq ($(POLYLIB), SAGE)
-    ign_other_backend := --ignore=logic1/theories/RCF/term/term_flint.py \
-                         --ignore=logic1/theories/RCF/test_term_flint.txt
-    exclude_re := logic1/theories/RCF/term/term_flint\.py|logic1/theories/RCF/test_term_flint\.txt
+    exclude_re := logic1/theories/RCF/term/term_flint\.py
 
   else
     $(error Could not determine valid POLYLIB)
@@ -44,16 +41,27 @@ ign_slow         := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
 ign_too_slow     := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
 					--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 
-ignores := $(ign_other_backend) $(ign_too_slow)
+ignores := $(ign_redlog_motor) $(ign_too_slow)
+PYTEST := pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules
 
-.PHONY: cython cython-clean cython-html \
-        pytest pytest-run pytest-fast pytest-seq pytest-full pytest-full-seq \
-        test-doc mypy mypy-run mypy_noinc test test-all doc pygount \
-        coverage coverage_html clean veryclean conda-build
+reduce := $(shell echo "quit;" | redcsl -w &>/dev/null; echo $$?)
+
+ifeq ($(reduce), 0)
+  $(info Executing Reduce succeeded, will run tests with Redlog)
+else
+  $(info Executing Reduce failed with exit code $(reduce), will skip tests with Redlog)
+  ignores += $(ign_redlog)
+endif
+
+.PHONY: cython cython-clean cython-veryclean \
+        pytest mypy mypy-run \
+        test test-all test-doc \
+        doc pygount coverage coverage_html \
+        clean veryclean conda-build
 
 test: cython
 	$(MAKE) mypy-run
-	$(MAKE) pytest-run
+	$(PYTEST) $(ignores)
 
 test-all: test test-doc
 
@@ -66,10 +74,7 @@ mypy-run:
 	mypy --exclude '$(exclude_re)' logic1
 
 pytest: cython
-	$(MAKE) pytest-run
-
-pytest-run:
-	pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules $(ignores)
+	$(PYTEST) $(ignores)
 
 test-doc:
 	cd doc && make test
@@ -85,7 +90,7 @@ cython-clean:
 cython-veryclean: cython-clean
 	/bin/rm -f $(addsuffix .cpython-*-darwin.so, $(CYTHON_BASES))
 
-doc:
+doc: cython
 	cd doc && make clean html
 
 pygount:
@@ -98,8 +103,11 @@ coverage_html: coverage
 	coverage html
 	open htmlcov/index.html
 
-veryclean:
-	/bin/rm -r htmlcov .coverage
+clean:
+	/bin/rm -rf build dist
+
+veryclean: clean cython-veryclean
+	/bin/rm -rf htmlcov .coverage doc/build
 
 conda-build:
 	LOGIC1_GIT_REPO="file:$$(pwd)" \
@@ -107,5 +115,11 @@ conda-build:
 	LOGIC1_VERSION="$$(python -m setuptools_scm)" \
 	rattler-build build --recipe conda
 
-# Upload release notes:
+# Upload release notes w/o creating a new release
 # gh release edit v0.2.0 --notes-file releases/v0.2.0.md
+
+# Create new release
+# gh release create v0.3.1 --title "0.3.1"--notes-file releases/v0.3.1.md
+
+# Get the SHA-256 checksum of the release tarball
+# curl -Ls https://github.com/logic1-eu/logic1/archive/refs/tags/v0.3.1.tar.gz | shasum -a 256
