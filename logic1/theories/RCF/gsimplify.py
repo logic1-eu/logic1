@@ -551,5 +551,5 @@ def gsimplify(f: Formula, assume: Iterable[AtomicFormula] =[], **options) -> For
     """Gröbner-simplify ``f`` modulo ``assume``. Raise
     :exc:`GSimplify.Inconsistent` if ``assume`` is detected to be inconsistent.
     """
-    logging.getLogger().setLevel(logging.DEBUG)
+    # logging.getLogger().setLevel(logging.DEBUG)
     return GSimplify(Options(**options))(f, assume)
