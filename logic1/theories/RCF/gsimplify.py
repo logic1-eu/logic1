@@ -1,6 +1,6 @@
-"""Gröbner simplification of formulas in the theory of real closed fields (RCF).
-The implementation follows but is not limited to ideas discussed in
-[DolzmannSturm-1997]_.
+"""This module implements *Gröbner simplification* of formulas in the theory of
+Real Closed Fields. The implementation is based on but not limited to ideas
+discussed in [DolzmannSturm-1997]_.
 """
 
 from dataclasses import dataclass, field
@@ -21,11 +21,9 @@ from logic1.theories.RCF.types import Formula
 
 @dataclass(frozen=True)
 class Options:
-    use_redlog_cnf: bool = True
-    """If :obj:`True`, use :func:`.redlog.cnf` for CNF computation. If
-    :obj:`False`, use :func:`.RCF.bnf.cnf`, which is based on PyEda.
     """
-
+    Options for Gröbner simplification as recognized by :func:`.gsimplify`.
+    """
     bnfsac: bool = True
     """The value to be used for the option ``bnfsac`` (Boolean normal form with
     subsumption and cut) when calling :func:`.redlog.cnf`.
@@ -43,6 +41,11 @@ class Options:
     compute a Gröbner basis of the radical ideal :math:`\sqrt{\langle f_1,
     \dots, f_n \rangle}`. The latter leads to stronger simplification at the
     cost of more expensive Gröbner basis computations.
+    """
+
+    use_redlog_cnf: bool = True
+    """If :obj:`True`, use :func:`.redlog.cnf` for CNF computation. If
+    :obj:`False`, use :func:`.RCF.bnf.cnf`, which is based on PyEda.
     """
 
 
@@ -315,10 +318,16 @@ class GlobalPremise:
 
 @dataclass
 class GSimplify:
+    """A callable class implementing Gröbner simplification. The Gröbner
+    simplifier should be called via the function :func:`.gsimplify`.
+    """
 
     _options: Options = field(default_factory=Options)
 
     class Inconsistent(Exception):
+        """Indicates that the set of atomic formulas given by the parameter
+        ``assume`` of :func:`.gsimplify` is inconsistent.
+        """
         pass
 
     def __call__(self, f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
@@ -550,6 +559,11 @@ class GSimplify:
 def gsimplify(f: Formula, assume: Iterable[AtomicFormula] =[], **options) -> Formula:
     """Gröbner-simplify ``f`` modulo ``assume``. Raise
     :exc:`GSimplify.Inconsistent` if ``assume`` is detected to be inconsistent.
+
+    .. seealso::
+
+      :class:`.Options`
+        for the options recognized by this function.
     """
     # logging.getLogger().setLevel(logging.DEBUG)
     return GSimplify(Options(**options))(f, assume)
