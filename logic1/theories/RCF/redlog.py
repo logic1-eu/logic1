@@ -223,37 +223,11 @@ def _unwrap(s: str) -> str:
     return s[:end]
 
 
-# Using Redlog as a parser for Redlog input:
-
-def to_logic1(s: str) -> Formula:
-    """Return the Redlog formula in `s` as a Logic1 Formula. `s` must be valid
-    Redlog input. `vars` is a superset of the variables in `s`.
-
-
-    >>> from logic1 import *
-    >>> from logic1.theories.RCF import *
-    >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
-    >>> s = 'all(x, ex(y, x**2 + x * y + b > 0 and (x + a * y**2 + b < 0 or x + a * y**2 + b = 0)))'
-    >>> redlog.to_logic1(s)
-    All(x, Ex(y, And(x**2 + x*y + b > 0, Or(a*y**2 + b + x < 0, a*y**2 + b + x == 0))))
-    """
-    output = _call_redlog(f'<< r2py_formula ({s}) >>')
-    result = _eval(output)
-    assert isinstance(result, firstorder.Formula), result
-    return result
-
-
 # Wrapped Redlog functions in alphabetical order:
 
 def cnf(f: Formula, bnfsm: bool = False, bnfsac: bool = True) -> Formula:
-    """Conjunctive normal form using the Redlog function `rlcnf
-    <https://www.redlog.eu/documentation/service.php?key=cnf>`_.
-
-    :param f:
-      The input formula.
-
-    :returns:
-      A conjunctive normal form of `f`.
+    """Return a conjunctive normal form of ``f``, using the Redlog function
+    :redlog:`rlcnf`.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -277,14 +251,8 @@ def cnf(f: Formula, bnfsm: bool = False, bnfsac: bool = True) -> Formula:
 
 
 def dnf(f: Formula, bnfsm: bool = False, bnfsac: bool = True) -> Formula:
-    """Disjunctive normal form using the Redlog function `rldnf
-    <https://www.redlog.eu/documentation/service.php?key=dnf>`_.
-
-    :param f:
-      The input formula.
-
-    :returns:
-      A conjunctive normal form of `f`.
+    """Return a disjunctive normal form of ``f``, using the Redlog function
+    :redlog:`rldnf`.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -305,16 +273,8 @@ def dnf(f: Formula, bnfsm: bool = False, bnfsac: bool = True) -> Formula:
 
 
 def gqe(f: Formula, generic: Generic = Generic.FULL) -> tuple[list[AtomicFormula], Formula]:
-    """Generic real quantifier elimination using the Redlog function `rlgqe`.
-
-    :param f:
-      The input formula to which quantifier elimination will be applied.
-
-    :returns:
-      A pair `(assumptions, f')`. The formula `f'` is a quantifier-free
-      equivalent of `f` modulo the `assumptions`. All assumptions are
-      instances of :class:`Ne <.RCF.atomic.Ne>`; if `generic=Generic.MONOMIAL`,
-      then all left hand sides of assumptions are monomial .
+    """Apply generic real quantifier elimination to ``f``, using the Redlog
+    function :redlog:`rlgqe`.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -325,10 +285,8 @@ def gqe(f: Formula, generic: Generic = Generic.FULL) -> tuple[list[AtomicFormula
     ([a + 1 != 0], 4*a*c - b**2 + 4*c <= 0)
 
     .. seealso::
-      * The documentation of the Redlog function `rlgqe
-        <https://www.redlog.eu/documentation/service.php?key=rlgqe>`_.
-      * Function :func:`qe <.RCF.qe.qe>` with `generic` in
-        :attr:`.Generic.FULL`, :attr:`.Generic.MONOMIAL`.
+      The Logic1 function :func:`qe() <.RCF.qe.qe>` with the option
+      ``generic=Generic.FULL`` or ``generic=Generic.MONOMIAL``.
     """
     match generic:
         case Generic.NONE:
@@ -352,26 +310,16 @@ def gqe(f: Formula, generic: Generic = Generic.FULL) -> tuple[list[AtomicFormula
 
 def gsn(f: Formula, assume: Iterable[AtomicFormula] = [], form: str = 'auto',
         bnfsm=False, bnfsac: bool = True) -> Formula:
-    """Real quantifier elimination using the Redlog function `rlgsn
-    <https://www.redlog.eu/documentation/service.php?key=rlgsn>`_.
+    """Apply Gröbner simplification to a Boolean normal form of ``f``, using the
+    Redlog function :redlog:`rlgsn`.
 
-    :param f:
-      The input formula to which quantifier elimination will be applied.
-
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The return value
-      is equivalent modulo those assumptions.
-
-    :param form:
-      Explicitly choose the normal form of the output. Possible arguments are
-      the strings 'auto' (default), 'cnf', 'dnf'.
-
-    :param bnfsm:
-    :param bnfsac:
-      Are passed on to CNF/DNF computation.
-
-    :returns:
-      A simplified equivalent of `f` modulo `assume`.
+    The argument ``assume`` is a list of atomic formulas that are assumed to
+    hold. The argument ``form`` allows to choose the normal form of the output,
+    where possible arguments are the strings ``'auto'`` (default), ``'cnf'``,
+    ``'dnf'``. The options ``bnfsm`` and ``bnfsac`` set the Redlog switches
+    ``rlbnfsm`` and ``rlbnfsac``, respectively, which control the behavior of
+    the Boolean normal form computation. Returns a simplified equivalent of
+    ``f`` modulo ``assume``.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -387,6 +335,9 @@ def gsn(f: Formula, assume: Iterable[AtomicFormula] = [], form: str = 'auto',
         Or(b != 0, a < 0),
         Or(b > 0, a <= 0, b**2 - 4*a >= 0),
         Or(a <= 0, b**2 - 4*a >= 0))
+
+    .. seealso::
+      The Logic1 function :func:`gsimplify() <.RCF.gsimplify.gsimplify>`.
     """
     rl_switches = (f'{_map_option(bnfsac, "rlbnfsac")} '
                    f'{_map_option(bnfsm, "rlbnfsm")}')
@@ -397,37 +348,12 @@ def gsn(f: Formula, assume: Iterable[AtomicFormula] = [], form: str = 'auto',
     assert isinstance(result, firstorder.Formula), result
     return result
 
-def help(key: Optional[str] = None, developer: bool = False) -> None:
-    """Raw access to the redlog help system. A call of this function corresponds
-    to the question mark within Redlog. Call `rl_help()` without arguments to
-    get started. Then, e.g., `?services` becomes `rl_help("services")`, and
-    `?rlqe` becomes `rl_help("rlqe")` which displays information on `:meth:qe`.
-    Note that all services and switches are prefixed with `rl` in Redlog and in
-    the help system, but not in Logic1.
-    """
-    if key is None:
-        key = "nil"
-    else:
-        key = "'" + key
-    if developer is False:
-        devp = "nil"
-    else:
-        devp = "t"
-    output = _call_help(f"rl_help({key}, {devp})")
-    print(output)
-
 def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
-    """Real quantifier elimination using the Redlog function `rlqe`.
+    """Apply real quantifier elimination to ``f``, using the Redlog function
+    :redlog:`rlqe`.
 
-    :param f:
-      The input formula to which quantifier elimination will be applied.
-
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The return value
-      is equivalent modulo those assumptions.
-
-    :returns:
-      A quantifier-free equivalent of `f` modulo `assume`.
+    The argument ``assume`` is a list of atomic formulas that are assumed to
+    hold. The return value is equivalent to ``f`` modulo the ``assumptions``.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -438,10 +364,8 @@ def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
     And(b > 0, a < 0)
 
     .. seealso::
-      * The documentation of the Redlog function `rlqe
-        <https://www.redlog.eu/documentation/service.php?key=rlqe>`_.
-      * Function :func:`qe <.RCF.qe.qe>` with the default option `generic` =
-        :attr:`.Generic.NONE`.
+      The Logic1 function :func:`qe <.RCF.qe.qe>` with the default option
+      ``generic=Generic.NONE``.
     """
     rl_f = f.as_redlog()
     rl_assume = '{' + ', '.join(atom.as_redlog() for atom in assume) + '}'
@@ -452,22 +376,12 @@ def qe(f: Formula, assume: Iterable[AtomicFormula] = []) -> Formula:
 
 
 def qea(f: Formula) -> list[tuple[Formula, list[str]]]:
-    """Extended real quantifier elimination using the Redlog function `rlqea`.
+    """Apply extended real quantifier elimination to ``f``, using the Redlog
+    function :redlog:`rlqea`.
 
-    :param f:
-      The input formula to which extended quantifier elimination will be applied.
-
-    :returns:
-      A list of pairs (f', answer). The semantics of the return value depends on
-      quantification of the outermost block of the input formula `f`:
-
-      * :class:`.Ex`: The disjunction of the guards `f'` is equivalent to
-        `f`. Each `answer` represents satisfying values of the quantified
-        variables in the corresponding case.
-
-      * :class:`.All`: The conjunction of the guards `f'` is equivalent to `f`.
-        Each `answer` represents unsatisfying values of the quantified variables
-        in the case that the corresponding `f'` does not hold.
+    The result is a list of pairs ``(f', answer)``, where each ``answer`` is the
+    unparsed string containing the corresponding generalized term returned by
+    Redlog.
 
     >>> from logic1 import *
     >>> from logic1.theories.RCF import *
@@ -477,10 +391,6 @@ def qea(f: Formula) -> list[tuple[Formula, list[str]]]:
      (And(a != 0, 4*a*c - b**2 <= 0), ['x = ( - sqrt( - 4*a*c + b**2) - b)/(2*a)']),
      (And(a != 0, 4*a*c - b**2 <= 0), ['x = (sqrt( - 4*a*c + b**2) - b)/(2*a)']),
      (And(b != 0, a == 0), ['x = ( - c)/b'])]
-
-    .. seealso::
-      The documentation of the Redlog function `rlqea
-      <https://www.redlog.eu/documentation/service.php?key=rlqea>`_.
     """
     input = f.as_redlog()
     output = _call_redlog(f'r2py_qea rlqea {input}')
@@ -495,21 +405,13 @@ def qea(f: Formula) -> list[tuple[Formula, list[str]]]:
 def simplify(f: Formula, assume: Iterable[AtomicFormula] = [],
              explode_always: bool = True, prefer_order: bool = True, prefer_weak: bool = False) \
         -> Formula:
-    """Simplification using the Redlog function `rlsimpl`.
+    """Simplify ``f``, using the Redlog function `rlsimpl`.
 
-    :param f:
-      The input formula to which quantifier elimination will be applied.
-
-    :param assume:
-      A list of atomic formulas that are assumed to hold. The return value
-      is equivalent modulo those assumptions.
-
-    :returns:
-      A simplified equivalent of `f` modulo `assume`.
+    The argument ``assume`` is a list of atomic formulas that are assumed to
+    hold. The result is equivalent to ``f`` modulo ``assume``.
 
     .. seealso::
-      The documentation of the Redlog function `rlsimpl
-      <https://www.redlog.eu/documentation/service.php?key=rlsimpl>`_.
+      The Logic1 function :func:`simplify() <.RCF.simplify.simplify>`.
     """
     rl_switches = (f'{_map_option(explode_always, "rlsiexpla")} '
                    f'{_map_option(prefer_order, "rlsipo")} '
@@ -520,3 +422,115 @@ def simplify(f: Formula, assume: Iterable[AtomicFormula] = [],
     result = _eval(output)
     assert isinstance(result, firstorder.Formula), result
     return result
+
+
+# Using Redlog as a parser for Redlog input:
+
+def to_logic1(s: str) -> Formula:
+    """Parse the string ``s`` as a Redlog formula and return it as a Logic1
+    :class:`Formula <.RCF.types.Formula>`.
+
+    >>> from logic1 import *
+    >>> from logic1.theories.RCF import *
+    >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
+    >>> s = 'all(x, ex(y, x**2 + x * y + b > 0 and (x + a * y**2 + b < 0 or x + a * y**2 + b = 0)))'
+    >>> redlog.to_logic1(s)
+    All(x, Ex(y, And(x**2 + x*y + b > 0, Or(a*y**2 + b + x < 0, a*y**2 + b + x == 0))))
+    """
+    output = _call_redlog(f'<< r2py_formula ({s}) >>')
+    result = _eval(output)
+    assert isinstance(result, firstorder.Formula), result
+    return result
+
+
+# Accessing Redlog Help
+
+def help(key: Optional[str] = None, developer: bool = False) -> None:
+    """Raw access to the redlog help system.
+
+    A call of this function corresponds to the question mark within Redlog.
+    Note that all Redlog functions and switches are prefixed with ``rl`` inside
+    Redlog and in the help system, but not in Logic1.
+
+    >>> from logic1.theories.RCF import redlog
+    >>> redlog.help()  # doctest: +ELLIPSIS
+    <BLANKLINE>
+    REDLOG BUILTINS
+        ?, all, and, ball, bex, equiv, ex, false, impl, mkand, mkor, not, or, repl,
+        rlabout, rlset, true
+    <BLANKLINE>
+    REDLOG SERVICES
+        rl1equation, rlall, rlatl, rlatml, rlatnum, rlbvarl, rlcad, rlcadporder,
+        rlcadproj, rlcnf, rldecdeg, rldecdeg1, rldepth, rldima, rldnf, rldpep,
+        rldump, rlenf, rlex, rlex2, rlexpand, rlexpanda, rlexplats, rlfvarl,
+        ...
+        rlsimplbasic, rlslfq, rlsmt2read, rlsmtqe, rlstex, rlstruct, rlsymbolify,
+        rltab, rltan2, rlterml, rltermml, rlthsimpl, rltnf, rltropsat, rlvarl,
+        rlvcreduce, rlvsl, rlwqe, rlwqea, rlxqe, rlxqea
+    <BLANKLINE>
+    REDLOG TYPES
+        Any, Assignment/1, Atom, Enum/n, Flag, Formula, Integer, List/1, List5/5,
+        LPolyQ, MList/1, Pair/2, Rational, String, Switch, Term, Triplet/3,
+        TruthValue, Variable, Void
+    <BLANKLINE>
+    REDLOG KEYWORDS
+        activity, auto, cnf, dfg, dlcs, dnf, mathematica, qepcad, sat, slfq, smt2,
+        unknown, unsat, zmom
+    <BLANKLINE>
+    SEE ALSO
+        ?builtins   more information on builtins
+        ?services   more information on services
+        ?types      more information on types
+        ?X          for a specific service, type, or switch X
+    <BLANKLINE>
+
+    >>> redlog.help('services')  # doctest: +ELLIPSIS
+    <BLANKLINE>
+    REDLOG SERVICES
+        rl1equation     equivalent DNF with one relevant equation in each branch (DCFSF)
+        rlall           universal closure
+        rlatl           set of contained atomic formulas
+        ...
+        rlwqea          weak quantifier elimination with answer
+        rlxqe           weakly parametric linear quantifier elimination
+        rlxqea          weakly parametric linear quantifier elimination with answer
+    <BLANKLINE>
+    SEE ALSO
+        ?X              for a specific service X
+    <BLANKLINE>
+
+    >>> redlog.help('rlqe')  # doctest: +ELLIPSIS
+    <BLANKLINE>
+    SYNOPSIS
+        rlqe(formula: Formula, assume = {}: List(Atom))
+    <BLANKLINE>
+    DESCRIPTION
+        quantifier elimination
+    <BLANKLINE>
+    RETURNS
+        Formula
+    <BLANKLINE>
+    ARGUMENTS
+        formula    first-order input formula
+        assume     atomic input assumptions
+    <BLANKLINE>
+    SEE ALSO
+        rlcad      cylindrical algebraic decomposition
+        rlgcad     generic cylindrical algebraic decomposition
+        rlghqe     generic Hermitian quantifier elimination
+        ...
+        rlqea      quantifier elimination with answer
+        rlqeipo    quantifier elimination in position
+        rlqews     quantifier elimination with selection
+    <BLANKLINE>
+    """
+    if key is None:
+        key = "nil"
+    else:
+        key = "'" + key
+    if developer is False:
+        devp = "nil"
+    else:
+        devp = "t"
+    output = _call_help(f"rl_help({key}, {devp})")
+    print(output)
