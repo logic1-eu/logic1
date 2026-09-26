@@ -34,12 +34,14 @@ ign_parallel     := --ignore-glob=*parallel*
 ign_redlog       := --ignore=logic1/theories/RCF/test_redlog.txt \
 				    --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                     --ignore=logic1/theories/RCF/redlog.py
-ign_slow         := --ignore=logic1/theories/RCF/test_simplify_motor.txt \
+ign_slow         := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
+					--ignore=logic1/theories/RCF/test_simplify_motor.txt \
                     --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
                     --ignore=logic1/theories/RCF/test_qe.txt
-ign_redlog_motor := --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
+ign_too_slow     := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
+					--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
 
-ignores := $(ign_redlog_motor)
+ignores := $(ign_redlog_motor) $(ign_too_slow)
 PYTEST := pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules
 
 reduce := $(shell echo "quit;" | redcsl -w &>/dev/null; echo $$?)
