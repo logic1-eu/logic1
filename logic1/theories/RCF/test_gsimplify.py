@@ -20,6 +20,7 @@ import subprocess
 
 import pytest
 
+from benchmarks.theories.RCF.motor_series.motor_inputs import series3
 from logic1.firstorder import And, F, Or, T
 from logic1.theories.RCF import Eq, Gt, Lt, Ne, VV, gsimplify
 from logic1.theories.RCF.gsimplify import Clause, GlobalPremise, GSimplify, Options
@@ -303,83 +304,18 @@ def test_tautological_regular_clause_is_removed():
     assert result == []
 
 
-def test_application_example_testseries3(cnf_options):
+# This test formerly constructed the DS97 formula locally under the name
+# ``testseries3``. It now reuses ``motor_inputs.series3`` so that the unit test
+# and motor benchmarks have one authoritative input definition. Before the
+# inline definition was removed, direct comparison confirmed formula equality,
+# identical ``repr`` output (hence the same tree and argument order), and the
+# same 94-atom count. The test name was changed accordingly from
+# ``test_application_example_testseries3`` to
+# ``test_application_example_series3``.
+def test_application_example_series3(cnf_options):
     """Exercise the complete pipeline on DS97 Table 6, instance 3."""
-    i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
-    p1_boundary = 2 * p1 - 7
-    q_td_boundary = 400 * q + 9 * td - 20050
-    td_cases = Or(
-        And(td - 400 >= 0, td - 700 < 0, 3 * td + 400 * z - 5320 == 0),
-        And(td - 700 >= 0, td - 990 < 0, 2 * td - 300 * z + 1015 == 0),
-        And(td == 0, z == 0),
-    )
-    boundary_cases = Or(
-        And(q_td_boundary <= 0, q - 40 == 0),
-        And(q_td_boundary > 0, td - 450 == 0),
-    )
-    formula = Or(
-        And(
-            p1_boundary >= 0,
-            q_td_boundary <= 0,
-            i2 == 0,
-            n - td == 0,
-            q >= 0,
-            q - 40 <= 0,
-            td_cases,
-        ),
-        And(
-            p1_boundary >= 0,
-            q_td_boundary >= 0,
-            i2 == 0,
-            n - td == 0,
-            td - 450 >= 0,
-            9 * td - 20050 <= 0,
-            q - 40 <= 0,
-            q >= 0,
-            td_cases,
-        ),
-        And(
-            p1_boundary >= 0,
-            i2 == 0,
-            n - td == 0,
-            q - 40 <= 0,
-            q >= 0,
-            td_cases,
-            boundary_cases,
-        ),
-        And(
-            p1_boundary < 0,
-            q_td_boundary <= 0,
-            i2 == 0,
-            n - td == 0,
-            q >= 0,
-            q - 40 <= 0,
-            td_cases,
-        ),
-        And(
-            p1_boundary < 0,
-            q_td_boundary >= 0,
-            i2 == 0,
-            n - td == 0,
-            td - 450 >= 0,
-            9 * td - 20050 <= 0,
-            q - 40 <= 0,
-            q >= 0,
-            td_cases,
-        ),
-        And(
-            p1_boundary < 0,
-            i2 == 0,
-            n - td == 0,
-            q - 40 <= 0,
-            q >= 0,
-            td_cases,
-            boundary_cases,
-        ),
-    )
-
-    result = gsimplify(formula, **cnf_options)
+    result = gsimplify(series3, **cnf_options)
     expected_atom_count = 49 if cnf_options == PYEDA_OPTIONS else 35
 
-    assert len(list(formula.atoms())) == 94
+    assert len(list(series3.atoms())) == 94
     assert len(list(result.atoms())) == expected_atom_count
