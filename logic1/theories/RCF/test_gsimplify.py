@@ -1,7 +1,8 @@
 # Coverage:
-# - 16 test functions, expanding to 28 pytest cases when Redlog is available
+# - 18 test functions, expanding to 43 pytest cases when Redlog is available
 # - Boundary cases: one equation, one inequality, T, F, and a disjunction of two equations
 # - Clause and global-premise operations, assumptions, contradictions, and Gröbner reduction
+# - Interactions among equational clauses, proper clauses, and atomic global premises
 # - Application example: DS97 Table 6, instance 3 (94 input atoms reduced to 35 with
 #   Redlog and 49 with PyEDA)
 # - Backend-dependent cases always use PyEDA and additionally use Redlog after an rlqe
@@ -10,10 +11,9 @@
 #
 # Verification:
 # - Coverage.py (both backends): 98% combined statement and branch coverage for gsimplify.py
-#   (287 statements, 5 missed; 110 branch opportunities, 2 partially covered)
-# - Pytest with Redlog: all 28 cases passed; all 454 project tests passed
-# - Pytest without Redlog: 20 cases passed; 8 Redlog variants skipped
-# - Mypy: no issues found
+#   (286 statements, 5 missed; 110 branch opportunities, 2 partially covered)
+# - Focused pytest with Redlog: all 43 cases passed
+# - Without Redlog: 28 cases run with PyEDA and 15 Redlog variants are skipped
 
 import shutil
 import subprocess
@@ -65,6 +65,8 @@ def cnf_options(request: pytest.FixtureRequest) -> dict[str, bool]:
     return request.param
 
 
+# Basic public-API tests ensure that both CNF backends preserve elementary
+# formulas and Boolean constants.
 def test_single_equation(cnf_options):
     formula = x == 0
 
@@ -93,9 +95,19 @@ def test_disjunction_of_two_equations(cnf_options):
     assert set(result.args) == {x == 0, y == 0}
 
 
-def test_inconsistent_assumptions():
+@pytest.mark.parametrize(
+    'assume',
+    [
+        [x == 0, x != 0],
+        [x > 0, x <= 0],
+    ],
+    ids=['equation-and-disequation', 'strict-and-weak-order'],
+)
+def test_inconsistent_assumptions(assume):
+    # Exercise algebraic and order-theoretic inconsistency detection. PyEDA is
+    # sufficient here because the CNF backend is immaterial to this contract.
     with pytest.raises(GSimplify.Inconsistent):
-        gsimplify(T, assume=[x == 0, x != 0], **PYEDA_OPTIONS)
+        gsimplify(T, assume=assume, **PYEDA_OPTIONS)
 
 
 @pytest.mark.parametrize(
@@ -109,6 +121,84 @@ def test_reduction_modulo_equational_assumption(formula, expected, cnf_options):
     assert gsimplify(formula, assume=[x == 0], **cnf_options) == expected
 
 
+def _commutative_key(formula):
+    """Compare Boolean formulas modulo argument order, retaining duplicates."""
+    if isinstance(formula, (And, Or)):
+        arguments = tuple(sorted(
+            (_commutative_key(argument) for argument in formula.args),
+            key=repr,
+        ))
+        return type(formula), arguments
+    return formula
+
+
+@pytest.mark.parametrize(
+    ('formula', 'expected'),
+    [
+        # Splitting product disequalities is performed by the standard
+        # simplification phases surrounding Gröbner simplification.
+        pytest.param(
+            And(x * y != 0, z != 0),
+            And(x != 0, y != 0, z != 0),
+            id='factor-disequalities',
+        ),
+        # Multiple equational clauses contribute jointly to the strong global
+        # premise and must remain equivalent when neither reduces the other.
+        pytest.param(
+            And(Or(x == 0, y == 0), Or(y == 0, z == 0)),
+            And(Or(x == 0, y == 0), Or(y == 0, z == 0)),
+            id='two-equational-clauses',
+        ),
+        # Proper clauses mix disequalities with equations and order relations;
+        # this guards restoration of their disequality disjuncts.
+        pytest.param(
+            And(
+                Or(x != 0, y > 0, z == 0),
+                Or(y != 0, z < 0, x == 0),
+            ),
+            And(
+                Or(x != 0, y > 0, z == 0),
+                Or(y != 0, z < 0, x == 0),
+            ),
+            id='proper-clauses-with-disequalities',
+        ),
+        # Atomic equations form a global premise that reduces the remaining
+        # proper clause to its only possible disjunct.
+        pytest.param(
+            And(x == 0, y == 0, Or(x != 0, y > 0, z < 0)),
+            And(x == 0, y == 0, z < 0),
+            id='proper-clause-reduced-by-atomic-premises',
+        ),
+        # A proper clause already entailed by the global premise is redundant.
+        pytest.param(
+            And(x == 0, y == 0, Or(x == 0, z > 0)),
+            And(x == 0, y == 0),
+            id='redundant-proper-clause',
+        ),
+        # Conversely, a proper clause refuted by the global premise makes the
+        # complete conjunction false.
+        pytest.param(
+            And(x == 0, y == 0, Or(x != 0, y != 0)),
+            F,
+            id='false-proper-clause',
+        ),
+    ],
+)
+def test_public_clause_interactions(formula, expected, cnf_options):
+    result = gsimplify(formula, **cnf_options)
+
+    assert _commutative_key(result) == _commutative_key(expected)
+
+
+def test_formula_entailed_by_assumptions(cnf_options):
+    # Assumptions can discharge the whole input, not merely reduce its atoms.
+    formula = And(x == 0, y > 0)
+
+    assert gsimplify(formula, assume=[x == 0, y > 0], **cnf_options) is T
+
+
+# Clause tests pin the normalized representation on which GSimplify's
+# higher-level premise and reduction steps rely.
 def test_empty_clause():
     clause = Clause(F)
 
@@ -167,6 +257,8 @@ def test_non_atomic_clause(formula):
     assert not Clause(formula).is_atomic()
 
 
+# GlobalPremise tests cover its relation-indexed storage, Gröbner-basis cache,
+# and invalidation when new equations arrive.
 def test_global_premise_operations():
     premise = GlobalPremise([x == 0, y > 0], Options(use_redlog_cnf=False))
 
@@ -186,6 +278,8 @@ def test_global_premise_operations():
 
 
 def test_multiple_atomic_clauses_detect_contradiction():
+    # Multiple atomic clauses are processed recursively through the dual
+    # clause; contradictory atoms must yield the empty clause.
     simplifier = GSimplify(Options(use_redlog_cnf=False))
 
     result = simplifier.gsimplify_clauses(
@@ -198,6 +292,7 @@ def test_multiple_atomic_clauses_detect_contradiction():
 
 
 def test_tautological_regular_clause_is_removed():
+    # A regular clause recognized as valid contributes nothing to a CNF.
     simplifier = GSimplify(Options(use_redlog_cnf=False))
 
     result = simplifier.gsimplify_clauses(
@@ -209,7 +304,7 @@ def test_tautological_regular_clause_is_removed():
 
 
 def test_application_example_testseries3(cnf_options):
-    """Test instance 3 from Table 6 in Dolzmann--Sturm (1997)."""
+    """Exercise the complete pipeline on DS97 Table 6, instance 3."""
     i2, n, p1, q, td, z = VV.get('i2', 'n', 'p1', 'q', 'td', 'z')
     p1_boundary = 2 * p1 - 7
     q_td_boundary = 400 * q + 9 * td - 20050
