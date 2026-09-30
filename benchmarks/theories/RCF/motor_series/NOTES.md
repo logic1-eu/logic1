@@ -1,6 +1,6 @@
 # Motor Series Benchmark Notes
 
-Updated: 2026-09-29
+Updated: 2026-09-30
 
 Operational instructions for AI agents are in `AGENTS.md`. This document keeps
 the provenance, structural findings, and completed verification in more detail.
@@ -116,6 +116,35 @@ The measured `simplify` output atom counts are:
 | 11 | 156 | 151 | 146 | 140 | 145 | 140 |
 | 12 | 2100 | 1977 | 1918 | 2054 | 1977 | 1914 |
 | 13 | 342 | 303 | 294 | 342 | 303 | 294 |
+
+## Deferred Redlog equivalence check
+
+A possible future correctness check for every `test_simplify_motor.py` case is
+
+```python
+assert redlog.qe(Equivalent(formula, result).all()) is T
+```
+
+This would prove that each simplified result is equivalent to its input, but
+it is slow and is not itself a benchmark. If implemented, keep the check in
+the existing parameterized benchmark function so it consumes the exact
+`result` already produced for all 78 option combinations; do not duplicate the
+matrix or recompute `simplify` in a separate test module. Run the Redlog call
+after `benchmark.pedantic` so it remains outside the measured interval.
+
+The proposed opt-in mechanism is a local
+`benchmarks/theories/RCF/motor_series/conftest.py` that registers a
+`--check-redlog-equivalence` flag. The benchmark function would inspect that
+flag through a typed `pytest.FixtureRequest` and perform the assertion only
+when explicitly requested. A correctness-only invocation would be:
+
+```bash
+pytest benchmarks/theories/RCF/motor_series/test_simplify_motor.py --benchmark-disable --check-redlog-equivalence
+```
+
+Normal pytest and benchmark runs must not perform the Redlog checks. Selection
+with `-k`, for example `-k series3`, should remain available. This design has
+been discussed but is intentionally not implemented yet.
 
 ## Verification completed
 

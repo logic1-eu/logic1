@@ -57,6 +57,18 @@ formulas (positions are one-based):
 An exhaustive scan found no other duplicate sibling formulas, nested or
 top-level, in `testseries1` through `testseries13`.
 
+## Deferred Redlog equivalence validation
+
+- A proposed explicit-request correctness check is documented in `NOTES.md`;
+  do not implement it unless the user asks to revisit the design.
+- If implemented, integrate it into the existing parameterized
+  `test_simplify_motor` function and reuse the `result` returned by
+  `benchmark.pedantic` for every option combination. Do not duplicate the
+  matrix or recompute `simplify` in a separate test.
+- Gate the Redlog check behind a pytest command-line option registered by a
+  local `conftest.py`, and run it after the timed benchmark call. Normal pytest
+  and benchmark invocations must not perform the check.
+
 ## Validation after structural changes
 
 - Compare equality and exact `repr` with all 13 raw formulas.
