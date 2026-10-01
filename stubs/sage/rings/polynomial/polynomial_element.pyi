@@ -8,4 +8,6 @@ class Polynomial:
 
 
 class Polynomial_generic_dense(Polynomial):
-    ...
+
+    def parent(self) -> object:
+        ...

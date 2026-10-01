@@ -377,7 +377,7 @@ class VariableSet(firstorder.VariableSet['Variable']):
         """Implements abstract method :meth:`.firstorder.term.VariableSet.__getitem__`.
         """
         if not isinstance(name, str):
-            raise ValueError(f'expecting string as index; {name} is {type(name)}')
+            raise TypeError(f'expecting string as index; {name} is {type(name)}')
         tcontext = TermContext([name])
         self._used.add(name)
         return tcontext.get_var_by_index(0)
@@ -516,12 +516,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     _poly: fmpq_mpoly
 
     def __add__(self, other: Number | Term) -> Term:
-        if isinstance(other, Term):
-            tcontext = self.term_context() | other.term_context()
-            sum = tcontext.coerce_poly(self._poly) + tcontext.coerce_poly(other._poly)
-            return Term.from_raw(sum)
-        else:
-            return self + Term(other)
+        if not isinstance(other, Term):
+            other = Term(other)
+        tcontext = self.term_context() | other.term_context()
+        sum = tcontext.coerce_poly(self._poly) + tcontext.coerce_poly(other._poly)
+        return Term.from_raw(sum)
 
     def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
@@ -582,7 +581,6 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         """Iterate over the polynomial representation of the term, yielding
         pairs of coefficients and monomials.
 
-        >>> from gmpy2 import mpq
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
         >>> [(abs(coef), power_product) for coef, power_product in t]
@@ -617,12 +615,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         >>> (x - y) * (x + y)
         x**2 - y**2
         """
-        if isinstance(other, Term):
-            tcontext = self.term_context() | other.term_context()
-            product = tcontext.coerce_poly(self._poly) * tcontext.coerce_poly(other._poly)
-            return Term.from_raw(product)
-        else:
-            return self * Term(other)
+        if not isinstance(other, Term):
+            other = Term(other)
+        tcontext = self.term_context() | other.term_context()
+        product = tcontext.coerce_poly(self._poly) * tcontext.coerce_poly(other._poly)
+        return Term.from_raw(product)
 
     def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
         lhs = self - other
@@ -633,10 +630,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     def __neg__(self) -> Term:
         return Term.from_raw(-self._poly)
 
-    def __pow__(self, exp: int) -> Term:
-        if exp < 0:
-            raise ValueError(f'Negative exponent {exp} not supported')
-        return Term.from_raw(self._poly ** exp)
+    def __pow__(self, n: int) -> Term:
+        if n < 0:
+            raise ValueError(f'Negative exponent {n} not supported')
+        return Term.from_raw(self._poly ** n)
 
     def __radd__(self, other: Number) -> Term:
         assert not isinstance(other, Term)
@@ -662,23 +659,25 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         return self._as_string(mul='*', pow='^')
 
     def __sub__(self, other: Number | Term) -> Term:
-        if isinstance(other, Term):
-            tcontext = self.term_context() | other.term_context()
-            difference = tcontext.coerce_poly(self._poly) - tcontext.coerce_poly(other._poly)
-            return Term.from_raw(difference)
-        else:
-            return self - Term(other)
+        if not isinstance(other, Term):
+            other = Term(other)
+        tcontext = self.term_context() | other.term_context()
+        difference = tcontext.coerce_poly(self._poly) - tcontext.coerce_poly(other._poly)
+        return Term.from_raw(difference)
 
     def __truediv__(self, other: Number | Term) -> Term:
-        """True division. `self` must be divisible by `other`. Otherwise, flint
-        will raise an error.
+        """True division. ``self`` must be divisible by ``other``. Otherwise,
+        flint will raise an error.
+
+        >>> x, y = VV.get('x', 'y')
+        >>> x*y / x
+        y
         """
-        if isinstance(other, Term):
-            tcontext = self.term_context() | other.term_context()
-            quotient = tcontext.coerce_poly(self._poly) / tcontext.coerce_poly(other._poly)
-            return Term.from_raw(quotient)
-        else:
-            return self / Term(other)
+        if not isinstance(other, Term):
+            other = Term(other)
+        tcontext = self.term_context() | other.term_context()
+        quotient = tcontext.coerce_poly(self._poly) / tcontext.coerce_poly(other._poly)
+        return Term.from_raw(quotient)
 
     def __xor__(self, other: object) -> Term:
         raise NotImplementedError(
@@ -686,7 +685,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
             "in Python, and has the wrong precedence")
 
     def as_constant(self) -> mpq:
-        assert self.is_constant()
+        if not self.is_constant():
+            raise ValueError(f'{self} is not constant')
         return self.constant_coefficient()
 
     def as_latex(self) -> str:
@@ -754,12 +754,15 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         return ''.join(ret)
 
     def as_variable(self) -> Variable:
+        if not self.is_variable():
+            raise ValueError(f'{self} is not a variable')
         return Variable.from_raw(self._poly)
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified in
-        the `degrees`. Mathematically, this is the coefficient in the base ring
-        adjoined by the variables of this ring that are not listed in `degrees`.
+        the ``degrees``. Mathematically, this is the coefficient in the base
+        ring adjoined by the variables of this ring that are not listed in
+        ``degrees``.
 
         >>> x, y = VV.get('x', 'y')
         >>> t = (x - y + 2) ** 2
@@ -875,10 +878,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
 
-        A pair `(unit, D)`, where `unit` is a rational number, the
-        keys of `D` are irreducible factors, and the corresponding values are
-        their multiplicities. All irreducible factors are monic. Note that
-        the return value is uniquely determined by this specification.
+        Returns a pair ``(unit, D)``, where ``unit`` is a rational number, the
+        keys of ``D`` are irreducible factors, and the corresponding values are
+        their multiplicities. All irreducible factors are monic. Note that the
+        return value is uniquely determined by this specification.
 
         >>> x, y = VV.get('x', 'y')
         >>> t = -x**2 + y**2
@@ -973,14 +976,25 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
 
     def is_variable(self) -> bool:
         """Check if this term is a variable.
+
+        >>> x = VV['x']
+        >>> t = x + 1 - 1
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, Variable)
+        False
+        >>> t.is_variable()
+        True
         """
         poly = self._poly
         return poly in poly.context().gens()
 
     def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
-        """Return :obj:`True` if this Term can be written as a_1 x_1 + ... +
-        a_n x_n + r such that a_1, ..., a_n in QQ, x_1, ..., x_n in X, and r is
-        a polynomial over QQ that does not contain any variable from X.
+        r"""Return :obj:`True` if this Term can be written as
+        :math:`a_1 x_1 + ... + a_n x_n + r` such that :math:`a_1, ..., a_n \in
+        \mathbb{Q}`, :math:`x_1, ..., x_n \in X`, and :math:`r` is a polynomial
+        over :math:`\mathbb{Q}` that does not contain any variable from
+        :math:`X`.
 
         >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
         >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
@@ -1000,7 +1014,19 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         return True
 
     def is_zero(self) -> bool:
-        """Return :obj:`True` if this term represents the constant zero.
+        """Return :obj:`True` if this term equals zero.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x = VV['x']
+        >>> t = x - x
+        >>> t
+        0
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, int)
+        False
+        >>> t.is_zero()
+        True
         """
         return self._poly.is_zero()
 
@@ -1286,8 +1312,8 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         return result
 
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
-        """Iterate over the summands of self yielding pairs of dictionaries
-        representing monomials, and coefficients.|
+        """Iterate over the summands of this term yielding pairs of monomials
+        and coefficients, where the monimials are represented as dictionaries.
 
         >>> x, y = VV.get('x', 'y')
         >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
