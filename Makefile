@@ -10,6 +10,7 @@ CYTHON_CS      := $(addsuffix .c, $(CYTHON_BASES))
 CYTHON_HTMLS   := $(addsuffix .html, $(CYTHON_BASES))
 CYTHON_SOS     := $(addsuffix $(EXT_SUFFIX), $(CYTHON_BASES))
 
+.DEFAULT_GOAL := test
 GOALS := $(if $(MAKECMDGOALS), $(MAKECMDGOALS), $(.DEFAULT_GOAL))
 
 POLYLIB_TARGETS := mypy-run
@@ -36,6 +37,9 @@ ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
 ignores :=
 PYTEST := pytest -n 8 --durations=10 --doctest-cython --exitfirst --doctest-modules
 
+REDLOG_TARGETS := test test-all pytest coverage coverage_html
+
+ifneq ($(filter $(GOALS), $(REDLOG_TARGETS)),)
 reduce := $(shell echo "quit;" | redcsl -w &>/dev/null; echo $$?)
 
 ifeq ($(reduce), 0)
@@ -43,6 +47,7 @@ ifeq ($(reduce), 0)
 else
   $(info Executing Reduce failed with exit code $(reduce), will skip tests with Redlog)
   ignores += $(ign_redlog)
+endif
 endif
 
 .PHONY: cython cython-clean cython-veryclean \
