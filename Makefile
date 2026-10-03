@@ -83,7 +83,8 @@ cython-veryclean: cython-clean
 	/bin/rm -f $(addsuffix .cpython-*-darwin.so, $(CYTHON_BASES))
 
 doc: cython
-	cd doc && make clean html
+	cd doc && $(MAKE) clean
+	cd doc && $(MAKE) html
 
 pygount:
 	pygount -f summary logic1
