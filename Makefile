@@ -29,20 +29,12 @@ ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   endif
 endif
 
-ign_cython       := --ignore=logic1/theories/RCF/range.pyx
-ign_parallel     := --ignore-glob=*parallel*
-ign_redlog       := --ignore=logic1/theories/RCF/test_redlog.txt \
-				    --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
-                    --ignore=logic1/theories/RCF/redlog.py
-ign_slow         := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
-					--ignore=logic1/theories/RCF/test_simplify_motor.txt \
-                    --ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt \
-                    --ignore=logic1/theories/RCF/test_qe.txt
-ign_too_slow     := --ignore=logic1/theories/RCF/test_gsimplify_motor.txt \
-					--ignore=logic1/theories/RCF/test_simplify_motor_redlog.txt
+ign_cython := --ignore=logic1/theories/RCF/range.pyx
+ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
+              --ignore=logic1/theories/RCF/redlog.py
 
-ignores := $(ign_redlog_motor) $(ign_too_slow)
-PYTEST := pytest -n 8 --durations=0 --doctest-cython --exitfirst --doctest-modules
+ignores :=
+PYTEST := pytest -n 8 --durations=10 --doctest-cython --exitfirst --doctest-modules
 
 reduce := $(shell echo "quit;" | redcsl -w &>/dev/null; echo $$?)
 
@@ -76,8 +68,8 @@ mypy-run:
 pytest: cython
 	$(PYTEST) $(ignores)
 
-test-doc:
-	cd doc && make test
+test-doc: cython
+	cd doc && $(MAKE) test
 
 cython: $(CYTHON_SOS)
 
