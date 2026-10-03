@@ -38,14 +38,11 @@ flint = [
 ]
 
 [build-system]
-requires = ["setuptools>=64", "setuptools-scm>=8", "Cython>=3.1.0"]
+requires = ["setuptools>=74.1.0", "setuptools-scm>=8", "Cython>=3.1.0"]
 build-backend = "setuptools.build_meta"
 
-[tool.local.cythonize.flags]
-annotate = true
-inplace = true
-
 [tool.setuptools]
+# Setuptools warns that declarative ext-modules are still experimental.
 ext-modules = [
   {name = "logic1.theories.RCF.range", sources = ["logic1/theories/RCF/range.pyx"]}
 #  {name = "logic1.theories.RCF.substitution", sources = ["logic1/theories/RCF/substitution.pyx"]}

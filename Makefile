@@ -4,8 +4,9 @@ RESET := $(ESC)[0m
 
 EXT_SUFFIX := $(shell python -c 'import sysconfig; print(sysconfig.get_config_var("EXT_SUFFIX"))')
 
-CYTHON_MODULES := range  # substitution
-CYTHON_BASES   := $(addprefix logic1/theories/RCF/, $(CYTHON_MODULES))
+# List active .pyx modules as whitespace-separated paths without the suffix.
+CYTHON_BASES   := logic1/theories/RCF/range
+# CYTHON_BASES += logic1/theories/RCF/substitution
 CYTHON_CS      := $(addsuffix .c, $(CYTHON_BASES))
 CYTHON_HTMLS   := $(addsuffix .html, $(CYTHON_BASES))
 CYTHON_SOS     := $(addsuffix $(EXT_SUFFIX), $(CYTHON_BASES))
@@ -31,7 +32,6 @@ ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   endif
 endif
 
-ign_cython := --ignore=logic1/theories/RCF/range.pyx
 ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
               --ignore=logic1/theories/RCF/redlog.py
 
@@ -52,7 +52,7 @@ else
 endif
 endif
 
-.PHONY: cython \
+.PHONY: cython cython-debug \
         pytest mypy mypy-run \
         test test-all test-doc \
         doc pygount coverage coverage_html \
@@ -78,10 +78,20 @@ pytest: cython
 test-doc: cython
 	cd doc && $(MAKE) test
 
+# Local Cython builds take their .pyx files from CYTHON_BASES.
+# cythonize --inplace builds the .so via setuptools, which also reads
+# pyproject.toml; cython-debug only generates .c and annotated .html.
+# Conda instead builds the extension declared in pyproject.toml, using
+# the gmpy2 include path supplied by conda/recipe.yaml.
 cython: $(CYTHON_SOS)
 
-logic1/theories/RCF/%$(EXT_SUFFIX): logic1/theories/RCF/%.pyx cython-setup.py
-	python cython-setup.py build_ext --inplace
+# In logic1_dev, Python's LDSHARED has the lib rpath twice; Conda's compiler
+# activation adds it again via LDFLAGS, causing two harmless linker warnings.
+logic1/%$(EXT_SUFFIX): logic1/%.pyx
+	cythonize --inplace $<
+
+cython-debug:
+	cythonize --annotate --force $(addsuffix .pyx,$(CYTHON_BASES))
 
 doc: cython
 	cd doc && $(MAKE) clean
@@ -90,6 +100,8 @@ doc: cython
 pygount:
 	pygount -f summary logic1
 
+# Cython doctests run, but compiled range.pyx lines are not measured until
+# the extension is rebuilt with line tracing enabled.
 coverage: cython
 	$(PYTEST) $(PYTEST_OPTIONS) --cov=logic1 --cov-report= $(ignores)
 
@@ -97,8 +109,8 @@ coverage_html: coverage
 	coverage html
 	open htmlcov/index.html
 
-# The retained .so keeps make cython from regenerating C/HTML;
-# use make -B cython if those files are needed again.
+# The retained .so keeps make cython from regenerating C;
+# use make cython-debug to regenerate C and annotated HTML.
 mostlyclean:
 	/bin/rm -rf build doc/build/doctrees
 	/bin/rm -f $(CYTHON_CS) $(CYTHON_HTMLS)
