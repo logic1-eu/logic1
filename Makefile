@@ -35,7 +35,8 @@ ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
               --ignore=logic1/theories/RCF/redlog.py
 
 ignores :=
-PYTEST := pytest -n 8 --durations=10 --doctest-cython --exitfirst --doctest-modules
+PYTEST := pytest
+PYTEST_OPTIONS := -n 8 --durations=10 --doctest-cython --exitfirst --doctest-modules
 
 REDLOG_TARGETS := test test-all pytest coverage coverage_html
 
@@ -58,7 +59,7 @@ endif
 
 test: cython
 	$(MAKE) mypy-run
-	$(PYTEST) $(ignores)
+	$(PYTEST) $(PYTEST_OPTIONS) $(ignores)
 
 test-all: test test-doc
 
@@ -71,7 +72,7 @@ mypy-run:
 	mypy --exclude '$(exclude_re)' logic1
 
 pytest: cython
-	$(PYTEST) $(ignores)
+	$(PYTEST) $(PYTEST_OPTIONS) $(ignores)
 
 test-doc: cython
 	cd doc && $(MAKE) test
@@ -95,7 +96,7 @@ pygount:
 	pygount -f summary logic1
 
 coverage: cython
-	coverage run -m pytest --doctest-modules $(ignores)
+	$(PYTEST) $(PYTEST_OPTIONS) --cov=logic1 --cov-report= $(ignores)
 
 coverage_html: coverage
 	coverage html
