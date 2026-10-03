@@ -9,6 +9,7 @@ CYTHON_BASES   := $(addprefix logic1/theories/RCF/, $(CYTHON_MODULES))
 CYTHON_CS      := $(addsuffix .c, $(CYTHON_BASES))
 CYTHON_HTMLS   := $(addsuffix .html, $(CYTHON_BASES))
 CYTHON_SOS     := $(addsuffix $(EXT_SUFFIX), $(CYTHON_BASES))
+CYTHON_SO_GLOBS := $(addsuffix .so, $(CYTHON_BASES)) $(addsuffix .*.so, $(CYTHON_BASES))
 
 .DEFAULT_GOAL := test
 GOALS := $(if $(MAKECMDGOALS), $(MAKECMDGOALS), $(.DEFAULT_GOAL))
@@ -51,11 +52,11 @@ else
 endif
 endif
 
-.PHONY: cython cython-clean cython-veryclean \
+.PHONY: cython \
         pytest mypy mypy-run \
         test test-all test-doc \
         doc pygount coverage coverage_html \
-        clean veryclean conda-build
+        mostlyclean clean conda-build
 
 test: cython
 	$(MAKE) mypy-run
@@ -82,12 +83,6 @@ cython: $(CYTHON_SOS)
 logic1/theories/RCF/%$(EXT_SUFFIX): logic1/theories/RCF/%.pyx cython-setup.py
 	python cython-setup.py build_ext --inplace
 
-cython-clean:
-	/bin/rm -f $(CYTHON_CS) $(CYTHON_HTMLS) $(CYTHON_SOS)
-
-cython-veryclean: cython-clean
-	/bin/rm -f $(addsuffix .cpython-*-darwin.so, $(CYTHON_BASES))
-
 doc: cython
 	cd doc && $(MAKE) clean
 	cd doc && $(MAKE) html
@@ -102,11 +97,20 @@ coverage_html: coverage
 	coverage html
 	open htmlcov/index.html
 
-clean:
-	/bin/rm -rf build dist
+# The retained .so keeps make cython from regenerating C/HTML;
+# use make -B cython if those files are needed again.
+mostlyclean:
+	/bin/rm -rf build doc/build/doctrees
+	/bin/rm -f $(CYTHON_CS) $(CYTHON_HTMLS)
 
-veryclean: clean cython-veryclean
-	/bin/rm -rf htmlcov .coverage doc/build
+# output/ contains Conda artifacts from make conda-build and is removed here.
+# dist/ contains PyPI artifacts from python -m build (outside this Makefile)
+# and is deliberately preserved.
+clean: mostlyclean
+	/bin/rm -f $(CYTHON_SO_GLOBS)
+	/bin/rm -rf htmlcov doc/build .pytest_cache .mypy_cache output
+	/bin/rm -f .coverage .coverage.*
+	find . -name .git -prune -o -type d -name __pycache__ -prune -exec /bin/rm -rf {} +
 
 conda-build:
 	LOGIC1_GIT_REPO="file:$$(pwd)" \
