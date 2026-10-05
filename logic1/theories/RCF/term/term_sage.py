@@ -1033,7 +1033,7 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
         """
         if not gen.is_gen():
             raise ValueError(f"{gen} is not a generator")
-        variable = cls.__new__(cls)
+        variable = Variable.__new__(Variable)
         variable._poly = gen
         variable._hash = None
         return variable

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from collections.abc import Container, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -308,7 +309,7 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         # because we would return a semantically meaningless term:
         assert not (bad_names := set(term._poly.context().names()) - VV._used), \
                f'{term} uses a context with unknown variables {bad_names}'
-        return Term.from_raw(self.coerce_poly(term._poly))
+        return Term._from_raw(self.coerce_poly(term._poly))
 
     def coerce_poly(self, poly: fmpq_mpoly) -> fmpq_mpoly:
         """Coerce poly to the _flint_context of the TermContext self.
@@ -329,14 +330,14 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
 
     def get_var_by_index(self, index: int) -> Variable:
         gen = self._ring.gen(index)
-        return Variable.from_raw(gen)
+        return Variable._from_gen(gen)
 
     def get_var_by_name(self, name: str) -> Variable:
         index = self._ring.variable_to_index(name)
         return self.get_var_by_index(index)
 
     def get_vars(self) -> tuple[Variable, ...]:
-        return tuple(Variable.from_raw(gen) for gen in self._ring.gens())
+        return tuple(Variable._from_gen(gen) for gen in self._ring.gens())
 
     def ordering(self) -> Ordering:
         return self._ring.ordering()
@@ -462,9 +463,9 @@ class SortKey[τ: Term]:
         return self.cmp(other) != 0
 
     def cmp(self, other: Self) -> int:
-        tcontext = self.term.term_context() | other.term.term_context()
-        p = tcontext.coerce_poly(self.term._poly)
-        q = tcontext.coerce_poly(other.term._poly)
+        ring = self.term._parent | other.term._parent
+        p = ring.coerce_poly(self.term._poly)
+        q = ring.coerce_poly(other.term._poly)
         return SortKey.cmp_sage_like(p, q)
 
     @staticmethod
@@ -513,16 +514,13 @@ class SortKey[τ: Term]:
         return 0
 
 
-class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
+class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fmpq_mpoly_ctx]):
 
     _poly: fmpq_mpoly
 
-    def __add__(self, other: Number | Term) -> Term:
-        if not isinstance(other, Term):
-            other = Term(other)
-        tcontext = self.term_context() | other.term_context()
-        sum = tcontext.coerce_poly(self._poly) + tcontext.coerce_poly(other._poly)
-        return Term.from_raw(sum)
+    @property
+    def _parent(self) -> Ring:
+        return Ring.from_raw(self._poly.context())
 
     def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
@@ -560,7 +558,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     def __hash__(self) -> int:
         # We use this low-level approach because
         # hash(self._summands_as_hashable()) was too slow.
-        return hash(repr(self._poly))
+        if self._hash is None:
+            self._hash = hash(repr(self._poly))
+        return self._hash
 
     def __init__(self, arg: Number) -> None:
         """
@@ -577,6 +577,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         """
         context = fmpq_mpoly_ctx.get((), TERM_ORDER)
         poly = context.constant(as_fmpq(arg))
+        self._hash = None
         self._poly = poly
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
@@ -591,7 +592,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         """
         poly_factory = self._poly.context().term
         for exp_vec, coeff in self._poly.terms():
-            monomial = Term.from_raw(poly_factory(exp_vec=exp_vec))
+            monomial = Term._from_raw(poly_factory(exp_vec=exp_vec))
             yield fmpq_to_mpq(coeff), monomial
 
     def __le__(self, other: Number | Term) -> Ge | Le:
@@ -611,61 +612,23 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         else:
             return Lt(lhs, 0)
 
-    def __mul__(self, other: Number | Term) -> Term:
-        """
-        >>> x, y = VV.get('x', 'y')
-        >>> (x - y) * (x + y)
-        x**2 - y**2
-        """
-        if not isinstance(other, Term):
-            other = Term(other)
-        tcontext = self.term_context() | other.term_context()
-        product = tcontext.coerce_poly(self._poly) * tcontext.coerce_poly(other._poly)
-        return Term.from_raw(product)
-
     def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
         lhs = self - other
         if lhs.lc() < 0:
             lhs = -lhs
         return Ne(lhs, Term(0))
 
-    def __neg__(self) -> Term:
-        return Term.from_raw(-self._poly)
-
-    def __pow__(self, n: int) -> Term:
-        if n < 0:
-            raise ValueError(f'Negative exponent {n} not supported')
-        return Term.from_raw(self._poly ** n)
-
-    def __radd__(self, other: Number) -> Term:
-        assert not isinstance(other, Term)
-        return Term(other) + self
-
     def __repr__(self) -> str:
         return self._as_string(mul='*', pow='**')
-
-    def __rmul__(self, other: Number) -> Term:
-        assert not isinstance(other, Term)
-        return Term(other) * self
-
-    def __rsub__(self, other: Number) -> Term:
-        assert not isinstance(other, Term)
-        return Term(other) - self
 
     def __setstate__(self, state: dict[str, Any]) -> None:
         context = fmpq_mpoly_ctx.get(state["names"], TERM_ORDER)
         poly = context.from_dict(state["poly_as_dict"])
+        self._hash = None
         self._poly = poly
 
     def __str__(self) -> str:
         return self._as_string(mul='*', pow='^')
-
-    def __sub__(self, other: Number | Term) -> Term:
-        if not isinstance(other, Term):
-            other = Term(other)
-        tcontext = self.term_context() | other.term_context()
-        difference = tcontext.coerce_poly(self._poly) - tcontext.coerce_poly(other._poly)
-        return Term.from_raw(difference)
 
     def __truediv__(self, other: Number | Term) -> Term:
         """True division. ``self`` must be divisible by ``other``. Otherwise,
@@ -677,14 +640,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         """
         if not isinstance(other, Term):
             other = Term(other)
-        tcontext = self.term_context() | other.term_context()
-        quotient = tcontext.coerce_poly(self._poly) / tcontext.coerce_poly(other._poly)
-        return Term.from_raw(quotient)
-
-    def __xor__(self, other: object) -> Term:
-        raise NotImplementedError(
-            "Use ** for exponentiation, not '^', which means xor "
-            "in Python, and has the wrong precedence")
+        ring = self._parent | other._parent
+        quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
+        return Term._from_raw(quotient)
 
     def as_constant(self) -> mpq:
         if not self.is_constant():
@@ -734,7 +692,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         def _format_mon(d: dict[Variable, int]) -> str:
             ret = ''
             for gen in self._poly.context().gens():
-                v = Variable.from_raw(gen)
+                v = Variable._from_gen(gen)
                 e = d.get(v, 0)
                 if e == 0:
                     continue
@@ -758,7 +716,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
     def as_variable(self) -> Variable:
         if not self.is_variable():
             raise ValueError(f'{self} is not a variable')
-        return Variable.from_raw(self._poly)
+        return Variable._from_gen(self._poly)
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified in
@@ -875,7 +833,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
             return Term(0)
         for _ in range(n):
             poly = poly.derivative(x_name)
-        return Term.from_raw(poly)
+        return Term._from_raw(poly)
 
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
@@ -899,17 +857,22 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
             lc = factor.leading_coefficient()
             unit *= lc ** exp
             factor /= lc
-            D[Term.from_raw(factor)] = exp
+            D[Term._from_raw(factor)] = exp
         return fmpq_to_mpq(unit), D
 
     @classmethod
-    def from_raw(cls, poly: fmpq_mpoly) -> Self:
-        self = cls.__new__(cls)
+    def _from_number(cls, num: Number) -> Term:
+        return Term(num)
+
+    @classmethod
+    def _from_raw(cls, poly: fmpq_mpoly) -> Term:
+        self = Term.__new__(Term)
+        self._hash = None
         self._poly = poly
         return self
 
     @classmethod
-    def from_sage(self, sage_poly: Any) -> Term:
+    def from_sage(cls, sage_poly: Any) -> Term:
         """Convert a Sage polynomial to a Term. The context of the
         result is determined by the names of the variables of sage_poly, and
         their order in the term order of sage_poly. In particular, if
@@ -923,7 +886,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         names = sage_poly.parent().variable_names()
         context = fmpq_mpoly_ctx.get(names, TERM_ORDER)
         flint_poly = context.from_dict(flint_dict)
-        return Term.from_raw(flint_poly)
+        return Term._from_raw(flint_poly)
 
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
@@ -1045,9 +1008,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         # comparison of monomial Terms involves subtraction, construction of an
         # AtomicFormula, and its evaluation via __bool__.
 
-        tcontext = self.term_context() | monomial.term_context()
-        self_poly = tcontext.coerce_poly(self._poly)
-        monomial_poly = tcontext.coerce_poly(monomial._poly)
+        ring = self._parent | monomial._parent
+        self_poly = ring.coerce_poly(self._poly)
+        monomial_poly = ring.coerce_poly(monomial._poly)
         monomial_terms = tuple(monomial_poly.terms())
         assert len(monomial_terms) == 1, f'{monomial!r} is not a monomial'
         monomial_exp_vec, monomial_coeff = monomial_terms[0]
@@ -1073,7 +1036,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         monic.
         """
         poly = self._poly
-        return Term.from_raw(poly / poly.leading_coefficient())
+        return Term._from_raw(poly / poly.leading_coefficient())
 
     def primitive_part(self, positive: bool = False) -> Term:
         """Return the primitive part over ``Z``. This is ``self`` divided by its
@@ -1098,12 +1061,12 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
-        tcontext = self.term_context() | other.term_context() | x.term_context()
+        ring = self._parent | other._parent | x._parent
         v = str(x._poly)
-        p1 = FmpqMpolyPoly.from_fmpq_mpoly(tcontext.coerce_poly(self._poly), v)
-        p2 = FmpqMpolyPoly.from_fmpq_mpoly(tcontext.coerce_poly(other._poly), v)
+        p1 = FmpqMpolyPoly.from_fmpq_mpoly(ring.coerce_poly(self._poly), v)
+        p2 = FmpqMpolyPoly.from_fmpq_mpoly(ring.coerce_poly(other._poly), v)
         quo, rem, _ = p1.pseudo_quo_rem(p2)
-        return Term.from_raw(quo.as_fmpq_mpoly()), Term.from_raw(rem.as_fmpq_mpoly())
+        return Term._from_raw(quo.as_fmpq_mpoly()), Term._from_raw(rem.as_fmpq_mpoly())
 
     def _pseudo_quo_rem_sage(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
@@ -1117,10 +1080,10 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
-        tcontext = self.term_context() | other.term_context() | x.term_context()
-        p1 = tcontext.coerce(self).to_sage()
-        p2 = tcontext.coerce(other).to_sage()
-        v = tcontext.coerce(x).to_sage()
+        ring = self._parent | other._parent | x._parent
+        p1 = ring.coerce(self).to_sage()
+        p2 = ring.coerce(other).to_sage()
+        v = ring.coerce(x).to_sage()
         p1_v = p1.polynomial(v)
         p2_v = p2.polynomial(v)
         quo_v, rem_v = p1_v.pseudo_quo_rem(p2_v)
@@ -1141,11 +1104,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
         (2/3*x*y + 1/3, 1)
         """
-        tcontext = self.term_context() | other.term_context()
-        p = tcontext.coerce_poly(self._poly)
-        q = tcontext.coerce_poly(other._poly)
+        ring = self._parent | other._parent
+        p = ring.coerce_poly(self._poly)
+        q = ring.coerce_poly(other._poly)
         quo, rem = divmod(p, q)
-        return Term.from_raw(quo), Term.from_raw(rem)
+        return Term._from_raw(quo), Term._from_raw(rem)
 
     def _quo_rem_sage(self, other: Term) -> tuple[Term, Term]:
         """Quotient and remainder of this term and `other`. Deprecated; use
@@ -1160,9 +1123,9 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         >>> f._quo_rem_sage(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
         (2/3*x*y + 1/3, 1)
         """
-        tcontext = self.term_context() | other.term_context()
-        p1 = tcontext.coerce(self).to_sage()
-        p2 = tcontext.coerce(other).to_sage()
+        ring = self._parent | other._parent
+        p1 = ring.coerce(self).to_sage()
+        p2 = ring.coerce(other).to_sage()
         quo, rem = p1.quo_rem(p2)
         return Term.from_sage(quo), Term.from_sage(rem)
 
@@ -1201,13 +1164,13 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         # consumed by the first traversal. ``Iterable[Term]`` matches the
         # corresponding method in ``term_sage``.
         G = tuple(G)
-        tcontext = self.term_context()
+        ring = self._parent
         for g in G:
-            tcontext |= g.term_context()
-        f_poly = tcontext.coerce_poly(self._poly)
-        G_poly = tuple(tcontext.coerce_poly(g._poly) for g in G)
-        rem, _ = self.reduce_poly(f_poly, G_poly, tcontext._ring)
-        return Term.from_raw(rem)
+            ring |= g._parent
+        f_poly = ring.coerce_poly(self._poly)
+        G_poly = tuple(ring.coerce_poly(g._poly) for g in G)
+        rem, _ = self.reduce_poly(f_poly, G_poly, ring._ring)
+        return Term._from_raw(rem)
 
     @staticmethod
     def reduce_poly(f: fmpq_mpoly, G: Sequence[fmpq_mpoly], ctx: fmpq_mpoly_ctx) \
@@ -1254,11 +1217,11 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
         # consumed by the first traversal. ``Iterable[Term]`` matches the
         # corresponding method in ``term_sage``.
         G = tuple(G)
-        tcontext = self.term_context()
+        ring = self._parent
         for g in G:
-            tcontext |= g.term_context()
-        self_sage = tcontext.coerce(self).to_sage()
-        G_sage = tuple(tcontext.coerce(g).to_sage() for g in G)
+            ring |= g._parent
+        self_sage = ring.coerce(self).to_sage()
+        G_sage = tuple(ring.coerce(g).to_sage() for g in G)
         return Term.from_sage(self_sage.reduce(G_sage))
 
     def sort_key(self) -> SortKey[Self]:
@@ -1286,7 +1249,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
             else:
                 constant_mapping[str(var._poly)] = as_fmpq(substitute)
         # First use fmpq_mpoly.subs for subsituting constants:
-        pre_result = Term.from_raw(self._poly.subs(constant_mapping))
+        pre_result = Term._from_raw(self._poly.subs(constant_mapping))
         # Then use arithmetic for the rest:
         result = Term(0)
         for exp_dict, coeff in pre_result.summands():
@@ -1324,7 +1287,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
          ({x: 2, y: 2}, mpq(-3,1)), ({}, mpq(1,1))]
         """
         poly = self._poly
-        vars = tuple(Variable.from_raw(gen) for gen in poly.context().gens())
+        vars = tuple(Variable._from_gen(gen) for gen in poly.context().gens())
         for exp_vec, coeff in poly.terms():
             exp_dict = dict()
             for i, exp in enumerate(exp_vec):
@@ -1353,11 +1316,6 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
                     exp_list.append((str(gen(i)), exp))
             summands.append((tuple(exp_list), fmpq_to_mpq(coeff)))
         return tuple(summands)
-
-    def term_context(self) -> Ring:
-        """Return a TermContext of this term.
-        """
-        return Ring.from_raw(self._poly.context())
 
     def to_sage(self) -> Any:
         """Convert this Term to a Sage MPolynomial_libsingular if
@@ -1390,7 +1348,7 @@ class Term(firstorder.Term['Term', 'Variable', Number, SortKey['Term']]):
             unused = set(poly.unused_gens())
         for gen in context.gens():
             if str(gen) not in unused:
-                yield Variable.from_raw(gen)
+                yield Variable._from_gen(gen)
 
 class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
@@ -1402,6 +1360,10 @@ class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
         return VV.fresh(suffix=f'_{str(self)}')
 
     @classmethod
-    def from_raw(cls, poly: fmpq_mpoly) -> Self:
-        assert poly in poly.context().gens(), f'{poly} is not a generator'
-        return super().from_raw(poly)
+    def _from_gen(cls, gen: fmpq_mpoly) -> Variable:
+        if not gen in gen.context().gens():
+            raise ValueError(f"{gen} is not a generator")
+        variable = Variable.__new__(Variable)
+        variable._poly = gen
+        variable._hash = None
+        return variable

@@ -76,24 +76,24 @@ class Ring:
     ----------------------------------------------------------------------------
     >>> R = Ring(['x', 'y'])
     >>> c = Term(1)
-    >>> c.term_context() == Ring(())
+    >>> c._parent == Ring(())
     True
-    >>> c.term_context() is Ring(())
+    >>> c._parent is Ring(())
     False
     >>> c = R.coerce(c)
-    >>> c.term_context() == R
+    >>> c._parent == R
     True
 
     >>> x = VV['x']
-    >>> x.term_context()
+    >>> x._parent
     Ring(('x',))
     >>> R_x = R.coerce(x)
-    >>> R_x.term_context() == R
+    >>> R_x._parent == R
     True
 
     >>> f = x + 1
     >>> R_f = R.coerce(f)
-    >>> R_f.term_context() == R
+    >>> R_f._parent == R
     True
 
     ----------------------------------------------------------------------------
@@ -652,20 +652,20 @@ class Term:
     (mpq(0,1), {})
 
     ----------------------------------------------------------------------------
-    Test from_raw:
+    Test _from_raw:
     ----------------------------------------------------------------------------
     From a variable's raw polynomial:
-    >>> Term.from_raw(x._poly)
+    >>> Term._from_raw(x._poly)
     x
 
     From a constant polynomial:
     >>> ctx = fmpq_mpoly_ctx.get((), 'deglex')
     >>> p = ctx.constant(fmpq(3, 4))
-    >>> Term.from_raw(p)
+    >>> Term._from_raw(p)
     3/4
 
     From coerced polynomials in a shared context:
-    >>> Term.from_raw((x**2 + z)._poly)
+    >>> Term._from_raw((x**2 + z)._poly)
     x**2 + z
 
     ----------------------------------------------------------------------------
