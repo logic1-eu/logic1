@@ -915,9 +915,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         terms = list(terms)
         if not terms:
             return []
-        tcontext = TermContext(())
+        tcontext = Ring(())
         for term in terms:
-            tcontext |= term.term_context()
+            tcontext |= term._parent
         sage_polys = [tcontext.coerce(term).to_sage() for term in terms]
         sage_ring = sage_polys[0].parent()
         sage_ideal = sage_ring.ideal(sage_polys)

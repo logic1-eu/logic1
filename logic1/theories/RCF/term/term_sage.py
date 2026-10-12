@@ -680,13 +680,18 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`sage.rings.polynomial.multi_polynomial_ideal.MPolynomialIdeal.groebner_basis()`
             <sage.rings.polynomial.multi_polynomial_ideal.MPolynomialIdeal.groebner_basis>`
         """
-        ring = cls.polynomial_ring.sage_ring
-        polys = [term.poly for term in terms]
-        ideal = ring.ideal(polys)
+        terms = list(terms)
+        if not terms:
+            return []
+        ring = _PolynomialRing()
+        for term in terms:
+            ring |= term._parent
+        polys = [ring.coerce_poly(term._poly) for term in terms]
+        ideal = ring._ring.ideal(polys)
         if radical:
             ideal = ideal.radical()
         gbasis_polys = ideal.groebner_basis()
-        gbasis_terms = [Term._from_sage(poly) for poly in gbasis_polys if not poly.is_zero()]
+        gbasis_terms = [Term._from_raw(poly) for poly in gbasis_polys if not poly.is_zero()]
         return gbasis_terms
 
     def is_constant(self) -> bool:
