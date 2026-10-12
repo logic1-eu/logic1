@@ -31,7 +31,9 @@ dependencies:
   - networkx
   - pip
   - pyeda
+  - pygount
   - pytest
+  - pytest-cov
   - pytest-xdist
   - python-flint
   - rattler-build

@@ -2,6 +2,7 @@ __pycache__
 
 # Coverage
 .coverage
+.coverage.*
 htmlcov
 
 # Jupyter Notebook
@@ -29,8 +30,6 @@ output
 *.so
 *.c
 /logic1/**/*.html
-
-Leaks
 
 # VS Code
 .vscode

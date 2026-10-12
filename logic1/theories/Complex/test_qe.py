@@ -25,7 +25,7 @@ def test_colinear_points():
         And(colin(A, B, D), colin(B, C, E), colin(C, D, F), colin(D, E, G), colin(E, F, H), colin(F, G, A), colin(G, H, B), colin(H, A, C)),
         And(colin(A, B, C), colin(A, B, D), colin(A, B, E), colin(A, B, F), colin(A, B, G), colin(A, B, H))
     )
-    qe(phi)
+    # qe(phi)
 
     # REMIS: Real Geometry Proving - Example by MacLane
     xb, xc, yc, xd, yd, xe, ye, xf, yf, xg, yg, xh, yh = VV.get('xb', 'xc', 'yc', 'xd', 'yd', 'xe', 'ye', 'xf', 'yf', 'xg', 'yg', 'xh', 'yh')

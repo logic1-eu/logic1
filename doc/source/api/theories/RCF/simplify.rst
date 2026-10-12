@@ -28,3 +28,19 @@ Simplification
 
   .. autoclass:: InternalRepresentation
     :exclude-members: __init__, __new__
+
+**********************
+Gröbner Simplification
+**********************
+
+.. automodule:: logic1.theories.RCF.gsimplify
+
+  .. autofunction:: gsimplify(f: RCF.types.Formula, assume: Iterable[RCF.atomic.AtomicFormula] = [], **options) -> RCF.types.Formula
+
+  .. autoclass:: Options
+    :members: bnfsac, bnfsm, radical, use_redlog_cnf
+    :exclude-members: __init__, __new__
+
+  .. autoclass:: GSimplify
+    :members: Inconsistent
+    :exclude-members: __call__, __init__, __new__

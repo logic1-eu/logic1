@@ -3,7 +3,26 @@
 import html
 import os
 import subprocess
+
+from docutils import nodes
 import setuptools_scm
+
+
+def redlog_role(name, rawtext, text, lineno, inliner, options=None, content=None):
+    url = f"https://www.redlog.eu/documentation/service.php?key={text}"
+    node = nodes.reference(
+        rawtext,
+        "",
+        nodes.literal(text, f"{text}()"),
+        refuri=url,
+        **(options or {}),
+    )
+    return [node], []
+
+
+def setup(app):
+    app.add_role("redlog", redlog_role)
+
 
 def subprocess_output(*args: str) -> str | None:
     """Return text output from a subprocess, or ``None``."""
