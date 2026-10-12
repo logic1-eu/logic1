@@ -76,24 +76,24 @@ class Ring:
     ----------------------------------------------------------------------------
     >>> R = Ring(['x', 'y'])
     >>> c = Term(1)
-    >>> c._parent == Ring(())
+    >>> c._ring == Ring(())
     True
-    >>> c._parent is Ring(())
+    >>> c._ring is Ring(())
     False
     >>> c = R.coerce(c)
-    >>> c._parent == R
+    >>> c._ring == R
     True
 
     >>> x = VV['x']
-    >>> x._parent
+    >>> x._ring
     Ring(('x',))
     >>> R_x = R.coerce(x)
-    >>> R_x._parent == R
+    >>> R_x._ring == R
     True
 
     >>> f = x + 1
     >>> R_f = R.coerce(f)
-    >>> R_f._parent == R
+    >>> R_f._ring == R
     True
 
     ----------------------------------------------------------------------------

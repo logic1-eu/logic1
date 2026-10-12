@@ -66,47 +66,51 @@ def init_env_arg() -> list[str]:
     return list(VV._used)
 
 
-class FmpqMpolyPoly():
+class UPolynomial:
+    """This class implements univariate polynomials with ``fmpq_mpoly`` as
+    coefficients.
 
-    # All fmpq_mpoly must have the same context. `name` is a name in that
-    # context, whose exponent is always 0.
+    The class takes the role of ``UPolynomial`` :mod:`.term_sage`. All
+    ``fmpq_mpoly`` coefficients must have the same Flint context. ``name`` is a
+    name in that context, whose exponent is 0 in all coefficients.
+    """
 
     name: str
-    terms: dict[int, fmpq_mpoly]
+    summands: dict[int, fmpq_mpoly]
 
-    def __init__(self, terms: dict[int, fmpq_mpoly], name: str) -> None:
-        self.terms = terms
+    def __init__(self, summands: dict[int, fmpq_mpoly], name: str) -> None:
+        self.summands = summands
         self.name = name
 
     def __repr__(self) -> str:
-        return f'FmpqMpolyPoly({self.name}, {self.terms})'
+        return f'UPolynomial({self.name}, {self.summands})'
 
     def __str__(self) -> str:
-        summands = sorted(self.terms.items(), reverse=True)
+        summands = sorted(self.summands.items(), reverse=True)
         return ' + '.join(f'({coeff!s}) {self.name}^{exp}' for exp, coeff in summands) or '0'
 
     def as_fmpq_mpoly(self) -> fmpq_mpoly:
-        if not self.terms:
+        if not self.summands:
             ctx = fmpq_mpoly_ctx.get((self.name,), TERM_ORDER)
             poly = ctx.constant(0)
             return poly
 
-        ctx = next(iter(self.terms.values())).context()
+        ctx = next(iter(self.summands.values())).context()
         idx = ctx.variable_to_index(self.name)
-        their_terms = {}
-        for exp, poly in self.terms.items():
+        their_summands = {}
+        for exp, poly in self.summands.items():
             for exp_vec, coeff in poly.terms():
                 their_exp_vec = exp_vec[:idx] + (exp,) + exp_vec[idx+1:]
-                their_terms[their_exp_vec] = coeff
-        poly = ctx.from_dict(their_terms)
+                their_summands[their_exp_vec] = coeff
+        poly = ctx.from_dict(their_summands)
         return poly
 
     @classmethod
     def from_fmpq_mpoly(cls, poly: fmpq_mpoly, name: str) -> Self:
-        """Convert a univariate fmpq_mpoly to an FmpqMpolyPoly. If `name` does
+        """Convert a univariate fmpq_mpoly to an UPolynomial. If `name` does
         not occur in the context of `poly`, we first project `poly` to a context
         containing `name`, which is then used as the common context for the
-        resulting FmpqMpolyPoly.
+        resulting UPolynomial.
         """
         ctx = poly.context()
         zero = ctx.constant(fmpq(0))
@@ -127,8 +131,8 @@ class FmpqMpolyPoly():
             terms[exp] = my_coeff
         return cls(terms, name)
 
-    def pseudo_quo_rem(self, divisor: FmpqMpolyPoly, full_delta: bool = True) \
-            -> tuple[FmpqMpolyPoly, FmpqMpolyPoly, fmpq_mpoly]:
+    def pseudo_quo_rem(self, divisor: UPolynomial, full_delta: bool = True) \
+            -> tuple[UPolynomial, UPolynomial, fmpq_mpoly]:
         """Pseudo-quotient and pseudo-remainder following Knuth Vol. 2.
 
         Computes (Q, R, lc_pow) satisfying:
@@ -148,9 +152,9 @@ class FmpqMpolyPoly():
 
         >>> ctx = fmpq_mpoly_ctx.get(('x',), TERM_ORDER)
         >>> x, = ctx.gens()
-        >>> A = FmpqMpolyPoly.from_fmpq_mpoly(
+        >>> A = UPolynomial.from_fmpq_mpoly(
         ...     x**8 - x**6 + 2*x**5 - 2*x**4 + 2*x**3 - 2*x**2 + 2*x - 1, 'x')
-        >>> B = FmpqMpolyPoly.from_fmpq_mpoly(
+        >>> B = UPolynomial.from_fmpq_mpoly(
         ...     3*x**6 - 5*x**4 + 3*x**3 - x, 'x')
         >>> Q, R, lc_pow = A.pseudo_quo_rem(B)
         >>> print(Q)
@@ -182,15 +186,15 @@ class FmpqMpolyPoly():
 
         Q and R scale by lc_B^(delta-s) = lc_pow // lc_pow2 between the two modes:
 
-        >>> all(R.terms[e] == R2.terms[e] * (lc_pow // lc_pow2) for e in R2.terms)
+        >>> all(R.summands[e] == R2.summands[e] * (lc_pow // lc_pow2) for e in R2.summands)
         True
 
         2. Parametric example with multivariate coefficients in QQ[a, b][x]:
 
         >>> ctx2 = fmpq_mpoly_ctx.get(('a', 'b', 'x'), TERM_ORDER)
         >>> a, b, x = ctx2.gens()
-        >>> A3 = FmpqMpolyPoly.from_fmpq_mpoly(a*b*x**2 + (a + b)*x + 1, 'x')
-        >>> B3 = FmpqMpolyPoly.from_fmpq_mpoly(a*x + b, 'x')
+        >>> A3 = UPolynomial.from_fmpq_mpoly(a*b*x**2 + (a + b)*x + 1, 'x')
+        >>> B3 = UPolynomial.from_fmpq_mpoly(a*x + b, 'x')
         >>> Q3, R3, lc_pow3 = A3.pseudo_quo_rem(B3)
         >>> print(Q3)
         (a^2*b) x^1 + (-a*b^2 + a^2 + a*b) x^0
@@ -213,31 +217,31 @@ class FmpqMpolyPoly():
         3. Trivial case deg(A) < deg(B): Q = 0, R = A, lc_pow = 1:
 
         >>> Q0, R0, lc_pow0 = B.pseudo_quo_rem(A)
-        >>> Q0.terms, R0.terms == B.terms, lc_pow0 == ctx.constant(1)
+        >>> Q0.summands, R0.summands == B.summands, lc_pow0 == ctx.constant(1)
         ({}, True, True)
         """
         assert self.name == divisor.name
-        assert divisor.terms
+        assert divisor.summands
 
         name = self.name
-        deg_A = max(self.terms, default=-1)
-        deg_B = max(divisor.terms)
+        deg_A = max(self.summands, default=-1)
+        deg_B = max(divisor.summands)
 
-        ctx = next(iter(divisor.terms.values())).context()
+        ctx = next(iter(divisor.summands.values())).context()
 
         zero = ctx.constant(fmpq(0))
         one = ctx.constant(fmpq(1))
 
         # Trivial case
         if deg_A < deg_B:
-            return FmpqMpolyPoly({}, name), FmpqMpolyPoly(dict(self.terms), name), one
+            return UPolynomial({}, name), UPolynomial(dict(self.summands), name), one
 
-        assert next(iter(self.terms.values())).context() is ctx
+        assert next(iter(self.summands.values())).context() is ctx
 
-        lc_B = divisor.terms[deg_B]
+        lc_B = divisor.summands[deg_B]
         delta = deg_A - deg_B + 1
 
-        R: dict[int, fmpq_mpoly] = dict(self.terms)
+        R: dict[int, fmpq_mpoly] = dict(self.summands)
         Q: dict[int, fmpq_mpoly] = {}
         steps = 0
 
@@ -261,7 +265,7 @@ class FmpqMpolyPoly():
             scale_dict(R, lc_B)
             scale_dict(Q, lc_B)
             add_term(Q, k, lc_R)
-            for e_B, c_B in divisor.terms.items():
+            for e_B, c_B in divisor.summands.items():
                 add_term(R, e_B + k, -(lc_R * c_B))
             steps += 1
 
@@ -274,14 +278,14 @@ class FmpqMpolyPoly():
 
         lc_pow = lc_B ** (delta if full_delta else steps)
 
-        return FmpqMpolyPoly(Q, name), FmpqMpolyPoly(R, name), lc_pow
+        return UPolynomial(Q, name), UPolynomial(R, name), lc_pow
 
 
 class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
     """A wrapper around a Flint polynomial ring.
     """
 
-    _ring: fmpq_mpoly_ctx
+    _wrapped_ring: fmpq_mpoly_ctx
 
     def __eq__(self, other: object) -> bool:
         """We efficiently check for identical poly_contexts, because equal
@@ -290,16 +294,16 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         """
         if not isinstance(other, Ring):
             return False
-        return self._ring is other._ring
+        return self._wrapped_ring is other._wrapped_ring
 
     def __init__(self, names: Iterable[str]):
         """Construct a polynomial ring with the given variables.
         """
         sorted_names = sorted(names, key=Ring.sort_key)
-        self._ring = fmpq_mpoly_ctx.get(sorted_names, TERM_ORDER)
+        self._wrapped_ring = fmpq_mpoly_ctx.get(sorted_names, TERM_ORDER)
 
     def __repr__(self) -> str:
-        return f'Ring({self._ring.names()})'
+        return f'Ring({self._wrapped_ring.names()})'
 
     def coerce(self, term: Term) -> Term:
         """Coerce term to the TermContext self.
@@ -314,33 +318,33 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
     def coerce_poly(self, poly: fmpq_mpoly) -> fmpq_mpoly:
         """Coerce poly to the _flint_context of the TermContext self.
         """
-        return poly.project_to_context(self._ring)
+        return poly.project_to_context(self._wrapped_ring)
 
     @classmethod
     def from_raw(cls, context: fmpq_mpoly_ctx) -> Self:
         self = cls.__new__(cls)
-        self._ring = context
+        self._wrapped_ring = context
         return self
 
     def get_gens(self) -> tuple[fmpq_mpoly, ...]:
-        return tuple(gen for gen in self._ring.gens())
+        return tuple(gen for gen in self._wrapped_ring.gens())
 
     def get_names(self) -> tuple[str, ...]:
-        return self._ring.names()
+        return self._wrapped_ring.names()
 
     def get_var_by_index(self, index: int) -> Variable:
-        gen = self._ring.gen(index)
+        gen = self._wrapped_ring.gen(index)
         return Variable._from_gen(gen)
 
     def get_var_by_name(self, name: str) -> Variable:
-        index = self._ring.variable_to_index(name)
+        index = self._wrapped_ring.variable_to_index(name)
         return self.get_var_by_index(index)
 
     def get_vars(self) -> tuple[Variable, ...]:
-        return tuple(Variable._from_gen(gen) for gen in self._ring.gens())
+        return tuple(Variable._from_gen(gen) for gen in self._wrapped_ring.gens())
 
     def ordering(self) -> Ordering:
-        return self._ring.ordering()
+        return self._wrapped_ring.ordering()
 
     @staticmethod
     def sort_key(s: str) -> tuple[Any, ...]:  # MyPy has issues with a more specific return type
@@ -381,9 +385,9 @@ class VariableSet(firstorder.VariableSet['Variable']):
         """
         if not isinstance(name, str):
             raise TypeError(f'expecting string as index; {name} is {type(name)}')
-        tcontext = Ring([name])
+        ring = Ring([name])
         self._used.add(name)
-        return tcontext.get_var_by_index(0)
+        return ring.get_var_by_index(0)
 
     def __init__(self) -> None:
         self._reset()
@@ -463,7 +467,7 @@ class SortKey[τ: Term]:
         return self.cmp(other) != 0
 
     def cmp(self, other: Self) -> int:
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         p = ring.coerce_poly(self.term._poly)
         q = ring.coerce_poly(other.term._poly)
         return SortKey.cmp_sage_like(p, q)
@@ -516,10 +520,11 @@ class SortKey[τ: Term]:
 
 class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fmpq_mpoly_ctx]):
 
+    _hash: Optional[int]
     _poly: fmpq_mpoly
 
     @property
-    def _parent(self) -> Ring:
+    def _ring(self) -> Ring:
         return Ring.from_raw(self._poly.context())
 
     def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
@@ -640,7 +645,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         """
         if not isinstance(other, Term):
             other = Term(other)
-        ring = self._parent | other._parent
+        ring = self._ring | other._ring
         quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
         return Term._from_raw(quotient)
 
@@ -915,10 +920,10 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         terms = list(terms)
         if not terms:
             return []
-        tcontext = Ring(())
+        ring = Ring(())
         for term in terms:
-            tcontext |= term._parent
-        sage_polys = [tcontext.coerce(term).to_sage() for term in terms]
+            ring |= term._ring
+        sage_polys = [ring.coerce(term).to_sage() for term in terms]
         sage_ring = sage_polys[0].parent()
         sage_ideal = sage_ring.ideal(sage_polys)
         if radical:
@@ -1047,7 +1052,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         # comparison of monomial Terms involves subtraction, construction of an
         # AtomicFormula, and its evaluation via __bool__.
 
-        ring = self._parent | monomial._parent
+        ring = self._ring | monomial._ring
         self_poly = ring.coerce_poly(self._poly)
         monomial_poly = ring.coerce_poly(monomial._poly)
         monomial_terms = tuple(monomial_poly.terms())
@@ -1100,10 +1105,10 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
-        ring = self._parent | other._parent | x._parent
+        ring = self._ring | other._ring | x._ring
         v = str(x._poly)
-        p1 = FmpqMpolyPoly.from_fmpq_mpoly(ring.coerce_poly(self._poly), v)
-        p2 = FmpqMpolyPoly.from_fmpq_mpoly(ring.coerce_poly(other._poly), v)
+        p1 = UPolynomial.from_fmpq_mpoly(ring.coerce_poly(self._poly), v)
+        p2 = UPolynomial.from_fmpq_mpoly(ring.coerce_poly(other._poly), v)
         quo, rem, _ = p1.pseudo_quo_rem(p2)
         return Term._from_raw(quo.as_fmpq_mpoly()), Term._from_raw(rem.as_fmpq_mpoly())
 
@@ -1119,14 +1124,14 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
-        ring = self._parent | other._parent | x._parent
+        ring = self._ring | other._ring | x._ring
         p1 = ring.coerce(self).to_sage()
         p2 = ring.coerce(other).to_sage()
         v = ring.coerce(x).to_sage()
         p1_v = p1.polynomial(v)
         p2_v = p2.polynomial(v)
         quo_v, rem_v = p1_v.pseudo_quo_rem(p2_v)
-        R = p1.parent()  # same as p2.parent() and v.parent(), and matches tcontext
+        R = p1.parent()  # same as p2.parent() and v.parent(), and matches ring._wrapped_ring
         quo = R(quo_v)
         rem = R(rem_v)
         return Term.from_sage(quo), Term.from_sage(rem)
@@ -1143,7 +1148,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
         (2/3*x*y + 1/3, 1)
         """
-        ring = self._parent | other._parent
+        ring = self._ring | other._ring
         p = ring.coerce_poly(self._poly)
         q = ring.coerce_poly(other._poly)
         quo, rem = divmod(p, q)
@@ -1162,7 +1167,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         >>> f._quo_rem_sage(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
         (2/3*x*y + 1/3, 1)
         """
-        ring = self._parent | other._parent
+        ring = self._ring | other._ring
         p1 = ring.coerce(self).to_sage()
         p2 = ring.coerce(other).to_sage()
         quo, rem = p1.quo_rem(p2)
@@ -1203,12 +1208,12 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         # consumed by the first traversal. ``Iterable[Term]`` matches the
         # corresponding method in ``term_sage``.
         G = tuple(G)
-        ring = self._parent
+        ring = self._ring
         for g in G:
-            ring |= g._parent
+            ring |= g._ring
         f_poly = ring.coerce_poly(self._poly)
         G_poly = tuple(ring.coerce_poly(g._poly) for g in G)
-        rem, _ = self.reduce_poly(f_poly, G_poly, ring._ring)
+        rem, _ = self.reduce_poly(f_poly, G_poly, ring._wrapped_ring)
         return Term._from_raw(rem)
 
     @staticmethod
@@ -1256,9 +1261,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         # consumed by the first traversal. ``Iterable[Term]`` matches the
         # corresponding method in ``term_sage``.
         G = tuple(G)
-        ring = self._parent
+        ring = self._ring
         for g in G:
-            ring |= g._parent
+            ring |= g._ring
         self_sage = ring.coerce(self).to_sage()
         G_sage = tuple(ring.coerce(g).to_sage() for g in G)
         return Term.from_sage(self_sage.reduce(G_sage))

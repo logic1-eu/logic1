@@ -62,61 +62,62 @@ def init_env_arg() -> list[str]:
 
 
 @final
-class _PolynomialRing(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
+class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
     """A wrapper around a Sage Singular polynomial ring.
     """
 
-    _ring: MPolynomialRing
-    """Underlying Sage polynomial ring. The variable names are sorted according
-    to the sort key :meth:`sort_key`
+    _wrapped_ring: MPolynomialRing
+    """The wrapped Sage polynomial ring.
+
+    The variable names are sorted according to the sort key :meth:`sort_key`.
     """
 
     def __init__(self, vars_: Iterable[str] = (), term_order: str = 'deglex') -> None:
         """Construct a polynomial ring with the given variables and term order.
 
-        >>> R = _PolynomialRing(['x', 'y'], term_order='lex')
+        >>> R = Ring(['x', 'y'], term_order='lex')
         >>> R
-        _PolynomialRing(['x', 'y'], order='lex')
+        Ring(['x', 'y'], order='lex')
         """
         vars_ = set(vars_)
         if 'unused_' in vars_:
             raise ValueError("Variable name 'unused_' is reserved and cannot be used.")
         vars_.add('unused_')
-        new_vars = sorted(vars_, key=_PolynomialRing.sort_key)
-        self._ring = self.MPolynomialRing_factory(new_vars, order=TermOrder(term_order))
+        new_vars = sorted(vars_, key=Ring.sort_key)
+        self._wrapped_ring = self.MPolynomialRing_factory(new_vars, order=TermOrder(term_order))
 
     def __repr__(self) -> str:
         """Return a string representation of the polynomial ring.
 
-        >>> R = _PolynomialRing()
+        >>> R = Ring()
         >>> R
-        _PolynomialRing([], order='deglex')
+        Ring([], order='deglex')
         """
         names = [str(g) for g in self.get_gens()]
-        order = self._ring.term_order().name()
-        return f'_PolynomialRing({names}, order=\'{order}\')'
+        order = self._wrapped_ring.term_order().name()
+        return f'Ring({names}, order=\'{order}\')'
 
     def __str__(self) -> str:
         """Return a string representation of the underlying Sage polynomial
         ring.
         """
-        return str(self._ring)
+        return str(self._wrapped_ring)
 
     def coerce_poly(self, poly: MPolynomial[Rational]) -> MPolynomial[Rational]:
         """Coerce poly to the :attr:`_ring` of ``self``.
         """
-        return self._ring(poly)
+        return self._wrapped_ring(poly)
 
     @classmethod
     def from_raw(cls, ring: MPolynomialRing) -> Self:
         self = cls.__new__(cls)
-        self._ring = ring
+        self._wrapped_ring = ring
         return self
 
     def get_names(self) -> tuple[str, ...]:
         """Return the names of the variables in the polynomial ring.
 
-        >>> R = _PolynomialRing(('a', 'b', 'c'))
+        >>> R = Ring(('a', 'b', 'c'))
         >>> R.get_names()
         ('a', 'b', 'c')
         """
@@ -125,11 +126,11 @@ class _PolynomialRing(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing
     def get_gens(self) -> tuple[MPolynomial[Rational], ...]:
         """Return the variables of the polynomial ring.
 
-        >>> R = _PolynomialRing(('a', 'b', 'c'))
+        >>> R = Ring(('a', 'b', 'c'))
         >>> R.get_gens()
         (a, b, c)
         """
-        return tuple(g for g in self._ring.gens() if str(g) != 'unused_')
+        return tuple(g for g in self._wrapped_ring.gens() if str(g) != 'unused_')
 
     @staticmethod
     def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
@@ -148,9 +149,9 @@ class _PolynomialRing(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing
         """Sort key for variable names. The sort order is lexicographic, except
         that variables with the same name are ordered by their numeric suffix.
 
-        >>> _PolynomialRing.sort_key('x')
+        >>> Ring.sort_key('x')
         ('x', -1)
-        >>> _PolynomialRing.sort_key('x1')
+        >>> Ring.sort_key('x1')
         ('x', 1)
         """
         base = s.rstrip('0123456789')
@@ -180,10 +181,10 @@ class VariableSet(firstorder.VariableSet['Variable']):
     _stack: list[set[str]]
 
     @property
-    def stack(self) -> list[MPolynomialRing]:
+    def stack(self) -> list[set[str]]:
         """Implements the abstract property :attr:`.firstorder.term.VariableSet.stack`.
         """
-        return self.stack
+        return self._stack
 
     @property
     def _used(self) -> set[str]:
@@ -202,14 +203,14 @@ class VariableSet(firstorder.VariableSet['Variable']):
         if not isinstance(name, str):
             raise TypeError(f'expecting string as index; {name} is {type(name)}')
         self._used.add(name)
-        ring = _PolynomialRing((name,))
+        ring = Ring((name,))
         return Variable._from_gen(ring.get_gens()[0])
 
     def __init__(self) -> None:
         self._stack = [set()]
 
     def __repr__(self) -> str:
-        names = sorted(self._used, key=_PolynomialRing.sort_key)
+        names = sorted(self._used, key=Ring.sort_key)
         s = ', '.join(name for name in (*names, '...'))
         return f'{{{s}}}'
 
@@ -262,19 +263,19 @@ class SortKey(Generic[τ]):
     term: τ
 
     def __eq__(self, other: Self) -> bool:  # type: ignore[override]
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly == other_poly
 
     def __ge__(self, other: Self) -> bool:
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly >= other_poly
 
     def __gt__(self, other: Self) -> bool:
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly > other_poly
@@ -283,19 +284,19 @@ class SortKey(Generic[τ]):
         return hash(self.term)
 
     def __le__(self, other: Self) -> bool:
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly <= other_poly
 
     def __lt__(self, other: Self) -> bool:
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly < other_poly
 
     def __ne__(self, other: Self) -> bool:  # type: ignore[override]
-        ring = self.term._parent | other.term._parent
+        ring = self.term._ring | other.term._ring
         self_poly = ring.coerce_poly(self.term._poly)
         other_poly = ring.coerce_poly(other.term._poly)
         return self_poly != other_poly
@@ -307,8 +308,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
     _poly: MPolynomial[Rational]
 
     @property
-    def _parent(self) -> _PolynomialRing:
-        return _PolynomialRing.from_raw(self._poly.parent())
+    def _ring(self) -> Ring:
+        return Ring.from_raw(self._poly.parent())
 
     def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
@@ -369,8 +370,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         """
         if not isinstance(arg, _NUMBER_TYPES):
             raise ValueError(f'expected a number type; {arg} is {type(arg)}')
-        ring = _PolynomialRing()
-        self._poly = ring._ring(arg)
+        ring = Ring()
+        self._poly = ring._wrapped_ring(arg)
         self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
@@ -414,7 +415,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         """
         if not isinstance(other, Term):
             other = Term(other)
-        ring = self._parent | other._parent
+        ring = self._ring | other._ring
         quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
         # For x*y / y we obtain an element of a fraction field. We must ensure
         # that the denominator is 1 and then convert to an MPolynomial.
@@ -501,9 +502,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`MPolynomial_libsingular.coefficient()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.coefficient>`
         """
-        ring = self._parent
+        ring = self._ring
         for variable in degrees:
-            ring |= variable._parent
+            ring |= variable._ring
         self_poly = ring.coerce_poly(self._poly)
         degrees_poly = {ring.coerce_poly(key._poly): value for key, value in degrees.items()}
         return Term._from_raw(self_poly.coefficient(degrees_poly))
@@ -552,7 +553,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`MPolynomial_libsingular.degree()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.degree>`
         """
-        ring = self._parent | x._parent
+        ring = self._ring | x._ring
         return ring.coerce_poly(self._poly).degree(ring.coerce_poly(x._poly))
 
     def derivative(self, x: Variable, n: int = 1) -> Term:
@@ -568,7 +569,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         """
         if n < 0:
             raise ValueError("Derivative order must be non-negative")
-        ring = self._parent | x._parent
+        ring = self._ring | x._ring
         df = ring.coerce_poly(self._poly).derivative(ring.coerce_poly(x._poly), n)
         return Term._from_raw(df)
 
@@ -636,8 +637,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         if isinstance(value, MPolynomial):
             poly = value
         elif isinstance(value, (Integer, Rational)):
-            ring = _PolynomialRing()
-            poly = ring._ring(value)
+            ring = Ring()
+            poly = ring._wrapped_ring(value)
         elif isinstance(value, UPolynomial):
             R = value.parent()
             names = []
@@ -647,8 +648,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
                 assert hasattr(R, 'base_ring')
                 R = R.base_ring()
             names.remove('unused_')
-            ring = _PolynomialRing(names)
-            poly = ring._ring(value)
+            ring = Ring(names)
+            poly = ring._wrapped_ring(value)
         else:
             raise TypeError(f"Unsupported type for Term: {type(value)}")
         term = Term.__new__(Term)
@@ -683,11 +684,11 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         terms = list(terms)
         if not terms:
             return []
-        ring = _PolynomialRing()
+        ring = Ring()
         for term in terms:
-            ring |= term._parent
+            ring |= term._ring
         polys = [ring.coerce_poly(term._poly) for term in terms]
-        ideal = ring._ring.ideal(polys)
+        ideal = ring._wrapped_ring.ideal(polys)
         if radical:
             ideal = ideal.radical()
         gbasis_polys = ideal.groebner_basis()
@@ -854,7 +855,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         """
         if not mon.is_monomial():
             raise ValueError(f'{mon} is not a monomial')
-        ring = self._parent | mon._parent
+        ring = self._ring | mon._ring
         self_poly = ring.coerce_poly(self._poly)
         mon_poly = ring.coerce_poly(mon._poly)
         return mpq(self_poly.monomial_coefficient(mon_poly))
@@ -910,7 +911,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
         """
         # self, other, quotient are of type UPolynomial
-        ring = self._parent | other._parent | x._parent
+        ring = self._ring | other._ring | x._ring
         x_poly = ring.coerce_poly(x._poly)
         self1 = ring.coerce_poly(self._poly).polynomial(x_poly)
         other1 = ring.coerce_poly(other._poly).polynomial(x_poly)
@@ -934,7 +935,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`MPolynomial_libsingular.quo_rem()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
         """
-        ring = self._parent | other._parent
+        ring = self._ring | other._ring
         self_poly = ring.coerce_poly(self._poly)
         other_poly = ring.coerce_poly(other._poly)
         quo, rem = self_poly.quo_rem(other_poly)
@@ -954,9 +955,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.reduce>`
         """
         G = tuple(G)
-        ring = self._parent
+        ring = self._ring
         for g in G:
-            ring |= g._parent
+            ring |= g._ring
         self_poly = ring.coerce_poly(self._poly)
         poly = self_poly.reduce([ring.coerce_poly(g._poly) for g in G])
         return Term._from_raw(poly)
@@ -981,13 +982,13 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`MPolynomial_libsingular.subs()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.subs>`
         """
-        ring = self._parent
+        ring = self._ring
         sage_keywords: dict[str, MPolynomial[Rational]] = dict()
         for variable, substitute in d.items():
             if not isinstance(substitute, Term):
                 substitute = Term(substitute)
             sage_keywords[str(variable)] = substitute._poly
-            ring = ring | variable._parent | substitute._parent
+            ring = ring | variable._ring | substitute._ring
         for string in sage_keywords:
             sage_keywords[string] = ring.coerce_poly(sage_keywords[string])
         self_poly = ring.coerce_poly(self._poly)
@@ -1031,7 +1032,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :external:meth:`MPolynomial_libsingular.iterator_exp_coeff()
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.iterator_exp_coeff>`
         """
-        gens = self._parent._ring.gens()
+        gens = self._ring._wrapped_ring.gens()
         for etuple, coefficient in self._poly.iterator_exp_coeff(as_ETuples=True):
             result = dict()
             for i, exponent in enumerate(etuple):
