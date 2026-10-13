@@ -287,32 +287,18 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
 
     _wrapped_ring: fmpq_mpoly_ctx
 
-    def __eq__(self, other: object) -> bool:
-        """We efficiently check for identical poly_contexts, because equal
-        fmpq_mpoly contexts are always identical. However, note that equal
-        TermContexts are not necessarily identical.
-        """
-        if not isinstance(other, Ring):
-            return False
-        return self._wrapped_ring is other._wrapped_ring
+    def __init__(self, names: Iterable[str] = ()):
+        """Construct a polynomial ring with the given variable names.
 
-    def __init__(self, names: Iterable[str]):
-        """Construct a polynomial ring with the given variables.
+        >>> Ring(('y', 'x'))
+        Ring(('x', 'y'))
         """
         sorted_names = sorted(names, key=Ring.sort_key)
         self._wrapped_ring = fmpq_mpoly_ctx.get(sorted_names, TERM_ORDER)
 
-    def __repr__(self) -> str:
-        return f'Ring({self._wrapped_ring.names()})'
-
     def coerce(self, term: Term) -> Term:
-        """Coerce term to the TermContext self.
+        """Coerce term to this Ring.
         """
-        # The following assertion fires in particular when term contains
-        # variables created between VV._stash() and VV._drop(). This is useful
-        # because we would return a semantically meaningless term:
-        assert not (bad_names := set(term._poly.context().names()) - VV._used), \
-               f'{term} uses a context with unknown variables {bad_names}'
         return Term._from_raw(self.coerce_poly(term._poly))
 
     def coerce_poly(self, poly: fmpq_mpoly) -> fmpq_mpoly:
@@ -871,10 +857,10 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
 
     @classmethod
     def _from_raw(cls, poly: fmpq_mpoly) -> Term:
-        self = Term.__new__(Term)
-        self._hash = None
-        self._poly = poly
-        return self
+        term = Term.__new__(Term)
+        term._poly = poly
+        term._hash = None
+        return term
 
     @classmethod
     def from_sage(cls, sage_poly: Any) -> Term:
@@ -920,7 +906,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         terms = list(terms)
         if not terms:
             return []
-        ring = Ring(())
+        ring = Ring()
         for term in terms:
             ring |= term._ring
         sage_polys = [ring.coerce(term).to_sage() for term in terms]

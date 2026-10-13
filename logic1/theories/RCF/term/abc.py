@@ -36,6 +36,13 @@ class Ring[α: RingElement, β](ABC):
 
     _wrapped_ring: β
 
+    def __eq__(self, other: object) -> bool:
+        # Depending on the implementation, it may be sufficient to check for
+        # identical wrapped rings. For instance, FINT contexts are unique.
+        if not isinstance(other, Ring):
+            return False
+        return self._wrapped_ring == other._wrapped_ring
+
     @abstractmethod
     def __init__(self, vars_: Iterable[str] = ()) -> None:
         ...
@@ -49,6 +56,22 @@ class Ring[α: RingElement, β](ABC):
         else:
             names = set(self.get_names()) | set(other.get_names())
             return self.__class__(names)
+
+    def __repr__(self) -> str:
+        """Return a string representation of the polynomial ring.
+
+        >>> from logic1.theories.RCF.term.term_sage import Ring
+        >>> Ring()
+        Ring()
+
+        >>> Ring(('y', 'x'))
+        Ring(('x', 'y'))
+        """
+        names = tuple(str(g) for g in self.get_gens())
+        if not names:
+            return f"{self.__class__.__name__}()"
+        else:
+            return f"{self.__class__.__name__}({names})"
 
     @abstractmethod
     def coerce_poly(self, x: α) -> α:
@@ -145,7 +168,6 @@ class Term[τ: Term, χ: firstorder.Variable, κ, α: RingElement, β](
         raise NotImplementedError(
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
-
 
     @classmethod
     @abstractmethod

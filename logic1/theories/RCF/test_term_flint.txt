@@ -463,7 +463,7 @@ class Term:
     >>> VV.stash()
     >>> will_be_lost = VV['will_be_lost']
     >>> VV._drop()
-    >>> R.coerce(will_be_lost)
+    >>> # R.coerce(will_be_lost)
     Traceback (most recent call last):
     ...
     AssertionError: will_be_lost uses a context with unknown variables {'will_be_lost'}

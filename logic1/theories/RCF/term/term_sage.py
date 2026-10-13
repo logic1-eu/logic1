@@ -33,6 +33,7 @@ from logic1.support.tracing import trace  # noqa
 
 POLYLIB: Final = "SAGE"
 
+TERM_ORDER: Final[TermOrder] = TermOrder("deglex")
 
 τ = TypeVar('τ', bound='Term')
 """A type variable denoting a type of terms with upper bound :class:`Term`.
@@ -72,36 +73,23 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
     The variable names are sorted according to the sort key :meth:`sort_key`.
     """
 
-    def __init__(self, vars_: Iterable[str] = (), term_order: str = 'deglex') -> None:
-        """Construct a polynomial ring with the given variables and term order.
+    def __init__(self, names: Iterable[str] = ()) -> None:
+        """Construct a polynomial ring with the given variable names.
 
-        >>> R = Ring(['x', 'y'], term_order='lex')
-        >>> R
-        Ring(['x', 'y'], order='lex')
+        >>> Ring(('y', 'x'))
+        Ring(('x', 'y'))
         """
-        vars_ = set(vars_)
-        if 'unused_' in vars_:
+        names = set(names)
+        if 'unused_' in names:
             raise ValueError("Variable name 'unused_' is reserved and cannot be used.")
-        vars_.add('unused_')
-        new_vars = sorted(vars_, key=Ring.sort_key)
-        self._wrapped_ring = self.MPolynomialRing_factory(new_vars, order=TermOrder(term_order))
-
-    def __repr__(self) -> str:
-        """Return a string representation of the polynomial ring.
-
-        >>> R = Ring()
-        >>> R
-        Ring([], order='deglex')
-        """
-        names = [str(g) for g in self.get_gens()]
-        order = self._wrapped_ring.term_order().name()
-        return f'Ring({names}, order=\'{order}\')'
-
-    def __str__(self) -> str:
-        """Return a string representation of the underlying Sage polynomial
-        ring.
-        """
-        return str(self._wrapped_ring)
+        names.add('unused_')
+        if len(names) > 2**15:
+            # https://github.com/Singular/Singular/issues/1383
+            # https://github.com/sagemath/sage/issues/42712
+            raise OverflowError(f'cannot construct a polynomial ring with {len(names)} variables')
+        sorted_names = sorted(names, key=Ring.sort_key)
+        self._wrapped_ring = sage_PolynomialRing(QQ, sorted_names,
+                                                 order=TERM_ORDER, implementation='singular')
 
     def coerce_poly(self, poly: MPolynomial[Rational]) -> MPolynomial[Rational]:
         """Coerce poly to the :attr:`_ring` of ``self``.
@@ -114,15 +102,6 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
         self._wrapped_ring = ring
         return self
 
-    def get_names(self) -> tuple[str, ...]:
-        """Return the names of the variables in the polynomial ring.
-
-        >>> R = Ring(('a', 'b', 'c'))
-        >>> R.get_names()
-        ('a', 'b', 'c')
-        """
-        return tuple(str(var) for var in self.get_gens())
-
     def get_gens(self) -> tuple[MPolynomial[Rational], ...]:
         """Return the variables of the polynomial ring.
 
@@ -132,17 +111,14 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
         """
         return tuple(g for g in self._wrapped_ring.gens() if str(g) != 'unused_')
 
-    @staticmethod
-    def MPolynomialRing_factory(names: str | Iterable[str], order: TermOrder) -> MPolynomialRing:
-        """Construct a Sage Singular polynomial ring with the given variable names and term order.
+    def get_names(self) -> tuple[str, ...]:
+        """Return the names of the variables in the polynomial ring.
+
+        >>> R = Ring(('a', 'b', 'c'))
+        >>> R.get_names()
+        ('a', 'b', 'c')
         """
-        if not isinstance(names, str):
-            names = tuple(names)
-            if len(names) > 2**15:
-                # https://github.com/Singular/Singular/issues/1383
-                # https://github.com/sagemath/sage/issues/42712
-                raise OverflowError(f'cannot construct a polynomial ring with {len(names)} variables')
-        return sage_PolynomialRing(QQ, names, order=order, implementation='singular')
+        return tuple(str(var) for var in self.get_gens())
 
     @staticmethod
     def sort_key(s: str) -> tuple[str, int]:
@@ -630,32 +606,28 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         return Term(num)
 
     @classmethod
-    def _from_raw(cls, value: Integer | Rational | MPolynomial[Rational] | UPolynomial) -> Term:
+    def _from_raw(cls, poly: MPolynomial[Rational]) -> Term:
         """Construct a :class:`Term` from a Sage object. Its argument types are
         private and should not be used outside of this module.
         """
-        if isinstance(value, MPolynomial):
-            poly = value
-        elif isinstance(value, (Integer, Rational)):
-            ring = Ring()
-            poly = ring._wrapped_ring(value)
-        elif isinstance(value, UPolynomial):
-            R = value.parent()
-            names = []
-            while R != QQ:
-                assert hasattr(R, 'variable_names')
-                names.extend(R.variable_names())
-                assert hasattr(R, 'base_ring')
-                R = R.base_ring()
-            names.remove('unused_')
-            ring = Ring(names)
-            poly = ring._wrapped_ring(value)
-        else:
-            raise TypeError(f"Unsupported type for Term: {type(value)}")
         term = Term.__new__(Term)
         term._poly = poly
         term._hash = None
         return term
+
+    @classmethod
+    def _from_u_polynomial(cls, upoly: UPolynomial) -> Term:
+        R = upoly.parent()
+        names = []
+        while R != QQ:
+            assert hasattr(R, 'variable_names')
+            names.extend(R.variable_names())
+            assert hasattr(R, 'base_ring')
+            R = R.base_ring()
+        names.remove('unused_')
+        ring = Ring(names)
+        poly = ring._wrapped_ring(upoly)
+        return Term._from_raw(poly)
 
     @classmethod
     def gbasis(cls, terms: Iterable[Term], radical: bool = False) -> list[Term]:
@@ -910,13 +882,12 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             :meth:`Polynomial.pseudo_quo_rem()
             <sage.rings.polynomial.polynomial_element.Polynomial.pseudo_quo_rem>`
         """
-        # self, other, quotient are of type UPolynomial
         ring = self._ring | other._ring | x._ring
         x_poly = ring.coerce_poly(x._poly)
-        self1 = ring.coerce_poly(self._poly).polynomial(x_poly)
-        other1 = ring.coerce_poly(other._poly).polynomial(x_poly)
+        self1: UPolynomial = ring.coerce_poly(self._poly).polynomial(x_poly)
+        other1: UPolynomial = ring.coerce_poly(other._poly).polynomial(x_poly)
         quotient, remainder = self1.pseudo_quo_rem(other1)
-        return Term._from_raw(quotient), Term._from_raw(remainder)
+        return Term._from_u_polynomial(quotient), Term._from_u_polynomial(remainder)
 
     def quo_rem(self, other: Term) -> tuple[Term, Term]:
         """Quotient and remainder of this term and `other`.
