@@ -296,24 +296,21 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         sorted_names = sorted(names, key=Ring.sort_key)
         self._wrapped_ring = fmpq_mpoly_ctx.get(sorted_names, TERM_ORDER)
 
-    def coerce(self, term: Term) -> Term:
-        """Coerce term to this Ring.
-        """
-        return Term._from_raw(self.coerce_poly(term._poly))
-
     def coerce_poly(self, poly: fmpq_mpoly) -> fmpq_mpoly:
-        """Coerce poly to the _flint_context of the TermContext self.
+        """Coerce a Flint polynomial to the wrapped Flint polynomial ring.
         """
         return poly.project_to_context(self._wrapped_ring)
 
-    @classmethod
-    def from_raw(cls, context: fmpq_mpoly_ctx) -> Self:
-        self = cls.__new__(cls)
-        self._wrapped_ring = context
-        return self
-
     def get_gens(self) -> tuple[fmpq_mpoly, ...]:
-        return tuple(gen for gen in self._wrapped_ring.gens())
+        """Return the generators of the wrapped Flint polynomial ring.
+
+        >>> R = Ring(('x', 'y'))
+        >>> R.get_gens()
+        (x, y)
+        """
+        return tuple(self._wrapped_ring.gens())
+
+    # dicuss: remove the following methods?
 
     def get_names(self) -> tuple[str, ...]:
         return self._wrapped_ring.names()
@@ -331,13 +328,6 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
 
     def ordering(self) -> Ordering:
         return self._wrapped_ring.ordering()
-
-    @staticmethod
-    def sort_key(s: str) -> tuple[Any, ...]:  # MyPy has issues with a more specific return type
-        base = s.rstrip('0123456789')
-        index = s[len(base):]
-        n = int(index) if index else -1
-        return base, n
 
 
 class VariableSet(firstorder.VariableSet['Variable']):
@@ -909,7 +899,7 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         ring = Ring()
         for term in terms:
             ring |= term._ring
-        sage_polys = [ring.coerce(term).to_sage() for term in terms]
+        sage_polys = [term._coerce(ring).to_sage() for term in terms]
         sage_ring = sage_polys[0].parent()
         sage_ideal = sage_ring.ideal(sage_polys)
         if radical:
@@ -1111,9 +1101,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         >>> assert c**(2 - 1 + 1) * f == q * g + r
         """
         ring = self._ring | other._ring | x._ring
-        p1 = ring.coerce(self).to_sage()
-        p2 = ring.coerce(other).to_sage()
-        v = ring.coerce(x).to_sage()
+        p1 = self._coerce(ring).to_sage()
+        p2 = other._coerce(ring).to_sage()
+        v = x._coerce(ring).to_sage()
         p1_v = p1.polynomial(v)
         p2_v = p2.polynomial(v)
         quo_v, rem_v = p1_v.pseudo_quo_rem(p2_v)
@@ -1154,8 +1144,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         (2/3*x*y + 1/3, 1)
         """
         ring = self._ring | other._ring
-        p1 = ring.coerce(self).to_sage()
-        p2 = ring.coerce(other).to_sage()
+        p1 = self._coerce(ring).to_sage()
+        p2 = other._coerce(ring).to_sage()
         quo, rem = p1.quo_rem(p2)
         return Term.from_sage(quo), Term.from_sage(rem)
 
@@ -1250,8 +1240,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
         ring = self._ring
         for g in G:
             ring |= g._ring
-        self_sage = ring.coerce(self).to_sage()
-        G_sage = tuple(ring.coerce(g).to_sage() for g in G)
+        self_sage = self._coerce(ring).to_sage()
+        G_sage = tuple(g._coerce(ring).to_sage() for g in G)
         return Term.from_sage(self_sage.reduce(G_sage))
 
     def sort_key(self) -> SortKey[Self]:

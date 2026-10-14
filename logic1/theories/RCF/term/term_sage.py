@@ -96,12 +96,6 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
         """
         return self._wrapped_ring(poly)
 
-    @classmethod
-    def from_raw(cls, ring: MPolynomialRing) -> Self:
-        self = cls.__new__(cls)
-        self._wrapped_ring = ring
-        return self
-
     def get_gens(self) -> tuple[MPolynomial[Rational], ...]:
         """Return the variables of the polynomial ring.
 
@@ -110,30 +104,6 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
         (a, b, c)
         """
         return tuple(g for g in self._wrapped_ring.gens() if str(g) != 'unused_')
-
-    def get_names(self) -> tuple[str, ...]:
-        """Return the names of the variables in the polynomial ring.
-
-        >>> R = Ring(('a', 'b', 'c'))
-        >>> R.get_names()
-        ('a', 'b', 'c')
-        """
-        return tuple(str(var) for var in self.get_gens())
-
-    @staticmethod
-    def sort_key(s: str) -> tuple[str, int]:
-        """Sort key for variable names. The sort order is lexicographic, except
-        that variables with the same name are ordered by their numeric suffix.
-
-        >>> Ring.sort_key('x')
-        ('x', -1)
-        >>> Ring.sort_key('x1')
-        ('x', 1)
-        """
-        base = s.rstrip('0123456789')
-        index = s[len(base):]
-        n = int(index) if index else -1
-        return base, n
 
 
 class VariableSet(firstorder.VariableSet['Variable']):
