@@ -13,7 +13,7 @@ class _:
     >>> R
     Ring(('x', 'y'))
 
-    >>> x, y = R.get_vars()
+    >>> x, y = map(Variable._from_gen, R.get_gens())
     >>> x
     x
     >>> x._poly, x._poly.context()
@@ -22,7 +22,7 @@ class _:
     >>> S = Ring(('z', 'x'))
     >>> S
     Ring(('x', 'z'))
-    >>> S_x, z = list(S.get_vars())
+    >>> S_x, z = map(Variable._from_gen, S.get_gens())
     >>> S_x
     x
     >>> S_x._poly, S_x._poly.context()
@@ -78,36 +78,6 @@ class Ring:
     >>> R.get_names()
     ('G0001', 'G0002', 'a', 'b', 'c', 'x', 'y')
 
-    ----------------------------------------------------------------------------
-    Test get_var_by_index:
-    ----------------------------------------------------------------------------
-    >>> R.get_var_by_index(2)
-    a
-    >>> R.get_var_by_index(6)
-    y
-    >>> R.get_var_by_index(7)
-    Traceback (most recent call last):
-    ...
-    IndexError: generator index out of range
-    >>> R.get_var_by_index(0).__class__.__name__
-    'Variable'
-
-    ----------------------------------------------------------------------------
-    Test get_var_by_name:
-    ----------------------------------------------------------------------------
-    >>> R.get_var_by_name('x')
-    x
-    >>> R.get_var_by_name('z')
-    Traceback (most recent call last):
-    ...
-    ValueError: variable not in context
-
-    ----------------------------------------------------------------------------
-    Test get_vars:
-    ----------------------------------------------------------------------------
-    >>> R.get_vars()
-    (G0001, G0002, a, b, c, x, y)
-
     """
 
 class VariableSet:
@@ -123,33 +93,15 @@ class VariableSet:
     c
 
     ----------------------------------------------------------------------------
-    Test stash:
-    ----------------------------------------------------------------------------
-    >>> VV.stash()
-    >>> VV['b']
-    b
-    >>> VV['d']
-    d
-    >>> VV.stack == [{'a', 'c'}, {'b', 'd'}]
-    True
-
-    ----------------------------------------------------------------------------
-    Test merge:
-    ----------------------------------------------------------------------------
-    >>> VV.merge()
-    >>> VV.stack == [{'a', 'b', 'c', 'd'}]
-    True
-
-    ----------------------------------------------------------------------------
     Test the property _used:
     ----------------------------------------------------------------------------
-    >>> VV._used == {'a', 'b', 'c', 'd'}
+    >>> VV._used == {'a', 'c'}
     True
 
     ----------------------------------------------------------------------------
     Test __getitem__:
     ----------------------------------------------------------------------------
-    >>> VV.stash()
+    >>> VV.push()
     >>> repr(VV)
     '{...}'
     >>> VV['a']
@@ -180,46 +132,23 @@ class VariableSet:
     G0002
 
     ----------------------------------------------------------------------------
-    Test merge:
+    Test pop:
     ----------------------------------------------------------------------------
-    >>> VV.stash()
-    >>> VV.fresh()
-    G0001
-
-    >>> VV.stack == [{'a', 'b', 'd', 'c'}, {'G0001', 'a', 'G0002', 'd'}, {'G0001'}]
-    True
-    >>> VV.merge()
-    >>> VV.stack == [{'d', 'b', 'a', 'c'}, {'d', 'G0002', 'G0001', 'a'}]
-    True
-    >>> VV.merge()
-    >>> VV.stack == [{'G0002', 'b', 'G0001', 'a', 'c', 'd'}]
-    True
-
-    Test merge at bottom of stack:
-    >>> VV.merge()
-    Traceback (most recent call last):
-    ...
-    ValueError: illegal merge at bottom of stack
-    >>> VV.stack == [{'b', 'G0001', 'd', 'a', 'c', 'G0002'}]
-    True
-
-    ----------------------------------------------------------------------------
-    Test _drop:
-    ----------------------------------------------------------------------------
-    >>> VV.stash()
+    >>> VV.push()
     >>> VV['will_be_lost']
     will_be_lost
-    >>> VV.stack == [{'d', 'G0001', 'c', 'G0002', 'b', 'a'}, {'will_be_lost'}]
+    >>> VV.stack == [{'c', 'a'}, {'G0002', 'a', 'd', 'G0001'}, {'will_be_lost'}]
     True
-    >>> VV._drop()
-    >>> VV.stack == [{'d', 'a', 'b', 'c', 'G0002', 'G0001'}]
+    >>> VV.pop()
+    >>> VV.stack == [{'c', 'a'}, {'G0002', 'a', 'd', 'G0001'}]
     True
 
-    Test _drop at bottom of stack:
-    >>> VV._drop()
+    Test pop at bottom of stack:
+    >>> VV.pop()
+    >>> VV.pop()
     Traceback (most recent call last):
     ...
-    ValueError: illegal _drop at bottom of stack
+    IndexError: pop at bottom of stack
 
     Test get, which is inherited from logic1.firstorder.term.VariableSet:
     >>> VV.get('d', 'e')
@@ -228,7 +157,7 @@ class VariableSet:
     The method imp also inherited from logic1.firstorder.term.VariableSet
     cannot be tested because we are not interactive here.
 
-    >>> VV.stack == [{'b', 'c', 'G0001', 'G0002', 'e', 'd', 'a'}]
+    >>> VV.stack == [{'e', 'd', 'a', 'c'}]
     True
 
     """
@@ -435,9 +364,9 @@ class Term:
     >>> bool(v == t)
     True
 
-    >>> VV.stash()
+    >>> VV.push()
     >>> will_be_lost = VV['will_be_lost']
-    >>> VV._drop()
+    >>> VV.pop()
     >>> # R.coerce(will_be_lost)
     Traceback (most recent call last):
     ...

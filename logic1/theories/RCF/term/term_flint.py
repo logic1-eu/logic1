@@ -310,27 +310,8 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         """
         return tuple(self._wrapped_ring.gens())
 
-    # dicuss: remove the following methods?
 
-    def get_names(self) -> tuple[str, ...]:
-        return self._wrapped_ring.names()
-
-    def get_var_by_index(self, index: int) -> Variable:
-        gen = self._wrapped_ring.gen(index)
-        return Variable._from_gen(gen)
-
-    def get_var_by_name(self, name: str) -> Variable:
-        index = self._wrapped_ring.variable_to_index(name)
-        return self.get_var_by_index(index)
-
-    def get_vars(self) -> tuple[Variable, ...]:
-        return tuple(Variable._from_gen(gen) for gen in self._wrapped_ring.gens())
-
-    def ordering(self) -> Ordering:
-        return self._wrapped_ring.ordering()
-
-
-class VariableSet(firstorder.VariableSet['Variable']):
+class VariableSet(RCF_term_abc.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
@@ -347,67 +328,13 @@ class VariableSet(firstorder.VariableSet['Variable']):
 
     _stack: list[set[str]]
 
-    # required by the abstract parent class
-    @property
-    def stack(self) -> list[set[str]]:
-        return self._stack
+    @staticmethod
+    def _ring_type() -> type[Ring]:
+        return Ring
 
-    @property
-    def _used(self) -> set[str]:
-        return self._stack[-1]
-
-    def __getitem__(self, name: str) -> Variable:
-        """Implements abstract method :meth:`.firstorder.term.VariableSet.__getitem__`.
-        """
-        if not isinstance(name, str):
-            raise TypeError(f'expecting string as index; {name} is {type(name)}')
-        ring = Ring([name])
-        self._used.add(name)
-        return ring.get_var_by_index(0)
-
-    def __init__(self) -> None:
-        self._reset()
-
-    def __repr__(self) -> str:
-        names = sorted(self._used, key=Ring.sort_key)
-        s = ', '.join(name for name in (*names, '...'))
-        return f'{{{s}}}'
-
-    def _drop(self) -> None:
-        if len(self._stack) <= 1:
-            raise ValueError('illegal _drop at bottom of stack')
-        self._stack.pop()
-
-    def fresh(self, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence G0001, G0002,
-        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
-        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
-        """
-        i = 1
-        v = f'G{i:04d}{suffix}'
-        while v in self._used:
-            i += 1
-            v = f'G{i:04d}{suffix}'
-        return self[v]
-
-    def merge(self) -> None:
-        if len(self._stack) <= 1:
-            raise ValueError('illegal merge at bottom of stack')
-        self.stack[-2].update(self._stack[-1])
-        self.stack.pop()
-
-    def pop(self) -> None:
-        self._drop()
-
-    def push(self) -> None:
-        self.stash()
-
-    def _reset(self) -> None:
-        self._stack = [set()]
-
-    def stash(self) -> None:
-        self._stack.append(set())
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
 
 
 VV: Final = VariableSet()
@@ -1370,8 +1297,9 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
             if str(gen) not in unused:
                 yield Variable._from_gen(gen)
 
-class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
 
+class Variable(Term, RCF_term_abc.Variable[
+    Term, "Variable", SortKey["Variable"], fmpq_mpoly, fmpq_mpoly_ctx]):
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements

@@ -106,7 +106,7 @@ class Ring(RCF_term_abc.Ring['MPolynomial[Rational]', MPolynomialRing]):
         return tuple(g for g in self._wrapped_ring.gens() if str(g) != 'unused_')
 
 
-class VariableSet(firstorder.VariableSet['Variable']):
+class VariableSet(RCF_term_abc.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
@@ -126,68 +126,13 @@ class VariableSet(firstorder.VariableSet['Variable']):
 
     _stack: list[set[str]]
 
-    @property
-    def stack(self) -> list[set[str]]:
-        """Implements the abstract property :attr:`.firstorder.term.VariableSet.stack`.
-        """
-        return self._stack
+    @staticmethod
+    def _ring_type() -> type[Ring]:
+        return Ring
 
-    @property
-    def _used(self) -> set[str]:
-        return self._stack[-1]
-
-    def __getitem__(self, name: str) -> Variable:
-        """Implements the abstract method :meth:`.firstorder.term.VariableSet.__getitem__`.
-
-        >>> from logic1.theories.RCF import VV
-        >>> isinstance(VV, VariableSet)
-        True
-        >>> x = VV['x']
-        >>> isinstance(x, Variable)
-        True
-        """
-        if not isinstance(name, str):
-            raise TypeError(f'expecting string as index; {name} is {type(name)}')
-        self._used.add(name)
-        ring = Ring((name,))
-        return Variable._from_gen(ring.get_gens()[0])
-
-    def __init__(self) -> None:
-        self._stack = [set()]
-
-    def __repr__(self) -> str:
-        names = sorted(self._used, key=Ring.sort_key)
-        s = ', '.join(name for name in (*names, '...'))
-        return f'{{{s}}}'
-
-    def fresh(self, suffix: str = '') -> Variable:
-        """Return a fresh variable, by default from the sequence G0001, G0002,
-        ..., G9999, G10000, ... This naming convention is inspired by Lisp's
-        gensym(). If the optional argument :data:`suffix` is specified, the
-        sequence G0001<suffix>, G0002<suffix>, ... is used instead.
-
-        >>> from logic1.theories.RCF import VV
-        >>> VV.fresh('_demo')
-        G0001_demo
-        >>> VV.fresh('_demo')
-        G0002_demo
-        """
-        i = 1
-        v = f'G{i:04d}{suffix}'
-        while v in self._used:
-            i += 1
-            v = f'G{i:04d}{suffix}'
-        return self[v]
-
-    def pop(self) -> None:
-        from . import cache_clear
-        self._stack.pop()
-        cache_clear()
-
-    def push(self) -> None:
-        from . import cache_clear
-        self._stack.append(set())
-        cache_clear()
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
 
 
 VV: Final = VariableSet()
@@ -993,7 +938,8 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             yield Variable._from_gen(g)
 
 
-class Variable(Term, firstorder.Variable['Variable', int, SortKey['Variable']]):
+class Variable(Term, RCF_term_abc.Variable[
+    Term, "Variable", SortKey["Variable"], "MPolynomial[Rational]", MPolynomialRing]):
 
     VV: ClassVar[VariableSet] = VV
 
