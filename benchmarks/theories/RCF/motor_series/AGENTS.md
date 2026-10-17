@@ -11,6 +11,8 @@ structural findings, atom counts, and completed verification.
   counts, and benchmark execution.
 - `test_simplify_motor.py` owns only `simplify` options, expected output atom
   counts, and benchmark execution.
+- `test_dnf_motor.py` owns the DNF configurations, measured output atom counts,
+  and benchmark execution, including its per-computation timeout.
 - Treat `motor_series_raw.py` as a raw reference; do not edit it unless the user
   explicitly requests that.
 - Put benchmarks for other simplification functions in separate
@@ -24,6 +26,10 @@ structural findings, atom counts, and completed verification.
 - `test_simplify_motor.py` has the Cartesian product of `implicit_ranges` in
   `{False, True}` and `substitute` in `{0, 1, 2}`. `implicit_ranges` is the
   primary sort key, with `False` before `True`; `substitute` is secondary.
+- `test_dnf_motor.py` has four configurations in this order: `redlog.dnf` with
+  `bnfsac=False, bnfsm=False`; `redlog.dnf` with both options `True`;
+  `RCF.bnf.dnf` with `method="cartesian"`; and `RCF.bnf.dnf` with
+  `method="pyeda"`. Each runs on `series1` through `series13`.
 - Give each configuration its own benchmark group so pytest-benchmark renders
   one 13-row table per configuration.
 - Keep benchmark functions fully type-annotated. Use `BenchmarkFixture` for
@@ -39,8 +45,15 @@ structural findings, atom counts, and completed verification.
   distribute, reorder, deduplicate, or Boolean-simplify formulas.
 - Keep `p1_split`, `q_td_split`, and `td_split` exact. Starred tuples must
   preserve flat argument sequences and their order.
-- Construct formulas outside benchmark timing. Both benchmark modules use one
-  round and one iteration, so each reported value represents one function call.
+- Construct formulas outside benchmark timing. All three benchmark modules use
+  one round and one iteration, so each reported value represents one function
+  call. The DNF benchmark also disables warmup and counts output atoms after
+  the timed call.
+- Keep each DNF computation in its own spawned worker with a 30-second wall
+  time limit. A plain signal-based pytest timeout did not interrupt a
+  long-running computation. The timed call includes a small pipe round trip;
+  worker startup and result atom counting are outside it. Timeouts appear as
+  pytest failures and have no output atom count.
 - Keep every polynomial on one physical source line.
 - For logical calls, do not break immediately after `And(` or `Or(`, and do not
   put a formula's closing parenthesis alone on a line.
@@ -74,10 +87,14 @@ top-level, in `testseries1` through `testseries13`.
 - Compare equality and exact `repr` with all 13 raw formulas.
 - Verify the input atom counts recorded in `MOTOR_SERIES`.
 - Compile the input and benchmark modules.
-- Run mypy with `--disallow-untyped-defs` on both benchmark modules.
+- Run mypy with `--disallow-untyped-defs` on all three benchmark modules.
 - Confirm pytest collects exactly 26 `gsimplify` cases and 78 `simplify`
-  cases.
+  cases, and 52 DNF cases.
 - Run at least one complete six-configuration `simplify` series and both
   `gsimplify` radical settings with benchmarking disabled.
+- Run all four DNF configurations on at least one series. The completed full
+  DNF run and its seven observed 30-second timeouts are recorded in `NOTES.md`.
+- After changing the motor formulas or DNF implementations, rerun the full DNF
+  matrix and update both module-docstring tables and timeout observations.
 
 Commands and the previously verified results are recorded in `NOTES.md`.
