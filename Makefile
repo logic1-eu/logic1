@@ -20,16 +20,6 @@ POLYLIB_TARGETS := mypy-run
 ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   POLYLIB := $(shell PYTHONPATH=. python -c 'from logic1.theories.RCF.term import POLYLIB; print(POLYLIB)')
   $(info Determined POLYLIB == $(BOLD)"$(POLYLIB)"$(RESET) via Python import)
-
-  ifeq ($(POLYLIB), FLINT)
-    exclude_re := logic1/theories/RCF/sage
-
-  else ifeq ($(POLYLIB), SAGE)
-    exclude_re := logic1/theories/RCF/flint
-
-  else
-    $(error Could not determine valid POLYLIB)
-  endif
 endif
 
 ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
@@ -70,7 +60,7 @@ mypy: cython
 mypy-run:
 # It seems that --no-incremental is not needed anymore
 	mypy --explicit-package-bases stubs
-	mypy --exclude '$(exclude_re)' logic1
+	mypy logic1
 
 pytest: cython
 	$(PYTEST) $(PYTEST_OPTIONS) $(ignores)

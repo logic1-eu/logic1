@@ -23,8 +23,7 @@ from sage.rings.rational import Rational
 
 from logic1.theories.RCF.abc import term as RCF_term_abc
 from logic1.theories.RCF.definite import Definite
-from logic1.theories.RCF.types import Number, _NUMBER_TYPES
-from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
+from logic1.theories.RCF.sage.types import Number, _NUMBER_TYPES
 
 from logic1.support.tracing import trace  # noqa
 
@@ -961,3 +960,6 @@ class Variable(Term, RCF_term_abc.Variable[
         variable._poly = gen
         variable._hash = None
         return variable
+
+
+from logic1.theories.RCF.sage.atomic import Eq, Ge, Gt, Le, Lt, Ne

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import final, Iterable, Optional, Protocol, Self
 
 from logic1 import firstorder
-from logic1.theories.RCF.types import _NUMBER_TYPES, Number
+from logic1.theories.RCF.abc.types import _NUMBER_TYPES, Number
 
 
 class RingElement(Protocol):

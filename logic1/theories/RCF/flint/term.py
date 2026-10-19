@@ -10,8 +10,7 @@ from gmpy2 import mpq
 
 from logic1.theories.RCF.abc import term as RCF_term_abc
 from logic1.theories.RCF.definite import Definite
-from logic1.theories.RCF.types import Number, _NUMBER_TYPES
-from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
+from logic1.theories.RCF.flint.types import Number, _NUMBER_TYPES
 
 
 POLYLIB: Final[str] = "FLINT"
@@ -1313,3 +1312,6 @@ class Variable(Term, RCF_term_abc.Variable[
         variable._poly = gen
         variable._hash = None
         return variable
+
+
+from logic1.theories.RCF.flint.atomic import Eq, Ge, Gt, Le, Lt, Ne
