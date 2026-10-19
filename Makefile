@@ -22,10 +22,10 @@ ifneq ($(filter $(GOALS), $(POLYLIB_TARGETS)),)
   $(info Determined POLYLIB == $(BOLD)"$(POLYLIB)"$(RESET) via Python import)
 
   ifeq ($(POLYLIB), FLINT)
-    exclude_re := logic1/theories/RCF/term/term_sage\.py
+    exclude_re := logic1/theories/RCF/sage
 
   else ifeq ($(POLYLIB), SAGE)
-    exclude_re := logic1/theories/RCF/term/term_flint\.py
+    exclude_re := logic1/theories/RCF/flint
 
   else
     $(error Could not determine valid POLYLIB)

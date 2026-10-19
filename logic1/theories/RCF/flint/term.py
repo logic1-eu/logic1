@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import abstractmethod
 from collections.abc import Container, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
@@ -9,9 +8,8 @@ from typing import Any, Final, Iterable, Iterator, Mapping, Optional, Self, Tupl
 from flint import Ordering, fmpq, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
 
-from logic1 import firstorder
-from logic1.theories.RCF.term import abc as RCF_term_abc
-from logic1.theories.RCF.term.definite import Definite
+from logic1.theories.RCF.abc import term as RCF_term_abc
+from logic1.theories.RCF.definite import Definite
 from logic1.theories.RCF.types import Number, _NUMBER_TYPES
 from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
 

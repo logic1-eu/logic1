@@ -11,7 +11,6 @@ from sage.all import QQ
 # Importing QQ from sage.rings.rational_fields causes problems. Notably, a
 # fresh instance of RationalField is assigned to QQ in sage.all.
 from sage.misc.latex import latex as sage_latex
-from sage.rings.integer import Integer
 from sage.rings.polynomial.multi_polynomial_libsingular import (
     MPolynomial_libsingular as MPolynomial,
     MPolynomialRing_libsingular as MPolynomialRing)
@@ -22,9 +21,8 @@ from sage.rings.polynomial.polynomial_element import (
 from sage.rings.polynomial.term_order import TermOrder
 from sage.rings.rational import Rational
 
-from logic1 import firstorder
-from logic1.theories.RCF.term import abc as RCF_term_abc
-from logic1.theories.RCF.term.definite import Definite
+from logic1.theories.RCF.abc import term as RCF_term_abc
+from logic1.theories.RCF.definite import Definite
 from logic1.theories.RCF.types import Number, _NUMBER_TYPES
 from logic1.theories.RCF.atomic import Eq, Ge, Gt, Le, Lt, Ne
 
