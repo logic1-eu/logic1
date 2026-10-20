@@ -45,12 +45,25 @@ endif
 .PHONY: cython cython-debug \
         pytest mypy mypy-run \
         test test-all test-doc \
+		test_flint test_sage test_both \
         doc pygount coverage coverage_html \
         mostlyclean clean conda-build
 
 test: cython
 	$(MAKE) mypy-run
 	$(PYTEST) $(PYTEST_OPTIONS) $(ignores)
+
+test_flint:
+	python scripts/test_backend.py flint
+
+test_sage:
+	python scripts/test_backend.py sage
+
+test_both:
+	@status=0; \
+	$(MAKE) test_sage || status=1; \
+	$(MAKE) test_flint || status=1; \
+	exit $$status
 
 test-all: test test-doc
 
