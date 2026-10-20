@@ -190,7 +190,18 @@ class SortKey(Generic[τ]):
         return self_poly != other_poly
 
 
-class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[Rational]', MPolynomialRing]):
+class Term(RCF_term_abc.Term['Term',
+                             'Variable',
+                             SortKey['Term'],
+                             'MPolynomial[Rational]',
+                             MPolynomialRing,
+                             "Eq",
+                             "Ge",
+                             "Gt",
+                             "Le",
+                             "Lt",
+                             "Ne",
+                            ]):
 
     _hash: Optional[int]
     _poly: MPolynomial[Rational]
@@ -198,17 +209,6 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
     @property
     def _ring(self) -> Ring:
         return Ring.from_raw(self._poly.parent())
-
-    def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
-        # MyPy requires "other: object". However, with our use a a constructor,
-        # it makes no sense to compare terms with general objects. We have
-        # Eq.__bool__, which supports some comparisons in Boolean contexts.
-        # Same for __ne__.
-        lhs = self - other
-        # Use poly.lc() in order to support @lru_cache on Term.lc().
-        if lhs._poly.lc() < 0:
-            lhs = -lhs
-        return Eq(lhs, 0)
 
     def __ge__(self, other: Number | Term) -> Ge | Le:
         lhs = self - other
@@ -223,6 +223,34 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             return Lt(-lhs, 0)
         else:
             return Gt(lhs, 0)
+
+    @staticmethod
+    def _eq_type() -> type[Eq]:
+        return Eq
+
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
+
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
+
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
+
+    @staticmethod
+    def _term_type() -> type[Term]:
+        return Term
 
     def __hash__(self) -> int:
         return super().__hash__()
@@ -711,7 +739,6 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
         """
         return self._poly.is_zero()
 
-    @lru_cache(maxsize=CACHE_SIZE)
     def lc(self) -> mpq:
         """Return the leading coefficient of this term with respect to the
         degree lexicographical term order :mod:`deglex <sage.rings.polynomial.term_order>`.
@@ -935,8 +962,17 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], 'MPolynomial[R
             yield Variable._from_gen(g)
 
 
-class Variable(Term, RCF_term_abc.Variable[
-    Term, "Variable", SortKey["Variable"], "MPolynomial[Rational]", MPolynomialRing]):
+class Variable(Term, RCF_term_abc.Variable[Term,
+                                           "Variable",
+                                           "SortKey[Variable]",
+                                           "MPolynomial[Rational]",
+                                           MPolynomialRing,
+                                           "Eq",
+                                           "Ge",
+                                           "Gt",
+                                           "Le",
+                                           "Lt",
+                                           "Ne"]):
 
     VV: ClassVar[VariableSet] = VV
 

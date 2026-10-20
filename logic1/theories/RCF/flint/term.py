@@ -418,7 +418,18 @@ class SortKey[τ: Term]:
         return 0
 
 
-class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fmpq_mpoly_ctx]):
+class Term(RCF_term_abc.Term['Term',
+                             'Variable',
+                             SortKey['Term'],
+                             fmpq_mpoly,
+                             fmpq_mpoly_ctx,
+                             "Eq",
+                             "Ne",
+                             "Lt",
+                             "Le",
+                             "Gt",
+                             "Ge",
+                            ]):
 
     _hash: Optional[int]
     _poly: fmpq_mpoly
@@ -426,18 +437,6 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
     @property
     def _ring(self) -> Ring:
         return Ring.from_raw(self._poly.context())
-
-    def __eq__(self, other: Number | Term) -> Eq:  # type: ignore[override]
-        # MyPy requires "other: object". However, with our use a a constructor,
-        # it makes no sense to compare terms with general objects. We have
-        # Eq.__bool__, which supports some comparisons in Boolean contexts.
-        # Same for __ne__.
-        lhs = self - other
-        # Use _poly.leadling_coefficient() in order to support @lru_cache on
-        # Term.lc().
-        if lhs._poly.leading_coefficient() < 0:
-            lhs = -lhs
-        return Eq(lhs, 0)
 
     def __ge__(self, other: Number | Term) -> Ge | Le:
         lhs = self - other
@@ -1294,9 +1293,48 @@ class Term(RCF_term_abc.Term['Term', 'Variable', SortKey['Term'], fmpq_mpoly, fm
             if str(gen) not in unused:
                 yield Variable._from_gen(gen)
 
+    @staticmethod
+    def _eq_type() -> type[Eq]:
+        return Eq
+
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
+
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
+
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
+
+    @staticmethod
+    def _term_type() -> type[Term]:
+        return Term
+
 
 class Variable(Term, RCF_term_abc.Variable[
-    Term, "Variable", SortKey["Variable"], fmpq_mpoly, fmpq_mpoly_ctx]):
+    Term,
+    "Variable",
+    SortKey["Variable"],
+    fmpq_mpoly,
+    fmpq_mpoly_ctx,
+    "Eq",
+    "Ne",
+    "Lt",
+    "Le",
+    "Gt",
+    "Ge",
+]):
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements

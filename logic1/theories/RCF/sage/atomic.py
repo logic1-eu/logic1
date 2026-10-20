@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from abc import abstractmethod
 from typing import Any, Final, Iterator, Mapping, Self
 
 from gmpy2 import mpq
 
 import logic1
 from logic1.firstorder import _T, _F
+from logic1.theories import RCF
 from logic1.theories.RCF.sage.types import Formula, Number
 from logic1.support.excepthook import NoTraceException
 
-class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.sage.atomic.AtomicFormula',
-                                                    'logic1.theories.RCF.sage.term.Term',
-                                                    'logic1.theories.RCF.sage.term.Variable',
-                                                    'logic1.theories.RCF.sage.types.Number']):
+class AtomicFormula(RCF.abc.AtomicFormula[
+                        'logic1.theories.RCF.sage.atomic.AtomicFormula',
+                        'logic1.theories.RCF.sage.term.Term',
+                        'logic1.theories.RCF.sage.term.Variable']):
     """Base class for atomic formulas over real closed fields. The class is the
     common parent of :class:`Eq <.RCF.atomic.Eq>`, :class:`Ne <.RCF.atomic.Ne>`,
     :class:`Le <.RCF.atomic.Le>`, :class:`Ge <.RCF.atomic.Ge>`, :class:`Lt
@@ -77,7 +79,7 @@ class AtomicFormula(logic1.firstorder.AtomicFormula['logic1.theories.RCF.sage.at
         return super().__hash__()
 
     def __init__(self, lhs: Number | Term | int, rhs: Number | Term) -> None:
-        super().__init__()
+        super().__init__(lhs, rhs)
         if not isinstance(self, (Eq, Ne, Ge, Gt, Le, Lt)):
             raise NoTraceException('Instantiate one of Eq, Ne, Ge, Gt, Le, Lt instead')
         if not isinstance(lhs, Term):
@@ -386,4 +388,3 @@ class Lt(AtomicFormula):
 
 
 from logic1.theories.RCF.sage.term import Term, Variable
-
