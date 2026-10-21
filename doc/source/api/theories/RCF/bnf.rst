@@ -8,12 +8,21 @@ Boolean Normal Forms
 
 .. automodule:: logic1.theories.RCF.bnf
 
-  .. function:: cnf(f: RCF.types.Formula) -> RCF.types.Formula
-                dnf(f: RCF.types.Formula) -> RCF.types.Formula
+  .. function:: cnf(f, method='pyeda', *, max_pair_checks=500)
+                dnf(f, method='pyeda', *, max_pair_checks=500)
 
     Compute a conjunctive or disjunctive normal form of ``f``. If ``f`` contains
     quantifiers, then the result is an equivalent prenex normal form whose
     matrix is in CNF or DNF, respectively.
+
+    ``method`` is ``'pyeda'`` (the default), ``'cartesian'``,
+    ``'cartesian-simplified'``, or ``'cartesian-subtree-simplified'``. The two
+    simplified Cartesian methods use the same atomic rules and final semantic
+    subsumption. The former reduces cubes as they are generated; the latter
+    reduces each completed subtree after its local Cartesian expansion.
+    ``max_pair_checks`` bounds the final semantic comparisons; zero skips
+    them, and ``None`` removes the limit. Recursive atomic simplification
+    always runs. The limit applies to both simplified Cartesian methods.
 
     .. rubric:: Some examples
 
@@ -64,14 +73,12 @@ Boolean Normal Forms
 
     .. seealso::
 
-      :class:`.BooleanNormalForm`
-        Its inherited methods :meth:`.BooleanNormalForm.cnf` and
-        :meth:`.BooleanNormalForm.dnf` are wrapped by the functions
-        :func:`.cnf` and :func:`.dnf`, respectively.
-
       :ref:`Simplification <api-RCF-simplify>`
-        for the simplifier that is used to simplify intermediate results
-        throughout the CNF and DNF computation.
+        for the RCF simplifier used before and after normal form construction,
+        and for final semantic subsumption in the new method.
+
+      ``doc/notes/RCF/dnf.md``
+        for the strict DNF simplification rules and their growth limits.
 
 
   Details
@@ -80,5 +87,14 @@ Boolean Normal Forms
   .. attention::
     The material below addresses implementers rather than users.
 
-  .. autoclass:: BooleanNormalForm
+  .. autoclass:: CartesianBooleanNormalForm
+    :exclude-members: __init__, __new__
+
+  .. autoclass:: SimplifyingCartesianBooleanNormalForm
+    :exclude-members: __new__
+
+  .. autoclass:: SubtreeSimplifyingCartesianBooleanNormalForm
+    :exclude-members: __new__
+
+  .. autoclass:: PyedaBooleanNormalForm
     :exclude-members: __init__, __new__

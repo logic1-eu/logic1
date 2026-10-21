@@ -1,9 +1,12 @@
 # Motor Series Benchmark Notes
 
-Updated: 2026-10-17
+Updated: 2026-10-21
 
-Operational instructions for AI agents are in `AGENTS.md`. This document keeps
-the provenance, structural findings, and completed verification in more detail.
+This document covers `benchmarks/theories/RCF/motor_series/` and all its
+descendants, excluding sibling benchmark directories. It records provenance,
+structural findings, measurements, and completed verification for that subtree.
+Operational instructions are in this directory's `AGENTS.md`; `NOTES.md` is
+supporting documentation, not an automatically loaded agent instruction file.
 
 ## Objective and files
 
@@ -122,29 +125,48 @@ The measured `simplify` output atom counts are:
 
 ## DNF benchmark
 
-`test_dnf_motor.py` has 52 cases: every motor series is run with `redlog.dnf`
+`test_dnf_motor.py` has 78 cases: every motor series is run with `redlog.dnf`
 using `bnfsac=False, bnfsm=False`, with `redlog.dnf` using both options set to
-`True`, with `RCF.bnf.dnf(method="cartesian")`, and with
+`True`, with `RCF.bnf.dnf(method="cartesian")`, with
+`RCF.bnf.dnf(method="cartesian-simplified")`, with
+`RCF.bnf.dnf(method="cartesian-subtree-simplified")`, and with
 `RCF.bnf.dnf(method="pyeda")`, in that order. Each configuration has its own
 13-row benchmark group. The first table in the module docstring records these
 input and result atom counts from the full run; the second records computation
 times in seconds:
 
-| Series | Input | Redlog off | Redlog on | Cartesian | PyEDA |
-|---:|---:|---:|---:|---:|---:|
-| 1 | 710 | 2105 | 2105 | 1528 | timeout |
-| 2 | 1420 | 2368 | 2300 | 2297 | timeout |
-| 3 | 94 | 112 | 35 | 112 | 49 |
-| 4 | 292 | 389 | 243 | 219 | 219 |
-| 5 | 157 | 152 | 96 | 143 | 143 |
-| 6 | 994 | 2205 | 2142 | 802 | timeout |
-| 7 | 248 | 308 | 308 | 230 | 230 |
-| 8 | 473 | 1203 | 1203 | 662 | timeout |
-| 9 | 235 | 282 | 282 | 210 | 210 |
-| 10 | 478 | 1104 | 1104 | 1005 | timeout |
-| 11 | 168 | 255 | 87 | 240 | 130 |
-| 12 | 2176 | 5020 | 2366 | 4560 | timeout |
-| 13 | 358 | 792 | 792 | 717 | timeout |
+| Series | Input | Redlog off | Redlog on | Cartesian | Early | Subtree | PyEDA |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 710 | 2105 | 2105 | 1528 | 1512 | 1512 | timeout |
+| 2 | 1420 | 2368 | 2300 | 2297 | 2263 | 2263 | timeout |
+| 3 | 94 | 112 | 35 | 112 | 38 | 38 | 49 |
+| 4 | 292 | 389 | 243 | 219 | 87 | 87 | 219 |
+| 5 | 157 | 152 | 96 | 143 | 48 | 48 | 143 |
+| 6 | 994 | 2205 | 2142 | 802 | 761 | 761 | timeout |
+| 7 | 248 | 308 | 308 | 230 | 176 | 176 | 230 |
+| 8 | 473 | 1203 | 1203 | 662 | 621 | 621 | timeout |
+| 9 | 235 | 282 | 282 | 210 | 162 | 162 | 210 |
+| 10 | 478 | 1104 | 1104 | 1005 | 1005 | 1005 | timeout |
+| 11 | 168 | 255 | 87 | 240 | 78 | 78 | 130 |
+| 12 | 2176 | 5020 | 2366 | 4560 | 2116 | 2116 | timeout |
+| 13 | 358 | 792 | 792 | 717 | 717 | 717 | timeout |
+
+Both simplified Cartesian methods use the same atomic relation rules and up
+to 500 final semantic cube-pair comparisons. The early method reduces cubes
+as they are generated; the subtree method reduces each completed local
+product. Both now choose cubes by size and sorted atoms instead of relying on
+set iteration order. The insertion routine selects the first applicable cube
+in one scan, avoiding a full sort at every insertion. In the repeated full
+run, both returned exactly the same output atom counts as before on all 13
+series. Their strict DNF sets also compared equal for all 13 after the shared
+initial simplification and before final semantic subsumption. Thus the motor
+inputs give no evidence that early insertion improves result quality. The
+full run gave mixed single-call timings: subtree was faster on four series
+and slower on nine. That timing run did not measure peak intermediate memory.
+
+The direct set comparison used the matrix of
+`early.simplify(formula.to_pnf())` for each input and checked
+`early._strict_dnf(matrix) == subtree._strict_dnf(matrix)`.
 
 Each case starts one spawned worker and waits for it to be ready before
 timing. The timed call requests one DNF computation and waits at most 30
@@ -156,13 +178,56 @@ computation and its child processes can be killed before the next case.
 
 The first full attempt used a signal-based pytest timeout. It did not
 interrupt a long-running computation, so that run was stopped. The spawned
-worker design completed two full 52-case runs. After moving result atom
-counting outside the timed call, the final run finished in 368.70 seconds:
-45 cases passed and seven PyEDA cases (`series1`, `series2`, `series6`,
-`series8`, `series10`, `series12`, and `series13`) raised `TimeoutError` at
-30 seconds. Both full runs produced identical output atom counts and the
-same seven timeouts. Pytest exits with status 1 for these timeouts. A timeout
-means no result size was obtained, rather than a zero-atom result.
+worker design completed two full 52-case runs and a 65-case run after the
+early simplified method was added. With the subtree method added, the full
+78-case run finished in 528.45 seconds: 71 cases passed and seven PyEDA
+cases (`series1`, `series2`, `series6`, `series8`, `series10`, `series12`, and
+`series13`) raised `TimeoutError` at 30 seconds. These are the same seven
+timeouts as in the earlier runs. Pytest exits with status 1 for these
+timeouts. A timeout means no result size was obtained, rather than a
+zero-atom result.
+
+After deterministic cube selection was added, the full 78-case matrix was
+run again in 527.20 seconds. It had the same 71 passes, seven PyEDA
+timeouts, and all result atom counts. At that point, the computation-time
+table in `test_dnf_motor.py` recorded this run. A separate comparison
+confirmed that the two simplified methods still produced equal strict DNF
+sets on every series before semantic subsumption. Summing the 13 timed calls
+gives 51.030 seconds for early insertion and 51.484 seconds for subtree
+reduction, compared with 46.740 and 47.804 seconds in the preceding run.
+These are single measurements, so the differences do not isolate sorting
+overhead from run-to-run variation.
+
+After `CartesianBooleanNormalForm.simplify` was fixed to
+`explode_always=False, substitute=1`, the full 78-case matrix was run again.
+It finished in 533.49 seconds: 71 cases passed, and PyEDA timed out on the
+same seven series (1, 2, 6, 8, 10, 12, 13). All successful result sizes
+remained the same except for early and subtree on series12, which both
+changed from 2100 to 2116 atom occurrences. The module docstring records
+the result sizes and one-run computation times from this latest run. The
+benchmark JSON is `/tmp/dnf-substitute1-motor-full.json`; the full pytest
+output is `/tmp/dnf-substitute1-motor-full.log`. A direct comparison with
+the new initial simplification again found equal strict DNF sets for early
+and subtree on all 13 series.
+
+### Initial implicit-ranges experiment
+
+A separate experiment disabled `implicit_ranges` only in the initial
+Cartesian simplification, retaining `explode_always=False, substitute=1`
+and the defaults for semantic checks and final simplification. For both early
+and subtree, disabling the option increased the final atom counts on series2
+(2263 to 2265), series4 (87 to 93), series5 (48 to 54), series6 (761 to 770),
+and series11 (78 to 87). The other eight series had unchanged atom counts.
+The two methods agreed on every result size under each setting.
+
+Single-call timings were mixed. The totals across all 13 inputs were
+50.725 seconds with implicit ranges and 48.910 without for early, and
+50.123 with and 48.694 without for subtree. These are separate exploratory
+measurements, not replacements for the default-option module tables.
+The saved data are in `/tmp/logic1-implicit-ranges-results.jsonl`, which also
+contains the corresponding SMT-LIB experiment. Temporary files are local
+artifacts and may disappear; the recorded findings do not depend on retaining
+them. The observed motor result sizes support keeping `implicit_ranges=True`.
 
 ## Deferred Redlog equivalence check
 
@@ -201,7 +266,7 @@ been discussed but is intentionally not implemented yet.
 - `series14` is absent from the result.
 - Python compilation succeeds.
 - Pytest collection finds exactly 26 `gsimplify` cases, 78 `simplify` cases,
-  and 52 DNF cases.
+  and 78 DNF cases.
 - All 13 `radical=True` `gsimplify` results were computed and have the same
   output atom counts as `radical=False`.
 - Both `gsimplify` radical settings passed for `series3` with benchmarking
@@ -212,10 +277,18 @@ been discussed but is intentionally not implemented yet.
 - The `gsimplify` and `simplify` modules pass mypy with
   `--disallow-untyped-defs`. The DNF module also passed that check after the
   full benchmark run.
-- All four DNF configurations passed on `series3` in a timed smoke run.
-- The full DNF benchmark completed with 45 results and the seven PyEDA
-  timeouts listed above. Every successful result had an output atom count;
-  these counts matched across both full runs.
+- All six DNF configurations passed on `series3` in the full run.
+- The full DNF benchmark was repeated after deterministic cube selection,
+  with 71 results and the seven PyEDA timeouts listed above. Every successful
+  result had an output atom count unchanged from the preceding run.
+- The full DNF benchmark was repeated after changing initial Cartesian
+  simplification to `explode_always=False, substitute=1`, with 71 results
+  and the same seven PyEDA timeouts. The only changed output counts were
+  early and subtree on series12 (2116 rather than 2100).
+- The early and subtree variants had equal strict DNF sets before final
+  semantic subsumption on every motor input after the preprocessing change.
+- Both simplified-class doctests passed with `PYTHONHASHSEED` set to 0, 63,
+  and 123, including their differing-output example.
 - An AST formatting check found no multiline polynomial expressions.
 - No full timed `gsimplify` or `simplify` pytest-benchmark run was performed
   after their latest matrix expansions.
@@ -223,7 +296,7 @@ been discussed but is intentionally not implemented yet.
 Useful checks from the Logic1 package directory:
 
 ```bash
-PYTHONPYCACHEPREFIX=/tmp/pycache-motor python3 -m py_compile benchmarks/theories/RCF/motor_series/motor_inputs.py benchmarks/theories/RCF/motor_series/test_gsimplify_motor.py benchmarks/theories/RCF/motor_series/test_simplify_motor.py benchmarks/theories/RCF/motor_series/test_dnf_motor.py
+PYTHONPYCACHEPREFIX=/tmp/pycache-motor conda run -n logic1_dev python -m py_compile benchmarks/theories/RCF/motor_series/motor_inputs.py benchmarks/theories/RCF/motor_series/test_gsimplify_motor.py benchmarks/theories/RCF/motor_series/test_simplify_motor.py benchmarks/theories/RCF/motor_series/test_dnf_motor.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev mypy --disallow-untyped-defs benchmarks/theories/RCF/motor_series/test_gsimplify_motor.py benchmarks/theories/RCF/motor_series/test_simplify_motor.py benchmarks/theories/RCF/motor_series/test_dnf_motor.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest --collect-only -q benchmarks/theories/RCF/motor_series/test_gsimplify_motor.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_gsimplify_motor.py -k series3 --benchmark-disable
@@ -231,7 +304,7 @@ DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest --collect-only -q 
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_simplify_motor.py -k series3 --benchmark-disable
 DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest --collect-only -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py
 DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py -k series3 --benchmark-only
-DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py --benchmark-only --benchmark-json=/tmp/dnf-motor-benchmark-final.json --tb=short
+DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py --benchmark-only --benchmark-json=/tmp/dnf-deterministic-full.json --tb=short
 ```
 
 ## Current state
