@@ -1,15 +1,16 @@
 """Boolean normal forms over real closed fields.
 
-The Cartesian methods distribute conjunction over disjunction directly. The
-``cartesian-simplified`` method simplifies during construction, while
-``cartesian-subtree-simplified`` simplifies each completed subtree. The
-``pyeda`` method uses a Boolean abstraction.
+The ``cartesian`` method distributes conjunction over disjunction directly.
+``Simplification`` selects no additional reductions (the default), reduction
+of the final strict DNF, or reduction after or during each recursive step.
+The ``pyeda`` method uses a Boolean abstraction.
 """
 from collections.abc import Mapping
+from enum import IntEnum
 import itertools
 from typing import Final, Literal, NewType, TypeGuard
 
-from logic1.firstorder import And, Or, Not, _F, _T, BooleanFormula
+from logic1.firstorder import And, Or, Not, _F, _T
 from logic1 import abc
 from logic1.theories.RCF.term import Term, Variable
 from logic1.theories.RCF.atomic import AtomicFormula, Eq, Ge, Gt, Le, Lt, Ne
@@ -18,6 +19,8 @@ from logic1.theories.RCF.types import Formula, Number
 
 
 AndOr = NewType("AndOr", Formula)
+type Cube = frozenset[AtomicFormula]
+type StrictDNF = set[Cube]
 
 
 def is_and_or(f: Formula) -> TypeGuard[AndOr]:
@@ -26,6 +29,24 @@ def is_and_or(f: Formula) -> TypeGuard[AndOr]:
     if isinstance(f, (And, Or)):
         return all(is_and_or(arg) for arg in f.args)
     return False
+
+
+class Simplification(IntEnum):
+    """Choose when DNF-specific reductions run during normal form computation.
+
+    A step constructs the DNF at one ``And`` or ``Or`` node. ``NONE`` keeps
+    ordinary preprocessing and conservative final simplification. ``FINAL``
+    reduces the complete strict DNF once. ``AFTER_STEP`` reduces each node's
+    completed result; ``DURING_STEP`` reduces cubes and partial products as
+    they are generated. The latter three also run final semantic subsumption.
+
+    Integer values identify schedules, not increasing quality or speed.
+    """
+
+    NONE = 0
+    FINAL = 1
+    AFTER_STEP = 2
+    DURING_STEP = 3
 
 
 class CartesianBooleanNormalForm:
@@ -50,8 +71,8 @@ class CartesianBooleanNormalForm:
         return dnf.quantify(prefix)
 
     def _dnf_and_or(self, f: AndOr) -> Formula:
-        sdnf = self._strict_dnf(f)
-        dnf = Or(*(And(*(atom for atom in conj)) for conj in sdnf))
+        strict_dnf = self._strict_dnf(f)
+        dnf = Or(*(And(*(atom for atom in conj)) for conj in strict_dnf))
         return dnf
 
     def conservative_simplify(self, f: Formula) -> Formula:
@@ -86,89 +107,26 @@ class CartesianBooleanNormalForm:
         raise ValueError(f"Unexpected formula type: {type(f)}")
 
 
-type Cube = frozenset[AtomicFormula]
-type StrictDNF = set[Cube]
-
-
 class SimplifyingCartesianBooleanNormalForm(CartesianBooleanNormalForm):
-    """Reduce cubes as they are produced by Cartesian distribution.
+    """Share cube reduction rules and final semantic subsumption.
 
-    The inherited DNF computation first prenexes and simplifies the input.
-    Its matrix contains only ``And``, ``Or``, truth values, and atomic
-    relations against zero. A strict DNF is a set of cubes, each a
-    frozenset of atoms interpreted as a conjunction.
+    Concrete subclasses choose when to normalize cubes and apply structural
+    subsumption and cut. A cube is a frozenset of polynomial constraints
+    against zero; a strict DNF is a set of cubes interpreted disjunctively.
 
-    At an ``Or`` node, insert child cubes into a running result and stop
-    if the empty cube makes it true. At an ``And`` node, fold in child
-    DNFs one at a time. Each pair of cubes produces a union of atoms;
-    normalize it when both factors are nonempty, then try to insert it
-    into the next result. Stop if that result becomes false. Cube
-    normalization intersects the allowed signs of relations on the same
-    polynomial and rejects contradictions. Insertion removes structurally
-    subsumed cubes and repeatedly merges cubes that differ in one relation
-    on the same polynomial. These recursive steps use no RCF validity
-    checks. Cube traversal and greedy comparison choices follow
-    :meth:`_cube_key`, independent of Python set iteration order.
+    Normalization intersects sign masks for each polynomial, rejecting
+    contradictory cubes. Insertion removes structurally subsumed cubes and
+    merges cubes differing in one relation on the same polynomial. These
+    operations use no RCF validity checks. Cube ordering makes the greedy
+    choices deterministic, but deletion can prevent later cuts, so neither
+    minimality nor increasing quality across schedules is guaranteed.
 
-    After construction, a semantic pass examines at most
-    ``max_pair_checks`` cube pairs (500 by default; zero skips the pass;
-    ``None`` is unbounded). It checks implications first by exact atoms
-    and sign masks, then by RCF simplification under assumptions. The
-    resulting DNF is converted to a formula and conservatively
-    simplified. Inherited CNF computation uses the DNF of the negation.
-
-    Early insertion can avoid storing a full local Cartesian product when
-    many cubes collapse, and can stop on ``T`` or ``F`` during recursion.
-    Its repeated subset and merge checks can also cost time. Greedy
-    deletion can prevent a later cut, so minimality is not guaranteed.
-    On the 13 motor series it produced the same strict DNFs as
-    :class:`SubtreeSimplifyingCartesianBooleanNormalForm`, with no
-    consistent timing advantage. See ``doc/notes/RCF/dnf.md``.
-
-    In the following input, the initial simplification retains six cubes.
-    Both classes cut on ``d``. Early insertion also cuts on ``a`` and then
-    ``b``, producing a cube that subsumes the remaining ``c`` cube. The
-    completed-subtree class subsumes an input to those cuts first. Both
-    calls use the default ``max_pair_checks=500``:
-
-    >>> from logic1.theories.RCF import VV
-    >>> a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
-    >>> f = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
-    ...        And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
-    ...        And(d > 0, e > 0), And(d <= 0, e > 0))
-    >>> normal_form = SimplifyingCartesianBooleanNormalForm()
-    >>> len(normal_form.simplify(f.to_pnf()).args)
-    6
-    >>> normal_form.dnf(f)
-    Or(e > 0, c > 0)
-    >>> other = SubtreeSimplifyingCartesianBooleanNormalForm()
-    >>> for clause in other.dnf(f).args:
-    ...     print(clause)
-    e > 0
-    c > 0 and b <= 0
-    c > 0 and b > 0 and a <= 0
-    c > 0 and a > 0
-
-    A grid of polynomial constraints shows the quality and cost of the
-    semantic pair budget. Initial simplification retains all 400 cubes;
-    distinct polynomials also prevent structural subsumption. Higher
-    budgets find more semantic implications. On one machine, the three
-    calls took about 0.5, 0.9, and 1.1 seconds, respectively. The
-    unbounded pass examines 760 cube pairs. The output columns are
-    budget, cubes, and atoms:
-
-    >>> x, y = VV.get('x', 'y')
-    >>> g = Or(*(And(x > i, y > j) for i in range(20) for j in range(20)))
-    >>> len(normal_form.simplify(g.to_pnf()).args)
-    400
-    >>> BNF = SimplifyingCartesianBooleanNormalForm
-    >>> for checks in (100, 500, None):
-    ...     result = BNF(max_pair_checks=checks).dnf(g)
-    ...     cubes = len(result.args) if isinstance(result, Or) else 1
-    ...     print(checks, cubes, len(list(result.atoms())))
-    100 341 682
-    500 141 282
-    None 1 2
+    After construction, a semantic pass examines at most ``max_pair_checks``
+    cube pairs (500 by default; zero disables it; ``None`` is unbounded).
+    It checks exact atoms and sign masks before calling the RCF simplifier
+    under assumptions. The resulting formula is conservatively simplified.
+    CNF computation uses the DNF of the negation. See
+    ``doc/notes/RCF/dnf.md`` for the rules and experimental findings.
     """
 
     max_pair_checks: int | None
@@ -279,6 +237,16 @@ class SimplifyingCartesianBooleanNormalForm(CartesianBooleanNormalForm):
             return common
         return common | {cls._MASK_OP[mask](atom_left.lhs, 0)}
 
+    def _reduce_strict_dnf(self, strict_dnf: StrictDNF) -> StrictDNF:
+        """Normalize cubes and apply structural subsumption and cut.
+        """
+        result: StrictDNF = set()
+        for cube in sorted(strict_dnf, key=self._cube_key):
+            simplified = self._simplify_cube(cube)
+            if simplified is not None:
+                self._insert(result, simplified)
+        return result
+
     def _simplify_cube(self, cube: Cube) -> Cube | None:
         """Intersect relations on each polynomial, rejecting contradictions.
         """
@@ -316,6 +284,209 @@ class SimplifyingCartesianBooleanNormalForm(CartesianBooleanNormalForm):
                     break
         return result
 
+
+class FinalSimplifyingCartesianBooleanNormalForm(SimplifyingCartesianBooleanNormalForm):
+    """Reduce only after constructing the complete strict DNF.
+
+    Inherit ordinary Cartesian recursion without reducing child DNFs or
+    partial products. Normalize the completed strict DNF and apply structural
+    subsumption and cut once, then run the shared bounded semantic pass.
+    Ordinary preprocessing and conservative final simplification also run.
+
+    This schedule avoids repeated reductions during recursion, but retains
+    the entire unreduced strict DNF in memory. It can be useful when plain
+    Cartesian construction is fast and only the completed result needs DNF
+    reduction. It does not guarantee a smaller result or a faster computation
+    than the other schedules. See ``doc/notes/RCF/dnf.md``.
+
+    Initial simplification retains the six cubes below. Final-only reduction
+    subsumes the second cube, cuts on ``d``, and keeps four cubes. During-step
+    reduction instead uses the second cube for further cuts and returns two.
+    Both calls use the default semantic pair budget of 500:
+
+    >>> from logic1.theories.RCF import VV
+    >>> a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
+    >>> f = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
+    ...        And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
+    ...        And(d > 0, e > 0), And(d <= 0, e > 0))
+    >>> normal_form = FinalSimplifyingCartesianBooleanNormalForm()
+    >>> len(normal_form.simplify(f.to_pnf()).args)
+    6
+    >>> for clause in normal_form.dnf(f).args:
+    ...     print(clause)
+    e > 0
+    c > 0 and b <= 0
+    c > 0 and b > 0 and a <= 0
+    c > 0 and a > 0
+    >>> DuringStepSimplifyingCartesianBooleanNormalForm().dnf(f)
+    Or(e > 0, c > 0)
+    """
+
+    def _simplify_strict_dnf(self, strict_dnf: StrictDNF) -> StrictDNF:
+        """Reduce the complete strict DNF before semantic subsumption.
+        """
+        return super()._simplify_strict_dnf(self._reduce_strict_dnf(strict_dnf))
+
+
+class AfterStepSimplifyingCartesianBooleanNormalForm(SimplifyingCartesianBooleanNormalForm):
+    """Reduce each subtree after its local Cartesian expansion is complete.
+
+    Recursion returns reduced strict DNFs for the children. An ``Or`` node
+    first unions their cubes; an ``And`` node first forms their full
+    Cartesian product. Only after that node's raw strict DNF exists does
+    this class simplify each cube and insert it into a reduced set.
+    Inherited rules combine relations on the same polynomial, reject
+    contradictory cubes, remove structural subsumption, and repeatedly
+    merge cubes differing in one relation. As in the during-step class, the
+    final semantic pass examines at most ``max_pair_checks`` cube pairs.
+    The reduced strict DNF is converted to a formula and conservatively
+    simplified. Cube traversal and inherited insertion use the same stable
+    key as the during-step class. Inherited CNF computation uses the DNF of the
+    negation.
+
+    This ordering matches the placement of Redlog's recursive
+    simplification, though the rules used here are different. It avoids
+    reducing partial products during an ``And`` node's expansion and gives
+    each node a simpler reduction schedule. The complete local
+    product must be stored before redundant or contradictory cubes are
+    removed, which can increase peak memory and construction time. On
+    the 13 motor series it gave exactly the same strict DNFs as the
+    during-step class; one-call timings gave neither method a clear advantage.
+    See ``doc/notes/RCF/dnf.md`` for the rules and measurements.
+
+    The initial simplification leaves all six cubes below. Both classes
+    cut on ``d``; the during-step class also cuts on ``a`` and ``b`` before
+    subsumption can remove the needed inputs. These calls use the default
+    ``max_pair_checks=500``:
+
+    >>> from logic1.theories.RCF import VV
+    >>> a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
+    >>> f = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
+    ...        And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
+    ...        And(d > 0, e > 0), And(d <= 0, e > 0))
+    >>> normal_form = AfterStepSimplifyingCartesianBooleanNormalForm()
+    >>> len(normal_form.simplify(f.to_pnf()).args)
+    6
+    >>> for clause in normal_form.dnf(f).args:
+    ...     print(clause)
+    e > 0
+    c > 0 and b <= 0
+    c > 0 and b > 0 and a <= 0
+    c > 0 and a > 0
+    >>> DuringStepSimplifyingCartesianBooleanNormalForm().dnf(f)
+    Or(e > 0, c > 0)
+
+    A small grid shows how the semantic pair budget affects result quality.
+    Initial simplification retains all 36 cubes. Larger budgets find more
+    implications. The output columns are budget, cubes, and atoms. The
+    larger 400-cube experiment is recorded in ``doc/notes/RCF/dnf.md``:
+
+    >>> x, y = VV.get('x', 'y')
+    >>> g = Or(*(And(x > i, y > j) for i in range(6) for j in range(6)))
+    >>> len(normal_form.simplify(g.to_pnf()).args)
+    36
+    >>> BNF = AfterStepSimplifyingCartesianBooleanNormalForm
+    >>> for checks in (10, 30, None):
+    ...     result = BNF(max_pair_checks=checks).dnf(g)
+    ...     cubes = len(result.args) if isinstance(result, Or) else 1
+    ...     print(checks, cubes, len(list(result.atoms())))
+    10 31 62
+    30 19 38
+    None 1 2
+    """
+
+    def _strict_dnf(self, f: AndOr) -> StrictDNF:
+        """Reduce a node after constructing its full Cartesian result.
+
+        The inherited construction calls ``self._strict_dnf`` for children,
+        so each child is reduced before the parent is expanded.
+        """
+        strict_dnf = super()._strict_dnf(f)
+        if isinstance(f, (AtomicFormula, _T, _F)):
+            return strict_dnf
+        return self._reduce_strict_dnf(strict_dnf)
+
+
+class DuringStepSimplifyingCartesianBooleanNormalForm(SimplifyingCartesianBooleanNormalForm):
+    """Reduce cubes as they are produced by Cartesian distribution.
+
+    The inherited DNF computation first prenexes and simplifies the input.
+    Its matrix contains only ``And``, ``Or``, truth values, and atomic
+    relations against zero. A strict DNF is a set of cubes, each a
+    frozenset of atoms interpreted as a conjunction.
+
+    At an ``Or`` node, insert child cubes into a running result and stop
+    if the empty cube makes it true. At an ``And`` node, fold in child
+    DNFs one at a time. Each pair of cubes produces a union of atoms;
+    normalize it when both factors are nonempty, then try to insert it
+    into the next result. Stop if that result becomes false. Cube
+    normalization intersects the allowed signs of relations on the same
+    polynomial and rejects contradictions. Insertion removes structurally
+    subsumed cubes and repeatedly merges cubes that differ in one relation
+    on the same polynomial. These recursive steps use no RCF validity
+    checks. Cube traversal and greedy comparison choices follow
+    :meth:`_cube_key`, independent of Python set iteration order.
+
+    After construction, a semantic pass examines at most
+    ``max_pair_checks`` cube pairs (500 by default; zero skips the pass;
+    ``None`` is unbounded). It checks implications first by exact atoms
+    and sign masks, then by RCF simplification under assumptions. The
+    resulting DNF is converted to a formula and conservatively
+    simplified. Inherited CNF computation uses the DNF of the negation.
+
+    Early insertion can avoid storing a full local Cartesian product when
+    many cubes collapse, and can stop on ``T`` or ``F`` during recursion.
+    Its repeated subset and merge checks can also cost time. Greedy
+    deletion can prevent a later cut, so minimality is not guaranteed.
+    On the 13 motor series it produced the same strict DNFs as
+    :class:`AfterStepSimplifyingCartesianBooleanNormalForm`, with no
+    consistent timing advantage. See ``doc/notes/RCF/dnf.md``.
+
+    In the following input, the initial simplification retains six cubes.
+    Both classes cut on ``d``. Early insertion also cuts on ``a`` and then
+    ``b``, producing a cube that subsumes the remaining ``c`` cube. The
+    completed-subtree class subsumes an input to those cuts first. Both
+    calls use the default ``max_pair_checks=500``:
+
+    >>> from logic1.theories.RCF import VV
+    >>> a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
+    >>> f = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
+    ...        And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
+    ...        And(d > 0, e > 0), And(d <= 0, e > 0))
+    >>> normal_form = DuringStepSimplifyingCartesianBooleanNormalForm()
+    >>> len(normal_form.simplify(f.to_pnf()).args)
+    6
+    >>> normal_form.dnf(f)
+    Or(e > 0, c > 0)
+    >>> other = AfterStepSimplifyingCartesianBooleanNormalForm()
+    >>> for clause in other.dnf(f).args:
+    ...     print(clause)
+    e > 0
+    c > 0 and b <= 0
+    c > 0 and b > 0 and a <= 0
+    c > 0 and a > 0
+
+    A small grid of polynomial constraints shows how the semantic pair
+    budget affects result quality. Initial simplification retains all 36 cubes;
+    distinct polynomials also prevent structural subsumption. Higher
+    budgets find more semantic implications. The output columns are budget,
+    cubes, and atoms. The larger 400-cube experiment is recorded in
+    ``doc/notes/RCF/dnf.md``:
+
+    >>> x, y = VV.get('x', 'y')
+    >>> g = Or(*(And(x > i, y > j) for i in range(6) for j in range(6)))
+    >>> len(normal_form.simplify(g.to_pnf()).args)
+    36
+    >>> BNF = DuringStepSimplifyingCartesianBooleanNormalForm
+    >>> for checks in (10, 30, None):
+    ...     result = BNF(max_pair_checks=checks).dnf(g)
+    ...     cubes = len(result.args) if isinstance(result, Or) else 1
+    ...     print(checks, cubes, len(list(result.atoms())))
+    10 31 62
+    30 19 38
+    None 1 2
+    """
+
     def _strict_dnf(self, f: AndOr) -> StrictDNF:
         """Distribute recursively, reducing each intermediate strict DNF.
         """
@@ -347,91 +518,6 @@ class SimplifyingCartesianBooleanNormalForm(CartesianBooleanNormalForm):
         raise ValueError(f"Unexpected formula type: {type(f)}")
 
 
-class SubtreeSimplifyingCartesianBooleanNormalForm(SimplifyingCartesianBooleanNormalForm):
-    """Reduce each subtree after its local Cartesian expansion is complete.
-
-    Recursion returns reduced strict DNFs for the children. An ``Or`` node
-    first unions their cubes; an ``And`` node first forms their full
-    Cartesian product. Only after that node's raw strict DNF exists does
-    this class simplify each cube and insert it into a reduced set.
-    Inherited rules combine relations on the same polynomial, reject
-    contradictory cubes, remove structural subsumption, and repeatedly
-    merge cubes differing in one relation. As in the parent class, the
-    final semantic pass examines at most ``max_pair_checks`` cube pairs.
-    The reduced strict DNF is converted to a formula and conservatively
-    simplified. Cube traversal and inherited insertion use the same stable
-    key as the parent class. Inherited CNF computation uses the DNF of the
-    negation.
-
-    This ordering matches the placement of Redlog's recursive
-    simplification, though the rules used here are different. It avoids
-    reducing partial products during an ``And`` node's expansion and gives
-    each node a simpler reduction schedule. The complete local
-    product must be stored before redundant or contradictory cubes are
-    removed, which can increase peak memory and construction time. On
-    the 13 motor series it gave exactly the same strict DNFs as the
-    parent class; one-call timings gave neither method a clear advantage.
-    See ``doc/notes/RCF/dnf.md`` for the rules and measurements.
-
-    The initial simplification leaves all six cubes below. Both classes
-    cut on ``d``; the parent class also cuts on ``a`` and ``b`` before
-    subsumption can remove the needed inputs. These calls use the default
-    ``max_pair_checks=500``:
-
-    >>> from logic1.theories.RCF import VV
-    >>> a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
-    >>> f = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
-    ...        And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
-    ...        And(d > 0, e > 0), And(d <= 0, e > 0))
-    >>> normal_form = SubtreeSimplifyingCartesianBooleanNormalForm()
-    >>> len(normal_form.simplify(f.to_pnf()).args)
-    6
-    >>> for clause in normal_form.dnf(f).args:
-    ...     print(clause)
-    e > 0
-    c > 0 and b <= 0
-    c > 0 and b > 0 and a <= 0
-    c > 0 and a > 0
-    >>> SimplifyingCartesianBooleanNormalForm().dnf(f)
-    Or(e > 0, c > 0)
-
-    The same grid shows the quality and cost of the semantic pair budget
-    for this class. Initial simplification retains all 400 cubes. On one
-    machine, budgets 100, 500, and unbounded took about 0.5, 0.9, and
-    1.1 seconds, respectively. The unbounded pass examines 760 cube
-    pairs. The output columns are budget, cubes, and atoms:
-
-    >>> x, y = VV.get('x', 'y')
-    >>> g = Or(*(And(x > i, y > j) for i in range(20) for j in range(20)))
-    >>> len(normal_form.simplify(g.to_pnf()).args)
-    400
-    >>> BNF = SubtreeSimplifyingCartesianBooleanNormalForm
-    >>> for checks in (100, 500, None):
-    ...     result = BNF(max_pair_checks=checks).dnf(g)
-    ...     cubes = len(result.args) if isinstance(result, Or) else 1
-    ...     print(checks, cubes, len(list(result.atoms())))
-    100 341 682
-    500 141 282
-    None 1 2
-    """
-
-    def _strict_dnf(self, f: AndOr) -> StrictDNF:
-        """Reduce a node after constructing its full Cartesian result.
-
-        The base method calls ``self._strict_dnf`` for its children, so each
-        child has already been reduced before the parent is expanded.
-        """
-        strict_dnf = CartesianBooleanNormalForm._strict_dnf(self, f)
-        if isinstance(f, (AtomicFormula, _T, _F)):
-            return strict_dnf
-        result: StrictDNF = set()
-        for cube in sorted(strict_dnf, key=self._cube_key):
-            simplified = self._simplify_cube(cube)
-            if simplified is not None:
-                self._insert(result, simplified)
-        return result
-
-
 class PyedaBooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Variable, Number]):
     """Implements the abstract methods :meth:`simplify
     <.abc.bnf.BooleanNormalForm.simplify>` and :meth:`final_simplify
@@ -458,49 +544,57 @@ class PyedaBooleanNormalForm(abc.bnf.BooleanNormalForm[AtomicFormula, Term, Vari
         return self.conservative_simplify(f)
 
 
-_cartesian_bnf = CartesianBooleanNormalForm()
-
-_pyeda_bnf = PyedaBooleanNormalForm()
-"""One instance of the PyedaBooleanNormalForm class used for both CNF and DNF
-computations.
-"""
-
-
-def cnf(f: Formula,
-        method: Literal["cartesian", "cartesian-simplified",
-                        "cartesian-subtree-simplified", "pyeda"] = "pyeda",
-        *, max_pair_checks: int | None = 500) -> Formula:
-    """Compute a CNF. The limit applies to the simplified Cartesian methods.
+def _normal_form(method: Literal["cartesian", "pyeda"], simplification: Simplification | int,
+                 max_pairs: int | None) -> CartesianBooleanNormalForm | PyedaBooleanNormalForm:
+    """Select the algorithm and validate its simplification schedule.
     """
-    if method == "cartesian-simplified":
-        return SimplifyingCartesianBooleanNormalForm(max_pair_checks=max_pair_checks).cnf(f)
-    if method == "cartesian-subtree-simplified":
-        return SubtreeSimplifyingCartesianBooleanNormalForm(max_pair_checks=max_pair_checks).cnf(f)
-    if max_pair_checks != 500:
-        raise ValueError("Simplification limits require a simplified Cartesian method")
-    if method == "cartesian":
-        return _cartesian_bnf.cnf(f)
-    if method == "pyeda":
-        return _pyeda_bnf.cnf(f)
-    else:
+    if isinstance(simplification, bool) or not isinstance(simplification, int):
+        raise TypeError("simplification must be a Simplification member or an integer")
+    schedule = Simplification(simplification)
+    if method not in ("cartesian", "pyeda"):
         raise ValueError(f"Unknown method: {method}")
+    if schedule is Simplification.NONE:
+        if max_pairs != 500:
+            raise ValueError("Comparison limits require a simplification schedule other than NONE")
+        return CartesianBooleanNormalForm() if method == "cartesian" else PyedaBooleanNormalForm()
+    if method != "cartesian":
+        raise ValueError("Simplification schedules are not supported by the pyeda method")
+    classes = {
+        Simplification.FINAL: FinalSimplifyingCartesianBooleanNormalForm,
+        Simplification.AFTER_STEP: AfterStepSimplifyingCartesianBooleanNormalForm,
+        Simplification.DURING_STEP: DuringStepSimplifyingCartesianBooleanNormalForm}
+    return classes[schedule](max_pair_checks=max_pairs)
 
 
-def dnf(f: Formula,
-        method: Literal["cartesian", "cartesian-simplified",
-                        "cartesian-subtree-simplified", "pyeda"] = "pyeda",
-        *, max_pair_checks: int | None = 500) -> Formula:
-    """Compute a DNF. The limit applies to the simplified Cartesian methods.
+def cnf(f: Formula, method: Literal["cartesian", "pyeda"] = "pyeda",
+        *, simplification: Simplification | int = Simplification.NONE,
+        max_pair_checks: int | None = 500) -> Formula:
+    """Compute a CNF with the selected algorithm and simplification schedule.
+
+    See :func:`dnf` for the schedules and semantic comparison budget.
     """
-    if method == "cartesian-simplified":
-        return SimplifyingCartesianBooleanNormalForm(max_pair_checks=max_pair_checks).dnf(f)
-    if method == "cartesian-subtree-simplified":
-        return SubtreeSimplifyingCartesianBooleanNormalForm(max_pair_checks=max_pair_checks).dnf(f)
-    if max_pair_checks != 500:
-        raise ValueError("Simplification limits require a simplified Cartesian method")
-    if method == "cartesian":
-        return _cartesian_bnf.dnf(f)
-    if method == "pyeda":
-        return _pyeda_bnf.dnf(f)
-    else:
-        raise ValueError(f"Unknown method: {method}")
+    return _normal_form(method, simplification, max_pair_checks).cnf(f)
+
+
+def dnf(f: Formula, method: Literal["cartesian", "pyeda"] = "pyeda",
+        *, simplification: Simplification | int = Simplification.NONE,
+        max_pair_checks: int | None = 500) -> Formula:
+    """Compute a DNF, preserving a quantifier prefix when present.
+
+    ``simplification`` accepts a :class:`Simplification` member or its integer
+    value. ``NONE`` preserves ordinary Cartesian construction. ``FINAL``
+    reduces the complete strict DNF once; ``AFTER_STEP`` reduces after each
+    Boolean node; ``DURING_STEP`` reduces during its construction. These
+    schedules are currently supported only by ``method="cartesian"``.
+
+    ``max_pair_checks`` limits the final semantic pass for the three
+    simplifying schedules: 500 by default, zero to disable, or ``None`` for
+    no limit. Other schedules require its default value. All methods retain
+    ordinary preprocessing and conservative final simplification.
+
+    >>> from logic1.theories.RCF import VV
+    >>> x = VV['x']
+    >>> dnf(x > 0, method="cartesian", simplification=Simplification.FINAL)
+    x > 0
+    """
+    return _normal_form(method, simplification, max_pair_checks).dnf(f)

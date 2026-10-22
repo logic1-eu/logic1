@@ -136,7 +136,7 @@ example; unrestricted saturation has no general space guarantee.
 
 ## Recursive simplification strategy
 
-The two simplified Cartesian methods separate inexpensive atomic
+The two recursive simplifying schedules separate inexpensive atomic
 subsumption and cut during recursive DNF construction from a final
 semantic subsumption pass. They keep the strict DNF as a set of
 frozenset cubes and work with six polynomial relations against zero.
@@ -156,7 +156,7 @@ A full mask removes the polynomial constraint. These operations use
 only equality of normalized polynomials and bitwise operations. They
 do not invoke a general RCF validity test.
 
-`SimplifyingCartesianBooleanNormalForm` inserts cubes into a running
+`DuringStepSimplifyingCartesianBooleanNormalForm` inserts cubes into a running
 strict DNF at each `Or` node. At each `And` node, it multiplies child
 DNFs one at a time, with insertion after each product. Insertion removes a
 structurally subsumed cube or merges two cubes as above; new merge
@@ -165,7 +165,7 @@ can discard a cube that might have supported a later cut, as shown in
 "Order and iteration" above. It keeps the algorithm and its storage
 small, but does not promise a minimal DNF.
 
-`SubtreeSimplifyingCartesianBooleanNormalForm` uses the same atomic
+`AfterStepSimplifyingCartesianBooleanNormalForm` uses the same atomic
 rules but finishes the local Cartesian expansion of each `And` or `Or`
 node before reducing its cubes. Its recursive calls return already
 reduced child DNFs. This matches the placement of Redlog's
@@ -196,12 +196,84 @@ The default was chosen after measuring the 13 motor series: a larger limit made
 the previous final-stage search exceed 30 seconds, while 500 checks
 preserved the main semantic gains in the recursive method.
 
-Both classes are in `RCF/bnf.py`. The public `dnf` and `cnf` functions
-select them with `method="cartesian-simplified"` and
-`method="cartesian-subtree-simplified"`, respectively; `cnf` uses the
-DNF of the negated input. The base Cartesian implementation remains
-available with `method="cartesian"`. The former witness pool and general
-pairwise validity-cut search are not part of either simplified method.
+### Interface and schedules (2026-10-22)
+
+The public `dnf` and `cnf` functions separate the algorithm, selected with
+`method="cartesian"` or `method="pyeda"`, from the simplification schedule.
+`Simplification` is exported by `logic1.theories.RCF` and has these values:
+
+| Member | Value | DNF-specific reductions |
+| --- | ---: | --- |
+| `NONE` | 0 | None; preserve ordinary preprocessing and conservative final simplification |
+| `FINAL` | 1 | Reduce the complete strict DNF once |
+| `AFTER_STEP` | 2 | Reduce each completed Boolean node |
+| `DURING_STEP` | 3 | Reduce cubes and partial products while constructing each node |
+
+A step constructs the DNF at one `And` or `Or` node. The integer values
+identify schedules, not increasing guarantees of quality or speed. `NONE`
+is the default. Nonzero schedules currently require `method="cartesian"`;
+unsupported combinations are rejected. Plain Cartesian construction remains
+useful because the recursive reductions can cost time without reducing the
+result. `FINAL` provides the previously missing experiment: plain recursive
+construction followed by one dedicated reduction of the completed strict DNF.
+
+`SimplifyingCartesianBooleanNormalForm` is the shared base for
+`FinalSimplifyingCartesianBooleanNormalForm`,
+`AfterStepSimplifyingCartesianBooleanNormalForm`, and
+`DuringStepSimplifyingCartesianBooleanNormalForm`. It provides the reduction
+rules, deterministic ordering, and bounded final semantic pass. The final-only
+class inherits plain Cartesian recursion and extends the final pass with cube
+normalization, structural subsumption, and cut. The other classes select the
+placement of those reductions through `_strict_dnf`. They are siblings;
+after-step no longer inherits the during-step construction algorithm.
+
+All three simplifying schedules use `max_pair_checks=500` for final semantic
+subsumption; zero skips that pass and `None` removes the limit. `NONE` and
+PyEDA require the default budget because neither uses this pass. CNF uses the
+DNF of the negation. The former witness pool and general pairwise validity-cut
+search are not part of these implementations.
+
+In the measurements below, **early** means `DURING_STEP` and **subtree** means
+`AFTER_STEP`. Those historical labels and dates are retained when describing
+the original experiments. The benchmark modules use the current schedule
+names for new measurements.
+
+### Large semantic-budget illustration
+
+The former class doctests used a 20-by-20 grid with 400 cubes to demonstrate
+the effect of budgets below, at, and above the default of 500:
+
+```python
+from logic1.firstorder import And, Or
+from logic1.theories.RCF import VV
+from logic1.theories.RCF.bnf import AfterStepSimplifyingCartesianBooleanNormalForm
+
+x, y = VV.get('x', 'y')
+g = Or(*(And(x > i, y > j) for i in range(20) for j in range(20)))
+for checks in (100, 500, None):
+    result = AfterStepSimplifyingCartesianBooleanNormalForm(max_pair_checks=checks).dnf(g)
+    cubes = len(result.args) if isinstance(result, Or) else 1
+    print(checks, cubes, len(list(result.atoms())))
+```
+
+Initial simplification retains all 400 cubes, and distinct polynomials prevent
+structural subsumption. Both recursive schedules gave these recorded results:
+
+| Pair budget | Result cubes | Result atoms |
+| --- | ---: | ---: |
+| 100 | 341 | 682 |
+| 500 | 141 | 282 |
+| `None` | 1 | 2 |
+
+The unbounded pass examined 760 pairs. Previously recorded standalone call
+times were approximately 0.5, 0.9, and 1.1 seconds, respectively. These are
+historical measurements, not performance expectations. Under the parallel
+regular test suite, each class doctest was reported at roughly four seconds.
+
+On 2026-10-22, the executable class doctests were reduced to a 6-by-6 grid
+with budgets 10, 30, and unbounded. They retain a meaningful quality comparison
+(31, 19, and one result cube), while keeping the larger experiment here,
+outside the regular test suite.
 
 ## Motor-series comparison
 
@@ -213,7 +285,7 @@ changed from 2100 to 2116 atom occurrences; the other counts stayed the
 same. These inputs provide no evidence that inserting cubes during product
 generation improves the result over reducing each completed subtree.
 
-The latest full run used one timed call per case. The subtree method was
+The 2026-10-21 full run used one timed call per case. The subtree method was
 faster on six series and slower on seven. On the largest case, series12,
 early insertion took 8.735 seconds and subtree reduction took 8.174
 seconds. The preceding run measured 7.845 and 8.071 seconds respectively,
@@ -221,6 +293,30 @@ illustrating run-to-run variation. These measurements do not establish a
 reliable speed advantage for either method. Peak memory use was not
 measured; completing a local product before reduction can require a larger
 temporary set, and sorting cube sets creates temporary lists.
+
+### Final-only comparison on 2026-10-22
+
+The four Cartesian schedules were measured on all 13 motor inputs, alongside
+Redlog off and on; PyEDA was excluded. All 78 cases completed within their
+30-second computation limits. Final-only, after-step, and during-step
+returned identical final atom counts on every motor input. Their total
+single-call computation times were 49.111, 50.262, and 50.900 seconds,
+respectively, compared with 21.102 seconds for plain Cartesian construction.
+For series12, plain Cartesian returned 4560 atoms, while every simplifying
+schedule returned 2116. The module docstring of `test_dnf_motor.py` records
+all result sizes and times. The earlier strict-DNF equality checks above
+concern the two recursive schedules; this run compared final atom counts.
+
+### SMT-LIB comparison on 2026-10-22
+
+On the eight SMT-LIB inputs, all three simplifying schedules returned the
+same atom counts for every completed main case. On sumcracker-14e, plain
+Cartesian returned 34,816 atoms in 14.397 seconds, while all three simplifying
+schedules and both Redlog configurations exceeded 30 seconds. Thus the
+final-only schedule also fails to improve this input within the main time
+limit. No result size was obtained for those timed-out computations.
+The separate 60-second budget experiments described in the SMT-LIB notes
+concern the two recursive schedules and were not rerun for this refactoring.
 
 ## Implementation and maintenance trade-offs
 
@@ -236,14 +332,14 @@ Subtree reduction has a shorter construction method: build a node's
 strict DNF, then reduce its cubes. It follows Redlog's simplification
 placement and is easier to explain. It must, however, materialize the
 complete local product, including cubes that reduction will discard.
-The current subclass inherits the reduction helpers from the early
-class and explicitly calls `CartesianBooleanNormalForm._strict_dnf`.
-That call recursively dispatches back to the subclass, which makes the
-inheritance less obvious than the algorithm itself. If subtree reduction
-were the only method, it could instead be a direct subclass of
-`CartesianBooleanNormalForm` with those helpers moved into it. Removing
-subtree is the smaller immediate edit; retaining subtree alone would
-remove the longer early construction method after that refactoring.
+Before the 2026-10-22 refactoring, the subtree subclass inherited the
+reduction helpers from the early class and explicitly called
+`CartesianBooleanNormalForm._strict_dnf`. That call recursively dispatched
+back to the subtree subclass. The current sibling classes instead inherit
+the helpers from a shared base; after-step uses `super()._strict_dnf`.
+If only one simplifying schedule is eventually retained, its helpers could
+be moved into that subclass. While comparing three schedules, the shared
+base keeps each construction algorithm separate without duplicating rules.
 
 The six-cube example in the class docstrings gives two cubes with early
 insertion and four with subtree reduction, both at the default
@@ -251,11 +347,12 @@ insertion and four with subtree reduction, both at the default
 quality, but does not establish that early insertion always gives the
 smaller DNF. The motor series give equal strict DNFs and no clear
 timing winner. The implementations share reduction helpers, so keeping
-both adds little duplicate core code. It does require two public method
-names and corresponding documentation, tests, and benchmarks.
+both adds little duplicate core code. It does require separate schedules
+and corresponding documentation, tests, and benchmarks.
 
-The present evidence does not justify maintaining both as permanent
-public methods. If one method is chosen chiefly for comprehensibility
+The historical evidence does not justify maintaining both as permanent
+public schedules. Final-only is now included in the comparison before
+choosing which schedules to retain. If one method is chosen chiefly for comprehensibility
 and maintenance, subtree reduction is simpler. Because large formulas
 and DNF growth are central here, peak memory should be measured on
 inputs with large local products before removing early insertion.

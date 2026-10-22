@@ -8,21 +8,30 @@ Boolean Normal Forms
 
 .. automodule:: logic1.theories.RCF.bnf
 
-  .. function:: cnf(f, method='pyeda', *, max_pair_checks=500)
-                dnf(f, method='pyeda', *, max_pair_checks=500)
+  .. function:: cnf(f, method='pyeda', *, simplification=Simplification.NONE, max_pair_checks=500)
+                dnf(f, method='pyeda', *, simplification=Simplification.NONE, max_pair_checks=500)
 
     Compute a conjunctive or disjunctive normal form of ``f``. If ``f`` contains
     quantifiers, then the result is an equivalent prenex normal form whose
     matrix is in CNF or DNF, respectively.
 
-    ``method`` is ``'pyeda'`` (the default), ``'cartesian'``,
-    ``'cartesian-simplified'``, or ``'cartesian-subtree-simplified'``. The two
-    simplified Cartesian methods use the same atomic rules and final semantic
-    subsumption. The former reduces cubes as they are generated; the latter
-    reduces each completed subtree after its local Cartesian expansion.
-    ``max_pair_checks`` bounds the final semantic comparisons; zero skips
-    them, and ``None`` removes the limit. Recursive atomic simplification
-    always runs. The limit applies to both simplified Cartesian methods.
+    ``method`` is ``'pyeda'`` (the default) or ``'cartesian'``. The separate
+    ``simplification`` option accepts a :class:`Simplification` member or its
+    integer value. The default, ``NONE`` (0), retains ordinary preprocessing
+    and conservative final simplification without additional DNF reductions.
+    The other schedules are currently supported only by ``'cartesian'``:
+
+    * ``FINAL`` (1): reduce the complete strict DNF once.
+    * ``AFTER_STEP`` (2): reduce each completed Boolean node.
+    * ``DURING_STEP`` (3): reduce cubes and partial products during construction
+      at each Boolean node.
+
+    These schedules share atomic rules and final semantic subsumption; larger
+    integer values do not guarantee better or faster results.
+    ``max_pair_checks`` bounds the final semantic comparisons for these three
+    schedules: 500 by default, zero to skip them, and ``None`` for no limit.
+    It does not bound atomic reductions or Cartesian construction. Unsupported
+    combinations of algorithms and schedules raise an exception.
 
     .. rubric:: Some examples
 
@@ -75,7 +84,7 @@ Boolean Normal Forms
 
       :ref:`Simplification <api-RCF-simplify>`
         for the RCF simplifier used before and after normal form construction,
-        and for final semantic subsumption in the new method.
+        and for final semantic subsumption in the simplifying schedules.
 
       ``doc/notes/RCF/dnf.md``
         for the strict DNF simplification rules and their growth limits.
@@ -90,10 +99,19 @@ Boolean Normal Forms
   .. autoclass:: CartesianBooleanNormalForm
     :exclude-members: __init__, __new__
 
+  .. autoclass:: Simplification
+    :members:
+
   .. autoclass:: SimplifyingCartesianBooleanNormalForm
     :exclude-members: __new__
 
-  .. autoclass:: SubtreeSimplifyingCartesianBooleanNormalForm
+  .. autoclass:: FinalSimplifyingCartesianBooleanNormalForm
+    :exclude-members: __new__
+
+  .. autoclass:: AfterStepSimplifyingCartesianBooleanNormalForm
+    :exclude-members: __new__
+
+  .. autoclass:: DuringStepSimplifyingCartesianBooleanNormalForm
     :exclude-members: __new__
 
   .. autoclass:: PyedaBooleanNormalForm

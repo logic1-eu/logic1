@@ -1,6 +1,6 @@
 # SMT-LIB DNF benchmark notes
 
-Updated: 2026-10-21
+Updated: 2026-10-22
 
 This document covers `benchmarks/theories/RCF/smtlib/` and all its descendants,
 including `inputs/`, excluding sibling benchmark directories. It records
@@ -77,14 +77,15 @@ numbers, and every comparison `left OP right` becomes the equivalent
 accept some Ultimate variable names containing `.`
 and `~`; those names are renamed bijectively to safe names. Logic1 flattens
 adjacent operators of the same kind when building `And` and `Or`. The same
-resulting Logic1 formula is supplied to all five methods.
+resulting Logic1 formula is supplied to all configurations.
 
-The benchmark compares Redlog DNF with both `bnfsac` and `bnfsm` off or on,
-Logic1's Cartesian method, its early simplified Cartesian method,
-and its completed-subtree simplified Cartesian method. The two simplified
-methods use the default `max_pair_checks=500`. All three Cartesian methods
-now simplify their input with `explode_always=False, substitute=1` before
-constructing the DNF.
+The main comparison has six configurations: Redlog DNF with both `bnfsac`
+and `bnfsm` off or on, and `method="cartesian"` with `Simplification.NONE`,
+`FINAL`, `AFTER_STEP`, or `DURING_STEP`. The default `NONE` retains ordinary
+preprocessing and conservative final simplification. Other schedules use
+`max_pair_checks=500`. Every Cartesian schedule preprocesses with
+`explode_always=False, substitute=1`. In the historical measurements, early
+means `DURING_STEP` and subtree means `AFTER_STEP`.
 Each main-comparison case starts a fresh worker, times one call, and enforces
 a 30-second wall limit on that call. It counts output atoms after timing.
 Worker startup, SMT-LIB parsing, and output counting are outside the measured
@@ -104,11 +105,33 @@ docstring of `test_dnf_smtlib.py`. Atom counts describe result size; this
 benchmark does not perform a separate equivalence check. This historical
 40-case run precedes the supplementary cases described below.
 
+## Four-schedule comparison on 2026-10-22
+
+The main six-configuration comparison plus the additional levin-rhsc case
+ran 49 computations. There were 44 results and five 30-second computation
+timeouts: Redlog off and on, `FINAL`, `AFTER_STEP`, and `DURING_STEP`, all on
+sumcracker-14e. Plain Cartesian (`NONE`) returned 34,816 atoms for that input
+in 14.397 seconds. Every other main case completed, and all three simplifying
+schedules agreed on the atom counts of their completed results. The new
+final-only schedule did not improve those counts over recursive reduction.
+
+The additional levin-rhsc computation again returned 16 atoms with initial
+implicit ranges disabled (0.203 seconds), compared with 88 for DURING_STEP
+with the default setting (0.293 seconds). The module docstring records the
+new size and timing tables and this additional comparison. `t/o` abbreviates
+a computation timeout in the main tables; its result size is unknown.
+
+The run took 359.02 seconds including worker startup and counting. Saved
+measurements are in `/tmp/logic1-smtlib-schedules-2026-10-22.json`; the log
+is `/tmp/logic1-smtlib-schedules-2026-10-22.log`. The historical PyEDA and
+pair-budget measurements below were retained without recomputation. Only
+their schedule labels and invocation examples were updated to the new API.
+
 ## Supplementary experiments
 
 ### Initial implicit ranges on levin-rhsc
 
-The additional case uses early (`method="cartesian-simplified"`) with
+The additional case uses `method="cartesian"` and `Simplification.DURING_STEP`, with
 `implicit_ranges=False` only during initial simplification. It uses a
 temporary replacement of `CartesianBooleanNormalForm.simplify` inside the
 worker and restores it afterwards. Semantic implication checks and final
@@ -153,13 +176,39 @@ A separate run on 2026-10-21 measured `method="pyeda"` with default options
 and a 30-second computation limit on all eight inputs. All eight completed.
 The module docstring contains an informational table of their atom counts
 and times. These are not benchmark cases implemented in this file and do
-not extend its five-method main comparison. In particular, PyEDA returned
+not extend its main comparison. In particular, PyEDA returned
 28,520 atoms for half-2 in 12.573 seconds and 34,816 for sumcracker-14e in
 15.338 seconds.
 
 ## Collection and commands
 
-The file currently collects 67 cases: 40 main comparisons, one additional
+### Latest validation and regular-test conventions
+
+The schedule API and class refactoring passed the Sage commit-readiness
+checks on 2026-10-22: 660 regular tests, 13 API documentation tests, and
+the source and stub mypy checks. Both changed DNF benchmark modules also
+passed mypy with `--disallow-untyped-defs`. These checks do not establish
+Flint compatibility; that backend was not checked in this validation round.
+
+The expensive 400-cube semantic-budget doctests have been replaced by
+36-cube examples that still show improvements with increasing budgets.
+Both recursive class doctests took 0.24 seconds in the focused run, which
+passed 57 tests in 0.65 seconds. The larger experiment remains documented
+in `doc/notes/RCF/dnf.md`, outside the regular test suite.
+
+The historical PyEDA measurements and 60-second pair-budget sweeps were not
+rerun for documentation or naming changes. The five sumcracker-14e timeouts
+in the latest 49-case comparison remain recorded as timeouts with unknown
+result sizes. No larger timeout was used to replace those observations.
+
+An intermittent mypy inference error involving `logic1.__all__` remains a
+separate unresolved issue. Backend switching and cache reuse are suspected,
+but no cache-isolation or annotation fix has been applied. The latest Sage
+checks passed without reproducing it.
+
+### Collection and execution
+
+The file currently collects 75 cases: 48 main comparisons, one additional
 levin-rhsc case, and 26 pair-budget cases (13 budgets for each of two methods).
 The module docstring keeps the main size and timing tables, supplementary
 experiments, and informational PyEDA results separate. They record individual
@@ -167,23 +216,23 @@ measurements, not averaged performance estimates. Reuse these measurements
 for presentation changes; preserve each run's date, options, and time limit.
 
 Run from the repository root. Select the main comparison and additional
-levin-rhsc case (41 cases) with:
+levin-rhsc case (49 cases) with:
 
 ```bash
 pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py::test_dnf_smtlib --benchmark-only
 ```
 
-Compare only the two early levin-rhsc cases with:
+Compare only the two DURING_STEP levin-rhsc cases with:
 
 ```bash
-pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k levin-rhsc-early --benchmark-only
+pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k levin-rhsc-during-step --benchmark-only
 ```
 
 Run each doubling sweep separately, stopping at its first timeout:
 
 ```bash
-pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k 'pair_checks and early and not 0-' --benchmark-only --exitfirst
-pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k 'pair_checks and subtree and not 0-' --benchmark-only --exitfirst
+pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k 'pair_checks and during-step and not 0-' --benchmark-only --exitfirst
+pytest benchmarks/theories/RCF/smtlib/test_dnf_smtlib.py -k 'pair_checks and after-step and not 0-' --benchmark-only --exitfirst
 ```
 
 Run the zero-budget controls separately:

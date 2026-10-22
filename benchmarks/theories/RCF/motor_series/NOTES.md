@@ -1,6 +1,6 @@
 # Motor Series Benchmark Notes
 
-Updated: 2026-10-21
+Updated: 2026-10-22
 
 This document covers `benchmarks/theories/RCF/motor_series/` and all its
 descendants, excluding sibling benchmark directories. It records provenance,
@@ -125,15 +125,22 @@ The measured `simplify` output atom counts are:
 
 ## DNF benchmark
 
-`test_dnf_motor.py` has 78 cases: every motor series is run with `redlog.dnf`
-using `bnfsac=False, bnfsm=False`, with `redlog.dnf` using both options set to
-`True`, with `RCF.bnf.dnf(method="cartesian")`, with
-`RCF.bnf.dnf(method="cartesian-simplified")`, with
-`RCF.bnf.dnf(method="cartesian-subtree-simplified")`, and with
-`RCF.bnf.dnf(method="pyeda")`, in that order. Each configuration has its own
-13-row benchmark group. The first table in the module docstring records these
-input and result atom counts from the full run; the second records computation
-times in seconds:
+`test_dnf_motor.py` now has 91 cases: Redlog off and on; Cartesian with
+`Simplification.NONE`, `FINAL`, `AFTER_STEP`, and `DURING_STEP`; and PyEDA,
+each on 13 inputs. The default `NONE` schedule reproduces plain Cartesian
+behavior. The other schedules share the atomic rules and a final semantic
+budget of 500 pairs. Every configuration has its own 13-row benchmark group.
+
+The schedule comparison on 2026-10-22 excluded all 13 PyEDA cases at the
+user's request and passed all 78 remaining cases. The module docstring has
+current input/result atom counts and computation times, plus a separate
+historical PyEDA table. Its PyEDA values were not recomputed.
+The PyEDA table now includes all 13 recorded input atom counts, checked
+against the main table. This presentation change
+did not recompute PyEDA results or times.
+
+The following table preserves the six-configuration results from 2026-10-21.
+Here early corresponds to `DURING_STEP`, and subtree to `AFTER_STEP`:
 
 | Series | Input | Redlog off | Redlog on | Cartesian | Early | Subtree | PyEDA |
 |---:|---:|---:|---:|---:|---:|---:|---:|
@@ -229,6 +236,72 @@ contains the corresponding SMT-LIB experiment. Temporary files are local
 artifacts and may disappear; the recorded findings do not depend on retaining
 them. The observed motor result sizes support keeping `implicit_ranges=True`.
 
+### Four simplification schedules (2026-10-22)
+
+The new `FINAL` schedule constructs the strict DNF without recursive
+reductions, then normalizes cubes and applies structural subsumption and cut
+once before final semantic subsumption. The after-step and during-step
+implementations now inherit their helpers from a shared base, rather than
+from each other. Existing recursive algorithms retain their reduction order.
+
+`FINAL`, `AFTER_STEP`, and `DURING_STEP` returned the same final atom counts
+on every motor input. Totals of the 13 single-call computation times were
+49.111, 50.262, and 50.900 seconds, respectively; `NONE` took 21.102 seconds.
+These measurements do not establish a consistent speed advantage. For
+series12, `NONE` returned 4560 atoms in 5.828 seconds, while `FINAL` returned
+2116 in 7.869 seconds, `AFTER_STEP` in 8.326, and `DURING_STEP` in 8.664.
+
+The full run took 368.11 seconds including worker startup and result
+counting. Saved measurements and output are in
+`/tmp/logic1-motor-schedules-2026-10-22.json` and
+`/tmp/logic1-motor-schedules-2026-10-22.log`. The new shared interface and
+schedules passed the unit tests and module doctests; the changed Python
+modules passed mypy with `--disallow-untyped-defs`.
+
+## Regular-test performance and validation on 2026-10-22
+
+`Simplification` is exported by `logic1.theories.RCF`. The public functions
+accept `method="cartesian"` with `NONE`, `FINAL`, `AFTER_STEP`, or
+`DURING_STEP`; nonzero schedules are currently unsupported by PyEDA.
+The three simplifying implementations are siblings under a shared base.
+Each public computation now creates a fresh normal-form instance. The module
+type definitions are grouped at the top of `bnf.py`, and its unused
+`BooleanFormula` import has been removed.
+
+The 400-cube semantic-budget examples made the two recursive class doctests
+take roughly four seconds each in the regular parallel suite. Their executable
+examples now use 36 cubes and budgets 10, 30, and unbounded, producing 31, 19,
+and one result cube. The focused run passed 57 tests in 0.65 seconds; each of
+the two class doctests took 0.24 seconds. These are observed timings, not
+performance thresholds. The larger experiment, including its default-budget
+result and 760 unbounded pair checks, is preserved in `doc/notes/RCF/dnf.md`.
+
+Commit-readiness checks in the Sage configuration passed:
+
+- `make test`: typing passed for 19 stub files and 68 source files, followed
+  by 660 passing regular tests in 13.43 seconds.
+- `make test-doc`: all 13 API documentation tests passed in 3.06 seconds.
+- Both changed DNF benchmark modules passed mypy with
+  `--disallow-untyped-defs`.
+- `git diff --check` was clean, and no references to the replaced method
+  strings remained in source, API documentation, or benchmark modules.
+
+The initial sandboxed test run could not create the local socket required by
+parallel QE. Repeating the full check outside the sandbox passed; this was a
+permission issue, not a DNF regression. The checks did not validate Flint.
+The regular-check logs are in
+`/tmp/logic1-precommit-test-unsandboxed-2026-10-22.log` and
+`/tmp/logic1-precommit-doc-2026-10-22.log`.
+
+An intermittent mypy `[has-type]` error for `__all__` in `logic1/__init__.py`
+remains unresolved. It disappeared after cleaning or retrying in the reported
+runs and did not recur in the commit-readiness checks. Switching RCF backends
+while reusing the same cache is a plausible trigger, not an established cause.
+Separate caches per backend and explicit `list[str]` annotations were
+discussed but have not been implemented. Preserve a failing cache before
+diagnosing with `--no-incremental --cache-dir=/dev/null`; do not treat a
+successful retry as proof that the underlying issue has been fixed.
+
 ## Deferred Redlog equivalence check
 
 A possible future correctness check for every `test_simplify_motor.py` case is
@@ -266,7 +339,7 @@ been discussed but is intentionally not implemented yet.
 - `series14` is absent from the result.
 - Python compilation succeeds.
 - Pytest collection finds exactly 26 `gsimplify` cases, 78 `simplify` cases,
-  and 78 DNF cases.
+  and 91 DNF cases (78 with PyEDA excluded).
 - All 13 `radical=True` `gsimplify` results were computed and have the same
   output atom counts as `radical=False`.
 - Both `gsimplify` radical settings passed for `series3` with benchmarking
@@ -304,7 +377,7 @@ DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest --collect-only -q 
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_simplify_motor.py -k series3 --benchmark-disable
 DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest --collect-only -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py
 DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py -k series3 --benchmark-only
-DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py --benchmark-only --benchmark-json=/tmp/dnf-deterministic-full.json --tb=short
+DOT_SAGE=/tmp/logic1-sage-bnf conda run --no-capture-output -n logic1_dev pytest -q benchmarks/theories/RCF/motor_series/test_dnf_motor.py -k 'not pyeda' --benchmark-only --benchmark-json=/tmp/logic1-motor-schedules-2026-10-22.json --tb=short
 ```
 
 ## Current state
