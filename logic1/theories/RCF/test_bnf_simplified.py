@@ -5,10 +5,9 @@ from collections.abc import Callable
 
 import pytest
 
-from logic1.firstorder import And, Ex, F, Or, T
+from logic1.firstorder import And, Ex, F, Not, Or, T
 from logic1.theories.RCF import AtomicFormula, Formula, Simplification, VV, cnf, dnf
 from logic1.theories.RCF.bnf import (AfterStepSimplifyingCartesianBooleanNormalForm,
-                                    CartesianBooleanNormalForm,
                                     DuringStepSimplifyingCartesianBooleanNormalForm,
                                     FinalSimplifyingCartesianBooleanNormalForm,
                                     SimplifyingCartesianBooleanNormalForm, is_and_or)
@@ -101,9 +100,9 @@ def test_invalid_limits_are_rejected() -> None:
 
 def test_limits_require_simplified_method() -> None:
     with pytest.raises(ValueError):
-        dnf(x > 0, method='pyeda', max_pair_checks=0)
+        dnf(x > 0, method='pyeda', simplification=Simplification.NONE, max_pair_checks=0)
     with pytest.raises(ValueError):
-        cnf(x > 0, method='cartesian', max_pair_checks=0)
+        cnf(x > 0, method='cartesian', simplification=Simplification.NONE, max_pair_checks=0)
 
 
 @pytest.mark.parametrize('normal_form', [dnf, cnf])
@@ -116,11 +115,17 @@ def test_integer_schedules(normal_form: Callable[..., Formula],
 
 
 @pytest.mark.parametrize('normal_form', [dnf, cnf])
-def test_default_schedule_is_none(normal_form: Callable[..., Formula]) -> None:
-    formula = And(Or(x > 0, y != 0), Or(x <= 0, y == 0))
-    expected = normal_form(formula, method='cartesian', simplification=Simplification.NONE)
-    assert normal_form(formula, method='cartesian') == expected
-    assert dnf(formula, method='cartesian') == CartesianBooleanNormalForm().dnf(formula)
+def test_defaults_are_cartesian_and_final(normal_form: Callable[..., Formula]) -> None:
+    a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
+    formula: Formula = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
+                          And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
+                          And(d > 0, e > 0), And(d <= 0, e > 0))
+    if normal_form is cnf:
+        formula = Not(formula)
+    expected = normal_form(formula, method='cartesian', simplification=Simplification.FINAL)
+    assert normal_form(formula) == expected
+    plain = normal_form(formula, method='cartesian', simplification=Simplification.NONE)
+    assert expected != plain
 
 
 @pytest.mark.parametrize(('value', 'error'), [

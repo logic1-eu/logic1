@@ -6,7 +6,7 @@ import pytest
 
 from benchmarks.theories.RCF.motor_series.motor_inputs import series3
 from logic1.firstorder import All, And, Equivalent, Ex, F, Or, T
-from logic1.theories.RCF import AtomicFormula, Formula, VV, cnf, dnf
+from logic1.theories.RCF import AtomicFormula, Formula, Simplification, VV, cnf, dnf
 
 
 Method = Literal['cartesian', 'pyeda']
@@ -46,7 +46,7 @@ a, b, c = VV.get('a', 'b', 'c')
                               And(c != 0, a != 0))))),
 ])
 def test_dnf(formula: Formula, expected: Formula, method: Method) -> None:
-    assert dnf(formula, method=method) == expected
+    assert dnf(formula, method=method, simplification=Simplification.NONE) == expected
 
 
 @pytest.mark.parametrize(('method', 'expected'), [
@@ -57,7 +57,7 @@ def test_dnf(formula: Formula, expected: Formula, method: Method) -> None:
 ])
 def test_dnf_mixed_clauses(method: Method, expected: Formula) -> None:
     formula = And(Or(a > 0, b != 0), Or(c <= 0, b == 0))
-    assert dnf(formula, method=method) == expected
+    assert dnf(formula, method=method, simplification=Simplification.NONE) == expected
 
 
 @pytest.mark.parametrize(('method', 'expected_clauses', 'expected_atoms'), [
@@ -66,7 +66,7 @@ def test_dnf_mixed_clauses(method: Method, expected: Formula) -> None:
 ])
 def test_dnf_motor_series3(method: Method, expected_clauses: int, expected_atoms: int) -> None:
     """Check the DNF structure and size of the third motor input."""
-    result = dnf(series3, method=method)
+    result = dnf(series3, method=method, simplification=Simplification.NONE)
     assert isinstance(result, Or)
     assert len(result.args) == expected_clauses
     assert all(isinstance(clause, And) for clause in result.args)
@@ -77,7 +77,7 @@ def test_dnf_motor_series3(method: Method, expected_clauses: int, expected_atoms
 @pytest.mark.parametrize('method', ['cartesian', 'pyeda'])
 def test_dnf_renames_bound_variables(method: Method) -> None:
     formula = Equivalent(Ex((a, b), And(a == 0, b == 0)), All(c, And(a == 0, c == 0)))
-    result = dnf(formula, method=method)
+    result = dnf(formula, method=method, simplification=Simplification.NONE)
     q0, q1, q2, q3, q4, q5 = result.qvars()
     expected_matrix = Or(And(q5 == 0, a == 0, q1 == 0, q2 == 0),
                          And(q5 == 0, a == 0, q0 != 0),
@@ -132,13 +132,13 @@ def test_dnf_renames_bound_variables(method: Method) -> None:
                                Or(c != 0, a == 0))))),
 ])
 def test_cnf(formula: Formula, expected: Formula, method: Method) -> None:
-    assert cnf(formula, method=method) == expected
+    assert cnf(formula, method=method, simplification=Simplification.NONE) == expected
 
 
 @pytest.mark.parametrize('method', ['cartesian', 'pyeda'])
 def test_cnf_renames_bound_variables(method: Method) -> None:
     formula = Equivalent(Ex((a, b), And(a == 0, b == 0)), All(c, And(a == 0, c == 0)))
-    result = cnf(formula, method=method)
+    result = cnf(formula, method=method, simplification=Simplification.NONE)
     q0, q1, q2, q3, q4, q5 = result.qvars()
     expected_matrix = And(Or(q2 == 0, q1 != 0, q0 != 0),
                           Or(q1 != 0, a == 0, q0 != 0),

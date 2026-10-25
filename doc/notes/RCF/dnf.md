@@ -210,12 +210,14 @@ The public `dnf` and `cnf` functions separate the algorithm, selected with
 | `DURING_STEP` | 3 | Reduce cubes and partial products while constructing each node |
 
 A step constructs the DNF at one `And` or `Or` node. The integer values
-identify schedules, not increasing guarantees of quality or speed. `NONE`
-is the default. Nonzero schedules currently require `method="cartesian"`;
+identify schedules, not increasing guarantees of quality or speed. Since
+2026-10-23, the defaults are `method="cartesian"` and `Simplification.FINAL`
+(previously PyEDA and `NONE`). Nonzero schedules require `method="cartesian"`;
 unsupported combinations are rejected. Plain Cartesian construction remains
 useful because the recursive reductions can cost time without reducing the
 result. `FINAL` provides the previously missing experiment: plain recursive
 construction followed by one dedicated reduction of the completed strict DNF.
+Select `Simplification.NONE` explicitly for plain Cartesian or PyEDA calls.
 
 `SimplifyingCartesianBooleanNormalForm` is the shared base for
 `FinalSimplifyingCartesianBooleanNormalForm`,

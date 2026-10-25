@@ -8,20 +8,20 @@ Boolean Normal Forms
 
 .. automodule:: logic1.theories.RCF.bnf
 
-  .. function:: cnf(f, method='pyeda', *, simplification=Simplification.NONE, max_pair_checks=500)
-                dnf(f, method='pyeda', *, simplification=Simplification.NONE, max_pair_checks=500)
+  .. function:: cnf(f, method='cartesian', *, simplification=Simplification.FINAL, max_pair_checks=500)
+                dnf(f, method='cartesian', *, simplification=Simplification.FINAL, max_pair_checks=500)
 
     Compute a conjunctive or disjunctive normal form of ``f``. If ``f`` contains
     quantifiers, then the result is an equivalent prenex normal form whose
     matrix is in CNF or DNF, respectively.
 
-    ``method`` is ``'pyeda'`` (the default) or ``'cartesian'``. The separate
+    ``method`` is ``'cartesian'`` (the default) or ``'pyeda'``. The separate
     ``simplification`` option accepts a :class:`Simplification` member or its
-    integer value. The default, ``NONE`` (0), retains ordinary preprocessing
-    and conservative final simplification without additional DNF reductions.
-    The other schedules are currently supported only by ``'cartesian'``:
+    integer value. All schedules retain ordinary preprocessing and conservative
+    final simplification. Nonzero schedules require ``'cartesian'``:
 
-    * ``FINAL`` (1): reduce the complete strict DNF once.
+    * ``NONE`` (0): no additional DNF reductions; required for ``'pyeda'``.
+    * ``FINAL`` (1, the default): reduce the complete strict DNF once.
     * ``AFTER_STEP`` (2): reduce each completed Boolean node.
     * ``DURING_STEP`` (3): reduce cubes and partial products during construction
       at each Boolean node.

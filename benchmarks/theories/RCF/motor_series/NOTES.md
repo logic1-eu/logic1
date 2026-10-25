@@ -127,9 +127,12 @@ The measured `simplify` output atom counts are:
 
 `test_dnf_motor.py` now has 91 cases: Redlog off and on; Cartesian with
 `Simplification.NONE`, `FINAL`, `AFTER_STEP`, and `DURING_STEP`; and PyEDA,
-each on 13 inputs. The default `NONE` schedule reproduces plain Cartesian
-behavior. The other schedules share the atomic rules and a final semantic
-budget of 500 pairs. Every configuration has its own 13-row benchmark group.
+each on 13 inputs. Explicit `NONE` reproduces plain Cartesian behavior and
+is also specified for PyEDA. Since 2026-10-23, the public defaults are
+Cartesian construction and `FINAL`; the benchmark options preserve the
+recorded configurations. The other schedules share the atomic rules and a
+final semantic budget of 500 pairs. Every configuration has its own 13-row
+benchmark group.
 
 The schedule comparison on 2026-10-22 excluded all 13 PyEDA cases at the
 user's request and passed all 78 remaining cases. The module docstring has

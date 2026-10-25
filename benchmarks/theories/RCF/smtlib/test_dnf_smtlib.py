@@ -194,7 +194,8 @@ def _dnf_without_initial_implicit_ranges(f: Formula) -> Formula:
 DNF_CONFIGURATIONS: tuple[tuple[str, Callable[..., Formula], DNFOptions], ...] = (
     ("redlog-off", redlog.dnf, {"bnfsac": False, "bnfsm": False}),
     ("redlog-on", redlog.dnf, {"bnfsac": True, "bnfsm": True}),
-    ("cartesian", logic1_dnf, {"method": "cartesian"}),
+    ("cartesian", logic1_dnf,
+     {"method": "cartesian", "simplification": Simplification.NONE}),
     ("final", logic1_dnf,
      {"method": "cartesian", "simplification": Simplification.FINAL}),
     ("after-step", logic1_dnf,

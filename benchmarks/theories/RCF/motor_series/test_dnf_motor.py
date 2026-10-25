@@ -137,14 +137,16 @@ type DNFOptions = dict[str, bool | int | str]
 DNF_CONFIGURATIONS: tuple[tuple[str, Callable[..., Formula], DNFOptions], ...] = (
     ("redlog-bnfsac-false-bnfsm-false", redlog.dnf, {"bnfsac": False, "bnfsm": False}),
     ("redlog-bnfsac-true-bnfsm-true", redlog.dnf, {"bnfsac": True, "bnfsm": True}),
-    ("logic1-cartesian", logic1_dnf, {"method": "cartesian"}),
+    ("logic1-cartesian", logic1_dnf,
+     {"method": "cartesian", "simplification": Simplification.NONE}),
     ("logic1-final", logic1_dnf,
      {"method": "cartesian", "simplification": Simplification.FINAL}),
     ("logic1-after-step", logic1_dnf,
      {"method": "cartesian", "simplification": Simplification.AFTER_STEP}),
     ("logic1-during-step", logic1_dnf,
      {"method": "cartesian", "simplification": Simplification.DURING_STEP}),
-    ("logic1-pyeda", logic1_dnf, {"method": "pyeda"}),
+    ("logic1-pyeda", logic1_dnf,
+     {"method": "pyeda", "simplification": Simplification.NONE}),
 )
 
 CASES = tuple(

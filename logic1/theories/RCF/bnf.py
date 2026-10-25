@@ -1,9 +1,10 @@
 """Boolean normal forms over real closed fields.
 
-The ``cartesian`` method distributes conjunction over disjunction directly.
-``Simplification`` selects no additional reductions (the default), reduction
-of the final strict DNF, or reduction after or during each recursive step.
-The ``pyeda`` method uses a Boolean abstraction.
+The default ``cartesian`` method distributes conjunction over disjunction
+directly and reduces the completed strict DNF with ``Simplification.FINAL``.
+Other schedules select no additional reductions or reduction after or during
+each recursive step. The ``pyeda`` method uses a Boolean abstraction and
+requires ``Simplification.NONE``.
 """
 from collections.abc import Mapping
 from enum import IntEnum
@@ -64,6 +65,11 @@ class CartesianBooleanNormalForm:
         return self.conservative_simplify(self._dnf(f))
 
     def _dnf(self, f: Formula) -> Formula:
+        """Prenex and preprocess a formula, then convert its matrix to DNF.
+
+        Restore the quantifier prefix after converting the quantifier-free
+        matrix. The public methods apply conservative final simplification.
+        """
         f = self.simplify(f.to_pnf())
         matrix, prefix = f.matrix()
         assert is_and_or(matrix)
@@ -71,11 +77,20 @@ class CartesianBooleanNormalForm:
         return dnf.quantify(prefix)
 
     def _dnf_and_or(self, f: AndOr) -> Formula:
+        """Convert an And/Or matrix to DNF through its strict representation.
+
+        Reconstruct a disjunction of conjunctions from the set of cubes
+        returned by ``_strict_dnf``.
+        """
         strict_dnf = self._strict_dnf(f)
         dnf = Or(*(And(*(atom for atom in conj)) for conj in strict_dnf))
         return dnf
 
     def conservative_simplify(self, f: Formula) -> Formula:
+        """Simplify while preserving the computed Boolean normal form.
+
+        Disable unconditional splitting by setting ``explode_always=False``.
+        """
         return _simplify(f, explode_always=False)
 
     def simplify(self, f: Formula) -> Formula:
@@ -87,6 +102,13 @@ class CartesianBooleanNormalForm:
         return _simplify(f, explode_always=False, substitute=1)
 
     def _strict_dnf(self, f: AndOr) -> set[frozenset[AtomicFormula]]:
+        """Construct a strict DNF as a set of frozenset conjunctions.
+
+        An ``And`` node forms the Cartesian product of its children's DNFs;
+        an ``Or`` node unions them. Sets remove duplicate cubes and atoms.
+        False is the empty set; true is the set containing the empty cube.
+        Recursive calls dispatch to subclasses through ``self._strict_dnf``.
+        """
         if isinstance(f, _F):
             return set()
         if isinstance(f, _T):
@@ -566,35 +588,48 @@ def _normal_form(method: Literal["cartesian", "pyeda"], simplification: Simplifi
     return classes[schedule](max_pair_checks=max_pairs)
 
 
-def cnf(f: Formula, method: Literal["cartesian", "pyeda"] = "pyeda",
-        *, simplification: Simplification | int = Simplification.NONE,
+def cnf(f: Formula, method: Literal["cartesian", "pyeda"] = "cartesian",
+        *, simplification: Simplification | int = Simplification.FINAL,
         max_pair_checks: int | None = 500) -> Formula:
     """Compute a CNF with the selected algorithm and simplification schedule.
 
     See :func:`dnf` for the schedules and semantic comparison budget.
+
+    Distribute a disjunction over a conjunction using the defaults:
+
+    >>> from logic1.theories.RCF import VV
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> f = Or(And(x > 0, y > 0), z > 0)
+    >>> cnf(f)
+    And(Or(z > 0, y > 0), Or(z > 0, x > 0))
     """
     return _normal_form(method, simplification, max_pair_checks).cnf(f)
 
 
-def dnf(f: Formula, method: Literal["cartesian", "pyeda"] = "pyeda",
-        *, simplification: Simplification | int = Simplification.NONE,
+def dnf(f: Formula, method: Literal["cartesian", "pyeda"] = "cartesian",
+        *, simplification: Simplification | int = Simplification.FINAL,
         max_pair_checks: int | None = 500) -> Formula:
     """Compute a DNF, preserving a quantifier prefix when present.
 
+    The defaults select Cartesian construction and ``Simplification.FINAL``.
     ``simplification`` accepts a :class:`Simplification` member or its integer
     value. ``NONE`` preserves ordinary Cartesian construction. ``FINAL``
     reduces the complete strict DNF once; ``AFTER_STEP`` reduces after each
     Boolean node; ``DURING_STEP`` reduces during its construction. These
     schedules are currently supported only by ``method="cartesian"``.
+    Use ``simplification=Simplification.NONE`` with ``method="pyeda"``.
 
     ``max_pair_checks`` limits the final semantic pass for the three
     simplifying schedules: 500 by default, zero to disable, or ``None`` for
     no limit. Other schedules require its default value. All methods retain
     ordinary preprocessing and conservative final simplification.
 
+    Distribute a conjunction over a disjunction using the defaults:
+
     >>> from logic1.theories.RCF import VV
-    >>> x = VV['x']
-    >>> dnf(x > 0, method="cartesian", simplification=Simplification.FINAL)
-    x > 0
+    >>> x, y, z = VV.get('x', 'y', 'z')
+    >>> f = And(Or(x > 0, y > 0), z > 0)
+    >>> dnf(f)
+    Or(And(z > 0, y > 0), And(z > 0, x > 0))
     """
     return _normal_form(method, simplification, max_pair_checks).dnf(f)

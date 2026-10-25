@@ -4,16 +4,17 @@
 # - Clause and global-premise operations, assumptions, contradictions, and Gröbner reduction
 # - Interactions among equational clauses, proper clauses, and atomic global premises
 # - Application example: DS97 Table 6, instance 3 (94 input atoms reduced to 35 with
-#   Redlog and 49 with PyEDA)
-# - Backend-dependent cases always use PyEDA and additionally use Redlog after an rlqe
-#   smoke test
+#   Redlog and 29 with the default Logic1 CNF)
+# - Backend-dependent cases always use the default Logic1 CNF and additionally use
+#   Redlog after an rlqe smoke test
 # - Production implementations; no monkeypatching
 #
-# Verification:
-# - Coverage.py (both backends): 98% combined statement and branch coverage for gsimplify.py
+# Verification (2026-10-23):
+# - Coverage.py (Redlog and default Logic1 CNF): 98% combined statement and branch coverage
+#   for gsimplify.py
 #   (286 statements, 5 missed; 110 branch opportunities, 2 partially covered)
 # - Focused pytest with Redlog: all 43 cases passed
-# - Without Redlog: 28 cases run with PyEDA and 15 Redlog variants are skipped
+# - Import sage.all before starting pytest with coverage to avoid tracing Sage initialization
 
 import shutil
 import subprocess
@@ -27,7 +28,7 @@ from logic1.theories.RCF.gsimplify import Clause, GlobalPremise, GSimplify, Opti
 
 
 x, y, z = VV.get('gsimplify_test_x', 'gsimplify_test_y', 'gsimplify_test_z')
-PYEDA_OPTIONS = {'use_redlog_cnf': False}
+LOGIC1_OPTIONS = {'use_redlog_cnf': False}
 
 
 def _redlog_works() -> bool:
@@ -57,7 +58,7 @@ CNF_OPTIONS = [
             reason='requires a working Redlog rlqe installation',
         ),
     ),
-    pytest.param(PYEDA_OPTIONS, id='pyeda'),
+    pytest.param(LOGIC1_OPTIONS, id='logic1'),
 ]
 
 
@@ -105,10 +106,10 @@ def test_disjunction_of_two_equations(cnf_options):
     ids=['equation-and-disequation', 'strict-and-weak-order'],
 )
 def test_inconsistent_assumptions(assume):
-    # Exercise algebraic and order-theoretic inconsistency detection. PyEDA is
-    # sufficient here because the CNF backend is immaterial to this contract.
+    # Exercise algebraic and order-theoretic inconsistency detection. The
+    # default Logic1 CNF suffices because the backend is immaterial here.
     with pytest.raises(GSimplify.Inconsistent):
-        gsimplify(T, assume=assume, **PYEDA_OPTIONS)
+        gsimplify(T, assume=assume, **LOGIC1_OPTIONS)
 
 
 @pytest.mark.parametrize(
@@ -315,7 +316,7 @@ def test_tautological_regular_clause_is_removed():
 def test_application_example_series3(cnf_options):
     """Exercise the complete pipeline on DS97 Table 6, instance 3."""
     result = gsimplify(series3, **cnf_options)
-    expected_atom_count = 49 if cnf_options == PYEDA_OPTIONS else 35
+    expected_atom_count = 29 if cnf_options == LOGIC1_OPTIONS else 35
 
     assert len(list(series3.atoms())) == 94
     assert len(list(result.atoms())) == expected_atom_count

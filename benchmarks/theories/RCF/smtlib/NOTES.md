@@ -81,9 +81,11 @@ resulting Logic1 formula is supplied to all configurations.
 
 The main comparison has six configurations: Redlog DNF with both `bnfsac`
 and `bnfsm` off or on, and `method="cartesian"` with `Simplification.NONE`,
-`FINAL`, `AFTER_STEP`, or `DURING_STEP`. The default `NONE` retains ordinary
+`FINAL`, `AFTER_STEP`, or `DURING_STEP`. Explicit `NONE` retains ordinary
 preprocessing and conservative final simplification. Other schedules use
-`max_pair_checks=500`. Every Cartesian schedule preprocesses with
+`max_pair_checks=500`. Since 2026-10-23, the public defaults are Cartesian
+construction and `FINAL`; explicit benchmark options preserve the recorded
+configurations. Every Cartesian schedule preprocesses with
 `explode_always=False, substitute=1`. In the historical measurements, early
 means `DURING_STEP` and subtree means `AFTER_STEP`.
 Each main-comparison case starts a fresh worker, times one call, and enforces

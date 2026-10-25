@@ -45,7 +45,7 @@ class Options:
 
     use_redlog_cnf: bool = True
     """If :obj:`True`, use :func:`.redlog.cnf` for CNF computation. If
-    :obj:`False`, use :func:`.RCF.bnf.cnf`, which is based on PyEda.
+    :obj:`False`, use :func:`.RCF.bnf.cnf` with its default options.
     """
 
 
@@ -366,8 +366,7 @@ class GSimplify:
     def cnf(self, f: Formula) -> Formula:
         """Return a conjunctive normal form of ``f``. Depending on the option
         :attr:`.Options.use_redlog_cnf`, the CNF is computed using either
-        :func:`.redlog.cnf` or :func:`.RCF.bnf.cnf`, which is based on
-        [PyEDA](https://pyeda.readthedocs.io).
+        :func:`.redlog.cnf` or :func:`.RCF.bnf.cnf` with its default options.
         """
         if self._options.use_redlog_cnf:
             logging.info('computing cnf using Redlog with '
@@ -376,7 +375,7 @@ class GSimplify:
             return redlog.cnf(f, bnfsac=self._options.bnfsac,
                                  bnfsm=self._options.bnfsm)
         else:
-            logging.info('computing cnf using PyEda ...')
+            logging.info('computing cnf using Logic1 defaults ...')
             return cnf(f)
 
     def formula_to_clauses(self, f: Formula) -> list[Clause]:
