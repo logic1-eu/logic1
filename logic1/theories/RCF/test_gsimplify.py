@@ -1,20 +1,32 @@
-# Coverage:
-# - 18 test functions, expanding to 43 pytest cases when Redlog is available
-# - Boundary cases: one equation, one inequality, T, F, and a disjunction of two equations
-# - Clause and global-premise operations, assumptions, contradictions, and Gröbner reduction
-# - Interactions among equational clauses, proper clauses, and atomic global premises
-# - Application example: DS97 Table 6, instance 3 (94 input atoms reduced to 35 with
-#   Redlog and 29 with the default Logic1 CNF)
-# - Backend-dependent cases always use the default Logic1 CNF and additionally use
-#   Redlog after an rlqe smoke test
-# - Production implementations; no monkeypatching
-#
-# Verification (2026-10-23):
-# - Coverage.py (Redlog and default Logic1 CNF): 98% combined statement and branch coverage
-#   for gsimplify.py
-#   (286 statements, 5 missed; 110 branch opportunities, 2 partially covered)
-# - Focused pytest with Redlog: all 43 cases passed
-# - Import sage.all before starting pytest with coverage to avoid tracing Sage initialization
+"""Unit tests for Gröbner simplification over real closed fields.
+
+The 18 test functions cover:
+
+* Boundary cases: one equation, one inequality, ``T``, ``F``, and a disjunction
+  of two equations.
+* Clause and global-premise operations, assumptions, contradictions, and
+  Gröbner reduction.
+* Interactions among equational clauses, proper clauses, and atomic global
+  premises.
+
+They exercise the production implementations without monkeypatching.
+
+Tests that compare CNF methods always use the default Logic1 CNF and also use
+Redlog when an rlqe smoke test succeeds, giving 43 cases with Redlog available.
+Without Redlog, 28 cases run and 15 Redlog variants are skipped.
+The application example, DS97 Table 6, instance 3, has 94 input atoms and
+reduces to 35 atoms with Redlog CNF and 29 with the default Logic1 CNF.
+
+Verification on 2026-10-23 with the Sage backend and both CNF methods:
+
+* All 43 cases passed.
+* Coverage.py measured 98.23% combined statement and branch coverage for
+  ``gsimplify.py``: 286 statements, 5 missed; 110 branch opportunities,
+  2 partially covered.
+
+For coverage runs, import ``sage.all`` before starting pytest to avoid tracing
+Sage initialization, which caused an assertion failure in the measured setup.
+"""
 
 import shutil
 import subprocess
