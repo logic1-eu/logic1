@@ -210,84 +210,40 @@ class Term(RCF_term_abc.Term['Term',
     def _ring(self) -> Ring:
         return Ring.from_raw(self._poly.parent())
 
-    def __ge__(self, other: Number | Term) -> Ge | Le:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Le(-lhs, 0)
-        else:
-            return Ge(lhs, 0)
-
-    def __gt__(self, other: Number | Term) -> Gt | Lt:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Lt(-lhs, 0)
-        else:
-            return Gt(lhs, 0)
-
-    @staticmethod
-    def _eq_type() -> type[Eq]:
-        return Eq
-
-    @staticmethod
-    def _ge_type() -> type[Ge]:
-        return Ge
-
-    @staticmethod
-    def _gt_type() -> type[Gt]:
-        return Gt
-
-    @staticmethod
-    def _le_type() -> type[Le]:
-        return Le
-
-    @staticmethod
-    def _lt_type() -> type[Lt]:
-        return Lt
-
-    @staticmethod
-    def _ne_type() -> type[Ne]:
-        return Ne
-
-    @staticmethod
-    def _term_type() -> type[Term]:
-        return Term
-
-    def __hash__(self) -> int:
-        return super().__hash__()
-
     def __init__(self, arg: Number) -> None:
         """Construct a :class:`Term` from a number.
 
         >>> from fractions import Fraction
-        >>> from logic1.theories.RCF import Term
-        >>> Term(2)
-        2
         >>> Term(0.5)
         1/2
-        >>> Term(Fraction(1, 2))
-        1/2
-        >>> Term(mpq(1, 2))
-        1/2
+        >>> Term(2)
+        2
+        >>> Term(Fraction(1, 4))
+        1/4
+        >>> Term(mpq(1, 5))
+        1/5
 
         .. attention::
             Python division of integers yields a float, which can cause
             precision issues:
 
-            >>> Term(1/10 + 2/10)
-            415716888680356/1385722962267853
+            >>> Term(1/10)
+            3602879701896397/36028797018963968
 
             In contrast:
 
-            >>> Term(mpq(1, 10) + mpq(2, 10))
-            3/10
-            >>> Term(Fraction(1, 10) + Fraction(2, 10))
-            3/10
+            >>> Term(mpq(1, 10))
+            1/10
+            >>> Term(Fraction(1, 10))
+            1/10
 
         """
         if not isinstance(arg, _NUMBER_TYPES):
             raise ValueError(f'expected a number type; {arg} is {type(arg)}')
         ring = Ring()
-        self._poly = ring._wrapped_ring(arg)
+        # The use of mpq prevents Sage approximations of floating-point ``arg``
+        # Term(1/10) above is an example, where 1/10 would be preserved.
+        self._poly = ring._wrapped_ring(mpq(arg))  # type: ignore
         self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
@@ -303,29 +259,6 @@ class Term(RCF_term_abc.Term['Term',
         for coefficient, power_product in self._poly:
             yield mpq(coefficient), Term._from_raw(power_product)
 
-    def __le__(self, other: Term | int | mpq) -> Ge | Le:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Ge(-lhs, 0)
-        else:
-            return Le(lhs, 0)
-
-    def __lt__(self, other: Term | int | mpq) -> Gt | Lt:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Gt(-lhs, 0)
-        else:
-            return Lt(lhs, 0)
-
-    def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
-        lhs = self - other
-        if lhs.lc() < 0:
-            lhs = -lhs
-        return Ne(lhs, 0)
-
-    def __repr__(self) -> str:
-        return repr(self._poly).replace('^', '**')
-
     def __truediv__(self, other: Number | Term) -> Term:
         """True division. ``self`` must be divisible by ``other``.
         """
@@ -336,70 +269,6 @@ class Term(RCF_term_abc.Term['Term',
         # For x*y / y we obtain an element of a fraction field. We must ensure
         # that the denominator is 1 and then convert to an MPolynomial.
         return Term._from_raw(quotient)
-
-    def as_constant(self) -> mpq:
-        """Return this term as an :class:`mpq <.gmpy2.mpq>`.
-        Raise :class:`ValueError` if this term is not constant.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x = VV['x']
-        >>> t = x + mpq(1, 2) - x
-        >>> t
-        1/2
-        >>> isinstance(t, Term)
-        True
-        >>> isinstance(t, mpq)
-        False
-        >>> c = t.as_constant()
-        >>> c
-        mpq(1,2)
-        >>> isinstance(c, mpq)
-        True
-
-        .. seealso::
-            :meth:`.Term.is_constant`
-        """
-        if not self.is_constant():
-            raise ValueError(f'{self} is not constant')
-        return self.constant_coefficient()
-
-    def as_latex(self) -> str:
-        """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.term.Term.as_latex`.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x, y = VV.get('x', 'y')
-        >>> t = (x - y + 2) ** 2
-        >>> t.as_latex()
-        'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
-        """
-        return str(sage_latex(self._poly))
-
-    def as_variable(self) -> Variable:
-        """Return this term as an instance of the subclass :class:`.Variable`.
-        Raise :class:`ValueError` if this term is not a variable.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x = VV['x']
-        >>> t = x + 1 - 1
-        >>> t
-        x
-        >>> isinstance(t, Term)
-        True
-        >>> isinstance(t, Variable)
-        False
-        >>> v = t.as_variable()
-        >>> v
-        x
-        >>> isinstance(v, Variable)
-        True
-
-        .. seealso::
-            :meth:`.Term.is_variable`
-        """
-        if not self.is_variable():
-            raise ValueError(f'{self} is not a variable')
-        return Variable._from_gen(self._poly)
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified in
@@ -425,7 +294,6 @@ class Term(RCF_term_abc.Term['Term',
         degrees_poly = {ring.coerce_poly(key._poly): value for key, value in degrees.items()}
         return Term._from_raw(self_poly.coefficient(degrees_poly))
 
-    @lru_cache(maxsize=CACHE_SIZE)
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this term.
 
@@ -489,6 +357,38 @@ class Term(RCF_term_abc.Term['Term',
         df = ring.coerce_poly(self._poly).derivative(ring.coerce_poly(x._poly), n)
         return Term._from_raw(df)
 
+    @staticmethod
+    def _eq_type() -> type[Eq]:
+        return Eq
+
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
+
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
+
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
+
+    @staticmethod
+    def _term_type() -> type[Term]:
+        return Term
+
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
+
     @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
@@ -532,18 +432,6 @@ class Term(RCF_term_abc.Term['Term',
             unit *= mpq(lc) ** multiplicity
             D[Term._from_raw(poly)] = multiplicity
         return unit, D
-
-    def all_variable_names(p):
-        R = p.parent()
-        names = []
-        while hasattr(R, "variable_names"):
-            names.extend(R.variable_names())
-            R = R.base_ring()
-        return tuple(names)
-
-    @classmethod
-    def _from_number(cls, num: Number) -> Term:
-        return Term(num)
 
     @classmethod
     def _from_raw(cls, poly: MPolynomial[Rational]) -> Term:
@@ -606,26 +494,6 @@ class Term(RCF_term_abc.Term['Term',
         gbasis_polys = ideal.groebner_basis()
         gbasis_terms = [Term._from_raw(poly) for poly in gbasis_polys if not poly.is_zero()]
         return gbasis_terms
-
-    def is_constant(self) -> bool:
-        """Return :obj:`True` if this term is constant.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x = VV['x']
-        >>> t = x + mpq(1, 2) - x
-        >>> t
-        1/2
-        >>> isinstance(t, mpq)
-        False
-        >>> t.is_constant()
-        True
-
-        .. seealso::
-            - :meth:`.as_constant`
-            - :external:meth:`MPolynomial_libsingular.is_constant()
-              <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_constant>`
-        """
-        return self._poly.is_constant()
 
     def is_definite(self, assume: Mapping[Variable, Definite] = {}) -> Definite:
         """A fast heuristic test for definitetess properties of this term. This

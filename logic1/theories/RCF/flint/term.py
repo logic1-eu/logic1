@@ -424,11 +424,11 @@ class Term(RCF_term_abc.Term['Term',
                              fmpq_mpoly,
                              fmpq_mpoly_ctx,
                              "Eq",
-                             "Ne",
-                             "Lt",
-                             "Le",
-                             "Gt",
                              "Ge",
+                             "Gt",
+                             "Le",
+                             "Lt",
+                             "Ne",
                             ]):
 
     _hash: Optional[int]
@@ -438,26 +438,12 @@ class Term(RCF_term_abc.Term['Term',
     def _ring(self) -> Ring:
         return Ring.from_raw(self._poly.context())
 
-    def __ge__(self, other: Number | Term) -> Ge | Le:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Le(-lhs, 0)
-        else:
-            return Ge(lhs, 0)
-
     def __getstate__(self) -> dict[str, Any]:
         poly = self._poly
         poly_as_dict = poly.to_dict()
         names = poly.context().names()
         d = {"poly_as_dict": poly_as_dict, "names": names}
         return d
-
-    def __gt__(self, other: Number | Term) -> Gt | Lt:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Lt(-lhs, 0)
-        else:
-            return Gt(lhs, 0)
 
     def __hash__(self) -> int:
         # We use this low-level approach because
@@ -467,18 +453,34 @@ class Term(RCF_term_abc.Term['Term',
         return self._hash
 
     def __init__(self, arg: Number) -> None:
-        """
+        """Construct a :class:`Term` from a number.
+
         >>> Term(0.5)
         1/2
-        >>> Term(fmpq(1, 3))
-        1/3
+        >>> Term(2)
+        2
         >>> Term(Fraction(1, 4))
         1/4
-        >>> Term(42)
-        42
         >>> Term(mpq(1, 5))
         1/5
+
+        .. attention::
+            Python division of integers yields a float, which can cause
+            precision issues:
+
+            >>> Term(1/10)
+            3602879701896397/36028797018963968
+
+            In contrast:
+
+            >>> Term(mpq(1, 10))
+            1/10
+            >>> Term(Fraction(1, 10))
+            1/10
+
         """
+        if not isinstance(arg, _NUMBER_TYPES):
+            raise ValueError(f'expected a number type; {arg} is {type(arg)}')
         context = fmpq_mpoly_ctx.get((), TERM_ORDER)
         poly = context.constant(as_fmpq(arg))
         self._hash = None
@@ -499,40 +501,11 @@ class Term(RCF_term_abc.Term['Term',
             monomial = Term._from_raw(poly_factory(exp_vec=exp_vec))
             yield fmpq_to_mpq(coeff), monomial
 
-    def __le__(self, other: Number | Term) -> Ge | Le:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Ge(-lhs, 0)
-        else:
-            return Le(lhs, 0)
-
-    def __len__(self) -> int:
-        return len(self._poly)
-
-    def __lt__(self, other: Number | Term) -> Gt | Lt:
-        lhs = self - other
-        if lhs.lc() < 0:
-            return Gt(-lhs, 0)
-        else:
-            return Lt(lhs, 0)
-
-    def __ne__(self, other: Number | Term) -> Ne:  # type: ignore[override]
-        lhs = self - other
-        if lhs.lc() < 0:
-            lhs = -lhs
-        return Ne(lhs, Term(0))
-
-    def __repr__(self) -> str:
-        return self._as_string(mul='*', pow='**')
-
     def __setstate__(self, state: dict[str, Any]) -> None:
         context = fmpq_mpoly_ctx.get(state["names"], TERM_ORDER)
         poly = context.from_dict(state["poly_as_dict"])
         self._hash = None
         self._poly = poly
-
-    def __str__(self) -> str:
-        return self._as_string(mul='*', pow='^')
 
     def __truediv__(self, other: Number | Term) -> Term:
         """True division. ``self`` must be divisible by ``other``. Otherwise,
@@ -547,131 +520,6 @@ class Term(RCF_term_abc.Term['Term',
         ring = self._ring | other._ring
         quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
         return Term._from_raw(quotient)
-
-    def as_constant(self) -> mpq:
-        if not self.is_constant():
-            raise ValueError(f'{self} is not constant')
-        return self.constant_coefficient()
-
-    def as_latex(self) -> str:
-        """LaTeX representation as a string. Implements the abstract method
-        :meth:`.firstorder.term.Term.as_latex`.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> t = (x - y + 2) ** 2
-        >>> t.as_latex()
-        'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
-        """
-        return self._as_string(mul=' ', pow='^', exp_pre='{', exp_post='}')
-
-    def _as_string(self, mul: str, pow: str, exp_pre: str = '', exp_post: str = '') -> str:
-
-        def _format_first(c: mpq, d) -> str:
-            m = _format_mon(d)
-            if c == mpq(1):
-                return m if m else f'{c}'
-            elif c == mpq(-1):
-                return f'-{m}' if m else f'{c}'
-            elif c != mpq(0):
-                return f'{c}{mul}{m}' if m else f'{c}'
-            else:
-                assert False, f'zero summand in {self!r}'
-
-        def _format_next(c: mpq, d) -> str:
-            m = _format_mon(d)
-            if c == mpq(1):
-                return f' + {m}' if m else f' + {c}'
-            elif c == mpq(-1):
-                return f' - {m}' if m else f' - {-c}'
-            elif c > mpq(0):
-                return f' + {c}{mul}{m}' if m else f' + {c}'
-            elif c < mpq(0):
-                return f' - {-c}{mul}{m}' if m else f' - {-c}'
-            else:
-                assert False, f'zero summand in {self!r}'
-
-        def _format_var(v: Variable) -> str:
-            return str(v._poly)
-
-        def _format_mon(d: dict[Variable, int]) -> str:
-            ret = ''
-            for gen in self._poly.context().gens():
-                v = Variable._from_gen(gen)
-                e = d.get(v, 0)
-                if e == 0:
-                    continue
-                elif e == 1:
-                    ret += f'{mul}{_format_var(v)}'
-                else:
-                    ret += f'{mul}{_format_var(v)}{pow}{exp_pre}{e}{exp_post}'
-            return ret.lstrip(mul)
-
-        summands = list(self.summands())
-        summands.reverse()
-        if not summands:
-            return '0'
-        d, c = summands.pop()
-        ret = [_format_first(c, d)]
-        while summands:
-            d, c = summands.pop()
-            ret.append(_format_next(c, d))
-        return ''.join(ret)
-
-    def as_variable(self) -> Variable:
-        if not self.is_variable():
-            raise ValueError(f'{self} is not a variable')
-        return Variable._from_gen(self._poly)
-
-    def coefficient(self, degrees: dict[Variable, int]) -> Term:
-        """Return the coefficient of the variables with the degrees specified in
-        the ``degrees``. Mathematically, this is the coefficient in the base
-        ring adjoined by the variables of this ring that are not listed in
-        ``degrees``.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> t = (x - y + 2) ** 2
-        >>> t.coefficient({x: 1, y: 1})
-        -2
-        >>> t.coefficient({x: 1})
-        -2*y + 4
-        """
-
-        def subtract_if_subset(d1: dict[Variable, int], d2: dict[str, int]) \
-                -> Optional[dict[Variable, int]]:
-            """Check if d2 constraints are satisfied by d1, return remaining
-            exponents. Returns d1 with keys matching d2 removed, if each key in
-            d2 either has a zero exponent and does not exist in d1, or has a
-            non-zero exponent and exists in d1 with the same exponent. Returns
-            None otherwise.
-            """
-            # Map variable names in d1 back to actual Variable objects
-            str_to_var = {str(var1): var1 for var1 in d1}
-
-            # Verify that contraint on d2 keys is satisfied
-            for name2, exp2 in d2.items():
-                if name2 not in str_to_var:
-                    if exp2 != 0:
-                        return None
-                else:
-                    var1 = str_to_var[name2]
-                    if d1[var1] != exp2:
-                        return None
-
-            # Return d1 with all variables mentioned in d2 removed
-            return {var1: exp1 for var1, exp1 in d1.items() if str(var1) not in d2}
-
-        # The result will have the same context as `self`. We reference
-        # `degrees` only by the names of the variables.
-        degrees_by_names = {str(var): exp for var, exp in degrees.items()}
-        ret = Term(0)
-        for exp_dict, coeff in self.summands():
-            summand_dict = subtract_if_subset(exp_dict, degrees_by_names)
-            if summand_dict is not None:
-                summand = Term(coeff)
-                for var, exp in summand_dict.items():
-                    summand *= var ** exp
-                ret += summand
-        return ret
 
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this Term.
@@ -739,6 +587,30 @@ class Term(RCF_term_abc.Term['Term',
             poly = poly.derivative(x_name)
         return Term._from_raw(poly)
 
+    @staticmethod
+    def _eq_type() -> type[Eq]:
+        return Eq
+
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
+
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
+
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
+
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
 
@@ -763,10 +635,6 @@ class Term(RCF_term_abc.Term['Term',
             factor /= lc
             D[Term._from_raw(factor)] = exp
         return fmpq_to_mpq(unit), D
-
-    @classmethod
-    def _from_number(cls, num: Number) -> Term:
-        return Term(num)
 
     @classmethod
     def _from_raw(cls, poly: fmpq_mpoly) -> Term:
@@ -831,11 +699,6 @@ class Term(RCF_term_abc.Term['Term',
         gbasis_terms = [Term.from_sage(p) for p in gbasis_sage_polys if not p.is_zero()]
         return gbasis_terms
 
-    def is_constant(self) -> bool:
-        """Return :obj:`True` if this term is constant.
-        """
-        return self._poly.is_constant()
-
     def is_definite(self, assume: Mapping[Variable, Definite] = {}) -> Definite:
         """A fast heuristic test for definitetess properties of this term. This
         is based on *trivial square sum* properties of coefficient signs and
@@ -881,21 +744,6 @@ class Term(RCF_term_abc.Term['Term',
         """
         coeffs = self._poly.coeffs()
         return len(coeffs) == 1 and coeffs[0] == 1
-
-    def is_variable(self) -> bool:
-        """Check if this term is a variable.
-
-        >>> x = VV['x']
-        >>> t = x + 1 - 1
-        >>> isinstance(t, Term)
-        True
-        >>> isinstance(t, Variable)
-        False
-        >>> t.is_variable()
-        True
-        """
-        poly = self._poly
-        return poly in poly.context().gens()
 
     def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
         r"""Return :obj:`True` if this Term can be written as
@@ -1294,32 +1142,12 @@ class Term(RCF_term_abc.Term['Term',
                 yield Variable._from_gen(gen)
 
     @staticmethod
-    def _eq_type() -> type[Eq]:
-        return Eq
-
-    @staticmethod
-    def _ge_type() -> type[Ge]:
-        return Ge
-
-    @staticmethod
-    def _gt_type() -> type[Gt]:
-        return Gt
-
-    @staticmethod
-    def _le_type() -> type[Le]:
-        return Le
-
-    @staticmethod
-    def _lt_type() -> type[Lt]:
-        return Lt
-
-    @staticmethod
-    def _ne_type() -> type[Ne]:
-        return Ne
-
-    @staticmethod
     def _term_type() -> type[Term]:
         return Term
+
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
 
 
 class Variable(Term, RCF_term_abc.Variable[

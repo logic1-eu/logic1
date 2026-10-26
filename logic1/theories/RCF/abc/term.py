@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, final, Iterable, Optional, Protocol, Self
+from typing import TYPE_CHECKING, final, Iterable, Iterator, Optional, Protocol, Self
 
 from gmpy2 import mpq
 
 from logic1 import firstorder
+from logic1.theories.Complex.atomic import Gt
 from logic1.theories.RCF.abc.types import _NUMBER_TYPES, Number
 
 if TYPE_CHECKING:
@@ -33,7 +34,7 @@ class RingElement(Protocol):
     def __hash__(self) -> int:
         ...
 
-    def __str__(self) -> str:
+    def is_constant(self) -> bool:
         ...
 
 
@@ -248,11 +249,11 @@ class Term[τ: Term,
            π: RingElement,
            ρ, # SAGE Polynomial Ring or FLINT Context
            T_Eq: AtomicFormula,
-           T_Ne: AtomicFormula,
-           T_Lt: AtomicFormula,
-           T_Le: AtomicFormula,
-           T_Gt: AtomicFormula,
            T_Ge: AtomicFormula,
+           T_Gt: AtomicFormula,
+           T_Le: AtomicFormula,
+           T_Lt: AtomicFormula,
+           T_Ne: AtomicFormula,
       ](firstorder.Term[τ, χ, Number, κ]):
 
     _hash: Optional[int]
@@ -265,7 +266,7 @@ class Term[τ: Term,
 
     def __add__(self, other: Number | τ) -> τ:
         if isinstance(other, _NUMBER_TYPES):
-            other = self.__class__._from_number(other)
+            other = self.__class__._term_type()(other)
         parent = self._ring | other._ring
         self_poly = parent.coerce_poly(self._poly)
         other_poly = parent.coerce_poly(other._poly)
@@ -283,17 +284,60 @@ class Term[τ: Term,
             lhs = -lhs
         return self.__class__._eq_type()(lhs, 0)
 
+    def __ge__(self, other: Number | τ) -> T_Ge | T_Le:
+        lhs = self - other
+        if lhs.lc() < 0:
+            return self.__class__._le_type()(-lhs, 0)
+        else:
+            return self.__class__._ge_type()(lhs, 0)
+
     def __getstate__(self):
         return {"_poly": self._poly}
+
+    def __gt__(self, other: Number | τ) -> T_Gt | T_Lt:
+        lhs = self - other
+        if lhs.lc() < 0:
+            return self.__class__._lt_type()(-lhs, 0)
+        else:
+            return self.__class__._gt_type()(lhs, 0)
 
     def __hash__(self) -> int:
         if self._hash is None:
             self._hash = hash(self._poly)
         return self._hash
 
+    @abstractmethod
+    def __init__(self, number: Number) -> None:
+        ...
+
+    def __le__(self, other: Number | τ) -> T_Ge | T_Le:
+        lhs = self - other
+        if lhs.lc() < 0:
+            return self.__class__._ge_type()(-lhs, 0)
+        else:
+            return self.__class__._le_type()(lhs, 0)
+
+    def __len__(self) -> int:
+        return sum(1 for _ in self.summands())
+
+    def __lt__(self, other: Number | τ) -> T_Gt | T_Lt:
+        lhs = self - other
+        if lhs.lc() < 0:
+            return self.__class__._gt_type()(-lhs, 0)
+        else:
+            return self.__class__._lt_type()(lhs, 0)
+
+    def __ne__(self, other: object) -> T_Ne:  # type: ignore[override]
+        if not isinstance(other, (*_NUMBER_TYPES, self.__class__._term_type())):
+            raise TypeError(f'Cannot compare Term with {type(other)}')
+        lhs = self - other
+        if lhs.lc() < 0:
+            lhs = -lhs
+        return self.__class__._ne_type()(lhs, 0)
+
     def __mul__(self, other: Number | τ) -> τ:
         if isinstance(other, _NUMBER_TYPES):
-            other = self.__class__._from_number(other)
+            other = self.__class__._term_type()(other)
         parent = self._ring | other._ring
         self_poly = parent.coerce_poly(self._poly)
         other_poly = parent.coerce_poly(other._poly)
@@ -307,17 +351,20 @@ class Term[τ: Term,
             raise ValueError(f'Negative exponent {n} not supported')
         return self.__class__._from_raw(self._poly ** n)
 
+    def __repr__(self) -> str:
+        return self._as_string(mul='*', pow='**')
+
     def __radd__(self, other: Number | τ) -> τ:
         assert isinstance(other, _NUMBER_TYPES)
-        return self.__class__._from_number(other) + self
+        return self.__class__._term_type()(other) + self
 
     def __rmul__(self, other: Number | τ) -> τ:
         assert isinstance(other, _NUMBER_TYPES)
-        return self.__class__._from_number(other) * self
+        return self.__class__._term_type()(other) * self
 
     def __rsub__(self, other: Number | τ) -> τ:
         assert isinstance(other, _NUMBER_TYPES)
-        return self.__class__._from_number(other) - self
+        return self.__class__._term_type()(other) - self
 
     def __setstate__(self, state):
         self._hash = None
@@ -332,11 +379,11 @@ class Term[τ: Term,
         >>> str(t)
         'x^2 - 2*x*y + y^2 + 4*x - 4*y + 4'
         """
-        return str(self._poly)
+        return self._as_string(mul='*', pow='^')
 
     def __sub__(self, other: Number | τ) -> τ:
         if isinstance(other, _NUMBER_TYPES):
-            other = self.__class__._from_number(other)
+            other = self.__class__._term_type()(other)
         parent = self._ring | other._ring
         self_poly = parent.coerce_poly(self._poly)
         other_poly = parent.coerce_poly(other._poly)
@@ -348,19 +395,245 @@ class Term[τ: Term,
             "Use ** for exponentiation, not '^', which means xor "
             "in Python, and has the wrong precedence")
 
+    def as_constant(self) -> mpq:
+        """Return this term as an :class:`mpq <.gmpy2.mpq>`.
+        Raise :class:`ValueError` if this term is not constant.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x = VV['x']
+        >>> t = x + mpq(1, 2) - x
+        >>> t
+        1/2
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, mpq)
+        False
+        >>> c = t.as_constant()
+        >>> c
+        mpq(1,2)
+        >>> isinstance(c, mpq)
+        True
+
+        .. seealso::
+            :meth:`.Term.is_constant`
+        """
+        if not self.is_constant():
+            raise ValueError(f'{self} is not constant')
+        return self.constant_coefficient()
+
+    def as_latex(self) -> str:
+        """LaTeX representation as a string. Implements the abstract method
+        :meth:`.firstorder.term.Term.as_latex`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.as_latex()
+        'x^{2} - 2 x y + y^{2} + 4 x - 4 y + 4'
+        """
+        return self._as_string(mul=' ', pow='^', exp_pre='{', exp_post='}')
+
+    def _as_string(self, mul: str, pow: str, exp_pre: str = '', exp_post: str = '') -> str:
+
+        def _format_first(c: mpq, d) -> str:
+            m = _format_mon(d)
+            if c == mpq(1):
+                return m if m else f'{c}'
+            elif c == mpq(-1):
+                return f'-{m}' if m else f'{c}'
+            elif c != mpq(0):
+                return f'{c}{mul}{m}' if m else f'{c}'
+            else:
+                assert False, f'zero summand in {self!r}'
+
+        def _format_next(c: mpq, d) -> str:
+            m = _format_mon(d)
+            if c == mpq(1):
+                return f' + {m}' if m else f' + {c}'
+            elif c == mpq(-1):
+                return f' - {m}' if m else f' - {-c}'
+            elif c > mpq(0):
+                return f' + {c}{mul}{m}' if m else f' + {c}'
+            elif c < mpq(0):
+                return f' - {-c}{mul}{m}' if m else f' - {-c}'
+            else:
+                assert False, f'zero summand in {self!r}'
+
+        def _format_var(v: Variable) -> str:
+            return str(v._poly)
+
+        def _format_mon(d: dict[Variable, int]) -> str:
+            ret = ''
+            for gen in self._ring.get_gens():
+                v = self.__class__._variable_type()._from_gen(gen)
+                e = d.get(v, 0)
+                if e == 0:
+                    continue
+                elif e == 1:
+                    ret += f'{mul}{_format_var(v)}'
+                else:
+                    ret += f'{mul}{_format_var(v)}{pow}{exp_pre}{e}{exp_post}'
+            return ret.lstrip(mul)
+
+        summands = list(self.summands())
+        summands.reverse()
+        if not summands:
+            return '0'
+        d, c = summands.pop()
+        ret = [_format_first(c, d)]
+        while summands:
+            d, c = summands.pop()
+            ret.append(_format_next(c, d))
+        return ''.join(ret)
+
+    def as_variable(self) -> χ:
+        """Return this term as an instance of the subclass :class:`.Variable`.
+        Raise :class:`ValueError` if this term is not a variable.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x = VV['x']
+        >>> t = x + 1 - 1
+        >>> t
+        x
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, Variable)
+        False
+        >>> v = t.as_variable()
+        >>> v
+        x
+        >>> isinstance(v, Variable)
+        True
+
+        .. seealso::
+            :meth:`.Term.is_variable`
+        """
+        if not self.is_variable():
+            raise ValueError(f'{self} is not a variable')
+        return self.__class__._variable_type()._from_gen(self._poly)
+
+    def coefficient(self, degrees: dict[χ, int]) -> τ:
+        """Return the coefficient of the variables with the degrees specified in
+        the ``degrees``. Mathematically, this is the coefficient in the base
+        ring adjoined by the variables of this ring that are not listed in
+        ``degrees``.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.coefficient({x: 1, y: 1})
+        -2
+        >>> t.coefficient({x: 1})
+        -2*y + 4
+        """
+
+        def subtract_if_subset(d1: dict[χ, int], d2: dict[χ, int]) -> Optional[dict[χ, int]]:
+            """Check if d2 constraints are satisfied by d1, return remaining
+            exponents. Returns d1 with keys matching d2 removed, if each key in
+            d2 either has a zero exponent and does not exist in d1, or has a
+            non-zero exponent and exists in d1 with the same exponent. Returns
+            None otherwise.
+            """
+            # Verify that contraint on d2 keys is satisfied
+            for name2, exp2 in d2.items():
+                if name2 not in d1:
+                    if exp2 != 0:
+                        return None
+                else:
+                    var1 = name2
+                    if d1[var1] != exp2:
+                        return None
+
+            # Return d1 with all variables mentioned in d2 removed
+            return {var1: exp1 for var1, exp1 in d1.items() if var1 not in d2}
+
+        # The result will have the same context as `self`. We reference
+        # `degrees` only by the names of the variables.
+        degrees_by_names = {var: exp for var, exp in degrees.items()}
+        ret = self.__class__._term_type()(0)
+        for exp_dict, coeff in self.summands():
+            summand_dict = subtract_if_subset(exp_dict, degrees_by_names)
+            if summand_dict is not None:
+                summand = self.__class__._term_type()(coeff)
+                for var, exp in summand_dict.items():
+                    summand *= var ** exp
+                ret += summand
+        return ret
+
     def _coerce(self, ring: Ring[π, ρ]) -> τ:
         """Coerce the underlying polynomial of this term to the given ring.
         """
         return self.__class__._from_raw(ring.coerce_poly(self._poly))
+
+    @abstractmethod
+    def constant_coefficient(self) -> mpq:
+        """Return the constant coefficient of this term.
+        """
+        ...
+
+    def is_constant(self) -> bool:
+        """Return :obj:`True` if this term is constant.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x = VV['x']
+        >>> t = x + mpq(1, 2) - x
+        >>> t
+        1/2
+        >>> isinstance(t, mpq)
+        False
+        >>> t.is_constant()
+        True
+
+        .. seealso::
+            - :meth:`.as_constant`
+            - :external:meth:`MPolynomial_libsingular.is_constant()
+              <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_constant>`
+        """
+        return self._poly.is_constant()
+
+    def is_variable(self) -> bool:
+        """Check if this term is a variable.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x = VV['x']
+        >>> t = x + 1 - 1
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, Variable)
+        False
+        >>> t.is_variable()
+        True
+        """
+        return self._poly in self._ring.get_gens()
 
     @staticmethod
     @abstractmethod
     def _eq_type() -> type[T_Eq]:
         ...
 
-    @classmethod
+    @staticmethod
     @abstractmethod
-    def _from_number(cls, num: Number) -> τ:
+    def _ge_type() -> type[T_Ge]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _gt_type() -> type[T_Gt]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _le_type() -> type[T_Le]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _lt_type() -> type[T_Lt]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _ne_type() -> type[T_Ne]:
         ...
 
     @classmethod
@@ -377,6 +650,18 @@ class Term[τ: Term,
     @staticmethod
     @abstractmethod
     def _term_type() -> type[τ]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _variable_type() -> type[χ]:
+        ...
+
+    @abstractmethod
+    def summands(self) -> Iterator[tuple[dict[χ, int], mpq]]:
+        """Iterate over the summands of this term yielding pairs of monomials
+        and coefficients, where the monimials are represented as dictionaries.
+        """
         ...
 
 
