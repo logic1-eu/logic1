@@ -1,6 +1,6 @@
 # Simplifying a strict DNF
 
-These notes concern a strict DNF represented as
+These notes concern a strict DNF conceptually represented as
 `set[frozenset[AtomicFormula]]`. Each inner frozenset is a conjunction
 (a *cube*); the outer set is a disjunction of cubes. Thus, for a DNF `N`,
 
@@ -12,6 +12,11 @@ $$
 The empty outer set represents `F`. A DNF containing the empty frozenset
 represents `T`, because the empty conjunction is true. In particular,
 `set()` represents `F`, while `{frozenset()}` represents `T`.
+
+In the implementation, `Cube` is an immutable wrapper around the inner
+frozenset, and `StrictDnf` is a mutable wrapper around `set[Cube]`. The
+corresponding Python values are `StrictDnf()` for `F` and
+`StrictDnf((Cube(),))` for `T`.
 
 The atoms are polynomial constraints. Equivalences with `T` or `F` below
 mean validity or unsatisfiability over real closed fields, respectively.
@@ -156,7 +161,7 @@ A full mask removes the polynomial constraint. These operations use
 only equality of normalized polynomials and bitwise operations. They
 do not invoke a general RCF validity test.
 
-`DuringStepSimplifyingCartesianBooleanNormalForm` inserts cubes into a running
+`DuringStepSimplifyingCartesianBnf` inserts cubes into a running
 strict DNF at each `Or` node. At each `And` node, it multiplies child
 DNFs one at a time, with insertion after each product. Insertion removes a
 structurally subsumed cube or merges two cubes as above; new merge
@@ -165,7 +170,7 @@ can discard a cube that might have supported a later cut, as shown in
 "Order and iteration" above. It keeps the algorithm and its storage
 small, but does not promise a minimal DNF.
 
-`AfterStepSimplifyingCartesianBooleanNormalForm` uses the same atomic
+`AfterStepSimplifyingCartesianBnf` uses the same atomic
 rules but finishes the local Cartesian expansion of each `And` or `Or`
 node before reducing its cubes. Its recursive calls return already
 reduced child DNFs. This matches the placement of Redlog's
@@ -219,15 +224,40 @@ result. `FINAL` provides the previously missing experiment: plain recursive
 construction followed by one dedicated reduction of the completed strict DNF.
 Select `Simplification.NONE` explicitly for plain Cartesian or PyEDA calls.
 
-`SimplifyingCartesianBooleanNormalForm` is the shared base for
-`FinalSimplifyingCartesianBooleanNormalForm`,
-`AfterStepSimplifyingCartesianBooleanNormalForm`, and
-`DuringStepSimplifyingCartesianBooleanNormalForm`. It provides the reduction
-rules, deterministic ordering, and bounded final semantic pass. The final-only
-class inherits plain Cartesian recursion and extends the final pass with cube
-normalization, structural subsumption, and cut. The other classes select the
-placement of those reductions through `_strict_dnf`. They are siblings;
-after-step no longer inherits the during-step construction algorithm.
+The current implementation separates values and computation:
+
+- `Cube` owns a conjunction's immutable atom set, ordering, normalization,
+  merging, and implication checks.
+- `StrictDnf` owns a mutable set of cubes. Its constructor, `add`, and `update`
+  collect without simplifying. `insert` requires a normalized cube and an
+  already reduced destination, which it mutates using subsumption and cut.
+  `syntactic_reduction` and `semantic_subsumption` return new collections.
+- `CartesianBnf` owns recursion and formula conversion. Its finishing hook
+  is the identity for plain Cartesian computation.
+- `SimplifyingCartesianBnf` owns budget validation and storage and implements
+  final semantic subsumption. The final, after-step, and during-step classes
+  inherit from it and select when syntactic reduction runs. The final-only
+  finishing hook runs both passes; the two recursive schedules inherit the
+  common semantic finishing hook.
+
+`Cube.sort_key` determines reconstruction, greedy insertion, and bounded
+comparison order. `StrictDnf` has structural equality and is unhashable.
+Its set is owned independently of any input container; immutable cubes may
+be shared. A strict DNF can be unsimplified, so none of these values stores
+an implicit simplification policy. Semantic counters start anew on each call.
+
+Earlier on 2026-11-02, `StrictDnfSimplificationMixin` supplied collection
+operations to three classes using independent multiple inheritance. Moving
+those operations into `StrictDnf` eliminated the mixin. The common Cartesian
+base now handles configuration and final processing without duplicating
+constructors or hooks. Historical measurements of the intermediate design
+are retained below.
+
+`simplify` and `conservative_simplify` continue to call the general RCF
+simplifier before construction and after formula reconstruction, respectively.
+Deterministic formula reconstruction is shared by all Cartesian schedules.
+The refactoring preserves the rules, budgets, and measured schedules; the
+historical benchmark data below is unchanged.
 
 All three simplifying schedules use `max_pair_checks=500` for final semantic
 subsumption; zero skips that pass and `None` removes the limit. `NONE` and
@@ -240,6 +270,230 @@ In the measurements below, **early** means `DURING_STEP` and **subtree** means
 the original experiments. The benchmark modules use the current schedule
 names for new measurements.
 
+### Mixin refactoring verification (2026-11-02)
+
+Checked with the Sage backend in the `logic1_dev` Conda environment, using
+`DOT_SAGE=/tmp/logic1-sage-implicit`:
+
+- Focused BNF unit tests and module doctests: 129 passed.
+- `make test`: mypy passed for 19 stub files and 68 source files; all 688
+  regular tests and doctests passed in 20.05 seconds.
+- `make test-doc`, run separately: all 13 API documentation tests passed
+  in 2.93 seconds.
+- Reversed-parent tests cover all three concrete schedules, DNF and CNF,
+  budgets of 0, 1, 500, and `None`, and examples requiring structural and
+  semantic simplification.
+- Python code and docstring line lengths and `git diff --check` passed.
+
+The initial sandboxed full run failed because the parallel QE test's
+multiprocessing manager could not create a local socket. The full rerun
+with socket access passed. Flint was not checked. No benchmarks were rerun,
+and the existing benchmark measurements and tables were retained.
+
+The full-run log is `/tmp/logic1-bnf-mixin-test-unsandboxed-2026-11-02.log`;
+the API documentation log is `/tmp/logic1-bnf-mixin-doc-2026-11-02.log`.
+These temporary paths record provenance and are not permanent artifacts.
+
+The subsequent terminology cleanup on 2026-11-02 renamed the batch operation
+to `_syntactic_reduction` and added two cases covering batch and incremental
+normalization and contradiction rejection. With the same Sage setup,
+`make test` passed mypy and all 690 tests in 20.43 seconds; the separate
+`make test-doc` run passed all 13 tests in 2.97 seconds. The logs are
+`/tmp/logic1-bnf-syntactic-test-unsandboxed-2026-11-02.log` and
+`/tmp/logic1-bnf-syntactic-doc-2026-11-02.log`. The rules, schedules, budgets,
+and parent-order independence are unchanged. Flint was not checked.
+
+### Ordering cleanup and reproducibility check (2026-11-02)
+
+The cube-ordering lambda in Cartesian reconstruction and the mixin's static
+method were consolidated into one module-level `_cube_key` function. All
+existing sorting was retained; no caches, ordered representations, or new
+configuration options were introduced.
+
+A one-off experiment compared exact result representations before and after
+this cleanup with the Sage backend. The RCF simplifier was assumed stable
+and left unchanged; PyEDA was outside the investigation. The six inputs were
+`T`, `F`, the six-cube cut witness, a product of two two-cube DNFs, a 3-by-3
+grid requiring semantic subsumption, and a quantified example.
+
+Each run covered DNF and CNF, all four Cartesian schedules, and budgets of
+0, 1, 500, and `None` for the three simplifying schedules. `NONE` used its
+supported default budget of 500. This gave 156 conversions per process.
+Hash seeds 0, 1, 63, and 314159 produced four distinct atom-set iteration
+orders. All exact outputs agreed across seeds, and all post-cleanup outputs
+matched the pre-cleanup baseline: 1,248 conversions in total. The witnesses
+produced three distinct results across schedules and three across budgets,
+so the checks exercised choices that can affect the result.
+
+This is evidence for the checked cases, not a proof for arbitrary inputs.
+Flint was not checked. Sorting costs were not measured, and no benchmark
+timings or tables were updated. The temporary driver is
+`/tmp/logic1-bnf-repro-2026-11-02.py`; its JSON records are named
+`/tmp/logic1-bnf-repro-{before,after}-seed{seed}-2026-11-02.json`.
+
+After the cleanup, Sage `make test` passed mypy and all 690 tests; the
+separate `make test-doc` run passed all 13 tests.
+
+### Cube wrapper (2026-11-02)
+
+The module-level ordering helper was an intermediate arrangement. `Cube` now
+owns `sort_key`, `normalize`, `merge`, `implies`, and the sign-mask mappings.
+It is a frozen, slotted dataclass containing one private
+`frozenset[AtomicFormula]`. Equality is structural, and hashing delegates
+directly to the frozenset. Construction removes duplicate atoms but does not
+normalize constraints. `conjoin` and `combine` also leave normalization
+explicit, preserving the four construction schedules.
+
+The mixin retains insertion, batch syntactic reduction, bounded semantic
+subsumption, and option initialization. Cartesian reconstruction and all
+collection processing use `Cube.sort_key`. The three concrete classes still
+inherit directly from the two independent parents. No sorting was removed,
+and no caches or additional options were introduced.
+
+#### Representation investigation
+
+Before implementation, isolated wrapper and frozenset-subclass prototypes
+moved the same operations into `Cube`. Both passed mypy, and both matched
+the current public outputs on 156 small cases for each of two hash seeds:
+936 checked outputs across the current representation and both prototypes.
+The comparison covered DNF and CNF, all schedules, and the selected semantic
+budgets. Strict construction also agreed on series3 and series12 for all four
+schedules. Complete series12 DNF calls agreed for NONE and DURING_STEP.
+
+Measured with Sage and Python 3.14.10, the wrapper adds 40 bytes per cube,
+excluding the stored frozenset and referenced atoms. For the measured series12
+strict DNFs, that added 29,840 bytes with NONE (746 cubes) and 15,760 bytes
+with DURING_STEP (394 cubes). These are container measurements, not
+whole-process peak memory. The subclass had no retained-container overhead
+but required adapters because inherited set operations return plain
+frozensets. A wrapper was chosen for its explicit interface and encapsulation.
+
+The prototype study's three-fresh-process median times, in seconds, were:
+
+| Series12 schedule | Current frozensets | Wrapper prototype | Subclass prototype |
+| --- | ---: | ---: | ---: |
+| NONE | 6.168 | 6.191 | 6.164 |
+| DURING_STEP | 8.572 | 8.602 | 8.545 |
+
+Recursive construction alone was approximately 3–5% slower with the wrapper
+on series12; the observed complete-call differences were within run-to-run
+variation. The temporary investigation script is
+`/tmp/logic1-cube-study-2026-11-02.py`; detailed measurements are in
+`/tmp/logic1-cube-micro-2026-11-02.json` and
+`/tmp/logic1-cube-integrated-2026-11-02.json`.
+
+#### Final implementation verification
+
+The implemented wrapper passed mypy and all 705 regular tests and doctests
+with Sage. The separate API documentation run passed all 13 tests. New tests
+cover structural equality and hashing, deduplication, immutable storage,
+pickle round trips, conjunction without automatic normalization, and the
+individual normalization, merge, and implication operations.
+
+A 624-conversion check covered the same six small inputs, all schedules and
+supported selected budgets, DNF and CNF, and hash seeds 0, 1, 63, and 314159.
+All exact outputs matched across seeds and matched the saved pre-wrapper
+baseline. Records are
+`/tmp/logic1-bnf-repro-cube-seed{seed}-2026-11-02.json`.
+
+The final code was compared with a saved pre-wrapper source in fresh workers,
+using three timed calls per representation and schedule on series12. Worker
+startup, input construction, and output counting were outside timing; the
+calls retained their ordinary preprocessing, final simplification, and
+default semantic budget. Median times in seconds were:
+
+| Series12 schedule | Pre-wrapper baseline | Implemented wrapper | Output atoms |
+| --- | ---: | ---: | ---: |
+| NONE | 6.143 | 6.207 | 4560 |
+| DURING_STEP | 8.571 | 8.588 | 2116 |
+
+All exact result representations matched. The observed median differences
+were about 1.0% and 0.2%, respectively, smaller than the run-to-run variation.
+These selected cases do not establish performance bounds for other inputs.
+The records are `/tmp/logic1-cube-final-timings-2026-11-02.json`.
+Neither the RCF simplifier nor PyEDA was modified. PyEDA was excluded from
+the representation investigation and timed comparisons. Flint was not
+checked. Existing benchmark-module tables retain their historical data.
+
+### StrictDnf wrapper (2026-11-02)
+
+An isolated prototype replaced the outer `set[Cube]` alias with a mutable,
+slotted wrapper and moved insertion, syntactic reduction, and semantic
+subsumption into it. Its batch methods preserve inputs. Insertion works
+on the private set directly, avoiding delegated set operations inside its
+comparison loop. No rules, sorting, schedules, defaults, or budgets changed.
+The wrapper adds 40 bytes per DNF container on Python 3.14.10; this is not a
+measurement of whole-process peak memory. It does not duplicate cubes.
+
+The prototype matched 624 small-case output comparisons across hash seeds
+0, 1, 63, and 314159 on each of Sage and Flint. These cover DNF and CNF, all
+schedules, selected budgets, and witnesses distinguishing schedules and
+budgets. Ownership, structural equality, nonmutation by batch passes, and
+unhashability were also checked.
+
+Complete series12 DNF calls used the default semantic budget of 500, hash
+seed 0, three fresh-process runs per configuration, and alternating execution
+order. Input creation, startup, and output counting were outside timing.
+Median times in seconds and output atom counts were:
+
+| Schedule | Sage current | Sage prototype | Flint current | Flint prototype | Atoms, all |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| NONE | 6.289 | 6.218 | 7.475 | 7.425 | 4560 |
+| FINAL | 7.850 | 7.781 | 18.563 | 18.515 | 2116 |
+| AFTER_STEP | 8.064 | 8.047 | 20.429 | 20.563 | 2116 |
+| DURING_STEP | 8.542 | 8.598 | 23.145 | 23.272 | 2116 |
+
+Every exact result representation agreed. Construction alone was timed on a
+preprocessed matrix, excluding the final semantic pass and reconstruction,
+using five alternating repetitions in one process. Median seconds were:
+
+| Schedule | Sage current | Sage prototype | Flint current | Flint prototype |
+| --- | ---: | ---: | ---: | ---: |
+| NONE | 0.003251 | 0.003636 | 0.003172 | 0.003517 |
+| AFTER_STEP | 2.013391 | 2.013776 | 12.383674 | 12.420979 |
+| DURING_STEP | 2.469750 | 2.474261 | 14.987632 | 15.358939 |
+
+FINAL shares NONE's construction. There is small absolute overhead in plain
+construction and a 2.5% during-step increase in the Flint construction sample.
+Complete-call differences were at most about 1.1% in magnitude. These selected
+measurements establish no general performance bounds. PyEDA was excluded.
+
+Flint was selected in a temporary package copy; every complete-call worker
+asserted `POLYLIB == "FLINT"`. The repository's selector remained on Sage.
+Raw investigation records are `/tmp/strictdnf-timings.json`,
+`/tmp/strictdnf-construction.json`, `/tmp/strictdnf-flint-timings.json`, and
+`/tmp/strictdnf-flint-construction.json`. These tables describe the prototype
+comparison and do not replace the benchmark modules' historical tables.
+
+#### Implementation verification
+
+The implemented wrapper passed Sage mypy checks (19 stub files and 68 source
+files), all 697 regular tests and doctests, and the separate 13 API
+documentation checks. The focused BNF suite passed 138 checks with both Sage
+and Flint. The earlier 24 reversed-parent tests became 12 inherited-budget
+and finishing tests; three collection tests and one doctest were added.
+The existing schedule and semantic-budget witnesses remain in place.
+
+The final source matched all 624 saved small-case outputs on each backend
+across the four hash seeds, for 1,248 comparisons. Records are
+`/tmp/strictdnf-final-{SAGE,FLINT}-seed{seed}.json`. Flint validation used a
+temporary package copy with the final BNF source and the Flint selector;
+the full repository-wide typing and test run used Sage.
+
+Selected final-code series12 checks used one fresh-process call per row,
+hash seed 0 and budget 500. Every exact output matched its saved baseline:
+
+| Backend | Schedule | Seconds | Result atoms |
+| --- | --- | ---: | ---: |
+| Sage | NONE | 6.158 | 4560 |
+| Sage | DURING_STEP | 8.394 | 2116 |
+| Flint | NONE | 7.445 | 4560 |
+| Flint | DURING_STEP | 23.025 | 2116 |
+
+These are individual verification runs, not replacements for the repeated
+prototype comparison above. Raw records are
+`/tmp/strictdnf-final-timings.json`. PyEDA was not benchmarked.
+
 ### Large semantic-budget illustration
 
 The former class doctests used a 20-by-20 grid with 400 cubes to demonstrate
@@ -248,12 +502,12 @@ the effect of budgets below, at, and above the default of 500:
 ```python
 from logic1.firstorder import And, Or
 from logic1.theories.RCF import VV
-from logic1.theories.RCF.bnf import AfterStepSimplifyingCartesianBooleanNormalForm
+from logic1.theories.RCF.bnf import AfterStepSimplifyingCartesianBnf
 
 x, y = VV.get('x', 'y')
 g = Or(*(And(x > i, y > j) for i in range(20) for j in range(20)))
 for checks in (100, 500, None):
-    result = AfterStepSimplifyingCartesianBooleanNormalForm(max_pair_checks=checks).dnf(g)
+    result = AfterStepSimplifyingCartesianBnf(max_pair_checks=checks).dnf(g)
     cubes = len(result.args) if isinstance(result, Or) else 1
     print(checks, cubes, len(list(result.atoms())))
 ```
@@ -336,7 +590,7 @@ placement and is easier to explain. It must, however, materialize the
 complete local product, including cubes that reduction will discard.
 Before the 2026-10-22 refactoring, the subtree subclass inherited the
 reduction helpers from the early class and explicitly called
-`CartesianBooleanNormalForm._strict_dnf`. That call recursively dispatched
+`CartesianBnf._strict_dnf`. That call recursively dispatched
 back to the subtree subclass. The current sibling classes instead inherit
 the helpers from a shared base; after-step uses `super()._strict_dnf`.
 If only one simplifying schedule is eventually retained, its helpers could

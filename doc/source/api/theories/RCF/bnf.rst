@@ -20,18 +20,19 @@ Boolean Normal Forms
     integer value. All schedules retain ordinary preprocessing and conservative
     final simplification. Nonzero schedules require ``'cartesian'``:
 
-    * ``NONE`` (0): no additional DNF reductions; required for ``'pyeda'``.
-    * ``FINAL`` (1, the default): reduce the complete strict DNF once.
-    * ``AFTER_STEP`` (2): reduce each completed Boolean node.
-    * ``DURING_STEP`` (3): reduce cubes and partial products during construction
-      at each Boolean node.
+    * ``NONE`` (0): no additional DNF simplification; required for ``'pyeda'``.
+    * ``FINAL`` (1, the default): simplify the complete strict DNF once.
+    * ``AFTER_STEP`` (2): simplify each completed Boolean node.
+    * ``DURING_STEP`` (3): simplify cubes and partial products during
+      construction at each Boolean node.
 
     These schedules share atomic rules and final semantic subsumption; larger
     integer values do not guarantee better or faster results.
     ``max_pair_checks`` bounds the final semantic comparisons for these three
     schedules: 500 by default, zero to skip them, and ``None`` for no limit.
-    It does not bound atomic reductions or Cartesian construction. Unsupported
-    combinations of algorithms and schedules raise an exception.
+    It does not bound cube normalization, structural subsumption and cut, or
+    Cartesian construction. Unsupported combinations of algorithms and
+    schedules raise an exception.
 
     .. rubric:: Some examples
 
@@ -96,23 +97,49 @@ Boolean Normal Forms
   .. attention::
     The material below addresses implementers rather than users.
 
-  .. autoclass:: CartesianBooleanNormalForm
+  .. autoclass:: CartesianBnf
     :exclude-members: __init__, __new__
 
   .. autoclass:: Simplification
     :members:
 
-  .. autoclass:: SimplifyingCartesianBooleanNormalForm
+  .. autoclass:: Cube
     :exclude-members: __new__
 
-  .. autoclass:: FinalSimplifyingCartesianBooleanNormalForm
+  .. autoclass:: StrictDnf
     :exclude-members: __new__
 
-  .. autoclass:: AfterStepSimplifyingCartesianBooleanNormalForm
+  Cartesian construction owns conversion between formulas and strict DNFs.
+  ``Cube`` owns an immutable atom set and the operations on one conjunction.
+  ``StrictDnf`` owns a mutable set of cubes, syntactic reduction, and semantic
+  subsumption. Construction, ``add``, and ``update`` perform no simplification.
+  ``insert`` mutates an already reduced collection using a normalized cube;
+  both batch passes return new collections and preserve their input.
+
+  ``SimplifyingCartesianBnf`` inherits from ``CartesianBnf`` and supplies
+  budget validation and final semantic subsumption. The three concrete
+  schedules inherit from this common base. The budget belongs to a
+  computation, not to its intermediate strict DNFs.
+
+  ``Cube.sort_key`` determines formula reconstruction, greedy insertion,
+  and bounded comparison order. Cube normalization remains explicit.
+  ``_finish_strict_dnf`` is an identity hook in ``CartesianBnf``. The final
+  schedule runs ``syntactic_reduction`` before semantic subsumption. The
+  after-step schedule runs it after each Boolean node; the during-step
+  schedule calls ``Cube.normalize`` and ``StrictDnf.insert`` incrementally.
+  Both recursive schedules inherit the common semantic finishing hook.
+
+  .. autoclass:: SimplifyingCartesianBnf
     :exclude-members: __new__
 
-  .. autoclass:: DuringStepSimplifyingCartesianBooleanNormalForm
+  .. autoclass:: FinalSimplifyingCartesianBnf
     :exclude-members: __new__
 
-  .. autoclass:: PyedaBooleanNormalForm
+  .. autoclass:: AfterStepSimplifyingCartesianBnf
+    :exclude-members: __new__
+
+  .. autoclass:: DuringStepSimplifyingCartesianBnf
+    :exclude-members: __new__
+
+  .. autoclass:: PyedaBnf
     :exclude-members: __init__, __new__

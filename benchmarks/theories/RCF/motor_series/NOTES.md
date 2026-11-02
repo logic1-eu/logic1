@@ -208,7 +208,7 @@ reduction, compared with 46.740 and 47.804 seconds in the preceding run.
 These are single measurements, so the differences do not isolate sorting
 overhead from run-to-run variation.
 
-After `CartesianBooleanNormalForm.simplify` was fixed to
+After `CartesianBnf.simplify` was fixed to
 `explode_always=False, substitute=1`, the full 78-case matrix was run again.
 It finished in 533.49 seconds: 71 cases passed, and PyEDA timed out on the
 same seven series (1, 2, 6, 8, 10, 12, 13). All successful result sizes

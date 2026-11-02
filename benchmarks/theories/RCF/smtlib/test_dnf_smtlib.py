@@ -166,8 +166,7 @@ import pytest
 from pytest_benchmark.fixture import BenchmarkFixture
 
 from logic1.theories.RCF import redlog
-from logic1.theories.RCF.bnf import (CartesianBooleanNormalForm, Simplification,
-                                    dnf as logic1_dnf)
+from logic1.theories.RCF.bnf import CartesianBnf, Simplification, dnf as logic1_dnf
 from logic1.theories.RCF.simplify import simplify as rcf_simplify
 from logic1.theories.RCF.types import Formula
 
@@ -183,11 +182,11 @@ def _dnf_without_initial_implicit_ranges(f: Formula) -> Formula:
     This function runs in the worker, where the temporary replacement also
     affects the inherited preprocessing of the early method.
     """
-    def simplify(self: CartesianBooleanNormalForm, f: Formula) -> Formula:
+    def simplify(self: CartesianBnf, f: Formula) -> Formula:
         return rcf_simplify(f, explode_always=False, substitute=1, implicit_ranges=False)
 
     with pytest.MonkeyPatch.context() as monkeypatch:
-        monkeypatch.setattr(CartesianBooleanNormalForm, "simplify", simplify)
+        monkeypatch.setattr(CartesianBnf, "simplify", simplify)
         return logic1_dnf(f, method="cartesian", simplification=Simplification.DURING_STEP)
 
 

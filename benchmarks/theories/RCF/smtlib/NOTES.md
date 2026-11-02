@@ -135,7 +135,7 @@ their schedule labels and invocation examples were updated to the new API.
 
 The additional case uses `method="cartesian"` and `Simplification.DURING_STEP`, with
 `implicit_ranges=False` only during initial simplification. It uses a
-temporary replacement of `CartesianBooleanNormalForm.simplify` inside the
+temporary replacement of `CartesianBnf.simplify` inside the
 worker and restores it afterwards. Semantic implication checks and final
 simplification retain their defaults. The computation limit remains
 30 seconds.

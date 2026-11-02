@@ -24,14 +24,14 @@ The measurements below were checked on 2026-10-21. The input is
 The SMT-LIB benchmark directory's `NOTES.md` records its source and credits.
 
 The experimental setting affects only
-`CartesianBooleanNormalForm.simplify`, called at the beginning of `_dnf`.
+`CartesianBnf.simplify`, called at the beginning of `_dnf`.
 Both variants use `explode_always=False` and `substitute=1` there.
 Semantic implication checks and `conservative_simplify` retain their
 defaults, including `implicit_ranges=True`. Early and subtree use
 `max_pair_checks=500` unless stated otherwise.
 
-Here early denotes `DuringStepSimplifyingCartesianBooleanNormalForm`, and subtree
-denotes `AfterStepSimplifyingCartesianBooleanNormalForm`, both in `bnf.py`. In the current interface these correspond to
+Here early denotes `DuringStepSimplifyingCartesianBnf`, and subtree
+denotes `AfterStepSimplifyingCartesianBnf`, both in `bnf.py`. In the current interface these correspond to
 `Simplification.DURING_STEP` and `Simplification.AFTER_STEP`, respectively.
 The measurements retain their original labels and date.
 
@@ -181,11 +181,11 @@ The following code reproduces the counts using the current early method:
 ```python
 from logic1.firstorder import And, Or
 from logic1.theories.RCF import VV
-from logic1.theories.RCF.bnf import DuringStepSimplifyingCartesianBooleanNormalForm
+from logic1.theories.RCF.bnf import DuringStepSimplifyingCartesianBnf
 from logic1.theories.RCF.simplify import simplify
 
 
-class WithoutInitialImplicitRanges(DuringStepSimplifyingCartesianBooleanNormalForm):
+class WithoutInitialImplicitRanges(DuringStepSimplifyingCartesianBnf):
     def simplify(self, f):
         return simplify(f, explode_always=False, substitute=1,
                         implicit_ranges=False)
@@ -198,7 +198,7 @@ def same_sign(p, q):
 x, b = VV.get('x', 'b')
 f = And(x > 0, same_sign(b, b*x), same_sign(b*x, b*x + b))
 
-for normal_form in (DuringStepSimplifyingCartesianBooleanNormalForm(),
+for normal_form in (DuringStepSimplifyingCartesianBnf(),
                     WithoutInitialImplicitRanges()):
     pre = normal_form.simplify(f)
     result = normal_form.dnf(f)
