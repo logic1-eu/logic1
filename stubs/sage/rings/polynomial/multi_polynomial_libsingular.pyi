@@ -72,6 +72,9 @@ class MPolynomial_libsingular(Generic[ρ]):
     def __add__(self, other: object) -> Self:
         ...
 
+    def __divmod__(self, other: object) -> tuple[Self, Self]:
+        ...
+
     def __gt__(self, other: object) -> bool:
         ...
 

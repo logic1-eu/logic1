@@ -1,28 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import Container
+from collections.abc import Container, Iterable, Iterator, Mapping
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import (ClassVar, Final, Generic, Iterable, Iterator, Mapping, Optional, Self, TypeVar)
-from typing_extensions import final
+from typing import ClassVar, Final, Generic, Optional, Self, TypeVar, final
 
 from gmpy2 import mpq
 from sage.all import QQ
 # Importing QQ from sage.rings.rational_fields causes problems. Notably, a
 # fresh instance of RationalField is assigned to QQ in sage.all.
-from sage.misc.latex import latex as sage_latex
 from sage.rings.polynomial.multi_polynomial_libsingular import (
     MPolynomial_libsingular as MPolynomial,
     MPolynomialRing_libsingular as MPolynomialRing)
-from sage.rings.polynomial.polynomial_ring_constructor import (
-    PolynomialRing as sage_PolynomialRing)
 from sage.rings.polynomial.polynomial_element import (
     Polynomial_generic_dense as UPolynomial)
+from sage.rings.polynomial.polynomial_ring_constructor import (
+    PolynomialRing as sage_PolynomialRing)
 from sage.rings.polynomial.term_order import TermOrder
 from sage.rings.rational import Rational
 
 from logic1.theories.RCF.abc import term as RCF_term_abc
-from logic1.theories.RCF.definite import Definite
 from logic1.theories.RCF.sage.types import Number, _NUMBER_TYPES
 
 from logic1.support.tracing import trace  # noqa
@@ -42,7 +39,7 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 def _caches():
     from logic1.theories.RCF.simplify import Simplify
     from logic1.theories.RCF.substitution import _SubstValue
-    return [Term.factor, _SubstValue.as_term, Simplify._simpl_at]
+    return [_SubstValue.as_term, Simplify._simpl_at]
 
 def cache_clear():
     for cache in _caches():
@@ -257,18 +254,8 @@ class Term(RCF_term_abc.Term['Term',
          (mpq(4,1), y), (mpq(4,1), 1)]
         """
         for coefficient, power_product in self._poly:
-            yield mpq(coefficient), Term._from_raw(power_product)
-
-    def __truediv__(self, other: Number | Term) -> Term:
-        """True division. ``self`` must be divisible by ``other``.
-        """
-        if not isinstance(other, Term):
-            other = Term(other)
-        ring = self._ring | other._ring
-        quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
-        # For x*y / y we obtain an element of a fraction field. We must ensure
-        # that the denominator is 1 and then convert to an MPolynomial.
-        return Term._from_raw(quotient)
+            monomial = Term._from_raw(power_product)
+            yield mpq(coefficient), monomial
 
     def coefficient(self, degrees: dict[Variable, int]) -> Term:
         """Return the coefficient of the variables with the degrees specified in
@@ -361,35 +348,6 @@ class Term(RCF_term_abc.Term['Term',
     def _eq_type() -> type[Eq]:
         return Eq
 
-    @staticmethod
-    def _ge_type() -> type[Ge]:
-        return Ge
-
-    @staticmethod
-    def _gt_type() -> type[Gt]:
-        return Gt
-
-    @staticmethod
-    def _le_type() -> type[Le]:
-        return Le
-
-    @staticmethod
-    def _lt_type() -> type[Lt]:
-        return Lt
-
-    @staticmethod
-    def _ne_type() -> type[Ne]:
-        return Ne
-
-    @staticmethod
-    def _term_type() -> type[Term]:
-        return Term
-
-    @staticmethod
-    def _variable_type() -> type[Variable]:
-        return Variable
-
-    @lru_cache(maxsize=CACHE_SIZE)
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
 
@@ -432,16 +390,6 @@ class Term(RCF_term_abc.Term['Term',
             unit *= mpq(lc) ** multiplicity
             D[Term._from_raw(poly)] = multiplicity
         return unit, D
-
-    @classmethod
-    def _from_raw(cls, poly: MPolynomial[Rational]) -> Term:
-        """Construct a :class:`Term` from a Sage object. Its argument types are
-        private and should not be used outside of this module.
-        """
-        term = Term.__new__(Term)
-        term._poly = poly
-        term._hash = None
-        return term
 
     @classmethod
     def _from_u_polynomial(cls, upoly: UPolynomial) -> Term:
@@ -495,48 +443,13 @@ class Term(RCF_term_abc.Term['Term',
         gbasis_terms = [Term._from_raw(poly) for poly in gbasis_polys if not poly.is_zero()]
         return gbasis_terms
 
-    def is_definite(self, assume: Mapping[Variable, Definite] = {}) -> Definite:
-        """A fast heuristic test for definitetess properties of this term. This
-        is based on *trivial square sum* properties of coefficient signs and
-        exponents.
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
 
-        >>> x, y = VV.get('x', 'y')
-        >>> print(Term(0).is_definite())
-        Definite.ZERO
-        >>> f = x**2 + y**2
-        >>> print(f.is_definite())
-        Definite.POSITIVE_SEMI
-        >>> g = -x**2 - y**2 - 1
-        >>> print(g.is_definite())
-        Definite.NEGATIVE
-        >>> h = (x - y) ** 2
-        >>> print(h.is_definite())
-        Definite.UNKNOWN
-        >>> print(h.is_definite(assume={x: Definite.POSITIVE, y: Definite.NEGATIVE}))
-        Definite.POSITIVE
-        >>> print(h.is_definite(assume={x: Definite.NEGATIVE_SEMI, y: Definite.POSITIVE_SEMI}))
-        Definite.POSITIVE_SEMI
-        """
-        # Start with the neutral element of Definite.add().
-        poly_result = Definite.ZERO
-        gens = self._poly.parent().gens()
-        for exponent, coefficient in self._poly.dict().items():
-            # Start with either POSITIVE or NEGATIVE, depending on the coefficient.
-            term_result = Definite.from_constant(mpq(coefficient))
-            for g, e in zip(gens, exponent):
-                if e == 0:
-                    # In contrast to a variable with even degree, an absent
-                    # variable yields the neutral element of Definite.mul().
-                    ge_result = Definite.POSITIVE
-                else:
-                    ge_result = assume.get(Variable._from_gen(g), Definite.UNKNOWN)
-                    if e % 2 == 0:
-                        ge_result = Definite.square(ge_result)
-                term_result = Definite.mul(term_result, ge_result)
-            poly_result = Definite.add(poly_result, term_result)
-            if poly_result is Definite.UNKNOWN:
-                return Definite.UNKNOWN
-        return poly_result
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
 
     def is_monomial(self) -> bool:
         """Check if this term is a monomial. A monomial is a summand without its
@@ -562,51 +475,6 @@ class Term(RCF_term_abc.Term['Term',
         """
         return self._poly.is_gen()
 
-    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
-        r"""Return :obj:`True` if this Term can be written as
-        :math:`a_1 x_1 + ... + a_n x_n + r` such that :math:`a_1, ..., a_n \in
-        \mathbb{Q}`, :math:`x_1, ..., x_n \in X`, and :math:`r` is a polynomial
-        over :math:`\mathbb{Q}` that does not contain any variable from
-        :math:`X`.
-
-        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
-        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
-        >>> term.is_weakly_parametric_linear({x, y})
-        True
-        >>> term.is_weakly_parametric_linear({a})
-        False
-        >>> term.is_weakly_parametric_linear({b})
-        False
-        """
-        for m in self.monomials():
-            if m in X:
-                continue
-            for v in m.vars():
-                if v in X:
-                    return False
-        return True
-
-    def is_zero(self) -> bool:
-        """Return :obj:`True` if this term equals zero.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x = VV['x']
-        >>> t = x - x
-        >>> t
-        0
-        >>> isinstance(t, Term)
-        True
-        >>> isinstance(t, int)
-        False
-        >>> t.is_zero()
-        True
-
-        .. seealso::
-            :external:meth:`MPolynomial_libsingular.is_zero()
-            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.is_zero>`
-        """
-        return self._poly.is_zero()
-
     def lc(self) -> mpq:
         """Return the leading coefficient of this term with respect to the
         degree lexicographical term order :mod:`deglex <sage.rings.polynomial.term_order>`.
@@ -622,6 +490,14 @@ class Term(RCF_term_abc.Term['Term',
             <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.lc>`
         """
         return mpq(self._poly.lc())
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
 
     def monomial_coefficient(self, mon: Term) -> mpq:
         """Return the coefficient in the base ring of the monomial ``mon`` in
@@ -639,39 +515,9 @@ class Term(RCF_term_abc.Term['Term',
         mon_poly = ring.coerce_poly(mon._poly)
         return mpq(self_poly.monomial_coefficient(mon_poly))
 
-    def monomials(self) -> list[Term]:
-        """Return a list of all monomials of this term. A monomial is defined
-        here as a summand of a polynomial *without* the coefficient.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x, y = VV.get('x', 'y')
-        >>> t = (x - y + 2) ** 2
-        >>> t.monomials()
-        [x**2, x*y, y**2, x, y, 1]
-
-        .. seealso::
-            :external:meth:`MPolynomial_libsingular.monomials()
-            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.monomials>`
-        """
-        return [Term._from_raw(monomial) for monomial in self._poly.monomials()]
-
-    @lru_cache(maxsize=CACHE_SIZE)
-    def normalize(self) -> Term:
-        """Divide this term by its leading coefficient, so that the result is monic.
-        """
-        return Term._from_raw(self._poly / self._poly.lc())
-
-    @lru_cache(maxsize=CACHE_SIZE)
-    def primitive_part(self, positive: bool = False) -> Term:
-        """Return the primitive part of this term. This is ``self`` divided by
-        its (positive) content, so that ``self.content() * self.primitive_part()
-        == self``. If ``positive`` is ``True``, the result is normalized to have
-        a positive leading coefficient.
-        """
-        pp = self / self.content()
-        if positive and pp.lc() < 0:
-            pp = -pp
-        return pp
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
 
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
@@ -695,29 +541,6 @@ class Term(RCF_term_abc.Term['Term',
         other1: UPolynomial = ring.coerce_poly(other._poly).polynomial(x_poly)
         quotient, remainder = self1.pseudo_quo_rem(other1)
         return Term._from_u_polynomial(quotient), Term._from_u_polynomial(remainder)
-
-    def quo_rem(self, other: Term) -> tuple[Term, Term]:
-        """Quotient and remainder of this term and `other`.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x, y = VV.get('x', 'y')
-        >>> f = 2*y*x**2 + x + 1
-        >>> f.quo_rem(x)
-        (2*x*y + 1, 1)
-        >>> f.quo_rem(y)
-        (2*x**2, x + 1)
-        >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
-        (2/3*x*y + 1/3, 1)
-
-        .. seealso::
-            :external:meth:`MPolynomial_libsingular.quo_rem()
-            <sage.rings.polynomial.multi_polynomial_libsingular.MPolynomial_libsingular.quo_rem>`
-        """
-        ring = self._ring | other._ring
-        self_poly = ring.coerce_poly(self._poly)
-        other_poly = ring.coerce_poly(other._poly)
-        quo, rem = self_poly.quo_rem(other_poly)
-        return Term._from_raw(quo), Term._from_raw(rem)
 
     def reduce(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G. The output is a polynomial ``r`` such that
@@ -817,6 +640,14 @@ class Term(RCF_term_abc.Term['Term',
                 if exponent:
                     result[Variable._from_gen(gens[i])] = int(exponent)
             yield result, mpq(coefficient)
+
+    @staticmethod
+    def _term_type() -> type[Term]:
+        return Term
+
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
 
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements

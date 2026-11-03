@@ -1,6 +1,7 @@
 """
 >>> from logic1 import *
 >>> from logic1.theories.RCF.flint.term import *
+>>> from logic1.theories.RCF.definite import Definite
 >>> from gmpy2 import mpq
 
 """
@@ -791,16 +792,16 @@ class Term:
     True
 
     ----------------------------------------------------------------------------
-    Test quo_rem:
+    Test divmod:
     ----------------------------------------------------------------------------
     >>> f = 2*y*x**2 + x + 1
-    >>> f.quo_rem(x)
+    >>> divmod(f, x)
     (2*x*y + 1, 1)
 
-    >>> f.quo_rem(y)
+    >>> divmod(f, y)
     (2*x**2, x + 1)
 
-    >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
+    >>> divmod(f, 3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
     (2/3*x*y + 1/3, 1)
 
     ----------------------------------------------------------------------------

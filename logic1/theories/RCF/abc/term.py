@@ -1,11 +1,13 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, final, Iterable, Iterator, Optional, Protocol, Self
+from collections.abc import Container, Iterable, Iterator, Mapping
+from typing import TYPE_CHECKING, final, Optional, Protocol, Self
 
 from gmpy2 import mpq
 
 from logic1 import firstorder
-from logic1.theories.Complex.atomic import Gt
 from logic1.theories.RCF.abc.types import _NUMBER_TYPES, Number
+from logic1.theories.RCF.definite import Definite
+
 
 if TYPE_CHECKING:
     from logic1.theories.RCF.abc.atomic import AtomicFormula
@@ -16,7 +18,13 @@ class RingElement(Protocol):
     def __add__(self, other: Self) -> Self:
         ...
 
-    def __sub__(self, other: Self) -> Self:
+    def __divmod__(self, other: Self) -> tuple[Self, Self]:
+        ...
+
+    def __eq__(self, other: object) -> bool:
+        ...
+
+    def __hash__(self) -> int:
         ...
 
     def __mul__(self, other: Self) -> Self:
@@ -25,16 +33,16 @@ class RingElement(Protocol):
     def __neg__(self) -> Self:
         ...
 
-    def __eq__(self, other: object) -> bool:
-        ...
-
     def __pow__(self, n: int) -> Self:
         ...
 
-    def __hash__(self) -> int:
+    def __sub__(self, other: Self) -> Self:
         ...
 
     def is_constant(self) -> bool:
+        ...
+
+    def is_zero(self) -> bool:
         ...
 
 
@@ -243,9 +251,16 @@ class VariableSet[χ: Variable](firstorder.VariableSet[χ]):
         ...
 
 
+class SortKey[τ: Term](ABC):
+
+    @abstractmethod
+    def __init__(self, term: τ) -> None:
+        ...
+
+
 class Term[τ: Term,
            χ: Variable,
-           κ, # sort key
+           κ,
            π: RingElement,
            ρ, # SAGE Polynomial Ring or FLINT Context
            T_Eq: AtomicFormula,
@@ -272,6 +287,27 @@ class Term[τ: Term,
         other_poly = parent.coerce_poly(other._poly)
         return self.__class__._from_raw(self_poly + other_poly)
 
+    def __divmod__(self, other: Number | τ) -> tuple[τ, τ]:
+        """Quotient and remainder of this term and `other`.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> f = 2*y*x**2 + x + 1
+        >>> divmod(f, x)
+        (2*x*y + 1, 1)
+        >>> divmod(f, y)
+        (2*x**2, x + 1)
+        >>> divmod(f, 3*x)
+        (2/3*x*y + 1/3, 1)
+        """
+        if isinstance(other, _NUMBER_TYPES):
+            other = self.__class__._term_type()(other)
+        ring = self._ring | other._ring
+        p = ring.coerce_poly(self._poly)
+        q = ring.coerce_poly(other._poly)
+        quo, rem = divmod(p, q)
+        return self.__class__._from_raw(quo), self.__class__._from_raw(rem)
+
     def __eq__(self, other: object) -> T_Eq:  # type: ignore[override]
         # MyPy requires "other: object". However, with our use a a constructor,
         # it makes no sense to compare terms with general objects. We have
@@ -283,6 +319,9 @@ class Term[τ: Term,
         if lhs.lc() < 0:
             lhs = -lhs
         return self.__class__._eq_type()(lhs, 0)
+
+    def __floordiv__(self, other: Number | τ) -> τ:
+        return self.__divmod__(other)[0]
 
     def __ge__(self, other: Number | τ) -> T_Ge | T_Le:
         lhs = self - other
@@ -310,6 +349,13 @@ class Term[τ: Term,
     def __init__(self, number: Number) -> None:
         ...
 
+    @abstractmethod
+    def __iter__(self) -> Iterator[tuple[mpq, τ]]:
+        """Iterate over the polynomial representation of the term, yielding
+        pairs of coefficients and monomials.
+        """
+        ...
+
     def __le__(self, other: Number | τ) -> T_Ge | T_Le:
         lhs = self - other
         if lhs.lc() < 0:
@@ -326,6 +372,9 @@ class Term[τ: Term,
             return self.__class__._gt_type()(-lhs, 0)
         else:
             return self.__class__._lt_type()(lhs, 0)
+
+    def __mod__(self, other: Number | τ) -> τ:
+        return self.__divmod__(other)[1]
 
     def __ne__(self, other: object) -> T_Ne:  # type: ignore[override]
         if not isinstance(other, (*_NUMBER_TYPES, self.__class__._term_type())):
@@ -388,6 +437,12 @@ class Term[τ: Term,
         self_poly = parent.coerce_poly(self._poly)
         other_poly = parent.coerce_poly(other._poly)
         return self.__class__._from_raw(self_poly - other_poly)
+
+    def __truediv__(self, other: Number | τ) -> τ:
+        quo, rem = self.__divmod__(other)
+        if rem != 0:
+            raise ValueError("Division not exact")
+        return quo
 
     @final
     def __xor__(self, other: object) -> Term:
@@ -571,6 +626,38 @@ class Term[τ: Term,
         """
         ...
 
+    @abstractmethod
+    def content(self) -> mpq:
+        """Return the content of this term, which is defined as the positive gcd
+        of its rational coefficients.
+        """
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _eq_type() -> type[T_Eq]:
+        ...
+
+    @classmethod
+    def _from_raw(cls, poly: π) -> τ:
+        """Construct a :class:`Term` from a polynomial.
+        """
+        term_type = cls._term_type()
+        term = term_type.__new__(term_type)
+        term._poly = poly
+        term._hash = None
+        return term
+
+    @staticmethod
+    @abstractmethod
+    def _ge_type() -> type[T_Ge]:
+        ...
+
+    @staticmethod
+    @abstractmethod
+    def _gt_type() -> type[T_Gt]:
+        ...
+
     def is_constant(self) -> bool:
         """Return :obj:`True` if this term is constant.
 
@@ -591,6 +678,45 @@ class Term[τ: Term,
         """
         return self._poly.is_constant()
 
+    def is_definite(self, assume: Mapping[χ, Definite] = {}) -> Definite:
+        """A fast heuristic test for definitetess properties of this term. This
+        is based on *trivial square sum* properties of coefficient signs and
+        exponents.
+
+        >>> from logic1.theories.RCF import Term, VV
+        >>> x, y = VV.get('x', 'y')
+        >>> print(Term(0).is_definite())
+        Definite.ZERO
+        >>> f = x**2 + y**2
+        >>> print(f.is_definite())
+        Definite.POSITIVE_SEMI
+        >>> g = -x**2 - y**2 - 1
+        >>> print(g.is_definite())
+        Definite.NEGATIVE
+        >>> h = (x - y) ** 2
+        >>> print(h.is_definite())
+        Definite.UNKNOWN
+        >>> print(h.is_definite(assume={x: Definite.POSITIVE, y: Definite.NEGATIVE}))
+        Definite.POSITIVE
+        >>> print(h.is_definite(assume={x: Definite.NEGATIVE_SEMI, y: Definite.POSITIVE_SEMI}))
+        Definite.POSITIVE_SEMI
+        """
+        # Start with the neutral element of Definite.add().
+        poly_result = Definite.ZERO
+        for exp_dict, coeff in self.summands():
+            # Start with either POSITIVE or NEGATIVE, depending on the coefficient.
+            mon_result = Definite.from_constant(coeff)
+            for var, exp in exp_dict.items():
+                assert exp != 0
+                var_exp_result = assume.get(var, Definite.UNKNOWN)
+                if exp % 2 == 0:
+                    var_exp_result = Definite.square(var_exp_result)
+                mon_result = Definite.mul(mon_result, var_exp_result)
+            poly_result = Definite.add(poly_result, mon_result)
+            if poly_result is Definite.UNKNOWN:
+                return Definite.UNKNOWN
+        return poly_result
+
     def is_variable(self) -> bool:
         """Check if this term is a variable.
 
@@ -606,19 +732,52 @@ class Term[τ: Term,
         """
         return self._poly in self._ring.get_gens()
 
-    @staticmethod
-    @abstractmethod
-    def _eq_type() -> type[T_Eq]:
-        ...
+    def is_weakly_parametric_linear(self, X: Container[χ]) -> bool:
+        r"""Return :obj:`True` if this Term can be written as
+        :math:`a_1 x_1 + ... + a_n x_n + r` such that :math:`a_1, ..., a_n \in
+        \mathbb{Q}`, :math:`x_1, ..., x_n \in X`, and :math:`r` is a polynomial
+        over :math:`\mathbb{Q}` that does not contain any variable from
+        :math:`X`.
 
-    @staticmethod
-    @abstractmethod
-    def _ge_type() -> type[T_Ge]:
-        ...
+        >>> from logic1.theories.RCF import VV
+        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
+        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
+        >>> term.is_weakly_parametric_linear({x, y})
+        True
+        >>> term.is_weakly_parametric_linear({a})
+        False
+        >>> term.is_weakly_parametric_linear({b})
+        False
+        """
+        for m in self.monomials():
+            if m in X:
+                continue
+            for v in m.vars():
+                if v in X:
+                    return False
+        return True
 
-    @staticmethod
+    def is_zero(self) -> bool:
+        """Return :obj:`True` if this term equals zero.
+
+        >>> from logic1.theories.RCF import Term, VV
+        >>> x = VV['x']
+        >>> t = x - x
+        >>> t
+        0
+        >>> isinstance(t, Term)
+        True
+        >>> isinstance(t, int)
+        False
+        >>> t.is_zero()
+        True
+        """
+        return self._poly.is_zero()
+
     @abstractmethod
-    def _gt_type() -> type[T_Gt]:
+    def lc(self) -> mpq:
+        """Return the leading coefficient of this term.
+        """
         ...
 
     @staticmethod
@@ -631,19 +790,55 @@ class Term[τ: Term,
     def _lt_type() -> type[T_Lt]:
         ...
 
+    def monomials(self) -> list[τ]:
+        """List of monomials of this term. A monomial is defined here as a
+        summand of a polynomial *without* the coefficient.
+
+        >>> from logic1.theories.RCF import VV
+        >>> x, y = VV.get('x', 'y')
+        >>> t = (x - y + 2) ** 2
+        >>> t.monomials()
+        [x**2, x*y, y**2, x, y, 1]
+        """
+        return [monomial for _, monomial in self]
+
     @staticmethod
     @abstractmethod
     def _ne_type() -> type[T_Ne]:
         ...
 
-    @classmethod
-    @abstractmethod
-    def _from_raw(cls, value: π) -> τ:
-        ...
+    def normalize(self) -> τ:
+        """Divide this Term by its leading coefficient, so that the result is
+        monic.
+        """
+        return self / self.lc()
+
+    def primitive_part(self, positive: bool = False) -> τ:
+        """Return the primitive part over ``Z``. This is ``self`` divided by its
+        (positive) content, so that ``self.content() * self.primitive_part() ==
+        self``. If ``positive`` is ``True``, the result is normalized to have a
+        positive leading coefficient.
+        """
+        pp = self / self.content()
+        if positive and pp.lc() < 0:
+            pp = -pp
+        return pp
+
+    # def sort_key(self) -> SortKey[τ]:
+    #     """A sort key suitable for ordering instances of this class. Implements
+    #     the abstract method :meth:`.firstorder.term.Term.sort_key`.
+    #     """
+    #     return self.__class__._sort_key_type()(self)
+
+    # @staticmethod
+    # @abstractmethod
+    # def _sort_key_type() -> type[SortKey[τ]]:
+    #     ...
 
     @abstractmethod
-    def lc(self) -> mpq:
-        """Return the leading coefficient of this term.
+    def summands(self) -> Iterator[tuple[dict[χ, int], mpq]]:
+        """Iterate over the summands of this term yielding pairs of monomials
+        and coefficients, where the monimials are represented as dictionaries.
         """
         ...
 
@@ -657,17 +852,10 @@ class Term[τ: Term,
     def _variable_type() -> type[χ]:
         ...
 
-    @abstractmethod
-    def summands(self) -> Iterator[tuple[dict[χ, int], mpq]]:
-        """Iterate over the summands of this term yielding pairs of monomials
-        and coefficients, where the monimials are represented as dictionaries.
-        """
-        ...
-
 
 class Variable[τ: Term,
                χ: Variable,
-               κ, # sort key
+               κ,
                π: RingElement,
                ρ, # SAGE Polynomial Ring or FLINT Context
                T_Eq: AtomicFormula,

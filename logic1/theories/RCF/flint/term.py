@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Container, Sequence
+from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Final, Iterable, Iterator, Mapping, Optional, Self, Tuple
+from typing import Any, Final, Optional, Self
 
 from flint import Ordering, fmpq, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
 
 from logic1.theories.RCF.abc import term as RCF_term_abc
-from logic1.theories.RCF.definite import Definite
 from logic1.theories.RCF.flint.types import Number, _NUMBER_TYPES
 
 
@@ -376,7 +375,7 @@ class SortKey[τ: Term]:
     def cmp_sage_like(p: fmpq_mpoly, q: fmpq_mpoly) -> int:
         """Comparator intended to match Sage MPolynomial_libsingular ordering.
         """
-        def exp_key(exp_vec: Tuple[int, ...]) -> Tuple[int, ...]:
+        def exp_key(exp_vec: tuple[int, ...]) -> tuple[int, ...]:
             if TERM_ORDER == Ordering.deglex:
                 return (sum(exp_vec), *exp_vec)
             if TERM_ORDER == Ordering.lex:
@@ -591,26 +590,6 @@ class Term(RCF_term_abc.Term['Term',
     def _eq_type() -> type[Eq]:
         return Eq
 
-    @staticmethod
-    def _ge_type() -> type[Ge]:
-        return Ge
-
-    @staticmethod
-    def _gt_type() -> type[Gt]:
-        return Gt
-
-    @staticmethod
-    def _le_type() -> type[Le]:
-        return Le
-
-    @staticmethod
-    def _lt_type() -> type[Lt]:
-        return Lt
-
-    @staticmethod
-    def _ne_type() -> type[Ne]:
-        return Ne
-
     def factor(self) -> tuple[mpq, dict[Term, int]]:
         """A polynomial factorization of this term.
 
@@ -635,13 +614,6 @@ class Term(RCF_term_abc.Term['Term',
             factor /= lc
             D[Term._from_raw(factor)] = exp
         return fmpq_to_mpq(unit), D
-
-    @classmethod
-    def _from_raw(cls, poly: fmpq_mpoly) -> Term:
-        term = Term.__new__(Term)
-        term._poly = poly
-        term._hash = None
-        return term
 
     @classmethod
     def from_sage(cls, sage_poly: Any) -> Term:
@@ -699,43 +671,13 @@ class Term(RCF_term_abc.Term['Term',
         gbasis_terms = [Term.from_sage(p) for p in gbasis_sage_polys if not p.is_zero()]
         return gbasis_terms
 
-    def is_definite(self, assume: Mapping[Variable, Definite] = {}) -> Definite:
-        """A fast heuristic test for definitetess properties of this term. This
-        is based on *trivial square sum* properties of coefficient signs and
-        exponents.
+    @staticmethod
+    def _ge_type() -> type[Ge]:
+        return Ge
 
-        >>> x, y = VV.get('x', 'y')
-        >>> print(Term(0).is_definite())
-        Definite.ZERO
-        >>> f = x**2 + y**2
-        >>> print(f.is_definite())
-        Definite.POSITIVE_SEMI
-        >>> g = -x**2 - y**2 - 1
-        >>> print(g.is_definite())
-        Definite.NEGATIVE
-        >>> h = (x - y) ** 2
-        >>> print(h.is_definite())
-        Definite.UNKNOWN
-        >>> print(h.is_definite(assume={x: Definite.POSITIVE, y: Definite.NEGATIVE}))
-        Definite.POSITIVE
-        >>> print(h.is_definite(assume={x: Definite.NEGATIVE_SEMI, y: Definite.POSITIVE_SEMI}))
-        Definite.POSITIVE_SEMI
-        """
-        # Start with the neutral element of Definite.add().
-        poly_result = Definite.ZERO
-        for exp_dict, coeff in self.summands():
-            # Start with either POSITIVE or NEGATIVE, depending on the coefficient.
-            mon_result = Definite.from_constant(coeff)
-            for var, exp in exp_dict.items():
-                assert exp != 0
-                var_exp_result = assume.get(var, Definite.UNKNOWN)
-                if exp % 2 == 0:
-                    var_exp_result = Definite.square(var_exp_result)
-                mon_result = Definite.mul(mon_result, var_exp_result)
-            poly_result = Definite.add(poly_result, mon_result)
-            if poly_result is Definite.UNKNOWN:
-                return Definite.UNKNOWN
-        return poly_result
+    @staticmethod
+    def _gt_type() -> type[Gt]:
+        return Gt
 
     def is_monomial(self) -> bool:
         """Check if this term is a monomial. A monomial is a summand without its
@@ -769,25 +711,16 @@ class Term(RCF_term_abc.Term['Term',
                     return False
         return True
 
-    def is_zero(self) -> bool:
-        """Return :obj:`True` if this term equals zero.
-
-        >>> from logic1.theories.RCF import VV
-        >>> x = VV['x']
-        >>> t = x - x
-        >>> t
-        0
-        >>> isinstance(t, Term)
-        True
-        >>> isinstance(t, int)
-        False
-        >>> t.is_zero()
-        True
-        """
-        return self._poly.is_zero()
-
     def lc(self) -> mpq:
         return fmpq_to_mpq(self._poly.leading_coefficient())
+
+    @staticmethod
+    def _le_type() -> type[Le]:
+        return Le
+
+    @staticmethod
+    def _lt_type() -> type[Lt]:
+        return Lt
 
     def monomial_coefficient(self, monomial: Term) -> mpq:
         """Return the rational coefficient of the monomial mon in self. If
@@ -811,34 +744,9 @@ class Term(RCF_term_abc.Term['Term',
                 return fmpq_to_mpq(coeff)
         return mpq(0)
 
-    def monomials(self) -> list[Term]:
-        """List of monomials of this term. A monomial is defined here as a
-        summand of a polynomial *without* the coefficient.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> t = (x - y + 2) ** 2
-        >>> t.monomials()
-        [x**2, x*y, y**2, x, y, 1]
-        """
-        return [monomial for _, monomial in self]
-
-    def normalize(self) -> Term:
-        """Divide this Term by its leading coefficient, so that the result is
-        monic.
-        """
-        poly = self._poly
-        return Term._from_raw(poly / poly.leading_coefficient())
-
-    def primitive_part(self, positive: bool = False) -> Term:
-        """Return the primitive part over ``Z``. This is ``self`` divided by its
-        (positive) content, so that ``self.content() * self.primitive_part() ==
-        self``. If ``positive`` is ``True``, the result is normalized to have a
-        positive leading coefficient.
-        """
-        pp = self / self.content()
-        if positive and pp.lc() < 0:
-            pp = -pp
-        return pp
+    @staticmethod
+    def _ne_type() -> type[Ne]:
+        return Ne
 
     def pseudo_quo_rem(self, other: Term, x: Variable) -> tuple[Term, Term]:
         """Pseudo quotient and remainder of this term and other, both as
@@ -858,67 +766,6 @@ class Term(RCF_term_abc.Term['Term',
         p2 = UPolynomial.from_fmpq_mpoly(ring.coerce_poly(other._poly), v)
         quo, rem, _ = p1.pseudo_quo_rem(p2)
         return Term._from_raw(quo.as_fmpq_mpoly()), Term._from_raw(rem.as_fmpq_mpoly())
-
-    def _pseudo_quo_rem_sage(self, other: Term, x: Variable) -> tuple[Term, Term]:
-        """Pseudo quotient and remainder of this term and other, both as
-        univariate polynomials in `x` with polynomial coefficients in all other
-        variables. Deprecated; use peudo_quo_rem() instead.
-
-        >>> a, b, c, x = VV.get('a', 'b', 'c', 'x')
-        >>> f = a * x**2 + b*x + c
-        >>> g = c * x + b
-        >>> q, r = f.pseudo_quo_rem(g, x); q, r
-        (a*c*x - a*b + b*c, a*b**2 - b**2*c + c**3)
-        >>> assert c**(2 - 1 + 1) * f == q * g + r
-        """
-        ring = self._ring | other._ring | x._ring
-        p1 = self._coerce(ring).to_sage()
-        p2 = other._coerce(ring).to_sage()
-        v = x._coerce(ring).to_sage()
-        p1_v = p1.polynomial(v)
-        p2_v = p2.polynomial(v)
-        quo_v, rem_v = p1_v.pseudo_quo_rem(p2_v)
-        R = p1.parent()  # same as p2.parent() and v.parent(), and matches ring._wrapped_ring
-        quo = R(quo_v)
-        rem = R(rem_v)
-        return Term.from_sage(quo), Term.from_sage(rem)
-
-    def quo_rem(self, other: Term) -> tuple[Term, Term]:
-        """Quotient and remainder of this term and `other`.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> f = 2*y*x**2 + x + 1
-        >>> f.quo_rem(x)
-        (2*x*y + 1, 1)
-        >>> f.quo_rem(y)
-        (2*x**2, x + 1)
-        >>> f.quo_rem(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
-        (2/3*x*y + 1/3, 1)
-        """
-        ring = self._ring | other._ring
-        p = ring.coerce_poly(self._poly)
-        q = ring.coerce_poly(other._poly)
-        quo, rem = divmod(p, q)
-        return Term._from_raw(quo), Term._from_raw(rem)
-
-    def _quo_rem_sage(self, other: Term) -> tuple[Term, Term]:
-        """Quotient and remainder of this term and `other`. Deprecated; use
-        quo_rem() instead.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> f = 2*y*x**2 + x + 1
-        >>> f._quo_rem_sage(x)
-        (2*x*y + 1, 1)
-        >>> f._quo_rem_sage(y)
-        (2*x**2, x + 1)
-        >>> f._quo_rem_sage(3*x)  # would yield (0, 2*x**2*y + x + 1) over ZZ
-        (2/3*x*y + 1/3, 1)
-        """
-        ring = self._ring | other._ring
-        p1 = self._coerce(ring).to_sage()
-        p2 = other._coerce(ring).to_sage()
-        quo, rem = p1.quo_rem(p2)
-        return Term.from_sage(quo), Term.from_sage(rem)
 
     def reduce(self, G: Iterable[Term]) -> Term:
         """Reduce self modulo G using the standard algorithm (Buchberger/CLO
@@ -960,13 +807,13 @@ class Term(RCF_term_abc.Term['Term',
             ring |= g._ring
         f_poly = ring.coerce_poly(self._poly)
         G_poly = tuple(ring.coerce_poly(g._poly) for g in G)
-        rem, _ = self.reduce_poly(f_poly, G_poly, ring._wrapped_ring)
+        rem, _ = self._reduce_poly(f_poly, G_poly, ring._wrapped_ring)
         return Term._from_raw(rem)
 
     @staticmethod
-    def reduce_poly(f: fmpq_mpoly, G: Sequence[fmpq_mpoly], ctx: fmpq_mpoly_ctx) \
-            -> Tuple[fmpq_mpoly, list[fmpq_mpoly]]:
-        """Reduce self modulo G.
+    def _reduce_poly(f: fmpq_mpoly, G: Sequence[fmpq_mpoly], ctx: fmpq_mpoly_ctx) \
+            -> tuple[fmpq_mpoly, list[fmpq_mpoly]]:
+        """Reduce f modulo G.
         """
         N: Final = ctx.nvars()
         ZERO: Final = ctx.constant(0)
@@ -1000,20 +847,6 @@ class Term(RCF_term_abc.Term['Term',
                 p -= lt_p
 
         return r, qs
-
-    def _reduce_sage(self, G: Iterable[Term]) -> Term:
-        """Reduce self modulo G via Sage. Deprecated; use reduce() instead.
-        """
-        # Convert ``G`` to a tuple to prevent a one-shot iterator from being
-        # consumed by the first traversal. ``Iterable[Term]`` matches the
-        # corresponding method in ``term_sage``.
-        G = tuple(G)
-        ring = self._ring
-        for g in G:
-            ring |= g._ring
-        self_sage = self._coerce(ring).to_sage()
-        G_sage = tuple(g._coerce(ring).to_sage() for g in G)
-        return Term.from_sage(self_sage.reduce(G_sage))
 
     def sort_key(self) -> SortKey[Self]:
         """A sort key suitable for ordering instances of this class. Implements
