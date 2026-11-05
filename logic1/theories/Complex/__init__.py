@@ -11,7 +11,7 @@ from .atomic import AtomicFormula, Eq, Ne, Ge, Le, Gt, Lt
 from .qe import qe, real_normal_form
 from .simplify import is_valid, simplify
 
-__all__ = [
+__all__: list[str] = [
     'AtomicFormula', 'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt',
 
     'Conj', 'I', 'Im', 'Term', 'Re', 'Variable', 'VV',

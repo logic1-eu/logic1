@@ -7,7 +7,7 @@ from . import RCF  # noqa
 
 from . import Sets  # noqa
 
-__all__ = [
+__all__: list[str] = [
 
     'Complex', 'RCF', 'Sets'
 ]

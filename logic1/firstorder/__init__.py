@@ -110,7 +110,7 @@ from logic1.firstorder.boolean import BooleanFormula, Equivalent, Implies, And, 
 from logic1.firstorder.quantified import QuantifiedFormula, Ex, All, Prefix
 
 
-__all__ = [
+__all__: list[str] = [
     'Ex', 'All', 'Prefix',
 
     'Equivalent', 'Implies', 'And', 'Or', 'Not', 'T', 'F'

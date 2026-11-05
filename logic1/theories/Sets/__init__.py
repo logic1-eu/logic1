@@ -77,7 +77,7 @@ from .qe import quantifier_elimination, qe  # noqa
 from .simplify import is_valid, simplify  # noqa
 from .types import Formula  # noqa
 
-__all__ = [
+__all__: list[str] = [
     'AtomicFormula', 'C', 'C_', 'Eq', 'Ne', 'oo', 'Variable', 'VV',
 
     'cnf', 'dnf',
