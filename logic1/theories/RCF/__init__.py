@@ -98,7 +98,7 @@ from logic1.theories.RCF import redlog
 from logic1.theories.RCF.simplify import is_valid, simplify
 from logic1.theories.RCF import node
 
-__all__ = [
+__all__: list[str] = [
     'POLYLIB', 'AtomicFormula', 'Eq', 'Ne', 'Ge', 'Le', 'Gt', 'Lt', 'Term',
     'Variable', 'VV',
 

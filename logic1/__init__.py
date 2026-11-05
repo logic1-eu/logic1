@@ -19,4 +19,4 @@ from . import theories
 
 from .theories import Complex, RCF, Sets  # noqa
 
-__all__ = firstorder.__all__ + theories.__all__
+__all__: list[str] = firstorder.__all__ + theories.__all__
