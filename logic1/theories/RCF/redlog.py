@@ -48,6 +48,9 @@ _END: Final = 'b0061974914468de549a2af8ced10316'
 
 _PRG: Final = """module redlog;
 
+% Print Python syntax in pieces. Whole-result strings can exceed CSL's
+% allocation limit, and repeated string concatenation copies large prefixes.
+
 off1 'output;
 off1 'nat;
 
@@ -71,58 +74,45 @@ procedure privv(v); <<
 
 put('vv, 'prifn, 'privv);
 
-operator wrap;
-procedure wrap(f); <<
-    terpri();
-    prin2 start!*;
-    prin2 f;
-    prin2 end!*;
-    nil
->>;
-
 operator r2py_qea;
 procedure r2py_qea(l);
-    % Convert the Lisp Prefix Form of an AM result of rlqea to a Python string.
-    begin scalar res, pair, guard, ans;
-        pop l;
-        if l then <<
-            pair := car l;
-            pop pair;
-            guard := r2py_formula car pair;
-            ans := r2py_equation_list cadr pair;
-            res := lto_sconcat {"[(", guard, ", ", ans, ")"};
-            for each pair in cdr l do <<
-                pop pair;
-                guard := r2py_formula car pair;
-                ans := r2py_equation_list cadr pair;
-                res := lto_sconcat {res, ", (", guard, ", ", ans, ")"}
-            >>
-        >> else <<
-            res := "[]"
+    % Print an algebraic-mode rlqea result as a Python list of answer pairs.
+    begin scalar separator;
+        prin2 "[";
+        separator := "";
+        for each pair in cdr l do <<
+            prin2 separator;
+            separator := ", ";
+            prin2 "(";
+            r2py_formula cadr pair;
+            prin2 ", ";
+            r2py_equation_list caddr pair;
+            prin2 ")"
         >>;
-        res := lto_sconcat {res, "]"};
-        return res
+        prin2 "]";
+        return nil
     end;
 
 procedure r2py_equation_list(l);
-    begin scalar equation, ans;
-        pop l;
-        if l then <<
-            equation := car l;
-            ans := lto_sconcat {"['", ioto_smaprin equation, "'"};
-            for each equation in cdr l do
-                ans := lto_sconcat {ans, ", '", ioto_smaprin equation, "'"};
-            ans:= lto_sconcat {ans, "]"}
-        >> else <<
-            ans := "[]"
+    % Print an algebraic list of equations as a Python list of strings.
+    begin scalar separator;
+        prin2 "[";
+        separator := "";
+        for each equation in cdr l do <<
+            prin2 separator;
+            separator := ", ";
+            prin2 "'";
+            prin2 ioto_smaprin equation;
+            prin2 "'"
         >>;
-        return ans
+        prin2 "]";
+        return nil
     end;
 
 operator r2py_formula;
 procedure r2py_formula(f);
-    % Convert the Lisp Prefix Form of a formula to a Python string.
-    begin scalar map1, map2, map3, map4, op, lhs, rhs, argl, nargl, result, v, m, w;
+    % Print a Lisp Prefix Form formula as a Python expression.
+    begin scalar map1, map2, map3, map4, op, argl, w, separator;
         map1 := '((true . "T") (false . "F"));
         map2 := '((equal . "==") (neq . "!=") (lessp . "<")
                   (greaterp . ">") (leq . "<=")  (geq . ">="));
@@ -130,30 +120,43 @@ procedure r2py_formula(f);
                   (equiv . "Equivalent") (not . "Not"));
         map4 := '((ex . "Ex") (all . "All"));
         op := if atom f then f else car f;
-        if w := atsoc(op, map1) then
-            return cdr w;
+        if w := atsoc(op, map1) then <<
+            prin2 cdr w;
+            return nil
+        >>;
         argl := cdr f;
         if op eq 'repl then <<
             op := 'impl;
             argl := reverse argl;
         >>;
         if w := atsoc(op, map2) then <<
-            lhs := ioto_smaprin subsvv car argl;
-            rhs := ioto_smaprin subsvv cadr argl;
-            return lto_sconcat {lhs, " ", cdr w, " ", rhs}
+            prin2 ioto_smaprin subsvv car argl;
+            prin2 " ";
+            prin2 cdr w;
+            prin2 " ";
+            prin2 ioto_smaprin subsvv cadr argl;
+            return nil
         >>;
         if w := atsoc(op, map3) then <<
-            nargl := for each arg in argl collect r2py_formula arg;
-            result := lto_sconcat {cdr w, "(", pop nargl};
-            for each arg in nargl do
-                result := lto_sconcat {result, ", ", arg};
-            result := lto_sconcat {result, ")"};
-            return result
+            prin2 cdr w;
+            prin2 "(";
+            separator := "";
+            for each arg in argl do <<
+                prin2 separator;
+                separator := ", ";
+                r2py_formula arg
+            >>;
+            prin2 ")";
+            return nil
         >>;
         if w := atsoc(op, map4) then <<
-            v := ioto_smaprin subsvv car argl;
-            m := r2py_formula cadr argl;
-            return lto_sconcat {cdr w, "(", v, ", ", m, ")"}
+            prin2 cdr w;
+            prin2 "(";
+            prin2 ioto_smaprin subsvv car argl;
+            prin2 ", ";
+            r2py_formula cadr argl;
+            prin2 ")";
+            return nil
         >>
     end;
 
@@ -166,21 +169,21 @@ procedure subsvv(f); <<
 
 operator r2py_gqe;
 procedure r2py_gqe(l);
-    % Convert the Lisp Prefix Form of an AM result of rlgqe to a Python string.
-    begin scalar atoms, formula, th, res;
-        pop l;
-        atoms := cdr pop l;
-        formula := pop l;
-        if atoms then <<
-            th := lto_sconcat {"[", r2py_formula car atoms};
-            for each at in cdr atoms do
-                th := lto_sconcat {th, ", ", r2py_formula at};
-            th := lto_sconcat {th, "]"}
-        >> else <<
-            th := "[]"
+    % Print an algebraic-mode rlgqe result as (assumptions, formula).
+    begin scalar atoms, formula, separator;
+        atoms := cdadr l;
+        formula := caddr l;
+        prin2 "([";
+        separator := "";
+        for each at in atoms do <<
+            prin2 separator;
+            separator := ", ";
+            r2py_formula at
         >>;
-        res := r2py_formula formula;
-        return lto_sconcat {"(", th, ", ", res, ")"}
+        prin2 "], ";
+        r2py_formula formula;
+        prin2 ")";
+        return nil
     end;
 
 endmodule;
@@ -196,13 +199,24 @@ def _call_help(command: str) -> str:
 
 
 def _call_redlog(command: str) -> str:
-    echo_string = _PRG.replace('"', r'\"') + '\n' + f'wrap({command});\n' + '\n' + 'quit;\n'
+    """Run a Reduce command, checking its exit status and result markers.
+
+    The markers and command share one block, so a failed command skips the
+    end marker and cannot be mistaken for a complete result.
+    """
+    program = f'{_PRG}\n'
+    program += '<< lisp << terpri(); prin2 start!* >>;\n'
+    program += f'{command};\n'
+    program += 'lisp prin2 end!* >>;\n'
+    program += 'quit;\n'
+    echo_string = program.replace('"', r'\"')
     cp = subprocess.run(f'echo "{echo_string}" | redcsl -w', shell=True, capture_output=True)
     if cp.returncode == 127:
         raise RuntimeError('redcsl not found. Install Reduce and make sure redcsl is in your PATH.')
     if cp.returncode != 0:
         raise RuntimeError(f'redcsl failed with exit code {cp.returncode}:\n'
-                           f'{cp.stderr.decode()}')
+                           f'stdout:\n{cp.stdout.decode(errors="replace")}\n'
+                           f'stderr:\n{cp.stderr.decode(errors="replace")}')
     return _unwrap(cp.stdout.decode())
 
 
@@ -217,10 +231,13 @@ def _map_option(logic1_setting: bool, redlog_switch: str) -> str:
 
 
 def _unwrap(s: str) -> str:
-    start = s.find(_START) + len(_START)
-    s = s[start:]
-    end = s.find(_END)
-    return s[:end]
+    """Extract the marked result or report incomplete Reduce output.
+    """
+    start = s.find(_START)
+    end = s.find(_END, start + len(_START))
+    if start == -1 or end == -1:
+        raise RuntimeError(f'redcsl did not return a complete marked result:\n{s}')
+    return s[start + len(_START):end]
 
 
 # Wrapped Redlog functions in alphabetical order:
@@ -391,6 +408,8 @@ def qea(f: Formula) -> list[tuple[Formula, list[str]]]:
      (And(a != 0, 4*a*c - b**2 <= 0), ['x = ( - sqrt( - 4*a*c + b**2) - b)/(2*a)']),
      (And(a != 0, 4*a*c - b**2 <= 0), ['x = (sqrt( - 4*a*c + b**2) - b)/(2*a)']),
      (And(b != 0, a == 0), ['x = ( - c)/b'])]
+    >>> redlog.qea(Ex(x, x**2 < 0))
+    [(F, [])]
     """
     input = f.as_redlog()
     output = _call_redlog(f'r2py_qea rlqea {input}')
