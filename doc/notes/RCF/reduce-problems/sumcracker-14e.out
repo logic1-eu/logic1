@@ -1,0 +1,129 @@
+Reduce (CSL, rev 7327),  7-Mar-2026 ...
+
+1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 1: 
+2: Redlog Revision 7176 of 2025-09-24, 14:31:43Z
+(c) 1992-2025 T. Sturm and A. Dolzmann (www.redlog.eu)
+type ?; for help
+
+{}
+
+3: 
+4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 4: 
+5: 5: 
+54$
+
+6: 6: 
+7: 7: 7: 
+8: 
+Time: 24 ms  plus GC time: 23 ms
+
+9: +++ Garbage collection 1 (list space) after 2.28+0.02 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 2 (list space) after 4.18+0.07 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 3 (list space) after 6.08+0.11 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 4 (list space) after 7.99+0.15 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 5 (list space) after 9.92+0.20 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 6 (list space) after 11.86+0.24 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 7 (list space) after 13.76+0.28 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 8 (list space) after 15.70+0.32 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 9 (list space) after 17.60+0.37 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 10 (list space) after 19.51+0.42 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 11 (list space) after 21.43+0.46 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 12 (list space) after 23.34+0.51 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 13 (list space) after 25.25+0.55 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 14 (list space) after 27.18+0.59 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 15 (list space) after 29.08+0.64 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 16 (list space) after 30.99+0.68 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 17 (list space) after 32.90+0.73 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 18 (list space) after 34.82+0.77 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 19 (list space) after 36.75+0.81 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 20 (list space) after 38.67+0.86 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 21 (list space) after 40.58+0.90 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 22 (list space) after 42.50+0.94 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 23 (list space) after 44.41+0.99 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 24 (list space) after 46.33+1.04 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 25 (list space) after 48.25+1.08 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 26 (list space) after 50.18+1.12 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 27 (list space) after 52.12+1.17 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 28 (list space) after 54.05+1.21 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 29 (list space) after 55.98+1.26 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 30 (list space) after 57.91+1.30 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 31 (list space) after 59.86+1.35 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 32 (list space) after 61.79+1.39 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 33 (list space) after 63.70+1.44 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 34 (list space) after 65.60+1.48 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 35 (list space) after 67.49+1.53 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 36 (list space) after 69.37+1.57 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 37 (list space) after 71.25+1.62 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 38 (list space) after 73.14+1.66 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 39 (list space) after 75.04+1.71 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 40 (list space) after 76.94+1.75 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 41 (list space) after 78.83+1.79 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 42 (list space) after 80.73+1.84 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 43 (list space) after 82.61+1.88 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 44 (list space) after 84.50+1.93 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 45 (list space) after 86.42+1.97 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 46 (list space) after 88.30+2.02 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 47 (list space) after 90.19+2.06 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 48 (list space) after 92.08+2.11 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 49 (list space) after 93.96+2.15 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 50 (list space) after 95.84+2.20 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
++++ Garbage collection 51 (list space) after 97.71+2.24 seconds
+At gc end about 24.0 Mbytes of 2048.0 (1.2%) of heap is in use
+
+Time: 98987 ms  plus GC time: 2267 ms
+
+10: 
+11: 
+34816$
+
+12: 12: 
