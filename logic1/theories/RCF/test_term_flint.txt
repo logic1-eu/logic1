@@ -342,7 +342,7 @@ class Term:
     >>> (x + y) ** 2 / x
     Traceback (most recent call last):
     ...
-    flint.utils.flint_exceptions.DomainError: fmpq_mpoly division is not exact
+    ValueError: Division not exact
     >>> (x + y) ** 2 / 2
     1/2*x**2 + x*y + 1/2*y**2
 
@@ -879,24 +879,6 @@ class Term:
 
     >>> list(Term(1).summands())
     [({}, mpq(1,1))]
-
-    ----------------------------------------------------------------------------
-    Test _summands_as_hashable:
-    ----------------------------------------------------------------------------
-    >>> f._summands_as_hashable()  # doctest: +NORMALIZE_WHITESPACE
-    (((('x', 5),), mpq(1,1)), ((('x', 4), ('y', 1)), mpq(5,1)),
-     ((('x', 3), ('y', 2)), mpq(10,1)), ((('x', 2), ('y', 3)), mpq(10,1)),
-     ((('x', 1), ('y', 4)), mpq(5,1)), ((('y', 5),), mpq(1,1)))
-
-    >>> motzkin._summands_as_hashable()  # doctest: +NORMALIZE_WHITESPACE
-    (((('x', 4), ('y', 2)), mpq(1,1)), ((('x', 2), ('y', 4)), mpq(1,1)),
-     ((('x', 2), ('y', 2)), mpq(-3,1)), ((), mpq(1,1)))
-
-    >>> Term(0)._summands_as_hashable()
-    ()
-
-    >>> Term(1)._summands_as_hashable()
-    (((), mpq(1,1)),)
 
     ----------------------------------------------------------------------------
     Test vars:

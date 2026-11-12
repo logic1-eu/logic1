@@ -20,4 +20,3 @@ Formula: TypeAlias = logic1.firstorder.Formula[
 Prefix: TypeAlias = logic1.firstorder.Prefix['logic1.theories.RCF.sage.term.Variable']
 """Type alias for :class:`.firstorder.quantified.Prefix` in the theory of Real Closed Fields.
 """
-

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import lru_cache
 from gmpy2 import mpq
 from typing import Final, Iterator, Optional, Self
 
@@ -26,7 +25,7 @@ class _SubstValue:
     def __post_init__(self) -> None:
         assert self.coefficient != 0 or self.variable is None
 
-    @lru_cache(maxsize=CACHE_SIZE)
+    # @lru_cache(maxsize=CACHE_SIZE)
     def as_term(self) -> Term:
         if self.variable is None:
             return Term(self.coefficient)
@@ -49,7 +48,7 @@ class _Root:
 
 @dataclass
 class _Substitution:
-    nodes: dict[SortKey[Variable], _Node] = field(default_factory=dict)
+    nodes: dict[SortKey, _Node] = field(default_factory=dict)
     constant_node: Final[_Node] = field(default_factory=lambda: _Node(mpq(1), None, None))
 
     def __iter__(self) -> Iterator[tuple[Variable, _SubstValue]]:
@@ -57,6 +56,7 @@ class _Substitution:
             if node.parent is None:
                 continue
             root = self.find2(node)
+            assert isinstance(key.term, Variable)
             yield key.term, _SubstValue(root.coefficient, root.node.variable)
 
     def __str__(self) -> str:

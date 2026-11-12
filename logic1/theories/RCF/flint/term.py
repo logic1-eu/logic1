@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from fractions import Fraction
-from typing import Any, Final, Optional, Self
+from typing import Any, ClassVar, Final, Optional, Self
 
 from flint import Ordering, fmpq, fmpq_mpoly, fmpq_mpoly_ctx
 from gmpy2 import mpq
 
-from logic1.theories.RCF.abc import term as RCF_term_abc
+from logic1.theories import RCF
 from logic1.theories.RCF.flint.types import Number, _NUMBER_TYPES
 
 
@@ -22,8 +22,7 @@ CACHE_SIZE: Final[Optional[int]] = 2**16
 
 def _caches():
     from logic1.theories.RCF.simplify import Simplify
-    from logic1.theories.RCF.substitution import _SubstValue
-    return [_SubstValue.as_term, Simplify._simpl_at]
+    return [Simplify._simpl_at]
 
 def cache_clear():
     for cache in _caches():
@@ -277,7 +276,7 @@ class UPolynomial:
         return UPolynomial(Q, name), UPolynomial(R, name), lc_pow
 
 
-class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
+class Ring(RCF.abc.term.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
     """A wrapper around a Flint polynomial ring.
     """
 
@@ -307,7 +306,7 @@ class Ring(RCF_term_abc.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         return tuple(self._wrapped_ring.gens())
 
 
-class VariableSet(RCF_term_abc.VariableSet['Variable']):
+class VariableSet(RCF.abc.term.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed
     Fields. Variables are uniquely identified by their name, which is a
     :external:class:`.str`. This class is a singleton, whose single instance is
@@ -340,11 +339,13 @@ The unique instance of :class:`.VariableSet`.
 
 
 @dataclass
-class SortKey[τ: Term]:
+class SortKey(RCF.abc.term.SortKey["Term"]):
 
-    term: τ
+    term: Term
 
-    def __eq__(self, other: Self) -> bool:  # type: ignore[override]
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SortKey):
+            return False
         return self.cmp(other) == 0
 
     def __ge__(self, other: Self) -> bool:
@@ -362,7 +363,9 @@ class SortKey[τ: Term]:
     def __lt__(self, other: Self) -> bool:
         return self.cmp(other) < 0
 
-    def __ne__(self, other: Self) -> bool:  # type: ignore[override]
+    def __ne__(self, other: object) -> bool:
+        if not isinstance(other, SortKey):
+            return True
         return self.cmp(other) != 0
 
     def cmp(self, other: Self) -> int:
@@ -417,9 +420,9 @@ class SortKey[τ: Term]:
         return 0
 
 
-class Term(RCF_term_abc.Term['Term',
+class Term(RCF.abc.term.Term['Term',
                              'Variable',
-                             SortKey['Term'],
+                             SortKey,
                              fmpq_mpoly,
                              fmpq_mpoly_ctx,
                              "Eq",
@@ -446,7 +449,7 @@ class Term(RCF_term_abc.Term['Term',
 
     def __hash__(self) -> int:
         # We use this low-level approach because
-        # hash(self._summands_as_hashable()) was too slow.
+        # ``hash(self._summands_as_hashable())`` was too slow.
         if self._hash is None:
             self._hash = hash(repr(self._poly))
         return self._hash
@@ -505,20 +508,6 @@ class Term(RCF_term_abc.Term['Term',
         poly = context.from_dict(state["poly_as_dict"])
         self._hash = None
         self._poly = poly
-
-    def __truediv__(self, other: Number | Term) -> Term:
-        """True division. ``self`` must be divisible by ``other``. Otherwise,
-        flint will raise an error.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> x*y / x
-        y
-        """
-        if not isinstance(other, Term):
-            other = Term(other)
-        ring = self._ring | other._ring
-        quotient = ring.coerce_poly(self._poly) / ring.coerce_poly(other._poly)
-        return Term._from_raw(quotient)
 
     def constant_coefficient(self) -> mpq:
         """Return the constant coefficient of this Term.
@@ -687,30 +676,6 @@ class Term(RCF_term_abc.Term['Term',
         coeffs = self._poly.coeffs()
         return len(coeffs) == 1 and coeffs[0] == 1
 
-    def is_weakly_parametric_linear(self, X: Container[Variable]) -> bool:
-        r"""Return :obj:`True` if this Term can be written as
-        :math:`a_1 x_1 + ... + a_n x_n + r` such that :math:`a_1, ..., a_n \in
-        \mathbb{Q}`, :math:`x_1, ..., x_n \in X`, and :math:`r` is a polynomial
-        over :math:`\mathbb{Q}` that does not contain any variable from
-        :math:`X`.
-
-        >>> a, b, x, y = VV.get('a', 'b', 'x', 'y')
-        >>> term = 2 * x - 3 * y + 4 * a**2 + 5 * a * b
-        >>> term.is_weakly_parametric_linear({x, y})
-        True
-        >>> term.is_weakly_parametric_linear({a})
-        False
-        >>> term.is_weakly_parametric_linear({b})
-        False
-        """
-        for m in self.monomials():
-            if m in X:
-                continue
-            for v in m.vars():
-                if v in X:
-                    return False
-        return True
-
     def lc(self) -> mpq:
         return fmpq_to_mpq(self._poly.leading_coefficient())
 
@@ -848,11 +813,9 @@ class Term(RCF_term_abc.Term['Term',
 
         return r, qs
 
-    def sort_key(self) -> SortKey[Self]:
-        """A sort key suitable for ordering instances of this class. Implements
-        the abstract method :meth:`.firstorder.term.Term.sort_key`.
-        """
-        return SortKey(self)
+    @staticmethod
+    def _sort_key_type() -> type[SortKey]:
+        return SortKey
 
     def subs(self, mapping: Mapping[Variable, Number | Term]) -> Term:
         """Simultaneous substitution of terms or constants for variables.
@@ -884,22 +847,6 @@ class Term(RCF_term_abc.Term['Term',
             result += summand
         return result
 
-    def subs_linear_solution(self, x: Variable, minimal_polynomial: Term) -> Term:
-        """Substitute the solution of the weakly parametric linear
-        polynomial ``minimal_polynomial`` this weakly parametric linear
-        polynomial.
-        """
-        # self = a * x + b
-        a = self.monomial_coefficient(x)
-        b = self - a * x
-        assert x not in b.vars(), f'{tuple(b.vars())} contains {x!r}, {tuple((x - x).vars())=}'
-        # minimal_polynomial = c * x + d
-        c = minimal_polynomial.monomial_coefficient(x)
-        d = minimal_polynomial - c * x
-        assert x not in d.vars()
-        result = a * (-d / c) + b
-        return result
-
     def summands(self) -> Iterator[tuple[dict[Variable, int], mpq]]:
         """Iterate over the summands of this term yielding pairs of monomials
         and coefficients, where the monimials are represented as dictionaries.
@@ -919,27 +866,9 @@ class Term(RCF_term_abc.Term['Term',
                     exp_dict[vars[i]] = int(exp)
             yield exp_dict, fmpq_to_mpq(coeff)
 
-    def _summands_as_hashable(self) -> tuple[tuple[tuple[tuple[str, int], ...], mpq], ...]:
-        """Return the summands of self as a hashable tuple of pairs of tuples
-        representing monomials, and coefficients. The summands ordered by the
-        term order.
-
-        >>> x, y = VV.get('x', 'y')
-        >>> motzkin = x**4 * y**2 + x**2 * y**4 - 3 * x**2 * y**2 + 1
-        >>> motzkin._summands_as_hashable()
-        (((('x', 4), ('y', 2)), mpq(1,1)), ((('x', 2), ('y', 4)), mpq(1,1)),
-         ((('x', 2), ('y', 2)), mpq(-3,1)), ((), mpq(1,1)))
-        """
-        poly = self._poly
-        gen = poly.context().gen
-        summands = []
-        for exp_vec, coeff in poly.terms():
-            exp_list = []
-            for i, exp in enumerate(exp_vec):
-                if exp:
-                    exp_list.append((str(gen(i)), exp))
-            summands.append((tuple(exp_list), fmpq_to_mpq(coeff)))
-        return tuple(summands)
+    @staticmethod
+    def _term_type() -> type[Term]:
+        return Term
 
     def to_sage(self) -> Any:
         """Convert this Term to a Sage MPolynomial_libsingular if
@@ -960,6 +889,10 @@ class Term(RCF_term_abc.Term['Term',
         sage_poly = sage_ring(sage_dict)
         return sage_poly
 
+    @staticmethod
+    def _variable_type() -> type[Variable]:
+        return Variable
+
     def vars(self) -> Iterator[Variable]:
         """An iterator that yields each variable of this term once. Implements
         the abstract method :meth:`.firstorder.term.Term.vars`.
@@ -974,28 +907,23 @@ class Term(RCF_term_abc.Term['Term',
             if str(gen) not in unused:
                 yield Variable._from_gen(gen)
 
-    @staticmethod
-    def _term_type() -> type[Term]:
-        return Term
 
-    @staticmethod
-    def _variable_type() -> type[Variable]:
-        return Variable
+class Variable(Term, RCF.abc.term.Variable[Term,
+                                           "Variable",
+                                           "SortKey",
+                                           fmpq_mpoly,
+                                           fmpq_mpoly_ctx,
+                                           "Eq",
+                                           "Ge",
+                                           "Gt",
+                                           "Le",
+                                           "Lt",
+                                           "Ne"]):
 
+    VV: ClassVar[VariableSet] = VV
 
-class Variable(Term, RCF_term_abc.Variable[
-    Term,
-    "Variable",
-    SortKey["Variable"],
-    fmpq_mpoly,
-    fmpq_mpoly_ctx,
-    "Eq",
-    "Ne",
-    "Lt",
-    "Le",
-    "Gt",
-    "Ge",
-]):
+    def __init__(self, arg: object) -> None:
+        raise NotImplementedError("Use the global variable set VV to create variables.")
 
     def fresh(self) -> Variable:
         """Returns a variable that has not been used so far. Implements
