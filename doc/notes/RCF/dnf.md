@@ -161,7 +161,7 @@ A full mask removes the polynomial constraint. These operations use
 only equality of normalized polynomials and bitwise operations. They
 do not invoke a general RCF validity test.
 
-`DuringStepSimplifyingCartesianBnf` inserts cubes into a running
+`DuringStepCartesianBnf` inserts cubes into a running
 strict DNF at each `Or` node. At each `And` node, it multiplies child
 DNFs one at a time, with insertion after each product. Insertion removes a
 structurally subsumed cube or merges two cubes as above; new merge
@@ -170,7 +170,7 @@ can discard a cube that might have supported a later cut, as shown in
 "Order and iteration" above. It keeps the algorithm and its storage
 small, but does not promise a minimal DNF.
 
-`AfterStepSimplifyingCartesianBnf` uses the same atomic
+`AfterStepCartesianBnf` uses the same atomic
 rules but finishes the local Cartesian expansion of each `And` or `Or`
 node before reducing its cubes. Its recursive calls return already
 reduced child DNFs. This matches the placement of Redlog's
@@ -217,12 +217,13 @@ The public `dnf` and `cnf` functions separate the algorithm, selected with
 A step constructs the DNF at one `And` or `Or` node. The integer values
 identify schedules, not increasing guarantees of quality or speed. Since
 2026-10-23, the defaults are `method="cartesian"` and `Simplification.FINAL`
-(previously PyEDA and `NONE`). Nonzero schedules require `method="cartesian"`;
-unsupported combinations are rejected. Plain Cartesian construction remains
-useful because the recursive reductions can cost time without reducing the
-result. `FINAL` provides the previously missing experiment: plain recursive
-construction followed by one dedicated reduction of the completed strict DNF.
-Select `Simplification.NONE` explicitly for plain Cartesian or PyEDA calls.
+(previously PyEDA and `NONE`). The schedules apply to `method="cartesian"`;
+PyEDA ignores `simplification` and `max_pair_checks`. Plain Cartesian
+construction remains useful because the recursive reductions can cost time
+without reducing the result. `FINAL` provides the previously missing experiment:
+plain recursive construction followed by one dedicated reduction of the
+completed strict DNF.
+Select `Simplification.NONE` explicitly for plain Cartesian calls.
 
 The current implementation separates values and computation:
 
@@ -232,13 +233,22 @@ The current implementation separates values and computation:
   collect without simplifying. `insert` requires a normalized cube and an
   already reduced destination, which it mutates using subsumption and cut.
   `syntactic_reduction` and `semantic_subsumption` return new collections.
-- `CartesianBnf` owns recursion and formula conversion. Its finishing hook
-  is the identity for plain Cartesian computation.
-- `SimplifyingCartesianBnf` owns budget validation and storage and implements
-  final semantic subsumption. The final, after-step, and during-step classes
-  inherit from it and select when syntactic reduction runs. The final-only
-  finishing hook runs both passes; the two recursive schedules inherit the
-  common semantic finishing hook.
+- `CartesianBnf` owns the shared `strict_dnf` traversal and formula conversion.
+  Its `conjoin_dnfs` and `disjoin_dnfs` methods construct raw products and
+  unions of child DNFs. It validates and stores `max_pair_checks` and supplies
+  final semantic subsumption through `finish_strict_dnf`. For plain Cartesian
+  computation, the public functions select this class with a zero limit.
+  Finishing then returns an equal, independent copy without sorting or
+  implication checks.
+- The final, after-step, and during-step classes inherit directly from
+  `CartesianBnf` and select when syntactic reduction runs. The final-only
+  finishing method applies syntactic reduction and calls the inherited
+  semantic finishing method. The two recursive schedules inherit that method
+  unchanged and override the two combination methods.
+
+All four classes require `max_pair_checks` explicitly. Only the public `dnf`
+and `cnf` functions supply defaults. The former `SimplifyingCartesianBnf`
+class has been removed.
 
 `Cube.sort_key` determines reconstruction, greedy insertion, and bounded
 comparison order. `StrictDnf` has structural equality and is unhashable.
@@ -259,16 +269,141 @@ Deterministic formula reconstruction is shared by all Cartesian schedules.
 The refactoring preserves the rules, budgets, and measured schedules; the
 historical benchmark data below is unchanged.
 
-All three simplifying schedules use `max_pair_checks=500` for final semantic
-subsumption; zero skips that pass and `None` removes the limit. `NONE` and
-PyEDA require the default budget because neither uses this pass. CNF uses the
-DNF of the negation. The former witness pool and general pairwise validity-cut
-search are not part of these implementations.
+The public functions default to `max_pair_checks=500` for final semantic
+subsumption; zero skips implication checks and `None` removes the limit.
+With `NONE`, the public argument must retain its default value and is unused;
+the selected `CartesianBnf` instance receives zero internally. PyEDA ignores
+the argument. CNF uses the DNF of the negation. The former witness pool and
+general pairwise validity-cut search are not part of these implementations.
 
 In the measurements below, **early** means `DURING_STEP` and **subtree** means
 `AFTER_STEP`. Those historical labels and dates are retained when describing
 the original experiments. The benchmark modules use the current schedule
 names for new measurements.
+
+### Common Cartesian finishing (2026-11-15)
+
+Budget validation, storage, and final semantic subsumption were moved from
+`SimplifyingCartesianBnf` to `CartesianBnf`, eliminating the intermediate
+class. The three simplifying classes now inherit directly from `CartesianBnf`.
+Their constructors require an explicit `max_pair_checks` argument, as does
+the constructor of `CartesianBnf`. The public function defaults and option
+validation remain unchanged. No helper object, mixin, or additional special
+budget value was introduced.
+
+The zero-limit path in `StrictDnf.semantic_subsumption` now returns its copy
+before sorting. Both old and new versions return a fresh mutable set sharing
+immutable cubes. The nonzero comparison loop is unchanged. A separate
+measurement on the saved series12 result with 340 cubes found copying alone
+took about 2 microseconds on both backends. The old zero-limit pass, including
+sorting, took 26.1 milliseconds on Sage and 352.1 milliseconds on FLINT.
+These were measurements on the returned DNF, not on the intermediate strict
+DNF before final simplification. They motivated skipping the unused sort
+without adding an identity setting. Raw samples are in
+`/tmp/logic1-semantic-subsumption-2026-11-15/zero-cost.json`.
+
+The approved prototype has one fewer code line, or 27 fewer lines including
+documentation and spacing. It passed source typing and 748 regular checks
+with the Sage backend, and source typing and 221 focused checks with the
+FLINT backend. Both backends passed 13 separate API documentation checks;
+the Sphinx HTML build passed without warnings. The final validation runner
+explicitly checked the temporary import path and backend, correcting an
+earlier documentation-run import-path problem.
+
+There were 1,248 exact-output comparisons against saved current-version
+results across both backends and hash seeds 0, 1, 63, and 314159. They covered
+DNF and CNF, all schedules, supported limits 0, 1, 500, and `None`, truth
+values, contradictions, and quantifiers. All comparisons passed.
+
+Performance measurements used Python 3.14.10, Sage 10.9, python-flint 0.8.0,
+and macOS 27.2.1 arm64. Series3, series12, and `half-2` were run with all four
+Cartesian schedules on both backends, three fresh-process repetitions each.
+The 72 new calls ran sequentially with a 60-second limit, hash seed 0,
+`max_pair_checks=500` at the public entry point, `explode_always=False`,
+`substitute=1`, and `implicit_ranges=True`. Startup, input loading, and output
+validation were excluded. Neither PyEDA nor Redlog was benchmarked.
+
+The comparison reused 72 baseline calls from the earlier same-day run after
+verifying that source files and inputs were unchanged. Every new call finished
+and matched the baseline output exactly. Median timing changes ranged from
+-3.54% to +4.95%, and from -1.54% to +2.56% on series12. Because the baseline
+was recorded separately, small differences cannot be attributed confidently
+to the refactoring. The measurements do not establish a material regression.
+
+The class-constructor default was removed after timing, at the user's request.
+Every timed call already supplied its limit explicitly through `_normal_form`;
+constructor and computation bodies were unchanged. Final verification used
+the required constructor argument. The measured and final source snapshots,
+hashes, raw measurements, output comparisons, and reproduction scripts are in
+`/tmp/logic1-cartesian-finishing-2026-11-15/`.
+
+The tested implementation was adopted without further code changes. The
+repository passed `make test` (typing and 748 regular checks with the Sage
+backend) and the separate `make test-doc` run (13 API documentation checks).
+
+### Separating traversal and combination (2026-11-15)
+
+Previously, `AfterStepCartesianBnf.strict_dnf` called the base
+implementation and then reduced its result. Correct placement of reduction
+depended on recursive calls inside the base method dispatching back to the
+override. An otherwise equivalent rewrite of the base traversal could
+silently change the after-step schedule.
+
+All four schedules now share `CartesianBnf.strict_dnf`. For each input `And`
+or `Or`, it passes the DNFs of the immediate arguments to `conjoin_dnfs` or
+`disjoin_dnfs`, respectively, and uses the returned DNF unchanged. Child DNFs
+are evaluated lazily in input order, using the selected schedule. The
+combination methods leave child DNFs unchanged and do not traverse formulas.
+During-step combination can stop requesting children when a partial union
+becomes true or a partial product becomes false.
+
+The base combination methods return exactly the raw union or product, with
+duplicate removal only. After-step combination reduces that complete result.
+During-step combination retains its incremental normalization and insertion.
+Final-only reduction, final semantic subsumption, budgets, and sorting are
+unchanged. These explicit contracts replace the dependency on an override
+calling a recursive base implementation; traversal changes must still respect
+the order of combination calls and lazy child evaluation.
+
+An isolated prototype initially used one `combine_dnfs(operator, children)`
+method. On Python 3.14.10, Sage 10.9, python-flint 0.8.0, and macOS 27.2.1
+arm64, it was compared with the preceding implementation on series3, series12,
+and `half-2`, across all four schedules and both backends. Three fresh-process
+calls per configuration and implementation gave 144 timed calls. Runs were
+sequential, with hash seed 0, `max_pair_checks=500`, `explode_always=False`,
+`substitute=1`, and `implicit_ranges=True`. Startup, input loading, and result
+counting were excluded. PyEDA was excluded. Every call completed within 60
+seconds and matched the preceding implementation's exact output.
+
+Median full-call time changes ranged from -2.8% to +2.5%. Separate measurements
+of construction alone found changes up to +4.2%, corresponding to 4.6
+microseconds on that small case. These observations did not establish a
+material performance regression. Raw measurements and source snapshots are
+in `/tmp/logic1-combine-dnfs-2026-11-15/`.
+
+The adopted prototype splits combination into the two methods above, removing
+the operator argument and dispatch. Relative to the preceding repository
+implementation, its executable line count is unchanged; including docstrings
+and blank lines adds 10 lines. Timing measurements were not repeated for this
+split, so the percentages above describe the combined-method prototype only.
+The split prototype passed mypy and 152 focused tests and module doctests on
+each backend. Across both backends and four hash seeds, 1,248 exact DNF/CNF
+outputs matched saved baseline outputs. Direct checks covered raw results,
+empty inputs, ownership, and early termination. A separate explicit-stack
+traversal reproduced the strict DNFs of small examples without changing the
+combination methods. This last check establishes functional agreement on
+those inputs, not identical evaluation or resource use.
+
+After applying the split prototype to the repository, 11 small regression
+cases were added for raw combination, lazy early termination, and the nested
+example with distinct results for all three simplifying schedules. Sage
+backend validation passed mypy on 19 stub files and 69 source files, all 733
+regular tests and doctests, and all 13 separate API documentation checks.
+The regular suite required local socket access for the parallel QE test.
+FLINT backend validation, in a separate copy with the same source and tests,
+passed mypy on the two changed Python files and all 163 focused BNF checks.
+The repository's backend selection was left unchanged. The executable code
+matches the verified split prototype; benchmark timings were not recomputed.
 
 ### Mixin refactoring verification (2026-11-02)
 
@@ -502,12 +637,12 @@ the effect of budgets below, at, and above the default of 500:
 ```python
 from logic1.firstorder import And, Or
 from logic1.theories.RCF import VV
-from logic1.theories.RCF.bnf import AfterStepSimplifyingCartesianBnf
+from logic1.theories.RCF.bnf import AfterStepCartesianBnf
 
 x, y = VV.get('x', 'y')
 g = Or(*(And(x > i, y > j) for i in range(20) for j in range(20)))
 for checks in (100, 500, None):
-    result = AfterStepSimplifyingCartesianBnf(max_pair_checks=checks).dnf(g)
+    result = AfterStepCartesianBnf(max_pair_checks=checks).dnf(g)
     cubes = len(result.args) if isinstance(result, Or) else 1
     print(checks, cubes, len(list(result.atoms())))
 ```
@@ -530,6 +665,91 @@ On 2026-10-22, the executable class doctests were reduced to a 6-by-6 grid
 with budgets 10, 30, and unbounded. They retain a meaningful quality comparison
 (31, 19, and one result cube), while keeping the larger experiment here,
 outside the regular test suite.
+
+## Preprocessing experiment on half-2 (2026-10-21)
+
+The SMT-LIB input half-2 is registered in
+`benchmarks/theories/RCF/smtlib/smtlib_inputs.py`. Its original file is
+`20170501-Heizmann-UltimateInvariantSynthesis/half_2.i_3_6_2.bpl_3.smt2`
+under that directory's `inputs/` tree. The following comparison was recorded
+in the development discussion on 2026-10-21 and added to these notes on
+2026-11-14 without rerunning the experiment.
+
+The experiment varied only initial Cartesian preprocessing, trying all six
+combinations of `substitute=0, 1, 2` and `explode_always=False, True`.
+Construction used plain Cartesian distribution; final
+`conservative_simplify` retained its usual settings. Both values of
+`explode_always` produced identical preprocessed formulas and final DNFs
+at each substitution setting:
+
+| `substitute` | Preprocessed atoms | Disjunction widths | Strict cubes | Final atoms |
+| -----------: | -----------------: | ------------------ | -----------: | ----------: |
+|            0 |                 75 | 2, 2               |            4 |         280 |
+|            1 |                 75 | 2, 2               |            4 |         280 |
+|            2 |                 87 | 4, 4, 5, 5         |          400 |       28520 |
+
+Atom counts are occurrences. Settings 0 and 1 also produced identical
+formulas. Enabling monomial substitution changed the Cartesian product
+from 2 × 2 = 4 to 4 × 4 × 5 × 5 = 400 cubes. This observation motivated
+`substitute=1` for Cartesian preprocessing; it does not establish that
+disabling monomial substitution is generally preferable.
+
+Substitution itself maps an atom to an atom. Subsequent simplification can
+split the resulting atom; `explode_always=False` still permits disjunctive
+splitting inside an existing disjunction. The measurements above compare
+complete preprocessing outcomes, not substitution in isolation. They do
+not justify introducing another option to control splitting.
+
+### Context-dependent substitution and structural matches (2026-11-14)
+
+A separate explanation, proposed by the user, concerns repeated atoms.
+The simplifier propagates information through the formula tree and enriches
+it with local atomic information. Substitution therefore depends on the
+context of each occurrence. Equal atoms in different branches can become
+different atoms after substitution. Structural subsumption relies on atom
+set inclusion, and syntactic cut relies on matching common atoms. Both can
+lose applicable matches even though the logical relationships are preserved.
+This mechanism does not require splitting.
+
+For example, consider
+
+$$
+f = (x=y \land x>0) \lor (x\ne y \land x>0).
+$$
+
+With `substitute=1`, preprocessing leaves this formula unchanged. Its two
+cubes share $x>0$, and cutting on $x=y$ and $x\ne y$ yields $x>0$.
+With `substitute=2`, preprocessing instead produces
+
+$$
+(x=y \land y>0) \lor (x\ne y \land x>0).
+$$
+
+Only the first branch supplies the substitution $x=y$. Consequently, the
+two occurrences of $x>0$ no longer match, and syntactic reduction retains
+both cubes. Neither cube implies the other, so semantic subsumption cannot
+recover the one-cube result either. That requires combining the two cubes
+using their semantic relationship.
+
+The example was verified on 2026-11-14 with the Sage backend. Both runs used
+`simplify(f, explode_always=False, substitute=...)`, followed by
+`CartesianBnf.strict_dnf` and `StrictDnf.syntactic_reduction`. Setting 1
+produced the single cube $\{x>0\}$; setting 2 retained the two cubes shown
+above. No atom was split. This verifies a loss of syntactic cut, not a
+measurement of the complete DNF pipeline or a witness for lost subsumption.
+
+Constant substitution can also destroy structural matches. The user's
+proposed trade-off is that its benefits are usually stronger: replacing
+variables by numbers can lower polynomial degrees, evaluate constraints,
+and expose contradictions. Retaining constant substitution while disabling
+monomial substitution may therefore be useful for DNF computation. This is
+a practical hypothesis, not an established general advantage; substitution
+can also make previously different atoms identical and enable reductions.
+
+The example establishes the mechanism independently of splitting. It does
+not establish how much, if any, of the growth observed on `half-2` comes
+from this mechanism. Resolving that question requires tracing the
+context-dependent rewrites and lost matches in that input's preprocessing.
 
 ## Motor-series comparison
 
@@ -591,8 +811,11 @@ complete local product, including cubes that reduction will discard.
 Before the 2026-10-22 refactoring, the subtree subclass inherited the
 reduction helpers from the early class and explicitly called
 `CartesianBnf._strict_dnf`. That call recursively dispatched
-back to the subtree subclass. The current sibling classes instead inherit
-the helpers from a shared base; after-step uses `super()._strict_dnf`.
+back to the subtree subclass. The sibling classes introduced on 2026-10-22
+instead inherited the helpers from a shared base while retaining recursive
+dispatch through the overridden construction method. Since 2026-11-15,
+after-step and during-step share the traversal and override the two
+combination methods described above.
 If only one simplifying schedule is eventually retained, its helpers could
 be moved into that subclass. While comparing three schedules, the shared
 base keeps each construction algorithm separate without duplicating rules.

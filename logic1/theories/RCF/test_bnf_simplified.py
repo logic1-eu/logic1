@@ -4,23 +4,20 @@
 from collections.abc import Callable
 from dataclasses import FrozenInstanceError
 import pickle
+from unittest.mock import Mock
 
 import pytest
 
 from logic1.firstorder import And, Ex, F, Not, Or, T
 from logic1.theories.RCF import AtomicFormula, Formula, Simplification, VV, cnf, dnf
-from logic1.theories.RCF.bnf import (AfterStepSimplifyingCartesianBnf, CartesianBnf, Cube,
-                                   DuringStepSimplifyingCartesianBnf, FinalSimplifyingCartesianBnf,
-                                   SimplifyingCartesianBnf, StrictDnf, is_and_or)
+from logic1.theories.RCF.bnf import (AfterStepCartesianBnf, CartesianBnf, Cube,
+                                   DuringStepCartesianBnf, FinalCartesianBnf,
+                                   StrictDnf, _normal_form, is_and_or)
 
 
-type SimplifyingBNF = (FinalSimplifyingCartesianBnf
-                      | AfterStepSimplifyingCartesianBnf
-                      | DuringStepSimplifyingCartesianBnf)
+type SimplifyingBNF = FinalCartesianBnf | AfterStepCartesianBnf | DuringStepCartesianBnf
 
-SIMPLIFYING_CLASSES = (FinalSimplifyingCartesianBnf,
-                       AfterStepSimplifyingCartesianBnf,
-                       DuringStepSimplifyingCartesianBnf)
+SIMPLIFYING_CLASSES = (FinalCartesianBnf, AfterStepCartesianBnf, DuringStepCartesianBnf)
 
 
 x, y = VV.get('x', 'y')
@@ -196,9 +193,9 @@ def test_syntactic_reduction(sdnf: set[Cube], expected: set[Cube]) -> None:
 
 
 @pytest.mark.parametrize(('cls', 'expected_cubes'), [
-        pytest.param(FinalSimplifyingCartesianBnf, 4, id='final'),
-        pytest.param(AfterStepSimplifyingCartesianBnf, 1, id='after-step'),
-        pytest.param(DuringStepSimplifyingCartesianBnf, 1, id='during-step')])
+        pytest.param(FinalCartesianBnf, 4, id='final'),
+        pytest.param(AfterStepCartesianBnf, 1, id='after-step'),
+        pytest.param(DuringStepCartesianBnf, 1, id='during-step')])
 def test_construction_schedule(cls: type[SimplifyingBNF],
                                expected_cubes: int) -> None:
     formula = And(Or(x < 0, x == 0), Or(y > 0, y == 0))
@@ -206,8 +203,67 @@ def test_construction_schedule(cls: type[SimplifyingBNF],
     assert is_and_or(formula)
     # Final-only leaves recursive construction unsimplified; all schedules
     # simplify the completed result, even with semantic comparisons disabled.
-    assert len(normal_form._strict_dnf(formula)) == expected_cubes
-    assert normal_form._dnf_and_or(formula) == And(y >= 0, x <= 0)
+    assert len(normal_form.strict_dnf(formula)) == expected_cubes
+    assert normal_form._dnf_from_and_or(formula) == And(y >= 0, x <= 0)
+
+
+@pytest.mark.parametrize(('operation', 'children', 'expected'), [
+        # The empty product represents truth.
+        ('conjoin_dnfs', (),
+         StrictDnf((cube(),))),
+        # The empty union represents false.
+        ('disjoin_dnfs', (),
+         StrictDnf()),
+        # A false child makes the product empty.
+        ('conjoin_dnfs', (StrictDnf((cube(x > 0),)), StrictDnf()),
+         StrictDnf()),
+        # A raw product preserves contradictions until explicit reduction.
+        ('conjoin_dnfs', (StrictDnf((cube(x > 0), cube(x == 0))), StrictDnf((cube(x < 0),))),
+         StrictDnf((cube(x > 0, x < 0), cube(x == 0, x < 0)))),
+        # A raw union removes duplicates but preserves subsumed cubes.
+        ('disjoin_dnfs', (StrictDnf((cube(x > 0),)), StrictDnf((cube(x > 0), cube(x > 0, y > 0)))),
+         StrictDnf((cube(x > 0), cube(x > 0, y > 0))))])
+def test_raw_combination(operation: str, children: tuple[StrictDnf, ...],
+                         expected: StrictDnf) -> None:
+    originals = tuple(StrictDnf(child) for child in children)
+    result = getattr(CartesianBnf(max_pair_checks=0), operation)(iter(children))
+    assert result == expected
+    assert children == originals
+    assert all(result is not child for child in children)
+
+
+@pytest.mark.parametrize(('operation', 'decisive_child'), [
+        ('conjoin_dnfs', StrictDnf()),
+        ('disjoin_dnfs', StrictDnf((cube(),)))])
+def test_during_step_stops_consuming_children(operation: str, decisive_child: StrictDnf) -> None:
+    compute_child = Mock(side_effect=[decisive_child, AssertionError('Unneeded child evaluated')])
+    children = map(compute_child, range(2))
+    result = getattr(DuringStepCartesianBnf(max_pair_checks=500), operation)(children)
+    assert result == decisive_child
+    assert result is not decisive_child
+    assert compute_child.call_count == 1
+
+
+@pytest.mark.parametrize(('simplification', 'expected_cubes', 'expected_atoms'), [
+        (Simplification.NONE, 8, 20),
+        (Simplification.FINAL, 6, 14),
+        (Simplification.AFTER_STEP, 4, 8),
+        (Simplification.DURING_STEP, 2, 2)])
+def test_nested_schedule_witness(simplification: Simplification,
+                                 expected_cubes: int, expected_atoms: int) -> None:
+    a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    formula = Or(And(d > 0, b <= 0),
+                 And(d > 0, b > 0, a <= 0),
+                 And(d > 0, b > 0, a > 0),
+                 And(d > 0, a > 0),
+                 And(c > 0, b <= 0),
+                 And(c > 0, a > 0),
+                 And(c > 0, Or(And(b > 0, a <= 0), And(b > 0, a > 0))))
+    assert CartesianBnf(max_pair_checks=0).simplify(formula) == formula
+    result = dnf(formula, method='cartesian', simplification=simplification)
+    assert isinstance(result, Or)
+    assert len(result.args) == expected_cubes
+    assert sum(1 for _ in result.atoms()) == expected_atoms
 
 
 @pytest.mark.parametrize(('conjunction', 'expected'), [
@@ -251,24 +307,30 @@ def test_invalid_limits_are_rejected(cls: type[SimplifyingBNF]) -> None:
 def test_inherited_budget_and_final_semantic_pass(cls: type[SimplifyingBNF],
                                                  max_pair_checks: int | None) -> None:
     normal_form = cls(max_pair_checks=max_pair_checks)
-    assert isinstance(normal_form, SimplifyingCartesianBnf)
+    assert isinstance(normal_form, CartesianBnf)
     assert normal_form.max_pair_checks == max_pair_checks
     sdnf = StrictDnf((cube(x - 1 > 0), cube(x > 0)))
     expected = sdnf if max_pair_checks == 0 else StrictDnf((cube(x > 0),))
-    assert normal_form._finish_strict_dnf(sdnf) == expected
+    assert normal_form.finish_strict_dnf(sdnf) == expected
     assert len(sdnf) == 2
 
 
-def test_plain_cartesian_finishing_keeps_strict_dnf() -> None:
+def test_plain_cartesian_finishing_copies_strict_dnf() -> None:
     sdnf = StrictDnf((cube(x - 1 > 0), cube(x > 0)))
-    assert CartesianBnf()._finish_strict_dnf(sdnf) is sdnf
+    normal_form = _normal_form("cartesian", Simplification.NONE, 500)
+    assert isinstance(normal_form, CartesianBnf)
+    assert normal_form.max_pair_checks == 0
+    result = normal_form.finish_strict_dnf(sdnf)
+    assert result == sdnf
+    assert result is not sdnf
+    result.add(cube(y > 0))
+    assert cube(y > 0) not in sdnf
 
 
-def test_limits_require_simplified_method() -> None:
+@pytest.mark.parametrize('normal_form', [dnf, cnf])
+def test_limits_require_cartesian_simplification(normal_form: Callable[..., Formula]) -> None:
     with pytest.raises(ValueError):
-        dnf(x > 0, method='pyeda', simplification=Simplification.NONE, max_pair_checks=0)
-    with pytest.raises(ValueError):
-        cnf(x > 0, method='cartesian', simplification=Simplification.NONE, max_pair_checks=0)
+        normal_form(x > 0, method='cartesian', simplification=Simplification.NONE, max_pair_checks=0)
 
 
 @pytest.mark.parametrize('normal_form', [dnf, cnf])
@@ -301,10 +363,24 @@ def test_invalid_schedules(value: object, error: type[Exception]) -> None:
         dnf(x > 0, method='cartesian', simplification=value)  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize('simplification', list(Simplification)[1:])
-def test_pyeda_rejects_simplification_schedules(simplification: Simplification) -> None:
-    with pytest.raises(ValueError):
-        dnf(x > 0, method='pyeda', simplification=simplification)
+@pytest.mark.parametrize('normal_form', [dnf, cnf])
+def test_pyeda_accepts_default_options(normal_form: Callable[..., Formula]) -> None:
+    formula = And(Or(x > 0, y == 0), Or(x <= 0, y > 0))
+    expected = normal_form(formula, method='pyeda', simplification=Simplification.NONE)
+    assert normal_form(formula, method='pyeda') == expected
+
+
+@pytest.mark.parametrize('normal_form', [dnf, cnf])
+@pytest.mark.parametrize(('simplification', 'max_pair_checks'), [
+        (Simplification.NONE, 0), (Simplification.FINAL, 0),
+        (Simplification.AFTER_STEP, None), (Simplification.DURING_STEP, -1),
+        (99, -1), (True, 1.5), ('ignored', 'ignored')])
+def test_pyeda_ignores_cartesian_options(normal_form: Callable[..., Formula],
+                                        simplification: object, max_pair_checks: object) -> None:
+    formula = And(Or(x > 0, y == 0), Or(x <= 0, y > 0))
+    expected = normal_form(formula, method='pyeda')
+    assert normal_form(formula, method='pyeda', simplification=simplification,
+                       max_pair_checks=max_pair_checks) == expected
 
 
 @pytest.mark.parametrize('simplification', list(Simplification)[1:])
@@ -345,3 +421,43 @@ def test_dnf_public_dispatch_preserves_quantifier(simplification: Simplification
          Ex(x, y == 0))])
 def test_cnf(formula: Formula, expected: Formula, simplification: Simplification) -> None:
     assert cnf(formula, method='cartesian', simplification=simplification) == expected
+
+
+@pytest.mark.parametrize('max_pair_checks', [0, 1, 500, None])
+def test_cartesian_budget_and_semantic_pass(max_pair_checks: int | None) -> None:
+    normal_form = CartesianBnf(max_pair_checks=max_pair_checks)
+    assert normal_form.max_pair_checks == max_pair_checks
+    sdnf = StrictDnf((cube(x - 1 > 0), cube(x > 0)))
+    expected = sdnf if max_pair_checks == 0 else StrictDnf((cube(x > 0),))
+    assert normal_form.finish_strict_dnf(sdnf) == expected
+    assert normal_form.finish_strict_dnf(sdnf) == expected
+    assert len(sdnf) == 2
+
+
+@pytest.mark.parametrize('cls', (CartesianBnf, *SIMPLIFYING_CLASSES))
+def test_cartesian_classes_require_explicit_limit(cls: type[CartesianBnf]) -> None:
+    with pytest.raises(TypeError, match='max_pair_checks'):
+        cls()  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize(('value', 'error'), [
+    (True, TypeError), (False, TypeError), (1.5, TypeError), (-1, ValueError)])
+def test_cartesian_rejects_invalid_limit(value: object, error: type[Exception]) -> None:
+    with pytest.raises(error):
+        CartesianBnf(max_pair_checks=value)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize('sdnf', [StrictDnf(), StrictDnf((cube(),)),
+                                StrictDnf((cube(x - 1 > 0), cube(x > 0)))])
+def test_zero_budget_preserves_independent_unsimplified_copy(
+        sdnf: StrictDnf, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Zero must not sort or attempt implication proofs, even on redundant cubes.
+    sort_key = Mock(side_effect=AssertionError('unexpected sorting'))
+    implies = Mock(side_effect=AssertionError('unexpected implication check'))
+    monkeypatch.setattr(Cube, 'sort_key', sort_key)
+    monkeypatch.setattr(Cube, 'implies', implies)
+    result = sdnf.semantic_subsumption(0)
+    assert result == sdnf
+    assert result is not sdnf
+    result.add(cube(y > 0))
+    assert cube(y > 0) not in sdnf
