@@ -292,7 +292,7 @@ class Ring(RCF.abc.term.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         self._wrapped_ring = fmpq_mpoly_ctx.get(sorted_names, TERM_ORDER)
 
     def coerce_poly(self, poly: fmpq_mpoly) -> fmpq_mpoly:
-        """Coerce a Flint polynomial to the wrapped Flint polynomial ring.
+        """Coerce a Flint polynomial to the :attr:`_wrapped_ring` of ``self``.
         """
         return poly.project_to_context(self._wrapped_ring)
 
@@ -438,6 +438,8 @@ class Term(RCF.abc.term.Term['Term',
                              "Ne",
                             ]):
 
+    _CONSTANT_RING: Final[Ring] = Ring()
+
     _hash: Optional[int]
     _poly: fmpq_mpoly
 
@@ -488,8 +490,7 @@ class Term(RCF.abc.term.Term['Term',
         """
         if not isinstance(arg, _NUMBER_TYPES):
             raise ValueError(f'expected a number type; {arg} is {type(arg)}')
-        context = fmpq_mpoly_ctx.get((), TERM_ORDER)
-        poly = context.constant(as_fmpq(arg))
+        poly = Term._CONSTANT_RING._wrapped_ring.constant(as_fmpq(arg))
         self._hash = None
         self._poly = poly
 

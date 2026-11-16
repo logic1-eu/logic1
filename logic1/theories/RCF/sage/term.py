@@ -82,8 +82,10 @@ class Ring(RCF.abc.term.Ring['MPolynomial[Rational]', MPolynomialRing]):
                                                  order=TERM_ORDER, implementation='singular')
 
     def coerce_poly(self, poly: MPolynomial[Rational]) -> MPolynomial[Rational]:
-        """Coerce poly to the :attr:`_ring` of ``self``.
+        """Coerce poly to the :attr:`_wrapped_ring` of ``self``.
         """
+        if poly.parent() is self._wrapped_ring:
+            return poly
         return self._wrapped_ring(poly)
 
     def get_gens(self) -> tuple[MPolynomial[Rational], ...]:
@@ -205,6 +207,8 @@ class Term(RCF.abc.term.Term['Term',
                              "Lt",
                              "Ne"]):
 
+    _CONSTANT_RING: Final[Ring] = Ring()
+
     _hash: Optional[int]
     _poly: MPolynomial[Rational]
 
@@ -242,10 +246,9 @@ class Term(RCF.abc.term.Term['Term',
         """
         if not isinstance(arg, _NUMBER_TYPES):
             raise ValueError(f'expected a number type; {arg} is {type(arg)}')
-        ring = Ring()
         # The use of mpq prevents Sage approximations of floating-point ``arg``
         # Term(1/10) above is an example, where 1/10 would be preserved.
-        self._poly = ring._wrapped_ring(mpq(arg))  # type: ignore
+        self._poly = Term._CONSTANT_RING._wrapped_ring(mpq(arg))  # type: ignore
         self._hash = None
 
     def __iter__(self) -> Iterator[tuple[mpq, Term]]:
