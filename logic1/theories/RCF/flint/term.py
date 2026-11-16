@@ -864,12 +864,17 @@ class Term(RCF.abc.term.Term['Term',
          ({x: 2, y: 2}, mpq(-3,1)), ({}, mpq(1,1))]
         """
         poly = self._poly
-        vars = tuple(Variable._from_gen(gen) for gen in poly.context().gens())
+        context = poly.context()
+        variables: dict[int, Variable] = {}
         for exp_vec, coeff in poly.terms():
             exp_dict = dict()
             for i, exp in enumerate(exp_vec):
                 if exp:
-                    exp_dict[vars[i]] = int(exp)
+                    variable = variables.get(i)
+                    if variable is None:
+                        variable = Variable._from_gen(context.gen(i))
+                        variables[i] = variable
+                    exp_dict[variable] = int(exp)
             yield exp_dict, fmpq_to_mpq(coeff)
 
     @staticmethod
@@ -939,7 +944,8 @@ class Variable(Term, RCF.abc.term.Variable[Term,
 
     @classmethod
     def _from_gen(cls, gen: fmpq_mpoly) -> Variable:
-        if not gen in gen.context().gens():
+        if not (len(gen) == 1 and gen.total_degree() == 1
+                and gen.leading_coefficient() == 1):
             raise ValueError(f"{gen} is not a generator")
         variable = Variable.__new__(Variable)
         variable._poly = gen
