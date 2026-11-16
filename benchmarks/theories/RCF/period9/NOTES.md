@@ -1,5 +1,13 @@
 # Period-9 QE Benchmark Notes
 
+Updated: 2026-10-21
+
+This document covers `benchmarks/theories/RCF/period9/` and all its
+descendants, excluding sibling benchmark directories. It records provenance,
+input details, measurements, and completed verification for that subtree.
+Operational instructions are in this directory's `AGENTS.md`; `NOTES.md` is
+supporting documentation, not an automatically loaded agent instruction file.
+
 ## Provenance
 
 The benchmark input comes from
@@ -59,7 +67,7 @@ performance expectations.
 Run these commands from the Logic1 package directory:
 
 ```bash
-PYTHONPYCACHEPREFIX=/tmp/pycache-period9 python3 -m py_compile benchmarks/theories/RCF/period9/period9_inputs.py benchmarks/theories/RCF/period9/test_qe_period9.py
+PYTHONPYCACHEPREFIX=/tmp/pycache-period9 conda run -n logic1_dev python -m py_compile benchmarks/theories/RCF/period9/period9_inputs.py benchmarks/theories/RCF/period9/test_qe_period9.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev mypy --disallow-untyped-defs benchmarks/theories/RCF/period9/period9_inputs.py benchmarks/theories/RCF/period9/test_qe_period9.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest --collect-only -q benchmarks/theories/RCF/period9/test_qe_period9.py
 DOT_SAGE=/tmp/logic1-sage-full conda run -n logic1_dev pytest -q benchmarks/theories/RCF/period9/test_qe_period9.py --benchmark-disable
