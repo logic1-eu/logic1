@@ -93,7 +93,13 @@ class Ring(RCF.abc.term.Ring['MPolynomial[Rational]', MPolynomialRing]):
         >>> R.get_gens()
         (a, b, c)
         """
-        return tuple(g for g in self._wrapped_ring.gens() if str(g) != 'unused_')
+        z = zip(self._wrapped_ring.gens(), self._wrapped_ring.variable_names())
+        return tuple(g for g, name in z if name != 'unused_')
+
+    def get_names(self) -> tuple[str, ...]:
+        """Return the variable names, excluding the reserved dummy variable.
+        """
+        return tuple(name for name in self._wrapped_ring.variable_names() if name != 'unused_')
 
 
 class VariableSet(RCF.abc.term.VariableSet['Variable']):

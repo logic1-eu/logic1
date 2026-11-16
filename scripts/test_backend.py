@@ -20,7 +20,7 @@ def main(backend: str) -> int:
         shutil.copytree(
             ROOT,
             project,
-            ignore=shutil.ignore_patterns(".mypy_cache", ".pytest_cache", "__pycache__"),
+            ignore=shutil.ignore_patterns(".mypy_cache", ".pytest_cache", "__pycache__", "build"),
         )
 
         wrappers = [project / "logic1" / "theories" / "RCF" / f"{name}.py"

@@ -100,7 +100,7 @@ class Ring[π: RingElement, ρ](ABC):
         >>> Ring(('y', 'x'))
         Ring(('x', 'y'))
         """
-        names = tuple(str(g) for g in self.get_gens())
+        names = self.get_names()
         if not names:
             return f"{self.__class__.__name__}()"
         else:
@@ -126,6 +126,7 @@ class Ring[π: RingElement, ρ](ABC):
         ring._wrapped_ring = wrapped_ring
         return ring
 
+    @abstractmethod
     def get_names(self) -> tuple[str, ...]:
         """Return the names of the variables in the polynomial ring.
 
@@ -134,7 +135,7 @@ class Ring[π: RingElement, ρ](ABC):
         >>> R.get_names()
         ('a', 'b', 'c')
         """
-        return tuple(str(var) for var in self.get_gens())
+        ...
 
     @abstractmethod
     def get_gens(self) -> tuple[π, ...]:
@@ -440,7 +441,7 @@ class Term[τ: Term,
 
     def __truediv__(self, other: Number | τ) -> τ:
         quo, rem = self.__divmod__(other)
-        if rem != 0:
+        if not rem.is_zero():
             raise ValueError("Division not exact")
         return quo
 

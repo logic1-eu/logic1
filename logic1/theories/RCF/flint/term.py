@@ -305,6 +305,11 @@ class Ring(RCF.abc.term.Ring[fmpq_mpoly, fmpq_mpoly_ctx]):
         """
         return tuple(self._wrapped_ring.gens())
 
+    def get_names(self) -> tuple[str, ...]:
+        """Return the variable names from the wrapped context.
+        """
+        return self._wrapped_ring.names()
+
 
 class VariableSet(RCF.abc.term.VariableSet['Variable']):
     """The infinite set of all variables belonging to the theory of Real Closed

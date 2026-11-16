@@ -6,3 +6,6 @@ class MPolynomialRing_base(Ring):
 
     def term_order(self) -> TermOrder:
         ...
+
+    def variable_names(self) -> tuple[str, ...]:
+        ...
