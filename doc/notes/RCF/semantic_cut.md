@@ -122,9 +122,10 @@ also returns false when its heuristic cannot prove an implication.
 
 ## Small examples surviving initial preprocessing
 
-These examples use the default Cartesian FINAL computation and a pair budget
-of 500. They were checked against the actual initial preprocessor and final
-conservative simplifier, rather than only against isolated cube operations.
+These examples use Cartesian FINAL, the default at the time of the
+experiments, and a pair budget of 500. They were checked against the actual
+initial preprocessor and final conservative simplifier, rather than only
+against isolated cube operations.
 
 ### Conditional cut across different polynomials
 

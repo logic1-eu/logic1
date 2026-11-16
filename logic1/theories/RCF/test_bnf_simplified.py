@@ -343,15 +343,21 @@ def test_integer_schedules(normal_form: Callable[..., Formula],
 
 
 @pytest.mark.parametrize('normal_form', [dnf, cnf])
-def test_defaults_are_cartesian_and_final(normal_form: Callable[..., Formula]) -> None:
-    a, b, c, d, e = VV.get('a', 'b', 'c', 'd', 'e')
-    formula: Formula = Or(And(a > 0, c > 0), And(a > 0, b > 0, c > 0),
-                          And(a <= 0, b > 0, c > 0), And(b <= 0, c > 0),
-                          And(d > 0, e > 0), And(d <= 0, e > 0))
+def test_defaults_are_cartesian_and_after_step(normal_form: Callable[..., Formula]) -> None:
+    a, b, c, d = VV.get('a', 'b', 'c', 'd')
+    formula: Formula = Or(And(d > 0, b <= 0),
+                          And(d > 0, b > 0, a <= 0),
+                          And(d > 0, b > 0, a > 0),
+                          And(d > 0, a > 0),
+                          And(c > 0, b <= 0),
+                          And(c > 0, a > 0),
+                          And(c > 0, Or(And(b > 0, a <= 0), And(b > 0, a > 0))))
     if normal_form is cnf:
         formula = Not(formula)
-    expected = normal_form(formula, method='cartesian', simplification=Simplification.FINAL)
+    expected = normal_form(formula, method='cartesian', simplification=Simplification.AFTER_STEP)
     assert normal_form(formula) == expected
+    final = normal_form(formula, method='cartesian', simplification=Simplification.FINAL)
+    assert expected != final
     plain = normal_form(formula, method='cartesian', simplification=Simplification.NONE)
     assert expected != plain
 

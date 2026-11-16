@@ -1,13 +1,13 @@
 """Boolean normal forms over real closed fields.
 
 The public :func:`dnf` and :func:`cnf` functions default to Cartesian
-construction with simplification schedule :attr:`Simplification.FINAL`. The
-Cartesian pipeline first converts the input to prenex form and preprocesses it
-with the RCF simplifier. It distributes conjunctions over disjunctions to
-construct a strict DNF of the quantifier-free matrix, applying the selected
-simplification schedule. Finally, it reconstructs the formula, restores the
-quantifier prefix, and conservatively simplifies the result while preserving
-DNF. CNF is obtained through the DNF of the negation.
+construction with simplification schedule :attr:`Simplification.AFTER_STEP`.
+The Cartesian pipeline first converts the input to prenex form and
+preprocesses it with the RCF simplifier. It distributes conjunctions over
+disjunctions to construct a strict DNF of the quantifier-free matrix, applying
+the selected simplification schedule. Finally, it reconstructs the formula,
+restores the quantifier prefix, and conservatively simplifies the result
+while preserving DNF. CNF is obtained through the DNF of the negation.
 
 A strict DNF is a disjunction of cubes, each a conjunction of polynomial
 constraints. :class:`Cube` owns an immutable set of atoms and provides
@@ -1165,7 +1165,7 @@ def _normal_form(method: Literal["cartesian", "pyeda"], simplification: Simplifi
 
 
 def cnf(f: Formula, method: Literal["cartesian", "pyeda"] = "cartesian",
-        *, simplification: Simplification | int = Simplification.FINAL,
+        *, simplification: Simplification | int = Simplification.AFTER_STEP,
         max_pair_checks: int | None = 500) -> Formula:
     """Compute a CNF of ``f``, with a prenex quantifier prefix when needed.
 
@@ -1189,7 +1189,7 @@ def cnf(f: Formula, method: Literal["cartesian", "pyeda"] = "cartesian",
 
 
 def dnf(f: Formula, method: Literal["cartesian", "pyeda"] = "cartesian",
-        *, simplification: Simplification | int = Simplification.FINAL,
+        *, simplification: Simplification | int = Simplification.AFTER_STEP,
         max_pair_checks: int | None = 500) -> Formula:
     """Compute a DNF of ``f``, with a prenex quantifier prefix when needed.
 
