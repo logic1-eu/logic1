@@ -11,8 +11,9 @@ The 18 test functions cover:
 
 They exercise the production implementations without monkeypatching.
 
-Tests that compare CNF methods always use the default Logic1 CNF and also use
-Redlog when an rlqe smoke test succeeds, giving 43 cases with Redlog available.
+Tests that compare CNF methods use the default native CNF computation and
+explicitly select Redlog with ``use_redlog_cnf=True`` when an rlqe smoke test
+succeeds, giving 43 cases with Redlog available.
 Without Redlog, 28 cases run and 15 Redlog variants are skipped.
 The application example, DS97 Table 6, instance 3, has 94 input atoms and
 reduces to 35 atoms with Redlog CNF and 29 with the default Logic1 CNF.
@@ -40,7 +41,6 @@ from logic1.theories.RCF.gsimplify import Clause, GlobalPremise, GSimplify, Opti
 
 
 x, y, z = VV.get('gsimplify_test_x', 'gsimplify_test_y', 'gsimplify_test_z')
-LOGIC1_OPTIONS = {'use_redlog_cnf': False}
 
 
 def _redlog_works() -> bool:
@@ -62,15 +62,15 @@ def _redlog_works() -> bool:
 
 
 CNF_OPTIONS = [
+    pytest.param({}, id='logic1'),
     pytest.param(
-        {},
+        {'use_redlog_cnf': True},
         id='redlog',
         marks=pytest.mark.skipif(
             not _redlog_works(),
             reason='requires a working Redlog rlqe installation',
         ),
     ),
-    pytest.param(LOGIC1_OPTIONS, id='logic1'),
 ]
 
 
@@ -121,7 +121,7 @@ def test_inconsistent_assumptions(assume):
     # Exercise algebraic and order-theoretic inconsistency detection. The
     # default Logic1 CNF suffices because the backend is immaterial here.
     with pytest.raises(GSimplify.Inconsistent):
-        gsimplify(T, assume=assume, **LOGIC1_OPTIONS)
+        gsimplify(T, assume=assume)
 
 
 @pytest.mark.parametrize(
@@ -274,7 +274,7 @@ def test_non_atomic_clause(formula):
 # GlobalPremise tests cover its relation-indexed storage, Gröbner-basis cache,
 # and invalidation when new equations arrive.
 def test_global_premise_operations():
-    premise = GlobalPremise([x == 0, y > 0], Options(use_redlog_cnf=False))
+    premise = GlobalPremise([x == 0, y > 0], Options())
 
     assert premise[Eq] == {x == 0}
     assert premise.product_of(Eq) == x
@@ -294,7 +294,7 @@ def test_global_premise_operations():
 def test_multiple_atomic_clauses_detect_contradiction():
     # Multiple atomic clauses are processed recursively through the dual
     # clause; contradictory atoms must yield the empty clause.
-    simplifier = GSimplify(Options(use_redlog_cnf=False))
+    simplifier = GSimplify(Options())
 
     result = simplifier.gsimplify_clauses(
         [Clause(x == 0), Clause(x != 0)],
@@ -307,7 +307,7 @@ def test_multiple_atomic_clauses_detect_contradiction():
 
 def test_tautological_regular_clause_is_removed():
     # A regular clause recognized as valid contributes nothing to a CNF.
-    simplifier = GSimplify(Options(use_redlog_cnf=False))
+    simplifier = GSimplify(Options())
 
     result = simplifier.gsimplify_clauses(
         [Clause(Or(x > 0, x <= 0))],
@@ -328,7 +328,7 @@ def test_tautological_regular_clause_is_removed():
 def test_application_example_series3(cnf_options):
     """Exercise the complete pipeline on DS97 Table 6, instance 3."""
     result = gsimplify(series3, **cnf_options)
-    expected_atom_count = 29 if cnf_options == LOGIC1_OPTIONS else 35
+    expected_atom_count = 35 if cnf_options.get('use_redlog_cnf') else 29
 
     assert len(list(series3.atoms())) == 94
     assert len(list(result.atoms())) == expected_atom_count

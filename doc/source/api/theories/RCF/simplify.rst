@@ -35,6 +35,15 @@ Gröbner Simplification
 
 .. automodule:: logic1.theories.RCF.gsimplify
 
+  By default, Gröbner simplification computes CNF using Logic1's
+  :func:`~logic1.theories.RCF.bnf.cnf` with its default options. No Redlog
+  installation is required.
+
+  Pass ``use_redlog_cnf=True`` to :func:`gsimplify` to use Redlog's
+  :func:`~logic1.theories.RCF.redlog.cnf` instead. The options
+  :attr:`Options.bnfsac` and :attr:`Options.bnfsm` affect only Redlog CNF
+  computation and are ignored when using native CNF.
+
   .. autofunction:: gsimplify(f: RCF.types.Formula, assume: Iterable[RCF.atomic.AtomicFormula] = [], **options) -> RCF.types.Formula
 
   .. autoclass:: Options

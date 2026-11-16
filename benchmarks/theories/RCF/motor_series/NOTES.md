@@ -1,6 +1,6 @@
 # Motor Series Benchmark Notes
 
-Updated: 2026-10-22
+Updated: 2026-11-16
 
 This document covers `benchmarks/theories/RCF/motor_series/` and all its
 descendants, excluding sibling benchmark directories. It records provenance,
@@ -75,7 +75,9 @@ logical calls.
 
 `motor_inputs.MOTOR_SERIES` records the input atom counts;
 `test_gsimplify_motor.EXPECTED_OUTPUT_ATOMS` records the `gsimplify` output
-counts, which are identical for `radical=False` and `radical=True`:
+counts for native CNF. The following table preserves the earlier measurements
+with `use_redlog_cnf=True`, which were identical for `radical=False` and
+`radical=True`:
 
 | Series | Input | Output |
 |---:|---:|---:|
@@ -96,7 +98,12 @@ counts, which are identical for `radical=False` and `radical=True`:
 `pytest --benchmark-only` selects tests using the benchmark fixture; it does not
 disable their assertions. All 26 tests collected from `test_gsimplify_motor.py`
 are benchmarks: 13 each for `radical=False` and `radical=True`. Both use
-`use_redlog_cnf=True`, and each radical setting has its own benchmark table.
+native CNF through the default `gsimplify` options, and each radical setting
+has its own benchmark table. The switch from Redlog CNF was made on
+2026-11-16. Native CNF uses `method="cartesian"`,
+`simplification=Simplification.AFTER_STEP`, and `max_pair_checks=500`.
+The module docstring preserves the original counts under `Logic1/RL` and
+records the new counts under `Native CNF`.
 
 `test_simplify_motor.py` has 78 cases: every motor series is tested with all
 six combinations of `substitute` in `{0, 1, 2}` and `implicit_ranges` in
@@ -128,9 +135,10 @@ The measured `simplify` output atom counts are:
 `test_dnf_motor.py` now has 91 cases: Redlog off and on; Cartesian with
 `Simplification.NONE`, `FINAL`, `AFTER_STEP`, and `DURING_STEP`; and PyEDA,
 each on 13 inputs. Explicit `NONE` reproduces plain Cartesian behavior and
-is also specified for PyEDA. Since 2026-10-23, the public defaults are
-Cartesian construction and `FINAL`; the benchmark options preserve the
-recorded configurations. The other schedules share the atomic rules and a
+is also specified for PyEDA. On 2026-10-23, the public defaults became
+Cartesian construction and `FINAL`; on 2026-11-16, the default schedule
+changed to `AFTER_STEP`. The benchmark options preserve the recorded
+configurations. The other schedules share the atomic rules and a
 final semantic budget of 500 pairs. Every configuration has its own 13-row
 benchmark group.
 
@@ -334,7 +342,23 @@ Normal pytest and benchmark runs must not perform the Redlog checks. Selection
 with `-k`, for example `-k series3`, should remain available. This design has
 been discussed but is intentionally not implemented yet.
 
-## Verification completed
+## Native CNF verification on 2026-11-16
+
+All 26 `gsimplify` configurations were computed sequentially with the Sage
+backend and native CNF. Both radical settings produced the same atom counts
+for every input. The new counts are smaller than the earlier Logic1 counts
+using Redlog CNF for 12 inputs and unchanged for series11.
+
+The expected counts and all 13 table rows were checked against the saved
+results. The module passed mypy with `--disallow-untyped-defs`; pytest
+collected all 26 cases, and both series3 cases passed with benchmarking
+disabled. These checks ran without Reduce on PATH. This was result-size
+verification, not a full pytest-benchmark timing run. The FLINT backend was
+not checked.
+
+## Earlier verification
+
+The `gsimplify` checks below used Redlog CNF.
 
 - All 13 constructed formulas compare equal to their originals.
 - All 13 formula `repr` values exactly match their originals.

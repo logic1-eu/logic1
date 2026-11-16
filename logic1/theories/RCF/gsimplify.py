@@ -43,7 +43,7 @@ class Options:
     cost of more expensive Gröbner basis computations.
     """
 
-    use_redlog_cnf: bool = True
+    use_redlog_cnf: bool = False
     """If :obj:`True`, use :func:`.redlog.cnf` for CNF computation. If
     :obj:`False`, use :func:`.RCF.bnf.cnf` with its default options.
     """
@@ -375,7 +375,7 @@ class GSimplify:
             return redlog.cnf(f, bnfsac=self._options.bnfsac,
                                  bnfsm=self._options.bnfsm)
         else:
-            logging.info('computing cnf using Logic1 defaults ...')
+            logging.info('computing native cnf using Logic1 defaults ...')
             return cnf(f)
 
     def formula_to_clauses(self, f: Formula) -> list[Clause]:
