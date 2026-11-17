@@ -46,14 +46,15 @@ quadratic equation:
 >>> from logic1 import *                # import Logic1
 >>> from logic1.theories.RCF import *   # import RCF
 >>> VV.imp('a', 'b', 'c', 'x')          # declare variables
->>> phi = Ex(x, a*x**2 + b*x + c == 0)  # formalization with existential quantifier
+>>> phi = Ex(x, a*x**2 + b*x + c == 0)  # formalization with an existential quantifier
 >>> qe(phi)                             # quantifier elimination
 Or(And(c == 0, b == 0, a == 0), And(b != 0, a == 0), And(a != 0, 4*a*c - b**2 <= 0))
 
 Consider the infinite real sequence defined by :math:`x_{i+2} = |x_{i+1}| -
 x_{i}`. Logic1 can check that this sequence has period 9 for all possible
-choices of :math:`x_1`, :math:`x_2`. The final output :code:`T` is a constant
-logical operator representing "True":
+choices of :math:`x_1`, :math:`x_2`. The :func:`~.RCF.qe.qe` call universally
+quantifies all variables and uses four CPUs in parallel. The final output
+:obj:`~.T` is a constant logical operator representing truth:
 
 >>> from logic1 import *
 >>> from logic1.theories.RCF import *
@@ -67,8 +68,8 @@ logical operator representing "True":
 ...           Or(And(x8 >= 0, x9 == x8 - x7), And(x8 < 0, x9 == -x8 - x7)),
 ...           Or(And(x9 >= 0, x10 == x9 - x8), And(x9 < 0, x10 == -x9 - x8)),
 ...           Or(And(x10 >= 0, x11 == x10 - x9), And(x10 < 0, x11 == -x10 - x9)))
->>> p9 = Implies(phi, And(x1 == x10, x2 == x11)).all()  # universally quantify all variables
->>> qe(p9, workers=4)                                   # use four processors in parallel
+>>> p9 = Implies(phi, And(x1 == x10, x2 == x11))
+>>> qe(p9.all(), workers=4)
 T
 
 .. toctree::

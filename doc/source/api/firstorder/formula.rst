@@ -101,22 +101,20 @@ going to describe the occurring classes starting at the top.
       which holds for all formulas :code:`f`. This approach has been adopted from
       the `SymPy <https://www.sympy.org/>`_ project:
 
-      .. doctest::
-
-        >>> from logic1.firstorder import *
-        >>> f = And(Implies(F, T), Or(T, Not(T)))
-        >>> # The class of f:
-        >>> f.op
-        <class 'logic1.firstorder.boolean.And'>
-        >>> # The argument tuple of f:
-        >>> f.args
-        (Implies(F, T), Or(T, Not(T)))
-        >>> # The invariant:
-        >>> f == f.op(*f.args)
-        True
-        >>> # Construction of a new formula using components of f:
-        >>> f.op(Equivalent(T, T), *f.args)
-        And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
+      >>> from logic1.firstorder import *
+      >>> f = And(Implies(F, T), Or(T, Not(T)))
+      >>> # The class of f:
+      >>> f.op
+      <class 'logic1.firstorder.boolean.And'>
+      >>> # The argument tuple of f:
+      >>> f.args
+      (Implies(F, T), Or(T, Not(T)))
+      >>> # The invariant:
+      >>> f == f.op(*f.args)
+      True
+      >>> # Construction of a new formula using components of f:
+      >>> f.op(Equivalent(T, T), *f.args)
+      And(Equivalent(T, T), Implies(F, T), Or(T, Not(T)))
 
     .. automethod:: __init__
 

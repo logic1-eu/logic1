@@ -40,13 +40,11 @@ def subprocess_output(*args: str) -> str | None:
 
 git_commit = subprocess_output('git', 'rev-parse', '--short=10', 'HEAD')
 
+
 # Configuration file for the Sphinx documentation builder.
 #
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
-
-# Project information
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
 project = 'Logic1'
 repository_url = 'https://github.com/logic1-eu/logic1'
@@ -55,23 +53,12 @@ author = '<a href="https://www.chalmers.se/en/persons/faross/">N. Faroß</a>, <a
 version = setuptools_scm.get_version(root='../..', relative_to=__file__)
 release = version
 
-# General configuration
-# https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
-
-import doctest
-doctest_default_flags = doctest.NORMALIZE_WHITESPACE
-
-exclude_patterns = ['**/atomlib.rst']
-
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.doctest',
     'sphinx.ext.graphviz',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
 ]
-
-# doctest_path = ['../logic1']
 
 autodoc_class_signature = 'separated'
 
@@ -79,8 +66,6 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'show-inheritance': True,
 }
-
-autodoc_type_aliases = {}
 
 extra_footer = (
     None if version is None else
@@ -99,21 +84,15 @@ intersphinx_mapping = {
     'sympy': ('https://docs.sympy.org/latest', None),
 }
 
-language = 'en'
-
 nitpicky = True
 
-# pygments_style = 'tango'
-
 python_use_unqualified_type_names = True
-
-templates_path = ['_templates']
 
 # Options for HTML output
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_context = {
-    # 'default_mode': 'auto'
+    'default_mode': 'auto'
 }
 
 html_css_files = [
@@ -124,20 +103,11 @@ html_js_files = ["sidebar-toggle.js"]
 
 html_last_updated_fmt = ''
 
-html_logo = None
-
-# html_sidebars = {
-#     '**': ['sidebar-logo.html',
-#            'search-field.html',
-#            'sbt-sidebar-nav.html']
-# }
-
 html_static_path = ['_static']
 
 html_theme = 'sphinx_book_theme'
 
 html_theme_options = {
-    'collapse_navbar': False,
     'extra_footer': extra_footer,
     'footer_content_items': [
         'extra-footer',
@@ -147,8 +117,7 @@ html_theme_options = {
     'home_page_in_toc': True,
     'max_navbar_depth': 12,
     'repository_url': repository_url,
-    'show_navbar_depth': 12,  # default is 1
-    'show_toc_level': 1,  # default is 1
+    'show_navbar_depth': 12,
     'use_repository_button': True
 }
 

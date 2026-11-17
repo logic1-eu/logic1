@@ -37,7 +37,7 @@ ign_redlog := --ignore=logic1/theories/RCF/test_redlog.txt \
 
 ignores :=
 PYTEST := pytest
-PYTEST_OPTIONS := -n 8 --durations=10 --doctest-cython --exitfirst --doctest-modules
+PYTEST_OPTIONS := -n 8 --durations=10 --doctest-cython --exitfirst
 
 REDLOG_TARGETS := test test-all pytest coverage coverage_html
 
